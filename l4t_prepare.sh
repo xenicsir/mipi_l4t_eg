@@ -1,29 +1,23 @@
-JETSON_DIR=$(pwd)
-
-LINUX_FOR_TEGRA_DIR=Linux_for_Tegra
-JETSON_PUBLIC_SOURCES=public_sources.tbz2
-JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
-TOOLCHAIN_DIR=l4t-gcc
-TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/bin/aarch64-buildroot-linux-gnu-
+. environment $@
+mkdir -p $L4T_VERSION
+pushd $L4T_VERSION
 
 #----------------------#
 # Get the Nvidia SDK   #
 #----------------------#
 cd ${JETSON_DIR}
-L4T_RELEASE_PACKAGE=jetson_linux_r35.1.0_aarch64.tbz2
-SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r35.1.0_aarch64.tbz2
 
 if [[ ! -f ${L4T_RELEASE_PACKAGE} ]]
 then
-   wget https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/release/${L4T_RELEASE_PACKAGE}
+   wget $L4T_RELEASE_PACKAGE_URL
 fi
 if [[ ! -f ${SAMPLE_FS_PACKAGE} ]]
 then
-   wget https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/release/${SAMPLE_FS_PACKAGE}
+   wget $SAMPLE_FS_PACKAGE_URL
 fi
 if [[ ! -f ${JETSON_PUBLIC_SOURCES} ]]
 then
-   wget https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/sources/${JETSON_PUBLIC_SOURCES}
+   wget $JETSON_PUBLIC_SOURCES_URL
 fi
 if [[ ! -d $LINUX_FOR_TEGRA_DIR ]]
 then
@@ -38,7 +32,7 @@ fi
 if [[ ! -f ${JETSON_TOOCHAIN_ARCHIVE} ]]
 then
    cd $JETSON_DIR
-   wget https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93 -O ${JETSON_TOOCHAIN_ARCHIVE}
+   wget $JETSON_TOOCHAIN_ARCHIVE_URL -O ${JETSON_TOOCHAIN_ARCHIVE}
 fi
 if [[ ! -d $JETSON_DIR/$TOOLCHAIN_DIR ]]
 then
@@ -56,14 +50,11 @@ mkdir modules
 tar -xvf kernel_src.tbz2
 
 cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/
-echo bootloader > .gitignore
-echo kernel >> .gitignore
-echo generate_capsule >> .gitignore
+echo generate_capsule > .gitignore
 echo nv_tegra >> .gitignore
 echo nv_tools >> .gitignore
 echo rootfs >> .gitignore
 echo source >> .gitignore
-echo tools >> .gitignore
 git init
 git add * .gitignore
 git commit -m "Initial state"

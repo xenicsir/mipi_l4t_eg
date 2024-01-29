@@ -1,0 +1,3354 @@
+diff --git a/nvidia/platform/t23x/common/kernel-dts/t234-common-cvb/tegra234-p3711-ethernet.dtsi b/nvidia/platform/t23x/common/kernel-dts/t234-common-cvb/tegra234-p3711-ethernet.dtsi
+index 953fd29..54136fa 100644
+--- a/nvidia/platform/t23x/common/kernel-dts/t234-common-cvb/tegra234-p3711-ethernet.dtsi
++++ b/nvidia/platform/t23x/common/kernel-dts/t234-common-cvb/tegra234-p3711-ethernet.dtsi
+@@ -14,7 +14,7 @@
+ / {
+         /* EQOS */
+ 	ethernet@2310000 {
+-		status = "okay";
++		status = "disabled";					//changed from okay to disabled to speed up boot on auvidea boards(fd)
+ 		nvidia,mac-addr-idx = <0>;
+ 		nvidia,phy-reset-gpio = <&tegra_main_gpio TEGRA234_MAIN_GPIO(G, 5) 0>;
+ 		phy-mode = "rgmii-id";
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-ethernet-3737-0000.dtsi b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-ethernet-3737-0000.dtsi
+index 35ca336..362963b 100644
+--- a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-ethernet-3737-0000.dtsi
++++ b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-ethernet-3737-0000.dtsi
+@@ -19,7 +19,7 @@
+ / {
+ 	/* MGBE - A */
+ 	ethernet@6810000 {
+-		status = "okay";
++		status = "disabled";				//changed from okay to disabled to speed up boot on auvidea boards(fd)
+ 		nvidia,mac-addr-idx = <0>;
+ 		nvidia,max-platform-mtu = <16383>;
+ 		/* 1=enable, 0=disable */
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-a04.dtsi b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-a04.dtsi
+index 4ff5f3d..52909dc 100644
+--- a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-a04.dtsi
++++ b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-a04.dtsi
+@@ -106,7 +106,7 @@
+ 	};
+ 
+ 	i2c@c240000 {
+-		ucsi_ccg: ucsi_ccg@8 {
++		ucsi_ccg: ucsi_ccg@8 {					//removed because no usbc is used on auvidea X230D(fd)
+ 			status = "okay";
+ 			compatible = "nvidia,ccgx-ucsi";
+ 			ccgx,firmware-build = "gn";
+@@ -185,9 +185,9 @@
+ 		ports {
+ 			usb2-0 {
+ 				mode = "otg";
+-				usb-role-switch;
++				usb-role-switch;				//removed for second USB3 to work on X230D(fd)		//change no longer needed(fd)
+ 				status = "okay";
+-				port {
++				port {						//removed for second USB3 to work on X230D(fd)		//change no longer needed(fd)
+ 					usb_role_switch0: endpoint {
+ 						remote-endpoint = <&ucsi_ccg_p1>;
+ 					};
+@@ -206,11 +206,11 @@
+ 				status = "okay";
+ 			};
+ 			usb3-0 {
+-				nvidia,usb2-companion = <1>;
++				nvidia,usb2-companion = <0>;			//changed form "nvidia,usb2-companion = <1>;" to "nvidia,usb2-companion = <0>;" for second USB3 to work on X230D(fd)
+ 				status = "okay";
+ 			};
+ 			usb3-1 {
+-				nvidia,usb2-companion = <0>;
++				nvidia,usb2-companion = <1>;			//changed form "nvidia,usb2-companion = <0>;" to "nvidia,usb2-companion = <1>;" for second USB3 to work on X230D(fd)
+ 				status = "okay";
+ 			};
+ 			usb3-2 {
+@@ -291,6 +291,23 @@
+ 		};
+ 	};
+ 
++	pcie@14180000 {				//addded to enable the 1xPCIE slot on the X230D(fd)
++		status = "okay";
++		phys = <&p2u_hsio_0>;
++		phy-names="p2u-0";
++	};	
++
++	pcie@141e0000 {				//added 8 lanes pcie for pcie x4 slot on X230D(fd)???
++		status = "okay";
++		phys = <&p2u_gbe_0>, <&p2u_gbe_1>, <&p2u_gbe_2>, 
++		<&p2u_gbe_3>, <&p2u_gbe_4>, <&p2u_gbe_5>, 
++		<&p2u_gbe_6>, <&p2u_gbe_7>;
++		phy-names="p2u-0", "p2u-1", "p2u-2", "p2u-3",
++			"p2u-4", "p2u-5", "p2u-6", "p2u-7";
++	};
++
++
++
+ 	gte@c1e0000 {
+ 		status = "okay";
+ 	};
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-camera-imx219-auvidea-M222.dtsi b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-camera-imx219-auvidea-M222.dtsi
+new file mode 100755
+index 0000000..e063dc9
+--- /dev/null
++++ b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-camera-imx219-auvidea-M222.dtsi
+@@ -0,0 +1,1256 @@
++/*
++ * Copyright (c) 2017-2021, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++
++//new file created for 2x cam on X230D(fd)
++#include "dt-bindings/clock/tegra234-clock.h"
++
++#define CAM0_RST_L	TEGRA234_MAIN_GPIO(H, 3)
++#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
++#define CAM1_RST_L	TEGRA234_MAIN_GPIO(AC, 1)
++#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
++#define CAM2_RST_L	TEGRA234_MAIN_GPIO(AC, 3)
++#define CAM2_PWDN	TEGRA234_MAIN_GPIO(AC, 2)
++#define CAM3_RST_L	TEGRA234_MAIN_GPIO(H, 4)
++#define CAM3_PWDN	TEGRA234_MAIN_GPIO(H, 5)
++
++#define CAM_TRIGGER	TEGRA234_MAIN_GPIO(R, 0)
++
++#define CAMERA_I2C_MUX_BUS(x) (0x1E + x)
++
++
++//new file created for 4x cam on X230(D) + M222					(fd)
++
++/ {
++
++	gpio@2200000 {
++		camera-control-output-low {
++			gpio-hog;
++			output-low;
++			gpios = <CAM0_RST_L 0 CAM0_PWDN 0
++				 CAM1_RST_L 0 CAM1_PWDN 0>;
++			label = "cam0-rst", "cam0-pwdn",
++				"cam1-rst", "cam1-pwdn";
++		};
++		camera-trigger-output-high {
++			gpio-hog;
++			output-high;
++			gpios = <CAM_TRIGGER 0>;
++			label = "cam-trigger";
++		};
++	};
++
++
++	tegra-capture-vi {
++		status = "okay";
++		num-channels = <4>;
++		ports {
++			status = "okay";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			vi_port0: port@0 {								//M222 CSI 01		
++				status = "okay";
++				reg = <0>;
++				rbpcv2_vi_in0: endpoint {
++					status = "okay";
++					port-index = <0>;
++					bus-width = <2>;
++					remote-endpoint = <&rbpcv2_csi_out0>;
++				};
++			};
++			vi_port1: port@1 {								//M222 CSI 67		
++				status = "okay";
++				reg = <1>;
++				rbpcv2_vi_in1: endpoint {
++					status = "okay";
++					port-index = <5>;
++					bus-width = <2>;
++					remote-endpoint = <&rbpcv2_csi_out1>;
++				};
++			};
++			vi_port2: port@2 {								//M222 CSI 45	
++				status = "okay";
++				reg = <2>;
++				rbpcv2_vi_in2: endpoint {
++					status = "okay";
++					port-index = <4>;
++					bus-width = <2>;
++					remote-endpoint = <&rbpcv2_csi_out2>;
++				};
++			};
++			vi_port3: port@3 {								//M222 CSI 23
++				status = "okay";
++				reg = <3>;
++				rbpcv2_vi_in3: endpoint {
++					status = "okay";
++					port-index = <2>;
++					bus-width = <2>;
++					remote-endpoint = <&rbpcv2_csi_out3>;
++				};
++			};
++		};
++	};
++
++	host1x@13e00000 {
++		nvcsi@15a00000 {
++			status = "okay";
++			num-channels = <4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			csi_chan0: channel@0 {								//M222 CSI 01		
++				status = "okay";
++				reg = <0>;
++				ports {
++					status = "okay";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					csi_chan0_port0: port@0 {
++						status = "okay";
++						reg = <0>;
++						rbpcv2_csi_in0: endpoint@0 {
++							status = "okay";
++							port-index = <0>;
++							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_imx219_out0>;
++						};
++					};
++					csi_chan0_port1: port@1 {
++						status = "okay";
++						reg = <1>;
++						rbpcv2_csi_out0: endpoint@1 {
++							status = "okay";
++							remote-endpoint = <&rbpcv2_vi_in0>;
++						};
++					};
++				};
++			};
++			csi_chan1: channel@1 {								//M222 CSI 67		
++				status = "okay";
++				reg = <1>;
++				ports {
++					status = "okay";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					csi_chan1_port0: port@0 {
++						status = "okay";
++						reg = <0>;
++						rbpcv2_csi_in1: endpoint@0 {
++							status = "okay";
++							port-index = <6>;
++							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_imx219_out1>;
++						};
++					};
++					csi_chan1_port1: port@1 {
++						status = "okay";
++						reg = <1>;
++						rbpcv2_csi_out1: endpoint@1 {
++							status = "okay";
++							remote-endpoint = <&rbpcv2_vi_in1>;
++						};
++					};
++				};
++			};
++			csi_chan2: channel@2 {								//M222 CSI 45		
++				status = "okay";
++				reg = <2>;
++				ports {
++					status = "okay";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					csi_chan2_port0: port@0 {
++						status = "okay";
++						reg = <0>;
++						rbpcv2_csi_in2: endpoint@0 {
++							status = "okay";
++							port-index = <4>;
++							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_imx219_out2>;
++						};
++					};
++					csi_chan2_port1: port@1 {
++						status = "okay";
++						reg = <1>;
++						rbpcv2_csi_out2: endpoint@1 {
++							status = "okay";
++							remote-endpoint = <&rbpcv2_vi_in2>;
++						};
++					};
++				};
++			};
++			csi_chan3: channel@3 {								//M222 CSI 23
++				status = "okay";
++				reg = <3>;
++				ports {
++					status = "okay";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					csi_chan3_port0: port@0 {
++						status = "okay";
++						reg = <0>;
++						rbpcv2_csi_in3: endpoint@0 {
++							status = "okay";
++							port-index = <2>;
++							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_imx219_out3>;
++						};
++					};
++					csi_chan3_port1: port@1 {
++						status = "okay";
++						reg = <1>;
++						rbpcv2_csi_out3: endpoint@1 {
++							status = "okay";
++							remote-endpoint = <&rbpcv2_vi_in3>;
++						};
++					};
++				};
++			};
++		};
++	};
++
++	i2c@31e0000 {											//M222 CSI 01		
++		imx219_cam0: rbpcv2_imx219_a@10 {
++			status="okay";
++			compatible = "sony,imx219";
++			reg = <0x10>;
++
++			reset-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
++
++			devnode = "video0";
++
++			physical_w = "3.680";
++			physical_h = "2.760";
++
++			sensor_model = "imx219";
++
++			use_sensor_mode_id = "true";
++
++			mode0 { // IMX219_MODE_3280x2464_21FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "2464";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16";
++				max_gain_val = "170";
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "21000000"; 
++				step_framerate = "1";
++				default_framerate = "21000000";
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode1 { // IMX219_MODE_3280x1848_28FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "1848";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16";
++				max_gain_val = "170";
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "28000000"; 
++				step_framerate = "1";
++				default_framerate = "28000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode2 { // IMX219_MODE_1920x1080_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1920";
++				active_h = "1080";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "30000000"; 
++				step_framerate = "1";
++				default_framerate = "30000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode3 { // IMX219_MODE_1640x1232_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1640";
++				active_h = "1232";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "30000000"; 
++				step_framerate = "1";
++				default_framerate = "30000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode4 { // IMX219_MODE_1280x720_60FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1280";
++				active_h = "720";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "60000000"; 
++				step_framerate = "1";
++				default_framerate = "60000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			ports {
++				status="okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					status="okay";
++					reg = <0>;
++					rbpcv2_imx219_out0: endpoint {
++						status="okay";
++						port-index = <0>;
++						bus-width = <2>;
++						remote-endpoint = <&rbpcv2_csi_in0>;
++					};
++				};
++			};
++		};
++	};
++	i2c@c240000 {												//M222 CSI 67			
++		imx219_cam1: rbpcv2_imx219_g@10 {
++			status="okay";
++			compatible = "sony,imx219";
++			reg = <0x10>;
++			
++			reset-gpios = <&tegra_main_gpio CAM0_PWDN GPIO_ACTIVE_HIGH>;
++
++			devnode = "video1";
++
++			physical_w = "3.680";
++			physical_h = "2.760";
++
++			sensor_model = "imx219";
++
++			use_sensor_mode_id = "true";
++
++			mode0 { // IMX219_MODE_3280x2464_21FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "2464";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "21000000"; 
++				step_framerate = "1";
++				default_framerate = "21000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode1 { // IMX219_MODE_3280x1848_28FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "1848";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "28000000"; 
++				step_framerate = "1";
++				default_framerate = "28000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode2 { // IMX219_MODE_1920x1080_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1920";
++				active_h = "1080";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "30000000";
++				step_framerate = "1";
++				default_framerate = "30000000";
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode3 { // IMX219_MODE_1640x1232_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1640";
++				active_h = "1232";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "30000000";
++				step_framerate = "1";
++				default_framerate = "30000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode4 { // IMX219_MODE_1280x720_60FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1280";
++				active_h = "720";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "60000000";
++				step_framerate = "1";
++				default_framerate = "60000000"; 
++				min_exp_time = "13";
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			ports {
++				status="okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					status="okay";
++					reg = <0>;
++					rbpcv2_imx219_out1: endpoint {
++						status = "okay";
++						port-index = <6>;
++						bus-width = <2>;
++						remote-endpoint = <&rbpcv2_csi_in1>;
++					};
++				};
++			};
++		};
++	};
++	i2c@c250000 {												//M222 CSI 45	
++		imx219_cam2: rbpcv2_imx219_e@10 {
++			status="okay";
++			compatible = "sony,imx219";
++			reg = <0x10>;
++			
++			reset-gpios = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
++
++			devnode = "video2";
++
++			physical_w = "3.680";
++			physical_h = "2.760";
++
++			sensor_model = "imx219";
++
++			use_sensor_mode_id = "true";
++
++			mode0 { // IMX219_MODE_3280x2464_21FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_e";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "2464";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "21000000"; 
++				step_framerate = "1";
++				default_framerate = "21000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode1 { // IMX219_MODE_3280x1848_28FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_e";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "1848";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "28000000"; 
++				step_framerate = "1";
++				default_framerate = "28000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode2 { // IMX219_MODE_1920x1080_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_e";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1920";
++				active_h = "1080";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "30000000";
++				step_framerate = "1";
++				default_framerate = "30000000";
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode3 { // IMX219_MODE_1640x1232_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_e";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1640";
++				active_h = "1232";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "30000000";
++				step_framerate = "1";
++				default_framerate = "30000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode4 { // IMX219_MODE_1280x720_60FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_e";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1280";
++				active_h = "720";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "60000000";
++				step_framerate = "1";
++				default_framerate = "60000000"; 
++				min_exp_time = "13";
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			ports {
++				status="okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					status="okay";
++					reg = <0>;
++					rbpcv2_imx219_out2: endpoint {
++						status = "okay";
++						port-index = <4>;
++						bus-width = <2>;
++						remote-endpoint = <&rbpcv2_csi_in2>;
++					};
++				};
++			};
++		};
++	};
++	i2c@3180000 {											//M222 CSI 23				
++		imx219_cam3: rbpcv2_imx219_c@10 {
++			status="okay";
++			compatible = "sony,imx219";
++			reg = <0x10>;
++			
++			reset-gpios = <&tegra_main_gpio CAM3_PWDN GPIO_ACTIVE_HIGH>;
++
++			devnode = "video3";
++
++			physical_w = "3.680";
++			physical_h = "2.760";
++
++			sensor_model = "imx219";
++
++			use_sensor_mode_id = "true";
++
++			mode0 { // IMX219_MODE_3280x2464_21FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_c";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "2464";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "21000000"; 
++				step_framerate = "1";
++				default_framerate = "21000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode1 { // IMX219_MODE_3280x1848_28FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_c";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "1848";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "28000000"; 
++				step_framerate = "1";
++				default_framerate = "28000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++			mode2 { // IMX219_MODE_1920x1080_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_c";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1920";
++				active_h = "1080";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "30000000";
++				step_framerate = "1";
++				default_framerate = "30000000";
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode3 { // IMX219_MODE_1640x1232_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_c";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1640";
++				active_h = "1232";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; 
++				max_framerate = "30000000";
++				step_framerate = "1";
++				default_framerate = "30000000"; 
++				min_exp_time = "13"; 
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			mode4 { // IMX219_MODE_1280x720_60FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_c";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1280";
++				active_h = "720";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; 
++				max_gain_val = "170"; 
++				step_gain_val = "1";
++				default_gain = "16"; 
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000";
++				max_framerate = "60000000";
++				step_framerate = "1";
++				default_framerate = "60000000"; 
++				min_exp_time = "13";
++				max_exp_time = "683709"; 
++				step_exp_time = "1";
++				default_exp_time = "2495"; 
++
++				embedded_metadata_height = "2";
++			};
++
++			ports {
++				status="okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					status="okay";
++					reg = <0>;
++					rbpcv2_imx219_out3: endpoint {
++						status = "okay";
++						port-index = <2>;
++						bus-width = <2>;
++						remote-endpoint = <&rbpcv2_csi_in3>;
++					};
++				};
++			};
++		};
++	};
++
++	lens_imx219@RBPCV2 {
++		min_focus_distance = "0.0";
++		hyper_focal = "0.0";
++		focal_length = "3.04";
++		f_number = "2.0";
++		aperture = "0.0";
++	};
++
++};
++
++
++/ {
++	tegra-camera-platform {
++		compatible = "nvidia, tegra-camera-platform";
++
++		num_csi_lanes = <8>;
++		max_lane_speed = <1500000>;
++		min_bits_per_pixel = <10>;
++		vi_peak_byte_per_pixel = <2>;
++		vi_bw_margin_pct = <25>;
++		max_pixel_rate = <240000>;
++		isp_peak_byte_per_pixel = <5>;
++		isp_bw_margin_pct = <25>;
++
++		modules {
++			cam_module0: module0 {
++				badge = "imx219_topright_RBPCV2";
++				position = "topright";
++				orientation = "1";
++				cam_module0_drivernode0: drivernode0 {
++					pcl_id = "v4l2_sensor";
++					devname = "imx219 8-0010";
++					proc-device-tree = "/proc/device-tree/i2c@31e0000/rbpcv2_imx219_a@10";
++				};
++				cam_module0_drivernode1: drivernode1 {
++					pcl_id = "v4l2_lens";
++					proc-device-tree = "/proc/device-tree/lens_imx219@RBPCV2/";
++				};
++			};
++			cam_module1: module1 {
++				badge = "imx219_bottomright_RBPCV2";
++				position = "bottomright";
++				orientation = "1";
++				cam_module1_drivernode0: drivernode0 {
++					pcl_id = "v4l2_sensor";
++					devname = "imx219 1-0010";
++					proc-device-tree = "/proc/device-tree/i2c@c240000/rbpcv2_imx219_g@10";
++				};
++				cam_module1_drivernode1: drivernode1 {
++					pcl_id = "v4l2_lens";
++					proc-device-tree = "/proc/device-tree/lens_imx219@RBPCV2/";
++				};
++			};
++			cam_module2: module2 {
++				badge = "imx219_topleft_RBPCV2";
++				position = "topleft";
++				orientation = "1";
++				cam_module2_drivernode0: drivernode0 {
++					pcl_id = "v4l2_sensor";
++					devname = "imx219 7-0010";
++					proc-device-tree = "/proc/device-tree/i2c@c250000/rbpcv2_imx219_e@10";
++				};
++				cam_module2_drivernode1: drivernode1 {
++					pcl_id = "v4l2_lens";
++					proc-device-tree = "/proc/device-tree/lens_imx219@RBPCV2/";
++				};
++			};
++			cam_module3: module3 {
++				badge = "imx219_bottomleft_RBPCV2";
++				position = "bottomleft";
++				orientation = "1";
++				cam_module3_drivernode0: drivernode0 {
++					pcl_id = "v4l2_sensor";
++					devname = "imx219 2-0010";
++					proc-device-tree = "/proc/device-tree/i2c@3180000/rbpcv2_imx219_c@10";
++				};
++				cam_module3_drivernode1: drivernode1 {
++					pcl_id = "v4l2_lens";
++					proc-device-tree = "/proc/device-tree/lens_imx219@RBPCV2/";
++				};
++			};
++		};
++	};
++};
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-camera-imx219-auvidea.dtsi b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-camera-imx219-auvidea.dtsi
+new file mode 100755
+index 0000000..fb0d245
+--- /dev/null
++++ b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-0000-camera-imx219-auvidea.dtsi
+@@ -0,0 +1,676 @@
++/*
++ * Copyright (c) 2017-2021, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++//new file created for 2x cam on X230D
++
++#include "dt-bindings/clock/tegra234-clock.h"
++
++#define CAM0_RST_L	TEGRA234_MAIN_GPIO(H, 3)
++#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
++#define CAM1_RST_L	TEGRA234_MAIN_GPIO(AC, 1)
++#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
++#define CAM_TRIGGER	TEGRA234_MAIN_GPIO(R, 0)
++
++#define CAMERA_I2C_MUX_BUS(x) (0x1E + x)
++
++/* camera control gpio definitions */
++
++/ {
++	gpio@2200000 {
++		camera-control-output-low {
++			gpio-hog;
++			output-low;
++			gpios = <CAM0_RST_L 0 CAM0_PWDN 0
++				 CAM1_RST_L 0 CAM1_PWDN 0>;
++			label = "cam0-rst", "cam0-pwdn",
++				"cam1-rst", "cam1-pwdn";
++		};
++		camera-trigger-output-high {					//remember to use "sudo busybox devmem 0x02430080 w 0x0c"
++			gpio-hog;						//for cameras to work properly
++			output-high;
++			gpios = <CAM_TRIGGER 1>;
++			label = "cam-trigger";
++		};
++	};
++
++	tegra-capture-vi {
++		status = "okay";
++		num-channels = <2>;
++		ports {
++			status = "okay";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			vi_port0: port@0 {
++				status = "okay";
++				reg = <0>;
++				rbpcv2_vi_in0: endpoint {
++					status = "okay";
++					port-index = <0>;
++					bus-width = <2>;
++					remote-endpoint = <&rbpcv2_csi_out0>;
++				};
++			};
++			vi_port1: port@1 {
++				status = "okay";
++				reg = <1>;
++				rbpcv2_vi_in1: endpoint {
++					status = "okay";
++					port-index = <5>;						//use stream 5 because no stream 6 is avaliable on the agx orin(fd)
++					bus-width = <2>;
++					remote-endpoint = <&rbpcv2_csi_out1>;
++				};
++			};
++		};
++	};
++
++	host1x@13e00000 {
++		nvcsi@15a00000 {
++			status = "okay";
++			num-channels = <2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			csi_chan0: channel@0 {
++				status = "okay";
++				reg = <0>;
++				ports {
++					status = "okay";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					csi_chan0_port0: port@0 {
++						status = "okay";
++						reg = <0>;
++						rbpcv2_csi_in0: endpoint@0 {
++							status = "okay";
++							port-index = <0>;
++							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_imx219_out0>;
++						};
++					};
++					csi_chan0_port1: port@1 {
++						status = "okay";
++						reg = <1>;
++						rbpcv2_csi_out0: endpoint@1 {
++							status = "okay";
++							remote-endpoint = <&rbpcv2_vi_in0>;
++						};
++					};
++				};
++			};
++			csi_chan1: channel@1 {
++				status = "okay";
++				reg = <1>;
++				ports {
++					status = "okay";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					csi_chan1_port0: port@0 {
++						status = "okay";
++						reg = <0>;
++						rbpcv2_csi_in1: endpoint@2 {
++							status = "okay";
++							port-index = <6>;
++							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_imx219_out1>;
++						};
++					};
++					csi_chan1_port1: port@1 {
++						status = "okay";
++						reg = <1>;
++						rbpcv2_csi_out1: endpoint@3 {
++							status = "okay";
++							remote-endpoint = <&rbpcv2_vi_in1>;
++						};
++					};
++				};
++			};
++		};
++	};
++
++	i2c@31e0000 {
++		status="okay";
++		rbpcv2_imx219_a@10 {
++			status = "okay";
++			reset-gpios = <&tegra_main_gpio CAM0_PWDN GPIO_ACTIVE_HIGH>;
++			compatible = "sony,imx219";
++			reg = <0x10>;
++
++			devnode = "video0";
++
++			physical_w = "3.680";
++			physical_h = "2.760";
++
++			sensor_model = "imx219";
++
++			use_sensor_mode_id = "true";
++
++			mode0 { // IMX219_MODE_3280x2464_21FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "2464";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "21000000"; // 21.0 fps //
++				step_framerate = "1";
++				default_framerate = "21000000"; // 21.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++			mode1 { // IMX219_MODE_3280x1848_28FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "1848";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "28000000"; // 28.0 fps //
++				step_framerate = "1";
++				default_framerate = "28000000"; // 28.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++			mode2 { // IMX219_MODE_1920x1080_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1920";
++				active_h = "1080";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "30000000"; // 30.0 fps //
++				step_framerate = "1";
++				default_framerate = "30000000"; // 30.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++
++			mode3 { // IMX219_MODE_1640x1232_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1640";
++				active_h = "1232";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "30000000"; // 60.0 fps //
++				step_framerate = "1";
++				default_framerate = "30000000"; // 60.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++
++			mode4 { // IMX219_MODE_1280x720_60FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_a";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1280";
++				active_h = "720";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "60000000"; // 60.0 fps //
++				step_framerate = "1";
++				default_framerate = "60000000"; // 60.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++
++			ports {
++				status="okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					status="okay";
++					reg = <0>;
++					rbpcv2_imx219_out0: endpoint {
++						status="okay";
++						port-index = <0>;
++						bus-width = <2>;
++						remote-endpoint = <&rbpcv2_csi_in0>;
++					};
++				};
++			};
++		};
++	};
++
++	i2c@c240000 {
++		status="okay";
++		rbpcv2_imx219_g@10 {
++			status = "okay";
++			reset-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
++			compatible = "sony,imx219";
++			reg = <0x10>;
++
++			devnode = "video1";
++
++			physical_w = "3.680";
++			physical_h = "2.760";
++
++			sensor_model = "imx219";
++
++			use_sensor_mode_id = "true";
++
++			mode0 { // IMX219_MODE_3280x2464_21FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "2464";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "21000000"; // 21.0 fps //
++				step_framerate = "1";
++				default_framerate = "21000000"; // 21.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++			mode1 { // IMX219_MODE_3280x1848_28FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "3280";
++				active_h = "1848";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "28000000"; // 28.0 fps //
++				step_framerate = "1";
++				default_framerate = "28000000"; // 28.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++			mode2 { // IMX219_MODE_1920x1080_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1920";
++				active_h = "1080";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "30000000"; // 30.0 fps //
++				step_framerate = "1";
++				default_framerate = "30000000"; // 30.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++
++			mode3 { // IMX219_MODE_1640x1232_30FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1640";
++				active_h = "1232";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "30000000"; // 60.0 fps //
++				step_framerate = "1";
++				default_framerate = "30000000"; // 60.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++
++			mode4 { // IMX219_MODE_1280x720_60FPS //
++				mclk_khz = "24000";
++				num_lanes = "2";
++				tegra_sinterface = "serial_g";
++				phy_mode = "DPHY";
++				discontinuous_clk = "yes";
++				dpcm_enable = "false";
++				cil_settletime = "0";
++
++				active_w = "1280";
++				active_h = "720";
++				mode_type = "bayer";
++				pixel_phase = "rggb";
++				csi_pixel_bit_depth = "10";
++				readout_orientation = "90";
++				line_length = "3448";
++				inherent_gain = "1";
++				mclk_multiplier = "9.33";
++				pix_clk_hz = "182400000";
++
++				gain_factor = "16";
++				framerate_factor = "1000000";
++				exposure_factor = "1000000";
++				min_gain_val = "16"; // 1.00x //
++				max_gain_val = "170"; // 10.66x //
++				step_gain_val = "1";
++				default_gain = "16"; // 1.00x //
++				min_hdr_ratio = "1";
++				max_hdr_ratio = "1";
++				min_framerate = "2000000"; // 2.0 fps //
++				max_framerate = "60000000"; // 60.0 fps //
++				step_framerate = "1";
++				default_framerate = "60000000"; // 60.0 fps //
++				min_exp_time = "13"; // us //
++				max_exp_time = "683709"; // us //
++				step_exp_time = "1";
++				default_exp_time = "2495"; // us //
++
++				embedded_metadata_height = "2";
++			};
++
++			ports {
++				status="okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					status="okay";
++					reg = <0>;
++					rbpcv2_imx219_out1: endpoint {
++						status = "okay";
++						port-index = <6>;
++						bus-width = <2>;
++						remote-endpoint = <&rbpcv2_csi_in1>;
++					};
++				};
++			};
++		};
++	};
++	lens_imx219@RBPCV2 {
++		min_focus_distance = "0.0";
++		hyper_focal = "0.0";
++		focal_length = "3.04";
++		f_number = "2.0";
++		aperture = "0.0";
++	};
++};
++
++/ {
++
++	tegra-camera-platform {
++		compatible = "nvidia, tegra-camera-platform";
++
++		num_csi_lanes = <4>;
++		max_lane_speed = <1500000>;
++		min_bits_per_pixel = <10>;
++		vi_peak_byte_per_pixel = <2>;
++		vi_bw_margin_pct = <25>;
++		max_pixel_rate = <240000>;
++		isp_peak_byte_per_pixel = <5>;
++		isp_bw_margin_pct = <25>;
++
++		modules {
++			cam_module0: module0 {
++				badge = "imx219_front_RBPCV2";
++				position = "front";
++				orientation = "1";
++				cam_module0_drivernode0: drivernode0 {
++					pcl_id = "v4l2_sensor";
++					devname = "imx219 8-0010";
++					proc-device-tree = "/proc/device-tree/i2c@31e0000/rbpcv2_imx219_a@10";
++				};
++				cam_module0_drivernode1: drivernode1 {
++					pcl_id = "v4l2_lens";
++					proc-device-tree = "/proc/device-tree/lens_imx219@RBPCV2/";
++				};
++			};
++			cam_module1: module1 {
++				badge = "imx219_rear_RBPCV2";
++				position = "rear";
++				orientation = "1";
++				cam_module1_drivernode0: drivernode0 {
++					pcl_id = "v4l2_sensor";
++					devname = "imx219 1-0010";
++					proc-device-tree = "/proc/device-tree/i2c@c240000/rbpcv2_imx219_g@10";
++				};
++				cam_module1_drivernode1: drivernode1 {
++					pcl_id = "v4l2_lens";
++					proc-device-tree = "/proc/device-tree/lens_imx219@RBPCV2/";
++				};
++			};
++		};
++	};
++};
++
++
++
++
++
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi
+index ec8309e..dcd41de 100644
+--- a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi
++++ b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi
+@@ -22,13 +22,15 @@
+  * #include "tegra234-p3737-0000-camera-imx274-a00.dtsi"
+  */
+ 
+-#include "tegra234-p3737-0000-camera-ar0234-a00.dtsi"
+-#include "tegra234-p3737-0000-camera-p3762-a00.dtsi"
++/*#include "tegra234-p3737-0000-camera-ar0234-a00.dtsi"				//remove for imx219 cams to work properly on X230D(fd)
++#include "tegra234-p3737-0000-camera-p3762-a00.dtsi"				TODO: make compatible with X230D(fd)
+ #include "tegra234-p3737-0000-camera-e3331-a00.dtsi"
+ #include "tegra234-p3737-0000-camera-e3333-a00.dtsi"
+ #include "tegra234-p3737-0000-camera-imx185-a00.dtsi"
+ #include "tegra234-p3737-0000-camera-imx390-a00.dtsi"
+-#include "tegra234-p3737-0000-camera-imx274-dual.dtsi"
++#include "tegra234-p3737-0000-camera-imx274-dual.dtsi"*/
++#include "tegra234-p3737-0000-camera-imx219-auvidea-M222.dtsi"			//added for imx219 support on X230D(fd)
++
+ 
+ 
+ #define CAM0_RST_L	TEGRA234_MAIN_GPIO(H, 3)
+@@ -61,7 +63,7 @@
+ 	};
+ 
+ 	/* all cameras are disabled by default */
+-	capture_vi_base: tegra-capture-vi {
++	/*capture_vi_base: tegra-capture-vi {					//remove everything! for imx219 cams to work properly on X230D(fd)
+ 		ports {
+ 			vi_port0: port@0 {
+ 				status = "disabled";
+@@ -480,5 +482,5 @@
+ 				};
+ 			};
+ 		};
+-	};
++	};*/
+ };
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi.bak b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi.bak
+new file mode 100755
+index 0000000..b10cdbe
+--- /dev/null
++++ b/nvidia/platform/t23x/concord/kernel-dts/cvb/tegra234-p3737-camera-modules.dtsi.bak
+@@ -0,0 +1,486 @@
++/*
++ * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/* These headers don't exist yet.
++ * TODO: add below headers for corresponding sensor modules.
++ * #include "tegra234-p3737-0000-camera-e3377-a00.dtsi"
++ * #include "tegra234-p3737-0000-camera-e3326-a00.dtsi"
++ * #include "tegra234-p3737-0000-camera-vivid.dtsi"
++ * #include "tegra234-p3737-0000-camera-imx274-a00.dtsi"
++ */
++
++/*#include "tegra234-p3737-0000-camera-ar0234-a00.dtsi"				//remove for imx219 cams to work properly on X230D(fd)
++#include "tegra234-p3737-0000-camera-p3762-a00.dtsi"				TODO: make compatible with X230D(fd)
++#include "tegra234-p3737-0000-camera-e3331-a00.dtsi"
++#include "tegra234-p3737-0000-camera-e3333-a00.dtsi"
++#include "tegra234-p3737-0000-camera-imx185-a00.dtsi"
++#include "tegra234-p3737-0000-camera-imx390-a00.dtsi"
++#include "tegra234-p3737-0000-camera-imx274-dual.dtsi"*/
++#include "tegra234-p3737-0000-camera-imx219-auvidea-M222.dtsi"			//added for imx219 support on X230D(fd)
++
++
++
++#define CAM0_RST_L	TEGRA234_MAIN_GPIO(H, 3)
++#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
++#define CAM1_RST_L	TEGRA234_MAIN_GPIO(AC, 1)
++#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
++
++/ {
++	tegra-camera-platform {
++		/**
++		* tpg_max_iso = <>;
++		* Max iso bw for 6 streams of tpg
++		* streams * nvcsi_freq * PG_bitrate / RG10 * BPP
++		* 6 * 102Mhz * 32 bits/ 10 bits * 2 Bps
++		* = 3916.8 MBps
++		*/
++		tpg_max_iso = <3916800>;
++	};
++
++	/* set camera gpio direction to output */
++	gpio@2200000 {
++		camera-control-output-low {
++			gpio-hog;
++			output-low;
++			gpios = <CAM0_RST_L 0 CAM0_PWDN 0
++				 CAM1_RST_L 0 CAM1_PWDN 0>;
++			label = "cam0-rst", "cam0-pwdn",
++				"cam1-rst", "cam1-pwdn";
++		};
++	};
++
++	/* all cameras are disabled by default */
++	/*capture_vi_base: tegra-capture-vi {					//remove everything! for imx219 cams to work properly on X230D(fd)
++		ports {
++			vi_port0: port@0 {
++				status = "disabled";
++				vi_in0: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port1: port@1 {
++				status = "disabled";
++				vi_in1: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port2: port@2 {
++				status = "disabled";
++				vi_in2: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port3: port@3 {
++				status = "disabled";
++				vi_in3: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port4: port@4 {
++				status = "disabled";
++				vi_in4: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port5: port@5 {
++				status = "disabled";
++				vi_in5: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port6: port@6 {
++				status = "disabled";
++				vi_in6: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++			vi_port7: port@7 {
++				status = "disabled";
++				vi_in7: endpoint {
++					vc-id = <0>;
++					status = "disabled";
++				};
++			};
++		};
++	};
++
++	host1x@13e00000 {
++		csi_base: nvcsi@15a00000 {
++			num-tpg-channels = <36>;
++			csi_chan0: channel@0 {
++				status = "disabled";
++				ports {
++					csi_chan0_port0: port@0 {
++						status = "disabled";
++						csi_in0: endpoint@0 {
++							status = "disabled";
++						};
++					};
++					csi_chan0_port1: port@1 {
++						status = "disabled";
++						csi_out0: endpoint@1 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan1: channel@1 {
++				status = "disabled";
++				ports {
++					csi_chan1_port0: port@0 {
++						status = "disabled";
++						csi_in1: endpoint@2 {
++							status = "disabled";
++						};
++					};
++					csi_chan1_port1: port@1 {
++						status = "disabled";
++						csi_out1: endpoint@3 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan2: channel@2 {
++				status = "disabled";
++				ports {
++					csi_chan2_port0: port@0 {
++						status = "disabled";
++						csi_in2: endpoint@4 {
++							status = "disabled";
++						};
++					};
++					csi_chan2_port1: port@1 {
++						status = "disabled";
++						csi_out2: endpoint@5 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan3: channel@3 {
++				status = "disabled";
++				ports {
++					csi_chan3_port0: port@0 {
++						status = "disabled";
++						csi_in3: endpoint@6 {
++							status = "disabled";
++						};
++					};
++					csi_chan3_port1: port@1 {
++						status = "disabled";
++						csi_out3: endpoint@7 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan4: channel@4 {
++				status = "disabled";
++				ports {
++					csi_chan4_port0: port@0 {
++						status = "disabled";
++						csi_in4: endpoint@8 {
++							status = "disabled";
++						};
++					};
++					csi_chan4_port1: port@1 {
++						status = "disabled";
++						csi_out4: endpoint@9 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan5: channel@5 {
++				status = "disabled";
++				ports {
++					csi_chan5_port0: port@0 {
++						status = "disabled";
++						csi_in5: endpoint@10 {
++							status = "disabled";
++						};
++					};
++					csi_chan5_port1: port@1 {
++						status = "disabled";
++						csi_out5: endpoint@11 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan6: channel@6 {
++				status = "disabled";
++				ports {
++					csi_chan6_port0: port@0 {
++						status = "disabled";
++						csi_in6: endpoint@12 {
++							status = "disabled";
++						};
++					};
++					csi_chan6_port1: port@1 {
++						status = "disabled";
++						csi_out6: endpoint@13 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++			csi_chan7: channel@7 {
++				status = "disabled";
++				ports {
++					csi_chan7_port0: port@0 {
++						status = "disabled";
++						csi_in7: endpoint@14 {
++							status = "disabled";
++						};
++					};
++					csi_chan7_port1: port@1 {
++						status = "disabled";
++						csi_out7: endpoint@15 {
++							status = "disabled";
++						};
++					};
++				};
++			};
++		};
++	};
++
++	i2c@31e0000 {
++		hawk_dser: max96712_a@62 {
++			status = "disabled";
++		};
++		hawk_cam0: ar0234_a@30 {
++			status = "disabled";
++		};
++		hawk_cam1: ar0234_b@31 {
++			status = "disabled";
++		};
++		hawk_cam2: ar0234_c@32 {
++			status = "disabled";
++		};
++		hawk_cam3: ar0234_d@33 {
++			status = "disabled";
++		};
++	};
++	i2c@3180000 {
++		owl_dser: max96712_b@62 {
++			status = "disabled";
++		};
++		owl_cam0: ar0234_e@30 {
++			status = "disabled";
++		};
++		owl_cam1: ar0234_f@32 {
++			status = "disabled";
++		};
++		owl_cam2: ar0234_g@34 {
++			status = "disabled";
++		};
++		owl_cam3: ar0234_h@36 {
++			status = "disabled";
++		};
++		e3326_cam0: ov5693_c@36 {
++			status = "disabled";
++		};
++		e2832_cam0: e2832@2b {
++			status = "disabled";
++		};
++		tca6408@21 {
++			status = "disabled";
++		};
++		tca9548@77 {
++			status = "disabled";
++			i2c@0 {
++				e3333_cam0: ov5693_a@36 {
++					status = "disabled";
++				};
++			};
++			i2c@1 {
++				e3333_cam1: ov5693_b@36 {
++					status = "disabled";
++				};
++			};
++			i2c@2 {
++				e3333_cam2: ov5693_c@36 {
++					status = "disabled";
++				};
++			};
++			i2c@3 {
++				e3333_cam3: ov5693_d@36 {
++					status = "disabled";
++				};
++			};
++			i2c@4 {
++				e3333_cam4: ov5693_e@36 {
++					status = "disabled";
++				};
++			};
++			i2c@5 {
++				e3333_cam5: ov5693_g@36 {
++					status = "disabled";
++				};
++			};
++		};
++		tca9546_70: tca9546@70 {
++			status = "disabled";
++			i2c@0 {
++				dual_hawk0:dual_hawk_a@18 {
++					status = "disabled";
++				};
++				dual_hawk1:dual_hawk_b@10 {
++					status = "disabled";
++				};
++				pca9570_a_24: pca9570_a@24 {
++					status = "disabled";
++				};
++				imx274_cam0: imx274_a@1a {
++					status = "disabled";
++				};
++				imx185_cam0: imx185_a@1a {
++					status = "disabled";
++				};
++				e3331_cam0: imx318_a@10 {
++					status = "disable";
++				};
++				max96712_dser: single_max96712_a@62 {
++					status = "disabled";
++				};
++				max9296_dser: max9296@48 {
++					status = "disabled";
++				};
++				max9295_prim: max9295_prim@62 {
++					status = "disabled";
++				};
++				max9295_ser0: max9295_a@40 {
++					status = "disabled";
++				};
++				max9295_ser1: max9295_b@60 {
++					status = "disabled";
++				};
++				imx390_cam0: imx390_a@1b {
++					status = "disabled";
++				};
++				imx390_cam1: imx390_b@1c {
++					status = "disabled";
++				};
++			};
++			i2c@1 {
++				dual_hawk2:dual_hawk_c@18 {
++					status = "disabled";
++				};
++				dual_hawk3:dual_hawk_d@10 {
++					status = "disabled";
++				};
++				imx274_cam1: imx274_c@1a {
++					status = "disabled";
++				};
++			};
++		};
++	};
++
++	tcp: tegra-camera-platform {
++		compatible = "nvidia, tegra-camera-platform";
++		modules {
++			cam_module0: module0 {
++				status = "disabled";
++				cam_module0_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module0_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module1: module1 {
++				status = "disabled";
++				cam_module1_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module1_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module2: module2 {
++				status = "disabled";
++				cam_module2_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module2_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module3: module3 {
++				status = "disabled";
++				cam_module3_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module3_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module4: module4 {
++				status = "disabled";
++				cam_module4_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module4_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module5: module5 {
++				status = "disabled";
++				cam_module5_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module5_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module6: module6 {
++				status = "disabled";
++				cam_module6_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module6_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++			cam_module7: module7 {
++				status = "disabled";
++				cam_module7_drivernode0: drivernode0 {
++					status = "disabled";
++				};
++				cam_module7_drivernode1: drivernode1 {
++					status = "disabled";
++					pcl_id = "v4l2_lens";
++				};
++			};
++		};
++	};
++};
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi b/nvidia/platform/t23x/concord/kernel-dts/tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi
+new file mode 100755
+index 0000000..6670eac
+--- /dev/null
++++ b/nvidia/platform/t23x/concord/kernel-dts/tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi
+@@ -0,0 +1,561 @@
++/*
++ * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++/ {
++	display@13800000 {
++		nvidia,dcb-image = [
++			55 aa 16 00 00 37 34 30 30 e9 4c 19 77 cc 56 49
++			44 45 4f 20 0d 00 00 00 70 01 00 00 00 00 49 42
++			4d 20 56 47 41 20 43 6f 6d 70 61 74 69 62 6c 65
++			01 00 00 00 10 00 82 18 30 34 2f 32 35 2f 32 32
++			00 00 00 00 00 00 00 00 21 18 50 00 e1 2b 00 00
++			50 4d 49 44 00 00 00 00 00 00 00 a0 00 b0 00 b8
++			00 c0 00 0e 47 41 31 30 42 20 56 47 41 20 42 49
++			4f 53 0d 0a 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 56 65 72 73 69 6f 6e 20 39 34 2e
++			30 42 2e 30 30 2e 30 30 2e 32 31 20 0d 0a 00 43
++			6f 70 79 72 69 67 68 74 20 28 43 29 20 31 39 39
++			36 2d 32 30 32 32 20 4e 56 49 44 49 41 20 43 6f
++			72 70 2e 0d 0a 00 00 00 ff ff 00 00 00 00 ff ff
++			47 50 55 20 42 6f 61 72 64 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 43 68 69 70 20 52 65 76 20 20 20 00 00
++			00 00 00 00 00 00 00 ba 91 98 96 91 9a 9a 8d 96
++			91 98 df ad 9a 93 9a 9e 8c 9a df d2 df b1 90 8b
++			df b9 90 8d df af 8d 90 9b 8a 9c 8b 96 90 91 df
++			aa 8c 9a f2 f5 ff 00 00 00 00 00 00 00 00 00 00
++			50 43 49 52 de 10 94 22 00 00 18 00 00 00 00 03
++			16 00 01 00 00 80 00 00 2e 8b c0 2e 8b c0 8b c0
++			4e 50 44 45 01 01 14 00 16 00 00 01 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			ff b8 42 49 54 00 00 01 0c 06 13 44 32 01 04 00
++			3e 02 42 02 25 00 4a 02 43 02 2c 00 6f 02 44 01
++			04 00 9b 02 49 01 24 00 9f 02 4d 02 29 00 c3 02
++			4e 00 00 00 00 00 50 02 fc 00 ec 02 53 02 18 00
++			e8 03 54 01 02 00 00 04 55 01 05 00 0a 04 56 01
++			06 00 0f 04 78 01 08 00 15 04 64 01 02 00 1d 04
++			70 02 04 00 1f 04 75 01 11 00 23 04 69 02 6e 00
++			34 04 45 01 04 00 02 04 73 01 04 00 06 04 00 00
++			a2 04 a2 04 e9 21 f0 21 e0 2b 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 0b 94 21 00
++			00 00 00 00 a8 07 00 00 00 00 00 00 00 00 02 00
++			5c 5c 2e 02 00 00 42 02 04 00 10 00 00 00 00 e9
++			0e 00 00 00 00 00 00 39 44 00 00 e7 2d 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 92 30 00 00 e5
++			44 00 00 23 45 00 00 4a 45 00 00 00 00 00 00 f6
++			04 00 00 00 00 fa 04 00 00 66 08 fa 04 16 2b 66
++			08 18 2b a2 04 ef 09 04 22 d4 09 c2 21 18 2b 90
++			00 9b 22 01 68 08 56 09 f4 43 00 00 fe 43 00 00
++			f7 0f 00 00 f0 21 00 00 fc 21 00 00 54 4a 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 d5 33 00 00
++			bb 36 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 b3 3c 00 00
++			00 00 00 00 ed 3c 00 00 12 43 00 00 00 00 00 00
++			00 00 00 00 df 33 00 00 32 3d 00 00 a0 43 00 00
++			ad 36 00 00 00 00 00 00 00 00 00 00 c2 43 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 61 0b 00 00 dd 0a 00 00 77 0b 00 00
++			11 3c 00 00 17 3c 00 00 1c 3c 00 00 20 3c 00 00
++			2a 3c 00 00 31 3c 00 00 3f 3c 00 00 81 3c 00 00
++			00 00 00 00 00 00 00 00 96 3c 00 00 f0 45 00 00
++			96 47 00 00 0b 48 00 00 91 49 00 00 80 4b 00 00
++			bc 4b 00 00 e6 49 00 00 9c 3c 00 00 79 3c 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 ec 4d 00 00
++			a0 3c 00 00 a9 3c 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 64 00 50 b5 00 19 cf 00
++			28 91 0e 14 a5 0e 23 00 01 23 23 01 14 00 00 00
++			0c 11 00 00 00 00 83 17 00 00 c8 0e 01 00 00 0d
++			0e df 0c 00 00 00 00 01 01 00 00 00 00 af 1d 31
++			4e 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			b2 2d 00 00 00 00 0b 94 21 00 00 b3 ef dc 01 58
++			03 00 00 30 34 2f 32 35 2f 32 32 00 00 00 00 00
++			00 00 00 00 00 00 00 21 01 10 00 00 00 80 01 00
++			00 00 00 00 30 30 30 30 30 30 30 30 30 30 30 30
++			00 00 00 00 00 00 00 00 03 42 00 00 62 5a 08 00
++			ad c1 45 18 8a 1c 7f 9f 7f fa 3e 96 54 33 00 00
++			00 00 00 00 c9 4c 00 00 00 00 00 00 00 00 97 4e
++			00 00 01 00 10 00 bf 09 30 00 02 00 94 22 00 00
++			00 00 01 00 44 00 6b 09 00 00 a2 04 00 00 56 09
++			00 00 fa 04 00 00 00 00 00 00 66 08 00 00 78 08
++			00 00 61 0b 00 00 dd 0a 00 00 77 0b 00 00 8d 0b
++			00 00 0d 0e 00 00 df 0c 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 2c 22 00 00 30 c0 61 40 00 00
++			00 10 00 00 00 00 08 23 61 00 80 00 00 00 80 00
++			00 00 88 23 61 00 80 00 00 00 80 00 00 00 08 24
++			61 00 80 00 00 00 80 00 00 00 88 24 61 00 80 00
++			00 00 80 00 00 00 08 25 61 00 80 00 00 00 80 00
++			00 00 88 25 61 00 80 00 00 00 80 00 00 00 08 26
++			61 00 80 00 00 00 80 00 00 00 00 2a 13 00 00 00
++			04 00 00 00 04 00 00 2a 13 00 00 00 01 00 00 00
++			01 00 00 6e 13 00 00 00 04 00 00 00 04 00 00 6e
++			13 00 00 00 01 00 00 00 01 00 4c 00 12 00 3f 00
++			00 00 00 00 00 00 0c 24 02 00 01 00 00 00 00 00
++			00 00 e4 05 02 00 7c 00 00 00 00 00 00 00 e4 05
++			02 00 7c 00 00 00 18 00 00 00 e4 05 02 00 7c 00
++			00 00 0c 00 00 00 e4 05 02 00 7c 00 00 00 04 00
++			00 00 e4 05 02 00 7c 00 00 00 08 00 00 00 e4 05
++			02 00 7c 00 00 00 14 00 00 00 20 0e 9a 00 00 00
++			02 00 00 00 02 00 00 0e 9a 00 00 00 02 00 00 00
++			02 00 00 0e 9a 00 01 00 00 00 01 00 00 00 34 c0
++			61 40 00 00 00 80 00 00 00 00 00 0c 82 00 ff ff
++			ff ff 00 00 00 00 00 0c 82 00 01 00 00 00 00 00
++			00 00 00 0c 82 00 02 00 00 00 00 00 00 00 00 0c
++			82 00 04 00 00 00 00 00 00 00 00 0c 82 00 08 00
++			00 00 00 00 00 00 00 0c 82 00 10 00 00 00 00 00
++			00 00 00 0c 82 00 20 00 00 00 00 00 00 00 90 02
++			82 00 01 00 00 00 00 00 00 00 88 02 82 00 ff 00
++			00 00 00 00 00 00 c0 04 82 00 07 00 00 00 00 00
++			00 00 00 0a 00 00 00 00 f0 1f 00 00 00 00 88 80
++			08 00 00 00 0f 00 00 00 01 00 40 c0 08 00 00 00
++			0c 00 00 00 0c 00 40 c0 08 00 1f 00 00 00 00 00
++			00 00 00 0a 00 00 00 00 f0 1f 00 00 00 00 74 09
++			9a 00 0f 00 00 00 00 00 00 00 e8 73 13 00 01 00
++			00 00 01 00 00 00 0c 06 9a 00 40 00 00 00 40 00
++			00 00 64 00 12 00 40 00 00 00 40 00 00 00 04 14
++			00 00 04 00 00 00 00 00 00 00 04 14 00 00 08 00
++			00 00 08 00 00 00 14 38 82 00 00 00 01 00 00 00
++			01 00 00 0a 00 00 00 00 f0 1f 00 00 00 00 0c 14
++			00 00 01 00 00 00 01 00 00 00 0c 14 00 00 02 00
++			00 00 01 00 00 00 88 54 62 00 00 00 01 00 00 00
++			00 00 88 54 62 00 00 00 02 00 00 00 00 00 88 54
++			62 00 00 00 04 00 00 00 00 00 9c 8b 11 00 00 00
++			00 80 00 00 00 00 14 0c 82 00 01 00 00 00 00 00
++			00 00 14 0c 82 00 02 00 00 00 00 00 00 00 14 0c
++			82 00 04 00 00 00 00 00 00 00 14 0c 82 00 08 00
++			00 00 00 00 00 00 14 0c 82 00 10 00 00 00 00 00
++			00 00 14 0c 82 00 20 00 00 00 00 00 00 00 9c 8b
++			11 00 00 00 00 80 00 00 00 00 10 01 82 00 01 00
++			00 00 00 00 00 00 d4 06 82 00 ff 03 00 00 00 00
++			00 00 14 0c 82 00 3f 00 00 00 01 00 00 00 00 14
++			00 00 02 00 00 00 00 00 00 00 44 c1 61 60 01 00
++			00 00 01 00 00 00 20 87 08 00 04 00 00 00 00 00
++			00 00 40 00 82 00 01 00 00 00 00 00 00 00 54 9b
++			41 00 ff 00 00 00 00 00 00 00 68 9b 41 00 03 00
++			00 00 00 00 00 00 40 80 11 00 02 00 00 00 00 00
++			00 00 04 0c 82 00 01 00 00 00 00 00 00 00 04 14
++			00 00 00 04 00 00 00 00 00 00 34 04 82 00 01 00
++			00 00 00 00 00 00 68 08 00 01 02 03 04 05 06 07
++			00 01 02 03 04 05 06 07 41 06 24 06 00 00 00 07
++			00 02 bf 00 01 51 00 04 bf 00 02 5e 00 01 bf 00
++			03 52 00 03 bf 00 84 19 00 00 4f 00 85 7b 59 98
++			4f 00 06 ff 00 00 4f 00 07 ff 00 00 ef 00 08 ff
++			00 00 ef 00 09 ff 00 00 ef 00 0a ff 00 00 ef 00
++			0b ff 00 00 ef 00 0c ff 00 00 ef 00 0d ff 00 00
++			ef 00 0e ff 00 00 ef 00 0f ff 00 00 ef 00 10 42
++			50 11 e4 00 11 41 42 0b e2 00 12 40 41 0a e1 00
++			13 70 51 12 e5 00 14 ff 00 00 ef 00 15 ff 00 00
++			ef 00 16 ff 00 00 ef 00 17 ff 00 00 ef 00 18 ff
++			00 00 ef 00 19 ff 00 00 ef 00 1a ff 00 00 ef 00
++			1b ff 00 00 ef 00 1c ff 00 00 ef 00 1d ff 00 00
++			ef 00 1e ff 00 00 ef 00 1f ff 00 00 ef 00 00 ff
++			00 00 0f 00 00 ff 00 00 0f 00 00 ff 00 00 0f 00
++			00 ff 00 00 0f 00 10 07 16 10 00 bd 0a 01 f0 10
++			03 00 00 00 00 ff ff ff 00 ff ff 00 10 00 00 00
++			00 00 00 1f 01 00 00 00 00 00 00 ff ff ff 00 ff
++			ff 00 10 00 00 00 00 00 00 2f 02 00 00 00 00 00
++			00 ff ff ff 00 ff ff 00 10 00 00 00 00 00 00 3f
++			03 00 00 00 00 00 00 ff ff ff 00 ff ff 00 10 00
++			00 00 00 00 00 4f 04 00 00 00 00 00 00 ff ff ff
++			00 ff ff 00 10 00 00 00 00 00 00 5f 05 00 00 00
++			00 00 00 ff ff ff 00 ff ff 00 10 00 00 00 00 00
++			00 6f 06 00 00 00 00 00 00 ff ff ff 00 ff ff 00
++			10 00 00 00 00 00 00 7f 07 00 00 00 00 00 00 ff
++			ff ff 00 ff ff 00 10 00 00 00 00 00 00 8f 00 00
++			00 00 00 00 00 ff ff ff 00 ff ff 00 10 00 00 00
++			00 00 00 9f 01 00 00 00 00 00 00 ff ff ff 00 ff
++			ff 00 10 00 00 00 00 00 00 af 02 00 00 00 00 00
++			00 ff ff ff 00 ff ff 00 10 00 00 00 00 00 00 bf
++			03 00 00 00 00 00 00 ff ff ff 00 ff ff 00 10 00
++			00 00 00 00 00 cf 04 00 00 00 00 00 00 ff ff ff
++			00 ff ff 00 10 00 00 00 00 00 00 df 05 00 00 00
++			00 00 00 ff ff ff 00 ff ff 00 10 00 00 00 00 00
++			00 ef 06 00 00 00 00 00 00 ff ff ff 00 ff ff 00
++			10 00 00 00 00 00 00 ff 07 00 00 00 00 00 00 ff
++			ff ff 00 ff ff 00 10 00 00 00 00 00 00 00 01 02
++			03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12
++			13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f 10 04 20
++			04 00 00 80 00 b8 4c 0a ff e0 93 04 00 20 d6 13
++			00 e0 93 04 01 20 d6 13 00 ff 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 ff 00 00 00 00 00 00 00
++			00 00 00 00 01 00 00 00 00 ff 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 ff 00 00 00 00 00 00 00
++			00 00 00 00 01 00 00 00 00 ff 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 ff 00 00 00 00 00 00 00
++			00 00 00 00 01 00 00 00 00 ff 00 00 00 00 00 00
++			00 20 05 11 01 00 00 35 0c 00 ff ff ff ff ff ff
++			ff ff ff 00 00 00 00 10 05 11 01 00 00 00 00 ff
++			ff 00 00 00 00 00 00 00 00 00 00 00 00 30 08 10
++			01 14 01 15 0e 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10
++			0d 17 34 b0 8f 11 00 00 00 00 00 00 00 00 00 34
++			a8 04 82 00 00 00 00 00 00 00 00 00 34 a0 04 82
++			00 00 00 00 00 00 00 00 00 34 d4 02 82 00 00 00
++			00 00 00 00 00 00 34 a4 04 82 00 00 00 00 00 00
++			00 00 00 34 7c 14 00 00 00 00 00 00 00 00 00 00
++			34 08 0e 82 00 00 00 00 00 00 00 00 00 34 0c 0e
++			82 00 00 00 00 00 00 00 00 00 34 a8 83 11 00 00
++			00 00 00 00 00 00 00 34 78 01 82 00 00 00 00 00
++			00 00 00 00 34 78 01 82 00 00 00 00 00 00 00 00
++			00 34 ac 04 82 00 00 00 00 00 00 00 00 00 34 94
++			10 82 00 00 00 00 00 00 00 00 00 34 88 10 82 00
++			00 00 00 00 00 00 00 00 34 8c 10 82 00 00 00 00
++			00 00 00 00 00 34 90 10 82 00 00 00 00 00 00 00
++			00 00 34 ac 83 11 00 00 00 00 00 00 00 00 00 34
++			78 01 82 00 00 00 00 00 00 00 00 00 34 d4 02 82
++			00 00 00 00 00 00 00 00 00 34 78 05 82 00 00 00
++			00 00 00 00 00 00 34 b0 04 82 00 00 00 00 00 00
++			00 00 00 34 78 01 82 00 00 00 00 00 00 00 00 00
++			34 7c 07 82 00 00 00 00 00 00 00 00 00 10 03 1b
++			05 80 00 07 60 05 08 40 08 09 60 0d 0a 40 10 0d
++			f0 17 0c e0 15 0e 60 18 0f 40 1c 10 e0 23 15 80
++			24 16 26 29 17 60 2d 18 40 30 19 60 35 1a 60 39
++			1b 60 3d 1d e0 43 1e a5 44 1f 60 49 20 60 4d 21
++			60 51 22 fc 47 23 a0 58 24 66 59 25 2c 5a 26 f2
++			5a 68 74 e1 61 8d e9 54 da de d0 33 c4 0d 30 30
++			cb 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 4e 56 49 44 49 41 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 4e 56 49 44 49 41 20 43 6f 72 70
++			6f 72 61 74 69 6f 6e 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 22 05 02 0e 0c 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 50 04 13 0e 07 95 01
++			95 01 d0 07 a0 0f 1b 00 1b 00 0f 0f 32 ff 01 3f
++			08 95 01 95 01 d0 07 a0 0f 1b 00 1b 00 0f 0f 32
++			ff 01 3f 0b 95 01 95 01 d0 07 a0 0f 1b 00 1b 00
++			0f 0f 32 ff 01 3f 04 e1 00 13 01 94 11 28 23 e1
++			00 13 01 01 01 14 ff 01 02 0c 1b 00 1b 00 40 06
++			80 0c 1b 00 1b 00 01 01 28 ff 01 3f 41 1b 00 1b
++			00 40 06 8c 0a 1b 00 28 00 01 ff 28 ff 03 3f 42
++			1b 00 1b 00 40 06 8c 0a 1b 00 28 00 01 ff 28 ff
++			03 3f 80 1b 00 1b 00 20 03 54 06 1b 00 1b 00 01
++			01 14 ff 01 3f 81 1b 00 1b 00 20 03 54 06 1b 00
++			1b 00 01 01 14 ff 01 3f 82 1b 00 1b 00 20 03 54
++			06 1b 00 1b 00 01 01 14 ff 01 3f 83 1b 00 1b 00
++			20 03 54 06 1b 00 1b 00 01 01 14 ff 01 3f 0d 1b
++			00 1b 00 20 03 54 06 1b 00 1b 00 01 01 14 ff 01
++			3f 0e 1b 00 1b 00 e8 03 d0 07 0d 00 1b 00 01 ff
++			28 ff 01 1f 0f 95 01 95 01 d0 07 a0 0f 1b 00 1b
++			00 0f 0f 32 ff 01 3f 10 04 02 06 00 00 00 07 00
++			07 00 07 00 07 00 07 10 05 04 10 04 0f 0f 0f 0f
++			2f 2f 2f 2f 1c 1c 1c 1c 0f 46 40 00 0f 0f 0f 0f
++			2f 2f 2f 2f 1d 1d 1d 1d 0f 46 40 00 0f 0f 0f 0f
++			2f 2f 2f 2f 1e 1e 1e 1e 0f 46 40 00 0f 0f 0f 0f
++			2f 2f 2f 2f 1f 1f 1f 1f 0f 46 40 00 0f 0f 0f 0f
++			2d 2d 2d 2d 19 19 19 19 0f 46 40 00 0f 0f 0f 0f
++			2c 2c 2c 2c 1b 1b 1b 1b 0f 46 40 00 0f 0f 0f 0f
++			2b 2b 2b 2b 1d 1d 1d 1d 0f 46 40 00 0f 0f 0f 0f
++			2a 2a 2a 2a 1f 1f 1f 1f 0f 46 40 00 0e 0e 0e 0e
++			29 29 29 29 18 18 18 18 0f 46 40 00 0e 0e 0e 0e
++			28 28 28 28 1a 1a 1a 1a 0f 46 40 00 0e 0e 0e 0e
++			27 27 27 27 1c 1c 1c 1c 0f 46 40 00 0e 0e 0e 0e
++			26 26 26 26 1e 1e 1e 1e 0f 46 40 00 0f 0f 0f 0f
++			2d 2d 2d 2d 19 19 19 19 0f 46 40 00 0f 0f 0f 0f
++			2c 2c 2c 2c 1b 1b 1b 1b 0f 46 40 00 0f 0f 0f 0f
++			2b 2b 2b 2b 1d 1d 1d 1d 0f 46 40 00 0f 0f 0f 0f
++			2a 2a 2a 2a 1f 1f 1f 1f 0f 46 40 00 20 19 04 00
++			00 50 32 74 40 e8 80 e4 57 01 04 04 06 31 1a 00
++			00 07 10 00 00 3d 11 00 00 3b 12 00 00 39 13 00
++			00 37 14 00 00 35 15 00 00 33 16 00 00 10 08 0e
++			05 00 2c 04 04 d1 84 00 00 00 00 0a 05 00 06 00
++			00 00 00 00 38 3d 3e 3f 3a 00 00 00 00 05 05 05
++			05 00 00 00 00 00 00 00 00 88 58 24 00 00 00 00
++			00 75 40 00 00 00 00 0a 05 00 06 00 00 00 00 00
++			38 3d 3e 3f 3a 3f 3f 3f 3f 05 05 05 05 0a 0a 0a
++			0a 00 00 00 00 88 58 24 00 00 00 00 00 65 19 00
++			00 00 00 0a 05 00 06 00 00 00 00 00 48 3a 3a 3a
++			3a 3a 3a 3a 3a 00 00 00 00 00 00 00 00 00 00 00
++			00 f8 5a 24 00 00 00 00 00 00 00 00 00 00 00 0a
++			0a 00 06 00 00 00 00 00 58 3a 3a 3a 3a 3a 3a 3a
++			3a 00 00 00 00 00 00 00 00 00 00 00 00 f8 5a 24
++			00 00 00 00 00 03 00 00 01 0a 05 0f 46 40 00 00
++			03 00 44 06 00 00 01 0a 08 0f 46 40 00 00 03 00
++			44 08 00 00 01 0a 05 0f 46 40 00 00 03 00 44 0a
++			00 00 01 0a 05 0f 46 40 00 00 03 00 44 0c 00 00
++			01 0a 08 0f 46 40 00 00 03 00 44 10 08 0e 05 00
++			2c 04 04 d1 84 00 00 00 00 0a 05 00 06 00 00 00
++			00 00 38 3d 3e 3f 3a 00 00 00 00 05 05 05 05 00
++			00 00 00 00 00 00 00 88 58 24 00 00 00 00 00 75
++			40 00 00 00 00 0a 05 00 06 00 00 00 00 00 38 3d
++			3e 3f 3a 00 00 00 00 05 05 05 05 00 00 00 00 00
++			00 00 00 88 58 24 00 00 00 00 00 65 19 00 00 00
++			00 0a 05 00 06 00 00 00 00 00 48 3a 3a 3a 3a 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 f8
++			5a 24 00 00 00 00 00 00 00 00 00 00 00 0a 0a 00
++			06 00 00 00 00 00 58 3a 3a 3a 3a 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 f8 5a 24 00 00
++			00 00 00 0c 00 00 01 0a 05 0f 46 40 00 00 03 00
++			44 0d 00 00 01 0a 08 0f 46 40 00 00 03 00 44 0e
++			00 00 01 0a 05 0f 46 40 00 00 03 00 44 0f 01 00
++			01 0a 05 0f 46 40 00 00 03 00 44 10 01 00 01 0a
++			08 0f 46 40 00 00 03 00 44 10 08 0e 05 00 2c 04
++			04 d1 84 00 00 00 00 0a 05 00 06 00 00 00 00 00
++			38 3d 3e 3f 3a 00 00 00 00 05 05 05 05 00 00 00
++			00 00 00 00 00 88 58 24 00 00 00 00 00 75 40 00
++			00 00 00 0a 05 00 06 00 00 00 00 00 38 3d 3e 3f
++			3a 3f 3f 3f 3f 05 05 05 05 05 05 05 05 00 00 00
++			00 88 58 24 00 00 00 00 00 65 19 00 00 00 00 0a
++			05 00 06 00 00 00 00 00 48 3a 3a 3a 3a 3a 3a 3a
++			3a 00 00 00 00 00 00 00 00 00 00 00 00 f8 5a 24
++			00 00 00 00 00 00 00 00 00 00 00 0a 0a 00 06 00
++			00 00 00 00 58 3a 3a 3a 3a 3a 3a 3a 3a 00 00 00
++			00 00 00 00 00 00 00 00 00 f8 5a 24 00 00 00 00
++			00 0c 01 00 01 0a 05 0f 46 40 00 00 03 00 44 0d
++			01 00 01 0a 08 0f 46 40 00 00 03 00 44 0e 02 00
++			01 0a 05 0f 46 40 00 00 03 00 44 0f 02 00 01 0a
++			05 0f 46 40 00 00 03 00 44 10 02 00 01 0a 08 0f
++			46 40 00 00 03 00 44 10 08 0e 05 00 2c 04 04 d1
++			84 00 00 00 00 0a 05 00 06 00 00 00 00 00 38 3d
++			3e 3f 3a 00 00 00 00 05 05 05 05 00 00 00 00 00
++			00 00 00 88 58 24 00 00 00 00 00 75 40 00 00 00
++			00 0a 05 00 06 00 00 00 00 00 38 3d 3e 3f 3a 00
++			00 00 00 05 05 05 05 00 00 00 00 00 00 00 00 88
++			58 24 00 00 00 00 00 65 19 00 00 00 00 0a 05 00
++			06 00 00 00 00 00 48 3a 3a 3a 3a 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 f8 5a 24 00 00
++			00 00 00 00 00 00 00 00 00 0a 0a 00 06 00 00 00
++			00 00 58 3a 3a 3a 3a 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 f8 5a 24 00 00 00 00 00 0c
++			00 00 01 0a 05 0f 46 40 00 00 03 00 44 0d 00 00
++			01 0a 08 0f 46 40 00 00 03 00 44 0e 00 00 01 0a
++			05 0f 46 40 00 00 03 00 44 0f 01 00 01 0a 05 0f
++			46 40 00 00 03 00 44 10 01 00 01 0a 08 0f 46 40
++			00 00 03 00 44 10 08 0e 05 00 2c 04 04 d1 84 00
++			00 00 00 0a 05 00 06 00 00 00 00 00 38 3d 3e 3f
++			3a 00 00 00 00 05 05 05 05 00 00 00 00 00 00 00
++			00 88 58 24 00 00 00 00 00 75 40 00 00 00 00 0a
++			05 00 06 00 00 00 00 00 38 3d 3e 3f 3a 3f 3f 3f
++			3f 05 05 05 05 08 08 08 08 00 00 00 00 88 58 24
++			00 00 00 00 00 65 19 00 00 00 00 0a 05 00 06 00
++			00 00 00 00 48 3a 3a 3a 3a 3a 3a 3a 3a 00 00 00
++			00 00 00 00 00 00 00 00 00 f8 5a 24 00 00 00 00
++			00 00 00 00 00 00 00 0a 0a 00 06 00 00 00 00 00
++			58 3a 3a 3a 3a 3a 3a 3a 3a 00 00 00 00 00 00 00
++			00 00 00 00 00 f8 5a 24 00 00 00 00 00 0c 01 00
++			01 0a 05 0f 46 40 00 00 03 00 44 0d 01 00 01 0a
++			08 0f 46 40 00 00 03 00 44 0e 02 00 01 0a 05 0f
++			46 40 00 00 03 00 44 0f 02 00 01 0a 05 0f 46 40
++			00 00 03 00 44 10 02 00 01 0a 08 0f 46 40 00 00
++			03 00 44 10 08 0e 05 00 2c 04 04 d1 84 00 00 00
++			00 0a 05 00 06 00 00 00 00 00 38 3d 3e 3f 3a 00
++			00 00 00 05 05 05 05 00 00 00 00 00 00 00 00 88
++			58 24 00 00 00 00 00 75 40 00 00 00 00 0a 05 00
++			06 00 00 00 00 00 38 3d 3e 3f 3a 00 00 00 00 05
++			05 05 05 00 00 00 00 00 00 00 00 88 58 24 00 00
++			00 00 00 65 19 00 00 00 00 0a 05 00 06 00 00 00
++			00 00 48 3a 3a 3a 3a 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 f8 5a 24 00 00 00 00 00 00
++			00 00 00 00 00 0a 0a 00 06 00 00 00 00 00 58 3a
++			3a 3a 3a 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 f8 5a 24 00 00 00 00 00 0c 00 00 01 0a
++			05 0f 46 40 00 00 03 00 44 0d 00 00 01 0a 08 0f
++			46 40 00 00 03 00 44 0e 00 00 01 0a 05 0f 46 40
++			00 00 03 00 44 0f 01 00 01 0a 05 0f 46 40 00 00
++			03 00 44 10 01 00 01 0a 08 0f 46 40 00 00 03 00
++			44 7a 14 c0 61 40 01 00 c2 0d 74 05 00 6e 14 c0
++			61 40 ff ff bf ff 00 00 00 00 6e e4 c5 61 40 fe
++			ff ff ff 00 00 00 00 71 5b b0 1a 71 5b 63 17 5b
++			68 17 71 56 00 ff 72 71 6e 0c c1 61 40 fe ff ff
++			ff 00 00 00 00 6e 40 65 61 80 fe ff ff ff 00 00
++			00 00 71 10 07 01 60 01 60 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 00 00 00 00 00 00 00 00 6e 00 23 61 40 ff
++			ff 80 fc 00 00 23 00 71 6e 00 23 61 40 ff ff 80
++			fc 00 00 27 00 71 6e 00 23 61 40 ff ff 80 fc 00
++			00 2b 00 71 6e 00 23 61 40 ff ff 80 fc 00 00 2f
++			00 71 41 23 10 08 25 19 cb bd dc 4e 78 08 00 00
++			00 00 00 00 67 19 ec 19 c1 00 00 00 00 00 00 00
++			00 00 00 00 00 02 03 80 01 10 00 62 04 0e 03 80
++			01 10 00 02 04 0e 11 02 01 10 00 02 00 2e 32 03
++			02 10 00 02 00 fe 40 04 00 00 00 00 00 0f 00 00
++			00 00 00 00 00 0f 00 00 00 00 00 00 00 0f 00 00
++			00 00 00 00 00 0f 00 00 00 00 00 00 00 0f 00 00
++			00 00 00 00 00 0f 00 00 00 00 00 00 00 0f 00 00
++			00 00 00 00 00 0f 00 00 00 00 00 00 00 0f 00 00
++			00 00 00 00 00 0f 00 00 00 00 00 00 00 0f 00 00
++			00 00 00 00 00 41 06 0f 04 02 0f 06 00 00 10 ff
++			03 00 80 ff 03 00 80 ff 03 00 10 ff 03 00 10 ff
++			03 00 10 ff 03 00 10 ff 03 00 10 ff 03 00 10 ff
++			03 00 10 ff 03 00 00 ff 03 00 00 ff 03 00 00 ff
++			03 00 00 ff 03 00 00 40 05 20 04 01 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00 00
++			ff 00 00 00 ff 00 00 00 ff 00 00 00 40 05 10 04
++			00 61 10 00 00 ff 01 00 00 ff 02 00 00 ff 03 00
++			00 ff 04 00 00 ff 00 00 00 ff 00 00 00 ff 00 00
++			00 ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00
++			00 ff 00 00 00 ff 00 00 00 ff 00 00 00 ff 00 00
++			00 10 05 40 01 00 00 00 0b 03 00 00 0a 02 00 00
++			08 02 00 20 04 02 00 80 00 00 00 80 00 00 00 80
++			00 00 00 80 00 00 00 20 00 00 00 20 00 03 00 00
++			0c 03 00 00 0a 03 00 80 0b 03 00 80 0b 03 00 80
++			0b 03 00 80 0b 03 71 71 6e 14 c0 61 40 ff ff 3f
++			fa 00 00 c0 01 74 05 00 6e 14 c0 61 40 f7 ff ff
++			ff 08 00 00 00 6e b8 c1 61 40 ff ff 3f 81 00 03
++			00 08 6e 00 23 61 40 ff ff 83 fc 00 00 00 00 71
++			58 40 c0 61 40 10 00 00 0a 1d 00 00 0a 04 00 00
++			08 04 00 20 04 04 00 80 00 00 00 80 00 00 00 80
++			00 00 00 80 00 00 00 20 00 00 00 20 00 1d 00 00
++			0c 1d 00 00 0a 1d 00 80 0a 1d 00 80 0a 1d 00 80
++			0a 1d 00 80 0a 1d 71 6e 00 23 61 40 ff ff fc fc
++			00 00 02 03 71 7a 14 c0 61 40 14 00 c2 0d 74 05
++			00 6e 14 c0 61 40 ff ff bf ff 00 00 00 00 74 14
++			00 71 6e 14 c0 61 40 ff ff ff f2 00 00 00 00 74
++			0a 00 6e 00 23 61 40 ff ff fc ff 00 00 01 00 6e
++			0c c1 61 60 ff bf ff ff 00 40 00 00 6e 14 c0 61
++			40 ff ff 7f ff 00 00 00 00 6e 30 c1 61 60 f0 ff
++			ff ff 0f 00 00 00 6e 34 c0 61 40 ff ff ee 7f 00
++			00 00 80 56 17 ff 6e 0c c1 61 60 fc ff ff ff 01
++			00 00 00 6e 30 c1 61 60 0f ff ff ff f0 00 00 00
++			74 0a 00 6e 30 c1 61 60 0f ff ff ff 00 00 00 00
++			6e 10 c1 61 40 e0 e0 e0 e0 00 00 00 00 6e 2c c1
++			61 40 e0 e0 e0 e0 00 00 00 00 3a 05 15 6e 40 c1
++			61 60 fd ff ff ff 02 00 00 00 98 0a 01 00 00 01
++			fe 01 71 98 02 01 00 00 01 d0 00 6e 10 c1 61 40
++			e0 e0 e0 e0 10 10 10 10 6e 2c c1 61 40 e0 e0 e0
++			e0 10 10 10 10 71 5f 0c c1 61 60 00 01 40 ff 40
++			00 00 00 00 40 65 61 80 fe bf 00 bf 3a 00 03 5b
++			14 1c 72 71 3a 07 01 38 6e 40 c1 61 60 fe ff ff
++			ff 01 00 00 00 72 5b 68 1d 52 e8 df 00 71 71 6e
++			0c c1 61 60 fe ff 00 ff 00 00 00 00 6e 30 c1 61
++			40 f0 ff ff ff 00 00 00 00 6e b0 c1 61 40 f0 ff
++			ff ff 00 00 00 00 6e 34 c0 61 40 ff ff ee 7f 00
++			00 11 80 56 17 ff 6e 14 c0 61 40 ff ff 7f ff 00
++			00 80 00 6e 00 23 61 40 ff ff fc ff 00 00 02 00
++			74 05 00 6e 14 c0 61 40 ff ff ff f2 00 00 00 0d
++			74 05 00 6e 14 c0 61 40 ff ff bf ff 00 00 40 00
++			74 05 00 6e 14 c0 61 40 f7 ff ff ff 08 00 00 00
++			6e 0c c0 61 40 ff f0 f0 f0 00 03 05 05 6e b8 c1
++			61 40 ff ff ff 81 00 03 00 08 6e 00 23 61 40 ff
++			ff 83 fc 00 00 00 00 6e 40 c1 61 60 fe ff ff ff
++			00 00 00 00 71 6e 0c c1 61 60 fd ff ff ff 02 00
++			00 00 6e 30 c1 61 60 ff ff bf ff 00 00 40 00 71
++			10 05 40 01 01 00 00 00 00 0a 10 00 00 00 a0 40
++			00 00 80 40 00 00 80 40 00 00 80 40 00 00 80 40
++			00 00 80 40 00 00 20 00 00 32 10 80 00 0a 90 80
++			00 00 80 80 00 00 80 80 00 00 80 80 00 00 80 80
++			00 00 80 80 00 71 71 6e 40 65 61 80 fe ff ff ff
++			00 00 00 00 71 71 98 07 01 00 00 01 ef 10 71 98
++			07 01 00 00 01 ef 00 71 58 40 c0 61 40 10 00 00
++			00 00 32 10 00 00 00 a0 40 00 00 80 40 00 00 80
++			40 00 00 80 40 00 00 80 40 00 00 80 40 00 00 20
++			00 00 32 10 80 00 96 90 80 00 00 80 80 00 00 80
++			80 00 00 80 80 00 00 80 80 00 00 80 80 00 71 42
++			15 02 07 13 04 03 0a 04 28 23 28 23 01 04 04 06
++			00 1d 00 00 00 00 00 00 00 00 00 00 00 00 00 00
++			00 00 14 00 02 19 0a 03 1e 14 04 2b 28 06 1e 00
++			03 25 0f 04 2f 21 06 28 00 04 32 14 06 3c 00 06
++			14 00 02 19 0a 03 1e 14 04 2b 28 06 1e 00 03 25
++			0f 04 2f 21 06 28 00 04 32 14 06 3c 00 06 14 00
++			02 19 0a 03 1e 14 04 2b 28 06 1e 00 03 25 0f 04
++			2f 21 06 28 00 04 32 14 06 3c 00 06 0f 00 02 16
++			09 03 1d 0e 04 27 12 06 17 00 03 21 09 04 27 0e
++			06 1f 00 04 27 09 06 27 00 06 62 1e 00 00 f2 1e
++			00 00 82 1f 00 00 12 20 00 00 a2 20 00 00 32 21
++			00 00 10 08 00 00 00 11 08 00 1e 00 00 00 00 01
++			05 05 00 40 00 00 00 00 00 30 00 14 00 00 00 00
++			01 05 05 00 40 00 00 00 00 00 30 00 10 00 00 00
++			00 01 05 05 00 40 00 00 00 00 00 30 00 0c 00 00
++			00 00 01 05 05 00 40 00 00 00 00 00 30 00 0a 00
++			00 00 00 01 05 05 00 40 00 00 00 00 00 30 00 09
++			00 00 00 00 01 05 05 00 40 00 00 00 00 00 30 00
++			08 00 00 00 00 01 05 05 00 40 00 00 00 00 00 30
++			00 06 00 00 00 00 01 05 05 00 40 00 00 00 00 00
++			30 00 10 08 00 00 00 11 08 00 1e 00 00 00 00 00
++			05 05 00 00 00 00 00 00 00 00 00 14 00 00 00 00
++			00 05 05 00 00 00 00 00 00 00 00 00 10 00 00 00
++			00 03 00 01 00 50 00 00 00 00 00 00 00 0c 00 00
++			00 00 03 00 01 00 50 00 00 00 00 00 00 00 0a 00
++			00 00 00 00 05 05 00 00 00 00 00 00 00 00 00 09
++			00 00 00 00 03 00 01 00 40 00 00 00 00 00 00 00
++			08 00 00 00 00 03 00 01 00 40 00 00 00 00 00 00
++			00 06 00 00 00 00 00 05 05 00 00 00 00 00 00 00
++			00 00 10 08 00 00 00 11 08 00 1e 00 00 00 00 00
++			05 05 00 00 00 00 00 00 00 00 00 14 00 00 00 00
++			00 05 05 00 00 00 00 00 00 00 00 00 10 00 00 00
++			00 03 00 01 00 50 00 00 00 00 00 00 00 0c 00 00
++			00 00 03 00 01 00 50 00 00 00 00 00 00 00 0a 00
++			00 00 00 00 05 05 00 00 00 00 00 00 00 00 00 09
++			00 00 00 00 03 00 01 00 40 00 00 00 00 00 00 00
++			08 00 00 00 00 03 00 01 00 40 00 00 00 00 00 00
++			00 06 00 00 00 00 00 05 05 00 00 00 00 00 00 00
++			00 00 10 08 00 00 00 11 08 00 1e 00 00 00 00 00
++			05 05 00 00 00 00 00 00 00 00 00 14 00 00 00 00
++			00 05 05 00 00 00 00 00 00 00 00 00 10 00 00 00
++			00 03 00 01 00 50 00 00 00 00 00 00 00 0c 00 00
++			00 00 03 00 01 00 50 00 00 00 00 00 00 00 0a 00
++			00 00 00 00 05 05 00 00 00 00 00 00 00 00 00 09
++			00 00 00 00 03 00 01 00 40 00 00 00 00 00 00 00
++			08 00 00 00 00 03 00 01 00 40 00 00 00 00 00 00
++			00 06 00 00 00 00 00 05 05 00 00 00 00 00 00 00
++			00 00 10 08 00 00 00 11 08 00 1e 00 00 00 00 00
++			05 05 00 00 00 00 00 00 00 00 00 14 00 00 00 00
++			00 05 05 00 00 00 00 00 00 00 00 00 10 00 00 00
++			00 03 00 01 00 50 00 00 00 00 00 00 00 0c 00 00
++			00 00 03 00 01 00 50 00 00 00 00 00 00 00 0a 00
++			00 00 00 00 05 05 00 00 00 00 00 00 00 00 00 09
++			00 00 00 00 03 00 01 00 40 00 00 00 00 00 00 00
++			08 00 00 00 00 03 00 01 00 40 00 00 00 00 00 00
++			00 06 00 00 00 00 00 05 05 00 00 00 00 00 00 00
++			00 00 10 08 00 00 00 11 08 00 1e 00 00 00 00 00
++			05 05 00 00 00 00 00 00 00 00 00 14 00 00 00 00
++			00 05 05 00 00 00 00 00 00 00 00 00 10 00 00 00
++			00 03 00 01 00 50 00 00 00 00 00 00 00 0c 00 00
++			00 00 03 00 01 00 50 00 00 00 00 00 00 00 0a 00
++			00 00 00 00 05 05 00 00 00 00 00 00 00 00 00 09
++			00 00 00 00 03 00 01 00 40 00 00 00 00 00 00 00
++			08 00 00 00 00 03 00 01 00 40 00 00 00 00 00 00
++			00 06 00 00 00 00 00 05 05 00 00 00 00 00 00 00
++			00 00 ];
++	};
++};
++
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0000-p3737-0000.dts b/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0000-p3737-0000.dts
+index 210935f..d633e7a 100644
+--- a/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0000-p3737-0000.dts
++++ b/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0000-p3737-0000.dts
+@@ -17,7 +17,8 @@
+ #include "cvm/tegra234-p3701-0000.dtsi"
+ #include "cvb/tegra234-p3737-0000-a04.dtsi"
+ #include "tegra234-power-tree-p3701-0000-p3737-0000.dtsi"
+-#include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01.dtsi"
++//#include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01.dtsi"				//replaced with "tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi" for hdmi 4k on X230(fd)
++#include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi"
+ #include <tegra234-soc/mods-simple-bus.dtsi>
+ #include "cvb/tegra234-p3737-camera-modules.dtsi"
+ 
+@@ -94,6 +95,25 @@
+ 		};
+ 	};
+ 
++	pinmux@2430000 {							//added to set can reset GPIO to low(fd)
++		pinctrl-names = "default", "drive", "unused";
++		pinctrl-0 = <&pinmux_default>;
++		//pinctrl-1 = <&drive_default>;
++		//pinctrl-2 = <&pinmux_unused_lowpower>;
++
++
++		pinmux_default: common {
++			can1_stb_pbb0 {
++				nvidia,pins = "can1_stb_pbb0";
++				nvidia,function = "rsvd0";
++				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
++			};
++		};
++	};
++
++
+ 	reserved-memory {
+ 		linux,cma {
+ 			status = "okay";
+diff --git a/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000.dts b/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000.dts
+index 497b03d..362160d 100644
+--- a/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000.dts
++++ b/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000.dts
+@@ -18,7 +18,8 @@
+ #include "cvm/tegra234-p3701-0000.dtsi"
+ #include "cvb/tegra234-p3737-0000-a04.dtsi"
+ #include "tegra234-power-tree-p3701-0000-p3737-0000.dtsi"
+-#include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01.dtsi"
++//#include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01.dtsi"
++#include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi"							//replaced with "tegra234-dcb-p3701-0000-a02-p3737-0000-a01_hdmi.dtsi" for hdmi 4k on X230(fd)
+ #include <tegra234-soc/mods-simple-bus.dtsi>
+ #include "cvb/tegra234-p3737-camera-modules.dtsi"
+ 
+@@ -94,6 +95,25 @@
+ 		};
+ 	};
+ 
++	pinmux@2430000 {							//added to set can reset GPIO to low(fd)
++		pinctrl-names = "default", "drive", "unused";
++		pinctrl-0 = <&pinmux_default>;
++		//pinctrl-1 = <&drive_default>;
++		//pinctrl-2 = <&pinmux_unused_lowpower>;
++
++
++		pinmux_default: common {
++			can1_stb_pbb0 {
++				nvidia,pins = "can1_stb_pbb0";
++				nvidia,function = "rsvd0";
++				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
++			};
++		};
++	};
++
++
+ 	reserved-memory {
+ 		linux,cma {
+ 			status = "okay";
+diff --git a/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3509-a02.dtsi b/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3509-a02.dtsi
+index b6f1047..c33f4ce 100644
+--- a/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3509-a02.dtsi
++++ b/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3509-a02.dtsi
+@@ -75,6 +75,10 @@
+ 						nvidia,function = "xusb";
+ 						status = "okay";
+ 					};
++					usb2-3 {						//added for USB3 on the JNX42(fd)
++						nvidia,function = "xusb";
++						status = "okay";
++					};
+ 				};
+ 			};
+ 			usb3 {
+@@ -83,6 +87,14 @@
+ 						nvidia,function = "xusb";
+ 						status = "okay";
+ 					};
++					usb3-1 {						//added for USB3 on the JNX42(fd)
++						nvidia,function = "xusb";
++						status = "okay";
++					};
++					usb3-2 {						//added for USB3 on the JNX42(fd)
++						nvidia,function = "xusb";
++						status = "okay";
++					};
+ 				};
+ 			};
+ 		};
+@@ -112,10 +124,22 @@
+                                 vbus-supply = <&p3509_vdd_5v_sys>;
+ 				status = "okay";
+ 			};
++			usb2-3 {								//added for USB3 on the JNX42(fd)
++				mode = "host";
++				status = "okay";
++			};
+ 			usb3-0 {
+ 				nvidia,usb2-companion = <1>;
+ 				status = "okay";
+ 			};
++			usb3-1 {								//added for USB3 on the JNX42(fd)
++				nvidia,usb2-companion = <2>;
++				status = "okay";
++			};
++			usb3-2 {								//added for USB3 on the JNX42(fd)
++				nvidia,usb2-companion = <3>;
++				status = "okay";
++			};
+ 		};
+ 	};
+ 
+@@ -130,8 +154,11 @@
+ 		status = "okay";
+ 		phys = <&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-1}>,
+ 			<&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-2}>,
+-			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-0}>;
+-		phy-names = "usb2-1", "usb2-2", "usb3-0";
++			<&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-3}>,			//added for USB3 on the JNX42(fd)
++			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-0}>,
++			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-1}>,			//added for USB3 on the JNX42(fd)
++			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-2}>;			//added for USB3 on the JNX42(fd)		
++		phy-names = "usb2-1", "usb2-2", "usb2-3", "usb3-0", "usb3-1", "usb3-2"; 	//added usb2-3, usb3-1 and usb3-2 for USB3 on the JNX42(fd)
+ 		nvidia,xusb-padctl = <&xusb_padctl>;
+ 	};
+ 
+diff --git a/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3768-0000-a0.dtsi b/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3768-0000-a0.dtsi
+index 01f41c8..6e8c143 100644
+--- a/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3768-0000-a0.dtsi
++++ b/nvidia/platform/t23x/p3768/kernel-dts/cvb/tegra234-p3768-0000-a0.dtsi
+@@ -75,6 +75,10 @@
+ 						nvidia,function = "xusb";
+ 						status = "okay";
+ 					};
++					usb2-3 {						//added for USB3 on the JNX42(fd)
++						nvidia,function = "xusb";
++						status = "okay";
++					};
+ 				};
+ 			};
+ 			usb3 {
+@@ -87,6 +91,10 @@
+ 						nvidia,function = "xusb";
+ 						status = "okay";
+ 					};
++					usb3-2 {						//added for USB3 on the JNX42(fd)
++						nvidia,function = "xusb";
++						status = "okay";
++					};
+ 				};
+ 			};
+ 		};
+@@ -113,6 +121,10 @@
+ 				vbus-supply = <&p3768_vdd_5v_sys>;
+ 				status = "okay";
+ 			};
++			usb2-3 {								//added for USB3 on the JNX42(fd)
++				mode = "host";
++				status = "okay";
++			};
+ 			usb3-0 {/* Goes to hub */
+ 				nvidia,usb2-companion = <1>;
+ 				status = "okay";
+@@ -121,6 +133,10 @@
+ 				nvidia,usb2-companion = <0>;
+ 				status = "okay";
+ 			};
++			usb3-2 {								//added for USB3 on the JNX42(fd)
++				nvidia,usb2-companion = <3>;
++				status = "okay";
++			};
+ 		};
+ 	};
+ 
+@@ -137,9 +153,11 @@
+ 		phys = <&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-0}>,
+ 			<&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-1}>,
+ 			<&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-2}>,
++			<&{/xusb_padctl@3520000/pads/usb2/lanes/usb2-3}>,			//added for USB3 on the JNX42(fd)
+ 			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-0}>,
+-			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-1}>;
+-		phy-names = "usb2-0", "usb2-1", "usb2-2", "usb3-0", "usb3-1";
++			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-1}>,
++			<&{/xusb_padctl@3520000/pads/usb3/lanes/usb3-2}>;			//added for USB3 on the JNX42(fd)
++		phy-names = "usb2-0", "usb2-1", "usb2-2", "usb2-3", "usb3-0", "usb3-1", "usb3-2";
+ 		nvidia,xusb-padctl = <&xusb_padctl>;
+ 	};
+ 
+diff --git a/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-0000-p3509-a02.dts b/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-0000-p3509-a02.dts
+index 3b0c540..98aae29 100644
+--- a/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-0000-p3509-a02.dts
++++ b/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-0000-p3509-a02.dts
+@@ -14,7 +14,8 @@
+  */
+ 
+ /dts-v1/;
+-#include "tegra234-dcb-p3767-0000-hdmi.dtsi"
++//#include "tegra234-dcb-p3767-0000-hdmi.dtsi"
++#include "tegra234-dcb-p3767-0000-dp.dtsi"				//only needed for JNX46 DP(fd)
+ #include <tegra234-soc/mods-simple-bus.dtsi>
+ #include <t234-common-cvm/tegra234-thermal.dtsi>
+ #include <t234-common-cvm/tegra234-cpuidle.dtsi>

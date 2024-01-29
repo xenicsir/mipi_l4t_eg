@@ -1,13 +1,15 @@
 To build the environment from scratch :
+======================================
 <pre>
-./L4T_r35.1_prepare.sh
-./L4T_r35.1_apply_patches.sh
-./L4T_r35.1_build.sh
+./L4T_r35.1_prepare.sh 35.1
+./L4T_r35.1_apply_patches.sh 35.1 [auvidea]
+./L4T_r35.1_build.sh 35.1
 </pre>
 
 To generate a "light" image (3.5GB) for flashing :
+=================================================
 <pre>
-./L4T_r35.1_gen_delivery_image.sh jetson-xavier-nx-devkit-emmc-dione
+./L4T_r35.1_gen_delivery_image.sh 35.1 jetson-xavier-nx-devkit-emmc-dione
 </pre>
 
 To flash it to the board :
@@ -18,4 +20,9 @@ sudo ./bootloader/mksparse  -v --fillpattern=0 bootloader/system.img.raw bootloa
 sudo NO_ROOTFS=1 NO_RECOVERY_IMG=1 ./flash.sh -r --no-systemimg jetson-xavier-nx-devkit-emmc-dione mmcblk0p1
 </pre>
 
-
+To generate a SD card image :
+=============================
+<pre>
+cd Linux_for_Tegra/tools
+./jetson-disk-image-creator.sh -o sd-blob.img -b jetson-xavier-nx-devkit
+</pre>

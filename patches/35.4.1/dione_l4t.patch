@@ -1,0 +1,190 @@
+diff --git a/jetson-xavier-nx-devkit-dione.conf b/jetson-xavier-nx-devkit-dione.conf
+new file mode 100644
+index 0000000..6f6d729
+--- /dev/null
++++ b/jetson-xavier-nx-devkit-dione.conf
+@@ -0,0 +1 @@
++p3509-0000+p3668-0000-qspi-sd-dione.conf
+\ No newline at end of file
+diff --git a/jetson-xavier-nx-devkit-emmc-dione.conf b/jetson-xavier-nx-devkit-emmc-dione.conf
+new file mode 100644
+index 0000000..00fa19f
+--- /dev/null
++++ b/jetson-xavier-nx-devkit-emmc-dione.conf
+@@ -0,0 +1 @@
++p3509-0000+p3668-0001-qspi-emmc-dione.conf
+\ No newline at end of file
+diff --git a/p3509-0000+p3668-0000-qspi-sd-dione.conf b/p3509-0000+p3668-0000-qspi-sd-dione.conf
+new file mode 100755
+index 0000000..d154a07
+--- /dev/null
++++ b/p3509-0000+p3668-0000-qspi-sd-dione.conf
+@@ -0,0 +1,55 @@
++# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions
++# are met:
++#  * Redistributions of source code must retain the above copyright
++#    notice, this list of conditions and the following disclaimer.
++#  * Redistributions in binary form must reproduce the above copyright
++#    notice, this list of conditions and the following disclaimer in the
++#    documentation and/or other materials provided with the distribution.
++#  * Neither the name of NVIDIA CORPORATION nor the names of its
++#    contributors may be used to endorse or promote products derived
++#    from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
++# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
++# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++# p3509-0000+p3668-0000-qspi-sd.conf: configuration for "P3668(SKU0) + P3509"
++# (T194 P3518).
++
++# Sourced by bash script.
++# Disable unused variable check. Most of these variables are used in an outer
++# script that sources this file.
++
++source "${LDK_DIR}/p3668.conf.common";
++
++BLBlockSize=1048576;
++EMMC_CFG=flash_l4t_t194_spi_sd_p3668.xml;
++DTB_FILE=tegra194-p3668-0000-p3509-0000-dioneir-dual.dtb;
++RECROOTFSSIZE=100MiB
++MISC_COLD_BOOT_CONFIG="tegra194-mb1-bct-misc-sd-l4t.cfg";
++
++# Rootfs A/B:
++if [[ "${ROOTFS_AB}" == 1 && "${ROOTFS_ENC}" == "" ]]; then
++	rootfs_ab=1;
++	EMMC_CFG=flash_l4t_t194_spi_sd_p3668_rootfs_ab.xml;
++# Disk encryption support:
++elif [[ "${ROOTFS_AB}" == "" && "${ROOTFS_ENC}" == 1 ]]; then
++	disk_enc_enable=1;
++	EMMC_CFG=flash_l4t_t194_spi_sd_p3668_enc_rfs.xml;
++# Rootfs A/B + Disk encryption support:
++elif [[ "${ROOTFS_AB}" == 1 && "${ROOTFS_ENC}" == 1 ]]; then
++	rootfs_ab=1;
++	disk_enc_enable=1;
++	EMMC_CFG=flash_l4t_t194_spi_sd_p3668_enc_rootfs_ab.xml;
++fi;
+diff --git a/p3509-0000+p3668-0001-qspi-emmc-dione.conf b/p3509-0000+p3668-0001-qspi-emmc-dione.conf
+new file mode 100755
+index 0000000..f46326c
+--- /dev/null
++++ b/p3509-0000+p3668-0001-qspi-emmc-dione.conf
+@@ -0,0 +1,53 @@
++# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions
++# are met:
++#  * Redistributions of source code must retain the above copyright
++#    notice, this list of conditions and the following disclaimer.
++#  * Redistributions in binary form must reproduce the above copyright
++#    notice, this list of conditions and the following disclaimer in the
++#    documentation and/or other materials provided with the distribution.
++#  * Neither the name of NVIDIA CORPORATION nor the names of its
++#    contributors may be used to endorse or promote products derived
++#    from this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
++# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
++# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
++# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++# p3509-0000+p3668-0001-qspi-emmc.conf: configuration for "P3668(SKU1) + P3509"
++# (T194 P3518).
++
++# Sourced by bash script.
++# Disable unused variable check. Most of these variables are used in an outer
++# script that sources this file.
++
++source "${LDK_DIR}/p3668.conf.common";
++EMMC_CFG=flash_l4t_t194_spi_emmc_p3668.xml;
++DTB_FILE=tegra194-p3668-0001-p3509-0000-dioneir-dual.dtb;
++EMMCSIZE=17179869184;
++RECROOTFSSIZE=100MiB;
++
++# Rootfs A/B:
++if [[ "${ROOTFS_AB}" == 1 && "${ROOTFS_ENC}" == "" ]]; then
++	rootfs_ab=1;
++	EMMC_CFG=flash_l4t_t194_spi_emmc_p3668_rootfs_ab.xml;
++# Disk encryption support:
++elif [[ "${ROOTFS_AB}" == "" && "${ROOTFS_ENC}" == 1 ]]; then
++	disk_enc_enable=1;
++	EMMC_CFG=flash_l4t_t194_spi_emmc_p3668_enc_rfs.xml;
++# Rootfs A/B + Disk encryption support:
++elif [[ "${ROOTFS_AB}" == 1 && "${ROOTFS_ENC}" == 1 ]]; then
++	rootfs_ab=1;
++	disk_enc_enable=1;
++	EMMC_CFG=flash_l4t_t194_spi_emmc_p3668_enc_rootfs_ab.xml;
++fi;
+diff --git a/tools/jetson-disk-image-creator.sh b/tools/jetson-disk-image-creator.sh
+index 7475597..343520a 100755
+--- a/tools/jetson-disk-image-creator.sh
++++ b/tools/jetson-disk-image-creator.sh
+@@ -24,6 +24,7 @@ function usage()
+ 	echo "	sd_blob_name	- valid file name"
+ 	echo "	board		- board name. Supported boards are:"
+ 	echo "			   jetson-xavier-nx-devkit"
++	echo "			   jetson-xavier-nx-devkit-dione"
+ 	echo "			   jetson-agx-xavier-devkit"
+ 	echo "		           jetson-agx-orin-devkit"
+ 	echo "		           jetson-orin-nano-devkit"
+@@ -72,6 +73,19 @@ function check_device()
+ 			;;
+ 		esac
+ 		;;
++	jetson-xavier-nx-devkit-dione)
++		case "${rootfs_dev}" in
++		"SD" | "sd")
++			rootfs_dev="mmcblk0p1"
++			;;
++		"USB" | "usb")
++			rootfs_dev="sda1"
++			;;
++		*)
++			usage "Incorrect root filesystem device - Supported devices - SD, USB"
++			;;
++		esac
++		;;
+ 	jetson-agx-xavier-devkit)
+ 		case "${rootfs_dev}" in
+ 		"SD" | "sd")
+@@ -120,6 +134,9 @@ function check_revision()
+ 	jetson-xavier-nx-devkit)
+ 		rev="000"
+ 		;;
++	jetson-xavier-nx-devkit-dione)
++		rev="000"
++		;;
+ 	esac
+ }
+ 
+@@ -172,6 +189,11 @@ function check_pre_req()
+ 			target="jetson-xavier-nx-devkit"
+ 			storage="sdcard"
+ 			;;
++		jetson-xavier-nx-devkit-dione)
++			boardid="3668"
++			target="jetson-xavier-nx-devkit-dione"
++			storage="sdcard"
++			;;
+ 		jetson-agx-xavier-devkit)
+ 			boardid="2888"
+ 			target="jetson-agx-xavier-devkit"

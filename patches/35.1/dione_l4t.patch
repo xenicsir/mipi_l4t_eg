@@ -134,3 +134,47 @@ index 0000000..f46326c
 +	disk_enc_enable=1;
 +	EMMC_CFG=flash_l4t_t194_spi_emmc_p3668_enc_rootfs_ab.xml;
 +fi;
+diff --git a/tools/jetson-disk-image-creator.sh b/tools/jetson-disk-image-creator.sh
+index 0afebec..453713b 100755
+--- a/tools/jetson-disk-image-creator.sh
++++ b/tools/jetson-disk-image-creator.sh
+@@ -24,6 +24,7 @@ function usage()
+ 	echo "	sd_blob_name	- valid file name"
+ 	echo "	board		- board name. Supported boards are:"
+ 	echo "			   jetson-xavier-nx-devkit"
++	echo "			   jetson-xavier-nx-devkit-dione"
+ 	echo "		           jetson-agx-orin-devkit"
+ 	echo "	revision	- SKU revision number"
+ 	echo "			   jetson-xavier-nx-devkit: default"
+@@ -56,6 +57,9 @@ function check_device()
+ 	jetson-xavier-nx-devkit)
+ 		rootfs_dev="mmcblk0p1"
+ 		;;
++	jetson-xavier-nx-devkit-dione)
++		rootfs_dev="mmcblk0p1"
++		;;
+ 	jetson-agx-orin-devkit)
+ 		case "${rootfs_dev}" in
+ 		"SD" | "sd")
+@@ -78,6 +82,9 @@ function check_revision()
+ 	jetson-xavier-nx-devkit)
+ 		rev="000"
+ 		;;
++	jetson-xavier-nx-devkit-dione)
++		rev="000"
++		;;
+ 	esac
+ }
+ 
+@@ -130,6 +137,11 @@ function check_pre_req()
+ 			target="jetson-xavier-nx-devkit"
+ 			storage="sdcard"
+ 			;;
++		jetson-xavier-nx-devkit-dione)
++			boardid="3668"
++			target="jetson-xavier-nx-devkit-dione"
++			storage="sdcard"
++			;;
+ 		jetson-agx-orin-devkit)
+ 			boardid="3701"
+ 			target="jetson-agx-orin-devkit"

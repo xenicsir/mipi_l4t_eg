@@ -1,8 +1,8 @@
 diff --git a/kernel-5.10/arch/arm64/configs/defconfig b/kernel-5.10/arch/arm64/configs/defconfig
-index c49c5c304..61b51b886 100644
+index ce9f3e0a7..1b3e4970d 100644
 --- a/kernel-5.10/arch/arm64/configs/defconfig
 +++ b/kernel-5.10/arch/arm64/configs/defconfig
-@@ -887,6 +887,7 @@ CONFIG_NV_VIDEO_OV5693=m
+@@ -894,6 +894,7 @@ CONFIG_NV_VIDEO_OV5693=m
  CONFIG_NV_VIDEO_OV9281=m
  CONFIG_NV_VIDEO_OV10823=m
  CONFIG_NV_VIDEO_OV23850=m
@@ -136,12 +136,10 @@ index e7834d982..5e1f56b0b 100644
  
  /**
 diff --git a/nvidia/drivers/media/i2c/Kconfig b/nvidia/drivers/media/i2c/Kconfig
-old mode 100644
-new mode 100755
-index 8362bc85b..79034dcb6
+index 5ec3c683c..92c3af32c 100644
 --- a/nvidia/drivers/media/i2c/Kconfig
 +++ b/nvidia/drivers/media/i2c/Kconfig
-@@ -184,6 +184,14 @@ config NV_VIDEO_AR0234
+@@ -193,6 +193,15 @@ config NV_VIDEO_AR0234
  	  To compile this driver as a module, choose M here: the module
  	  will be called ar0234.
  
@@ -153,28 +151,22 @@ index 8362bc85b..79034dcb6
 +		This driver supports DIONE (640/1280/320/1024) infra camera sensors from Xenics.
 +		To compile this driver as a module, choose M here: the
 +		module will be called dione_ir.
- endmenu
- 
- endif
++
+ config NV_VIDEO_HAWK_OWL
+ 	tristate "Hawk & Owl camera sensor support"
+ 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
 diff --git a/nvidia/drivers/media/i2c/Makefile b/nvidia/drivers/media/i2c/Makefile
-old mode 100644
-new mode 100755
-index af6122bca..35a3535af
+index c4708d8c7..6ac92e2dc 100644
 --- a/nvidia/drivers/media/i2c/Makefile
 +++ b/nvidia/drivers/media/i2c/Makefile
-@@ -23,3 +23,10 @@ obj-$(CONFIG_I2C_IOEXPANDER_DESER_MAX9296) += max9296.o
- obj-$(CONFIG_NV_VIDEO_IMX390) += nv_imx390.o
- obj-$(CONFIG_NV_VIDEO_AR0234) += nv_ar0234.o
+@@ -27,3 +27,5 @@ obj-$(CONFIG_NV_VIDEO_HAWK_OWL) += nv_hawk_owl.o
  obj-$(CONFIG_NV_DESER_MAX96712) += max96712.o
-+
+ obj-$(CONFIG_VIDEO_ECAM) += ar1335.o
+ ar1335-objs :=  ar1335_common.o
 +obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 +dione_ir-y += dioneir.o tc358746_calculation.o
-+dione_ir-y += dioneir.o tc358746_calculation.o
-+dione_ir-y += dioneir.o tc358746_calculation.o
-+dione_ir-y += dioneir.o tc358746_calculation.o
-+
 diff --git a/nvidia/drivers/media/i2c/dioneir.c b/nvidia/drivers/media/i2c/dioneir.c
-new file mode 100644
+new file mode 100755
 index 000000000..386f64912
 --- /dev/null
 +++ b/nvidia/drivers/media/i2c/dioneir.c
@@ -1452,7 +1444,7 @@ index 000000000..386f64912
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
 diff --git a/nvidia/drivers/media/i2c/tc358746_calculation.c b/nvidia/drivers/media/i2c/tc358746_calculation.c
-new file mode 100644
+new file mode 100755
 index 000000000..5f4ffefbd
 --- /dev/null
 +++ b/nvidia/drivers/media/i2c/tc358746_calculation.c
@@ -1962,7 +1954,7 @@ index 000000000..5f4ffefbd
 +	return 0;
 +}
 diff --git a/nvidia/drivers/media/i2c/tc358746_calculation.h b/nvidia/drivers/media/i2c/tc358746_calculation.h
-new file mode 100644
+new file mode 100755
 index 000000000..c0551cfe4
 --- /dev/null
 +++ b/nvidia/drivers/media/i2c/tc358746_calculation.h
@@ -2042,7 +2034,7 @@ index 000000000..c0551cfe4
 +
 +#endif
 diff --git a/nvidia/drivers/media/i2c/tc358746_regs.h b/nvidia/drivers/media/i2c/tc358746_regs.h
-new file mode 100644
+new file mode 100755
 index 000000000..3d730eb94
 --- /dev/null
 +++ b/nvidia/drivers/media/i2c/tc358746_regs.h
