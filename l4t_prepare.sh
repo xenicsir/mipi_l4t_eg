@@ -55,6 +55,7 @@ echo nv_tegra >> .gitignore
 echo nv_tools >> .gitignore
 echo rootfs >> .gitignore
 echo source >> .gitignore
+echo kernel >> .gitignore
 git init
 git add * .gitignore
 git commit -m "Initial state"

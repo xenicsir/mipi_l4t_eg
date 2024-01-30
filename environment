@@ -59,7 +59,7 @@ case "${1}" in
    SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v2.0/release/${SAMPLE_FS_PACKAGE}
    ;;
 *)
-   echo "Incorrect version. Versions 35.1, 35.4.1 are supported"
+   echo "Incorrect version. Versions 35.1, 35.3.1, 35.4.1, 36.2 are supported"
    exit
    ;;
 esac

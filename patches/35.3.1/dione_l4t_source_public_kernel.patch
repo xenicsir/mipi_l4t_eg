@@ -1,5 +1,5 @@
 diff --git a/kernel-5.10/arch/arm64/configs/defconfig b/kernel-5.10/arch/arm64/configs/defconfig
-index ce9f3e0a7..1b3e4970d 100644
+index bda2dff57..1c07541c5 100644
 --- a/kernel-5.10/arch/arm64/configs/defconfig
 +++ b/kernel-5.10/arch/arm64/configs/defconfig
 @@ -894,6 +894,7 @@ CONFIG_NV_VIDEO_OV5693=m
@@ -136,7 +136,7 @@ index e7834d982..5e1f56b0b 100644
  
  /**
 diff --git a/nvidia/drivers/media/i2c/Kconfig b/nvidia/drivers/media/i2c/Kconfig
-index 5ec3c683c..92c3af32c 100644
+index 0592973a8..ce92adde7 100644
 --- a/nvidia/drivers/media/i2c/Kconfig
 +++ b/nvidia/drivers/media/i2c/Kconfig
 @@ -193,6 +193,15 @@ config NV_VIDEO_AR0234
@@ -156,10 +156,10 @@ index 5ec3c683c..92c3af32c 100644
  	tristate "Hawk & Owl camera sensor support"
  	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
 diff --git a/nvidia/drivers/media/i2c/Makefile b/nvidia/drivers/media/i2c/Makefile
-index c4708d8c7..6ac92e2dc 100644
+index f8f6c3ba0..8f21fcf23 100644
 --- a/nvidia/drivers/media/i2c/Makefile
 +++ b/nvidia/drivers/media/i2c/Makefile
-@@ -27,3 +27,5 @@ obj-$(CONFIG_NV_VIDEO_HAWK_OWL) += nv_hawk_owl.o
+@@ -26,3 +26,5 @@ obj-$(CONFIG_NV_VIDEO_HAWK_OWL) += nv_hawk_owl.o
  obj-$(CONFIG_NV_DESER_MAX96712) += max96712.o
  obj-$(CONFIG_VIDEO_ECAM) += ar1335.o
  ar1335-objs :=  ar1335_common.o
