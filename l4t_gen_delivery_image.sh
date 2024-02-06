@@ -5,7 +5,7 @@ pushd $L4T_VERSION
 
 if [[ x$2 == x ]]
 then
-   Please specify the target configuration. E.g. jetson-xavier-nx-devkit-dione
+   echo Please specify the target configuration. E.g. jetson-xavier-nx-devkit-dione
    exit
 fi
 

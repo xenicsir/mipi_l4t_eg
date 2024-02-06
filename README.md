@@ -1,15 +1,15 @@
 To build the environment from scratch :
 ======================================
 <pre>
-./L4T_r35.1_prepare.sh 35.1
-./L4T_r35.1_apply_patches.sh 35.1 [auvidea]
-./L4T_r35.1_build.sh 35.1
+./l4t_prepare.sh 35.1
+./l4t_copy_sources.sh 35.1 [auvidea]
+./l4t_build.sh 35.1
 </pre>
 
 To generate a "light" image (3.5GB) for flashing :
 =================================================
 <pre>
-./L4T_r35.1_gen_delivery_image.sh 35.1 jetson-xavier-nx-devkit-emmc-dione
+./l4t_gen_delivery_image.sh 35.1 jetson-xavier-nx-devkit-emmc-dione
 </pre>
 
 To flash it to the board :
