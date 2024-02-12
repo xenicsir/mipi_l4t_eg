@@ -34,6 +34,8 @@
 #include "tc358746_regs.h"
 #include "tc358746_calculation.h"
 
+#define MAX_I2C_CLIENTS_NUMBER 128
+
 #define DIONE_IR_REG_WIDTH_MAX		0x0002f028
 #define DIONE_IR_REG_HEIGHT_MAX		0x0002f02c
 #define DIONE_IR_REG_MODEL_NAME		0x00000044
@@ -59,6 +61,17 @@ enum {
 	DIONE_IR_MODE_320x240_60FPS,
 	DIONE_IR_MODE_1024x768_60FPS,
 };
+struct dione_ir_i2c_client {
+   struct i2c_client *i2c_client;
+   struct i2c_adapter *root_adap;
+   char chnod_name[128];
+   int i2c_locked ;
+   int chnod_major_number;
+   dev_t chnod_device_number;
+   struct class *pClass_chnod;
+};
+
+struct dione_ir_i2c_client i2c_clients[MAX_I2C_CLIENTS_NUMBER];
 
 static const int dione_ir_60fps[] = {
 	60,
@@ -128,7 +141,7 @@ static const struct regmap_config tx_regmap_config = {
 	.cache_type = REGCACHE_NONE,
 	.max_register = 0x05ff,
 	.reg_format_endian = REGMAP_ENDIAN_BIG,
-	.val_format_endian = REGMAP_ENDIAN_BIG_LITTLE,
+	.val_format_endian = REGMAP_ENDIAN_NATIVE,
 	.rd_table = &tx_regmap_access,
 	.wr_table = &tx_regmap_access,
 	.name = "tc358746-tx",
@@ -173,6 +186,18 @@ struct dione_ir {
 
 static int dione_ir_i2c_read(struct i2c_client *client, u32 addr, u8 *buf, u16 len);
 static int dione_ir_i2c_write32(struct i2c_client *client, u32 addr, u32 val);
+
+static void dione_ir_regmap_format_32_ble(void *buf, unsigned int val)
+{
+   u8 *b = buf;
+   int val_after;
+
+   b[0] = val >> 8;
+   b[1] = val;
+   b[2] = val >> 24;
+   b[3] = val >> 16;
+   val_after = *(int*)buf;
+}
 
 static inline int dione_ir_read_reg(struct camera_common_data *s_data,
 	u16 addr, u8 *val)
@@ -381,33 +406,44 @@ static int tc358746_enable_csi_lanes(struct regmap *regmap,
 				     int lane_num, int enable)
 {
 	u32 val = 0;
+	u32 bleVal = 0;
 	int err = 0;
 
 	if (lane_num < 1 || !enable) {
 		if (!err)
-			err = regmap_write(regmap, CLW_CNTRL,
-					   CLW_CNTRL_CLW_LANEDISABLE_MASK);
+      {
+         dione_ir_regmap_format_32_ble((void *)&bleVal, CLW_CNTRL_CLW_LANEDISABLE_MASK);
+			err = regmap_write(regmap, CLW_CNTRL, bleVal);
+      }
 		if (!err)
-			err = regmap_write(regmap, D0W_CNTRL,
-					   D0W_CNTRL_D0W_LANEDISABLE_MASK);
+      {
+         dione_ir_regmap_format_32_ble((void *)&bleVal, D0W_CNTRL_D0W_LANEDISABLE_MASK);
+			err = regmap_write(regmap, D0W_CNTRL, bleVal);
+      }
 	}
 
 	if (lane_num < 2 || !enable) {
 		if (!err)
-			err = regmap_write(regmap, D1W_CNTRL,
-					   D1W_CNTRL_D1W_LANEDISABLE_MASK);
+      {
+         dione_ir_regmap_format_32_ble((void *)&bleVal, D1W_CNTRL_D1W_LANEDISABLE_MASK);
+			err = regmap_write(regmap, D1W_CNTRL, bleVal);
+      }
 	}
 
 	if (lane_num < 3 || !enable) {
 		if (!err)
-			err = regmap_write(regmap, D2W_CNTRL,
-					   D2W_CNTRL_D2W_LANEDISABLE_MASK);
+      {
+         dione_ir_regmap_format_32_ble((void *)&bleVal, D2W_CNTRL_D2W_LANEDISABLE_MASK);
+			err = regmap_write(regmap, D2W_CNTRL, bleVal);
+      }
 	}
 
 	if (lane_num < 4 || !enable) {
 		if (!err)
-			err = regmap_write(regmap, D3W_CNTRL,
-					   D2W_CNTRL_D3W_LANEDISABLE_MASK);
+      {
+         dione_ir_regmap_format_32_ble((void *)&bleVal, D2W_CNTRL_D3W_LANEDISABLE_MASK);
+			err = regmap_write(regmap, D3W_CNTRL, bleVal);
+      }
 	}
 
 	if (lane_num > 0 && enable) {
@@ -425,7 +461,10 @@ static int tc358746_enable_csi_lanes(struct regmap *regmap,
 		val |= HSTXVREGEN_D3M_HSTXVREGEN_MASK;
 
 	if (!err)
-		err = regmap_write(regmap, HSTXVREGEN, val);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, val);
+		err = regmap_write(regmap, HSTXVREGEN, bleVal);
+   }
 
 	return err;
 }
@@ -433,63 +472,97 @@ static int tc358746_enable_csi_lanes(struct regmap *regmap,
 static int tc358746_set_csi(struct regmap *regmap,
 			    const struct tc358746_csi *csi)
 {
-	u32 val;
+	u32 val, bleVal;
 	int err;
 
 	val = TCLK_HEADERCNT_TCLK_ZEROCNT_SET(csi->tclk_zerocnt) |
 	      TCLK_HEADERCNT_TCLK_PREPARECNT_SET(csi->tclk_preparecnt);
-	err = regmap_write(regmap, TCLK_HEADERCNT, val);
+   dione_ir_regmap_format_32_ble((void *)&bleVal, val);
+	err = regmap_write(regmap, TCLK_HEADERCNT, bleVal);
 
 	val = THS_HEADERCNT_THS_ZEROCNT_SET(csi->ths_zerocnt) |
 	      THS_HEADERCNT_THS_PREPARECNT_SET(csi->ths_preparecnt);
 	if (!err)
-		err = regmap_write(regmap, THS_HEADERCNT, val);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, val);
+		err = regmap_write(regmap, THS_HEADERCNT, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, TWAKEUP, csi->twakeupcnt);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, csi->twakeupcnt);
+		err = regmap_write(regmap, TWAKEUP, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, TCLK_POSTCNT, csi->tclk_postcnt);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, csi->tclk_postcnt);
+		err = regmap_write(regmap, TCLK_POSTCNT, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, THS_TRAILCNT, csi->ths_trailcnt);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, csi->ths_trailcnt);
+		err = regmap_write(regmap, THS_TRAILCNT, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, LINEINITCNT, csi->lineinitcnt);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, csi->lineinitcnt);
+		err = regmap_write(regmap, LINEINITCNT, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, LPTXTIMECNT, csi->lptxtimecnt);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, csi->lptxtimecnt);
+		err = regmap_write(regmap, LPTXTIMECNT, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, TCLK_TRAILCNT, csi->tclk_trailcnt);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, csi->tclk_trailcnt);
+		err = regmap_write(regmap, TCLK_TRAILCNT, bleVal);
+   }
 
 	if (!err)
-		err = regmap_write(regmap, HSTXVREGCNT, CSI_HSTXVREGCNT);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, CSI_HSTXVREGCNT);
+		err = regmap_write(regmap, HSTXVREGCNT, bleVal);
+   }
 
 	val = csi->is_continuous_clk ? TXOPTIONCNTRL_CONTCLKMODE_MASK : 0;
 	if (!err)
-		err = regmap_write(regmap, TXOPTIONCNTRL, val);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, val);
+		err = regmap_write(regmap, TXOPTIONCNTRL, bleVal);
+   }
 
 	return err;
 }
 
 static int tc358746_wr_csi_control(struct regmap *regmap, u32 val)
 {
+	u32 bleVal;
 	val &= CSI_CONFW_DATA_MASK;
 	val |= CSI_CONFW_MODE_SET_MASK | CSI_CONFW_ADDRESS_CSI_CONTROL_MASK;
+   dione_ir_regmap_format_32_ble((void *)&bleVal, val);
 
-	return regmap_write(regmap, CSI_CONFW, val);
+	return regmap_write(regmap, CSI_CONFW, bleVal);
 }
 
 static int tc358746_enable_csi_module(struct regmap *regmap, int lane_num)
 {
-	u32 val;
+	u32 val, bleVal;
 	int err;
 
-	err = regmap_write(regmap, STARTCNTRL, STARTCNTRL_START_MASK);
+   dione_ir_regmap_format_32_ble((void *)&bleVal, STARTCNTRL_START_MASK);
+	err = regmap_write(regmap, STARTCNTRL, bleVal);
 
 	if (!err)
-		err = regmap_write(regmap, CSI_START, CSI_START_STRT_MASK);
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, CSI_START_STRT_MASK);
+		err = regmap_write(regmap, CSI_START, bleVal);
+   }
 
 	val = CSI_CONTROL_NOL_1_MASK;
 	if (lane_num == 2)
@@ -503,7 +576,9 @@ static int tc358746_enable_csi_module(struct regmap *regmap, int lane_num)
 		CSI_CONTROL_EOTDIS_MASK; /* add, according to Excel */
 
 	if (!err)
+   {
 		err = tc358746_wr_csi_control(regmap, val);
+   }
 
 	return err;
 }
@@ -642,6 +717,7 @@ static int dione_ir_stop_streaming(struct tegracam_device *tc_dev)
 	struct regmap *ctl_regmap = s_data->regmap;
 	struct regmap *tx_regmap = priv->tx_regmap;
 	int err;
+   u32 bleVal;
 
 	err = regmap_update_bits(ctl_regmap, PP_MISC, PP_MISC_FRMSTOP_MASK,
 				 PP_MISC_FRMSTOP_MASK);
@@ -655,9 +731,10 @@ static int dione_ir_stop_streaming(struct tegracam_device *tc_dev)
 					 PP_MISC_RSTPTR_MASK);
 
 	if (!err)
-		err = regmap_write(tx_regmap, CSIRESET,
-				   (CSIRESET_RESET_CNF_MASK |
-				    CSIRESET_RESET_MODULE_MASK));
+   {
+      dione_ir_regmap_format_32_ble((void *)&bleVal, CSIRESET_RESET_CNF_MASK | CSIRESET_RESET_MODULE_MASK);
+      err = regmap_write(tx_regmap, CSIRESET, bleVal);
+   }
 	if (!err)
 		err = regmap_write(ctl_regmap, DBG_ACT_LINE_CNT, 0);
 
@@ -856,12 +933,193 @@ static int dione_ir_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
 }
 #endif
 
+static ssize_t dione_ir_chnod_read(
+      struct file *file_ptr
+      , char __user *user_buffer
+      , size_t count
+      , loff_t *position)
+{
+   int ret = -EINVAL;
+   int i;
+   u8 *buffer_i2c = NULL;
+
+   // printk( KERN_NOTICE "chnod: Device file read at offset = %i, bytes count = %u\n"
+   // , (int)*position
+   // , (unsigned int)count );
+
+   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
+   {
+      if (strcmp(i2c_clients[i].chnod_name, file_ptr->f_path.dentry->d_name.name) == 0)
+      {
+         buffer_i2c =  kmalloc(count, GFP_KERNEL);
+         if (buffer_i2c)
+         {
+ 
+            ret = i2c_master_recv(i2c_clients[i].i2c_client, buffer_i2c, count);
+            if (ret <= 0)
+            {
+               printk(KERN_ERR "%s : Error sending read request, ret = %d\n", __func__, ret);
+               kfree(buffer_i2c);
+               return -1;
+            }
+
+            if( copy_to_user(user_buffer, buffer_i2c, count) != 0 )
+            {
+               printk(KERN_ERR "%s : Error, failed to copy from user\n", __func__);
+               kfree(buffer_i2c);
+               return -EFAULT;
+            }
+
+            kfree(buffer_i2c);
+         }
+         else
+         {
+            printk(KERN_ERR "%s : Error allocating memory\n", __func__);
+            return -1;
+         }
+      }
+   }
+
+   return ret;
+}
+
+static ssize_t dione_ir_chnod_write(
+      struct file *file_ptr
+      , const char __user *user_buffer
+      , size_t count
+      , loff_t *position)
+{
+   int ret = -EINVAL;
+   u8 *buffer_i2c = NULL;
+   int i;
+
+   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
+   {
+      if (strcmp(i2c_clients[i].chnod_name, file_ptr->f_path.dentry->d_name.name) == 0)
+      {
+         // printk( KERN_NOTICE "chnod: Device file write at offset = %i, bytes count = %u\n"
+         // , (int)*position
+         // , (unsigned int)count );
+
+         buffer_i2c =  kmalloc(count, GFP_KERNEL);
+         if (buffer_i2c)
+         {
+            if( copy_from_user(buffer_i2c, user_buffer, count) != 0 )
+            {
+               printk(KERN_ERR "%s : Error, failed to copy from user\n", __func__);
+               kfree(buffer_i2c);
+               return -EFAULT;
+            }
+
+            ret = i2c_master_send(i2c_clients[i].i2c_client, buffer_i2c, count);
+            if (ret <= 0)
+            {
+               printk(KERN_ERR "%s : Error sending Write request, ret = %d\n", __func__, ret);
+               kfree(buffer_i2c);
+               return -1;
+            }
+            kfree(buffer_i2c);
+         }
+         else
+         {
+            printk(KERN_ERR "%s : Error allocating memory\n", __func__);
+            return -1;
+         }
+         break;
+      }
+   }
+
+   return ret;
+}
+
+int dione_ir_chnod_open (struct inode * pInode, struct file * file)
+{
+   int i;
+   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
+   {
+      if (strcmp(i2c_clients[i].chnod_name, file->f_path.dentry->d_name.name) == 0)
+      {
+         if (i2c_clients[i].i2c_locked == 0)
+         {
+            i2c_clients[i].i2c_locked = 1;
+            return 0;
+         }
+         else
+         {
+            return -EBUSY;
+         }
+         break;
+      }
+   }
+   return -EINVAL;
+}
+
+int dione_ir_chnod_release (struct inode * pInode, struct file * file)
+{
+   int i;
+   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
+   {
+      if (strcmp(i2c_clients[i].chnod_name, file->f_path.dentry->d_name.name) == 0)
+      {
+         i2c_clients[i].i2c_locked = 0;
+         return 0;
+      }
+   }
+   return -EINVAL;
+}
+
+static struct file_operations dione_ir_chnod_register_fops = 
+{
+   .owner   = THIS_MODULE,
+   .read    = dione_ir_chnod_read,
+   .write   = dione_ir_chnod_write,
+   .open    = dione_ir_chnod_open,
+   .release = dione_ir_chnod_release,
+};
+
+
+static inline int dione_ir_chnod_register_device(int i2c_ind)
+{
+   struct device *pDev;
+   int result = 0;
+   result = register_chrdev( 0, i2c_clients[i2c_ind].chnod_name, &dione_ir_chnod_register_fops );
+   if( result < 0 )
+   {
+      printk( KERN_WARNING "dal register chnod:  can\'t register character device with error code = %i\n", result );
+      return result;
+   }
+   i2c_clients[i2c_ind].chnod_major_number = result;
+   printk( KERN_DEBUG "dal register chnod: registered character device with major number = %i and minor numbers 0...255\n", i2c_clients[i2c_ind].chnod_major_number );
+
+   i2c_clients[i2c_ind].chnod_device_number = MKDEV(i2c_clients[i2c_ind].chnod_major_number, 0);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,4,0)
+   i2c_clients[i2c_ind].pClass_chnod = class_create(THIS_MODULE, i2c_clients[i2c_ind].chnod_name);
+#else
+   i2c_clients[i2c_ind].pClass_chnod = class_create(i2c_clients[i2c_ind].chnod_name);
+#endif
+   if (IS_ERR(i2c_clients[i2c_ind].pClass_chnod)) {
+      printk(KERN_WARNING "\ncan't create class");
+      unregister_chrdev_region(i2c_clients[i2c_ind].chnod_device_number, 1);
+      return -EIO;
+   }
+
+   if (IS_ERR(pDev = device_create(i2c_clients[i2c_ind].pClass_chnod, NULL, i2c_clients[i2c_ind].chnod_device_number, NULL, i2c_clients[i2c_ind].chnod_name))) {
+      printk(KERN_WARNING "Can't create device /dev/%s\n", i2c_clients[i2c_ind].chnod_name);
+      class_destroy(i2c_clients[i2c_ind].pClass_chnod);
+      unregister_chrdev_region(i2c_clients[i2c_ind].chnod_device_number, 1);
+      return -EIO;
+   }
+   return 0;
+}
+
 static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 {
 	struct device *dev = priv->s_data->dev;
 	u32 width, height;
 	u8 buf[64];
 	int i, mode, ret;
+   int err = 0;
 
 	msleep(200);
 
@@ -899,6 +1157,27 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 	for (i = sizeof(buf) - 1; i >= 0 && buf[i] == 0xff; i--)
 		buf[i] = '\0';
 
+   if (priv->fpga_found)
+   {
+      // Find the first i2c client available
+      for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
+      {
+         if (i2c_clients[i].i2c_client == NULL)
+         {
+            i2c_clients[i].i2c_client = priv->fpga_client;
+            sprintf(i2c_clients[i].chnod_name,  "%s-i2c-%02x", dev_driver_string(dev), fpga_addr);
+            dev_info(dev, "chnod: /dev/%s\n", i2c_clients[i].chnod_name);
+            err = dione_ir_chnod_register_device(i);
+            if (err)
+            {
+               dev_err(dev, "chnod register failed\n");
+               i2c_clients[i].chnod_name[0] = 0;
+               return err;
+            }
+            break;
+         }
+      }
+   }
 	dev_info(dev, "dione-ir %ux%u at address %#02x, firmware: %s\n",
 		 width, height, fpga_addr, buf);
 
@@ -938,7 +1217,7 @@ static int dione_ir_board_setup(struct dione_ir *priv)
 #ifdef DIONE_IR_STARTUP_TMO_MS
 	priv->start_up = ktime_get();
 #endif
-	/* Probe sensor model id registers */
+	// Probe sensor model id registers
 	err = regmap_read(ctl_regmap, CHIPID, &reg_val);
 	if (err)
 		goto err_reg_probe;
@@ -1237,11 +1516,30 @@ static int dione_ir_probe(struct i2c_client *client,
 
 static int dione_ir_remove(struct i2c_client *client)
 {
-	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
+	struct device *dev = &client->dev;
+   struct camera_common_data *s_data = to_camera_common_data(dev);
 	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+   int i;
 
 	tegracam_v4l2subdev_unregister(priv->tc_dev);
 	tegracam_device_unregister(priv->tc_dev);
+
+   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
+   {
+      if (i2c_clients[i].chnod_name[0] != 0)
+      {
+         if(i2c_clients[i].chnod_major_number != 0)
+         {
+            device_destroy(i2c_clients[i].pClass_chnod, i2c_clients[i].chnod_device_number);
+            class_destroy(i2c_clients[i].pClass_chnod);
+            unregister_chrdev(i2c_clients[i].chnod_major_number, i2c_clients[i].chnod_name);
+         }
+         dev_info(dev, "Removed %s device\n", i2c_clients[i].chnod_name);
+         i2c_clients[i].i2c_client = NULL;
+         i2c_clients[i].chnod_name[0] = 0;
+         break;
+      }
+   }
 
 	dione_ir_sysfs_remove(client);
 
@@ -1267,6 +1565,6 @@ static struct i2c_driver dione_ir_i2c_driver = {
 module_i2c_driver(dione_ir_i2c_driver);
 
 MODULE_DESCRIPTION("Media Controller driver for Xenics Dione IR sensors");
-MODULE_AUTHOR("Xenics Infrared Solutions / Peter Rozsahegyi, Botond Kardos");
+MODULE_AUTHOR("Xenics Exosens");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");

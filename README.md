@@ -2,7 +2,7 @@ To build the environment from scratch :
 ======================================
 <pre>
 ./l4t_prepare.sh 35.1
-./l4t_copy_sources.sh 35.1 [auvidea]
+./l4t_copy_sources.sh 35.1
 ./l4t_build.sh 35.1
 </pre>
 
