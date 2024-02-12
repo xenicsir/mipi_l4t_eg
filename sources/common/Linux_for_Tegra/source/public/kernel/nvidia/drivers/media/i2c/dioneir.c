@@ -54,8 +54,8 @@ module_param(test_mode, int, 0644);
 module_param(quick_mode, int, 0644);
 
 enum {
-	DIONE_IR_MODE_1280x1024_60FPS,
 	DIONE_IR_MODE_640x480_60FPS,
+	DIONE_IR_MODE_1280x1024_60FPS,
 	DIONE_IR_MODE_320x240_60FPS,
 	DIONE_IR_MODE_1024x768_60FPS,
 };
@@ -69,8 +69,8 @@ static const int dione_ir_60fps[] = {
  * device tree!
  */
 static const struct camera_common_frmfmt dione_ir_frmfmt[] = {
-	{{1280, 1024},	dione_ir_60fps, 1, 0, DIONE_IR_MODE_1280x1024_60FPS},
 	{{640, 480},	dione_ir_60fps, 1, 0, DIONE_IR_MODE_640x480_60FPS},
+	{{1280, 1024},	dione_ir_60fps, 1, 0, DIONE_IR_MODE_1280x1024_60FPS},
 	{{320, 240},	dione_ir_60fps, 1, 0, DIONE_IR_MODE_320x240_60FPS},
 	{{1024, 768},	dione_ir_60fps, 1, 0, DIONE_IR_MODE_1024x768_60FPS},
 	/* Add modes with no device tree support after below */

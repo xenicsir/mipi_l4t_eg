@@ -237,6 +237,7 @@
 
 					embedded_metadata_height = "0";
 				};
+            
 
 				mode1 { /* DIONE_IR_MODE_1280x1024_60FPS */
 					mclk_khz = "24000";
@@ -283,7 +284,6 @@
 
 					embedded_metadata_height = "0";
 				};
-
 				mode2 { /* DIONE_IR_MODE_320x240_60FPS */
 					mclk_khz = "24000";
 					num_lanes = "2";
@@ -500,7 +500,6 @@
 
 					embedded_metadata_height = "0";
 				};
-
 				mode2 { /* DIONE_IR_MODE_320x240_60FPS */
 					mclk_khz = "24000";
 					num_lanes = "2";
