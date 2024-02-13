@@ -1165,7 +1165,7 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
          if (i2c_clients[i].i2c_client == NULL)
          {
             i2c_clients[i].i2c_client = priv->fpga_client;
-            sprintf(i2c_clients[i].chnod_name,  "%s-i2c-%02x", dev_driver_string(dev), fpga_addr);
+            sprintf(i2c_clients[i].chnod_name,  "%s-i2c-%s-%02x", dev_driver_string(dev), dev_name(dev), fpga_addr);
             dev_info(dev, "chnod: /dev/%s\n", i2c_clients[i].chnod_name);
             err = dione_ir_chnod_register_device(i);
             if (err)

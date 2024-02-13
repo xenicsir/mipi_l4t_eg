@@ -184,6 +184,15 @@ config NV_VIDEO_AR0234
 	  To compile this driver as a module, choose M here: the module
 	  will be called ar0234.
 
+config VIDEO_EG_EC_MIPI
+	tristate "Exosens Group EngineCore MIPI camera support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+		This is a Video4Linux2 sensor driver for the Exosens Group EngineCore MIPI cameras.
+		To compile this driver as a module, choose M here: the
+		module will be called eg-ec-mipi.
+
 config VIDEO_DIONE_IR
 	tristate "Dione MIPI camera support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API

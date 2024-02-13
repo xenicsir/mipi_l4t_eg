@@ -15,7 +15,7 @@
 
 /dts-v1/;
 #include "common/tegra194-p3668-common.dtsi"
-#include "common/tegra194-p3509-0000-a00-dioneir-dual.dtsi"
+#include "common/tegra194-p3509-0000-a00-eg-cams.dtsi"
 
 / {
 	nvidia,dtsfilename = __FILE__;

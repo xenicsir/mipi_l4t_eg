@@ -23,5 +23,7 @@ obj-$(CONFIG_I2C_IOEXPANDER_DESER_MAX9296) += max9296.o
 obj-$(CONFIG_NV_VIDEO_IMX390) += nv_imx390.o
 obj-$(CONFIG_NV_VIDEO_AR0234) += nv_ar0234.o
 obj-$(CONFIG_NV_DESER_MAX96712) += max96712.o
+eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
+obj-$(CONFIG_VIDEO_EG_EC_MIPI)	+= eg-ec-mipi.o
 obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 dione_ir-y += dioneir.o tc358746_calculation.o

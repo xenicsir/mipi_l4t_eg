@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "tegra194-camera-dioneir-dual.dtsi"
+#include "tegra194-camera-eg-cams.dtsi"
 
 #define CAM_I2C_MUX TEGRA194_AON_GPIO(CC, 3)
 
