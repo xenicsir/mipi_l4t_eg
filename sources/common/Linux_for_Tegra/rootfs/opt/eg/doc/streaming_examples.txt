@@ -1,0 +1,37 @@
+* Mono16 :
+	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="Y16 " --set-ctrl=sensor_mode=0 --stream-count=1  --stream-to=video.raw
+	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="Y16 " --set-ctrl=sensor_mode=3 --stream-count=1  --stream-to=video.raw
+* ARGB888 :
+	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24" --set-ctrl=sensor_mode=1 --stream-count=1 --stream-to=video.raw
+	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="AR24" --set-ctrl=sensor_mode=4 --stream-count=1 --stream-to=video.raw
+* YCbCr  :
+	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="YUYV" --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=video.raw
+	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=video.raw
+
+* gstream :
+	- Mono16 :
+	to a file (1 image) :
+		gst-launch-1.0 v4l2src device="/dev/video0" num-buffers=1 ! "video/x-raw, format=(string)GRAY16_LE" ! filesink location=video.raw
+	to the screen :
+		gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" ! videoconvert ! ximagesink sync=false
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)GRAY16_LE, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+
+	- RGB888 :
+	native ARGB888 :
+		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)BGRA" ! filesink location=video.raw
+	RGB888
+		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)BGRA" ! videoconvert ! video/x-raw,format=BGR ! filesink location=video.raw
+	to the screen :
+		gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+
+	- YCbYr :
+	to a file (1 image) :
+		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)YUY2" ! filesink location=video.raw
+	to the screen :
+		gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=640, height=480" ! ximagesink sync=false
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! ximagesink sync=false
+
+	to a TCP port :
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device=/dev/video0  ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! videoconvert ! video/x-raw,format=Y444 ! x264enc key-int-max=12 byte-stream=true ! mpegtsmux ! tcpserversink host=0.0.0.0 port=50000
+

@@ -1126,7 +1126,11 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 	dev_info(dev, "probing fpga at address %#02x%s\n",
 		fpga_addr, priv->reva ? " reva" : "");
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,5,0)
+	priv->fpga_client = i2c_new_dummy(priv->tc35_client->adapter, fpga_addr);
+#else
 	priv->fpga_client = i2c_new_dummy_device(priv->tc35_client->adapter, fpga_addr);
+#endif
 	if (!priv->fpga_client)
 		return -ENOMEM;
 
@@ -1514,7 +1518,11 @@ static int dione_ir_probe(struct i2c_client *client,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,1)
 static int dione_ir_remove(struct i2c_client *client)
+#else
+static void dione_ir_remove(struct i2c_client *client)
+#endif
 {
 	struct device *dev = &client->dev;
    struct camera_common_data *s_data = to_camera_common_data(dev);
@@ -1543,7 +1551,9 @@ static int dione_ir_remove(struct i2c_client *client)
 
 	dione_ir_sysfs_remove(client);
 
-	return 0;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(6,1,1)
+   return 0;
+#endif
 }
 
 static const struct i2c_device_id dione_ir_id[] = {

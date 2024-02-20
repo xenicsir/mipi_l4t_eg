@@ -1,0 +1,9 @@
+To enable NVCSI logs :
+	nvcsi_traces.sh
+
+To display logs :
+	cat /sys/kernel/debug/tracing/trace | less
+
+To read NVCSI registers :  WARNING, do it during video streaming, unless the kernel crashes
+	/usr/bin/nvcsi_read_register*.sh
+
