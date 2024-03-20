@@ -29,9 +29,9 @@ then
 fi
 
 # Get toolchain
+cd $JETSON_DIR
 if [[ ! -f ${JETSON_TOOCHAIN_ARCHIVE} ]]
 then
-   cd $JETSON_DIR
    wget $JETSON_TOOCHAIN_ARCHIVE_URL -O ${JETSON_TOOCHAIN_ARCHIVE}
 fi
 if [[ ! -d $JETSON_DIR/$TOOLCHAIN_DIR ]]

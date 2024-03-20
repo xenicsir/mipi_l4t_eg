@@ -250,7 +250,11 @@ static inline int eg_ec_chnod_register_device(int i2c_ind)
 
 	i2c_clients[i2c_ind].chnod_device_number = MKDEV(i2c_clients[i2c_ind].chnod_major_number, 0);
 
-	i2c_clients[i2c_ind].pClass_chnod = class_create(THIS_MODULE, i2c_clients[i2c_ind].chnod_name);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,4,0)
+   i2c_clients[i2c_ind].pClass_chnod = class_create(THIS_MODULE, i2c_clients[i2c_ind].chnod_name);
+#else
+   i2c_clients[i2c_ind].pClass_chnod = class_create(i2c_clients[i2c_ind].chnod_name);
+#endif
 	if (IS_ERR(i2c_clients[i2c_ind].pClass_chnod)) {
 		printk(KERN_WARNING "\ncan't create class");
 		unregister_chrdev_region(i2c_clients[i2c_ind].chnod_device_number, 1);
@@ -588,7 +592,11 @@ err_camera_register:
 	return -EIO;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,1)
 static int eg_ec_mipi_remove(struct i2c_client *client)
+#else
+static void eg_ec_mipi_remove(struct i2c_client *client)
+#endif
 {
 	struct device *dev = &client->dev;
 	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
@@ -617,7 +625,9 @@ static int eg_ec_mipi_remove(struct i2c_client *client)
 		}
 	}
 
-	return 0;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(6,1,1)
+   return 0;
+#endif
 }
 
 static const struct i2c_device_id eg_ec_mipi_id[] = {

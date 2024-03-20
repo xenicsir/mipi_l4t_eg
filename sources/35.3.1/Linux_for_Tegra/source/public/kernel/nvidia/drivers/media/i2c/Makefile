@@ -26,5 +26,7 @@ obj-$(CONFIG_NV_VIDEO_HAWK_OWL) += nv_hawk_owl.o
 obj-$(CONFIG_NV_DESER_MAX96712) += max96712.o
 obj-$(CONFIG_VIDEO_ECAM) += ar1335.o
 ar1335-objs :=  ar1335_common.o
+eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
+obj-$(CONFIG_VIDEO_EG_EC_MIPI)	+= eg-ec-mipi.o
 obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 dione_ir-y += dioneir.o tc358746_calculation.o
