@@ -28,22 +28,24 @@ cd Linux_for_Tegra/tools
 </pre>
 
 To generate a debian package to install on an official nvidia distribution :
-==========================================================================
+============================================================================
+<pre>
 ./l4t_gen_delivery_package.sh $L4T_VERSION
+</pre>
 
 Auvidea X230D kit for Jetson AGX Orin :
 =======================================
-L4T_VERSION = 35.3.1
+L4T_VERSION=35.3.1
 
 ## Building the l4t_eg environment
 This section is for developers needing to rebuild the drivers. Skip the "Flashing with sdkmanager" section.
 
-If you don't need to build the drivers and received the eg-nvidia-l4t-$L4T_VERSION_$TAG_VERSION_arm64.deb package, go to the "Flashing with sdkmanager" section.
+If you don't need to build the drivers and received a "jetson-l4t-$L4T_VERSION-eg-cams_$DRIVERVERSION_arm64.deb" package, go to the "Flashing with sdkmanager" section.
 
 - flash the image before building the drivers :
 <pre>
 ./l4t_prepare.sh $L4T_VERSION
-./l4t_copy_sources.sh $L4T_VERSION auvidea
+./l4t_copy_sources.sh $L4T_VERSION auvidea_X230D
 cd $L4T_VERSION/Linux_for_Tegra
 sudo ./flash.sh jetson-agx-orin-devkit mmcblk0p1
 </pre>
@@ -53,18 +55,18 @@ sudo ./flash.sh jetson-agx-orin-devkit mmcblk0p1
 ./l4t_build.sh $L4T_VERSION
 </pre>
 
-- generate the eg-nvidia-l4t-$L4T_VERSION_$TAG_VERSION_arm64.deb package :
+- generate the jetson-l4t-$L4T_VERSION-eg-cams_$DRIVERVERSION_arm64.deb package :
 <pre>
 ./l4t_gen_delivery_package.sh $L4T_VERSION
 </pre>
 
 ## Flashing with sdkmanager
-Flash the X230D kit following the instructions in the SW Setup Guide https://auvidea.eu/download/Software. Use JetPack 5.1.1 version.
+Flash the Auvidea X230D kit following the instructions in the SW Setup Guide https://auvidea.eu/download/Software. Use the JetPack 5.1.1 version.
 
 ## Install the camera drivers on the board
-- install the eg-nvidia-l4t-$L4T_VERSION_$TAG_VERSION_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+- install the jetson-l4t-$L4T_VERSION-eg-cams_$DRIVERVERSION_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
-sudo dpkg -i eg-nvidia-l4t-$L4T_VERSION_$TAG_VERSION_arm64.deb
+sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_$DRIVERVERSION_arm64.deb
 </pre>
 - edit the /boot/extlinux/extlinux.conf file, create a new entry and make it default  :
 <pre>

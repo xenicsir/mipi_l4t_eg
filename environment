@@ -2,6 +2,11 @@
 
 LINUX_FOR_TEGRA_DIR=Linux_for_Tegra
 ROOT_DIR=$(pwd)
+. /usr/lib/git-core/git-sh-prompt
+GIT_TAG=$(echo $(__git_ps1) | sed 's/[()]//g')
+GIT_COMMIT=$(git rev-parse --short HEAD)
+
+
 
 case "${1}" in
 32.6.1)

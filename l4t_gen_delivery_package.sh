@@ -5,7 +5,7 @@
 cd $JETSON_DIR
 
 KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/)
-PACKAGE_NAME=eg_nvidia_l4t_${L4T_VERSION}
+PACKAGE_NAME=jetson-l4t-${L4T_VERSION}-eg-cams
 sudo rm -rf ${PACKAGE_NAME}*
 
 INSTALL_DIR=${PACKAGE_NAME}/usr
@@ -49,7 +49,7 @@ EOT
 
 if [[ x${2} = x ]]
 then
-	PACKAGE_VERSION="$GIT_VERSION"
+	PACKAGE_VERSION="$GIT_TAG"
 else
 	PACKAGE_VERSION="$2"
 fi

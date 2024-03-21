@@ -1,10 +1,6 @@
 # L4T_r35.1_prepare.sh script must have been executed before
 . environment $@
 
-. /usr/lib/git-core/git-sh-prompt
-GIT_TAG=$(echo $(__git_ps1) | sed 's/[()]//g')
-GIT_COMMIT=$(git rev-parse --short HEAD)
-
 mkdir -p $L4T_VERSION
 pushd $L4T_VERSION
 
@@ -33,12 +29,12 @@ sudo cp -fv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/dts/nvidia/*-eg*.dtb* r
 # Copy modules to destination dir
 sudo rsync --exclude nvgpu.ko -iahHAXxvz --progress $JETSON_KERNEL_SOURCES/modules/lib/modules/ rootfs/lib/modules
 
-echo Jetson_L4T_${L4T_VERSION}_eg_${GIT_TAG}-${GIT_COMMIT} > version_eg_cams
-sudo mv version_eg_cams $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/etc/version_eg_cams
-
+echo jetson-l4t-${L4T_VERSION}_eg-${GIT_TAG}-${GIT_COMMIT} > version_eg_cams
+sudo mv version_eg_cams $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/etc/
 
 #-----------------------------#
 # Flash to the Jetson board   #
 #-----------------------------#
-# For example :
+# For examples :
 #sudo ./flash.sh jetson-xavier-nx-devkit-emmc-dione mmcblk0p1
+#sudo ./flash.sh jetson-agx-orin-devkit mmcblk0p1
