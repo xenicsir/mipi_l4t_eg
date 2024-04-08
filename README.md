@@ -2,7 +2,7 @@ To build the environment from scratch :
 ======================================
 <pre>
 ./l4t_prepare.sh $L4T_VERSION
-./l4t_copy_sources.sh $L4T_VERSION
+./l4t_copy_sources.sh $L4T_VERSION auvidea_X230D
 ./l4t_build.sh $L4T_VERSION
 </pre>
 

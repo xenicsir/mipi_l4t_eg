@@ -41,14 +41,62 @@ function get_cam_dt {
    fi
 }
 
+boardtype=$(cat /proc/device-tree/chosen/ids |awk -F"-" '{print $1}')
+if [[ $boardtype == 3668 ]]
+then
+   echo board type $boardtype : Xavier NX
+fi
+if [[ $boardtype == 3448 ]]
+then
+   echo board type $boardtype : Nano
+fi
+if [[ $boardtype == 3701 ]]
+then
+   echo board type $boardtype : AGX Orin
+fi
 
-cam=None
-get_cam_dt /proc/device-tree/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e /proc/device-tree/cam_i2cmux/i2c@0/eg_ec_a@16
-echo "Camera port 0 configuration : $cam"
+if [[ $boardtype == 3668 || $boardtype == 3448 ]] # Xavier NX or Nano
+then
+   cam=None
+   dione_dev=/proc/device-tree/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e
+   eg_ec_dev=/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_a@16
+   if [[ -d $dione_dev && -d $eg_ec_dev ]]
+   then
+      get_cam_dt $dione_dev $eg_ec_dev
+      echo "Camera port 0 configuration : $cam"
+   fi
 
-cam=None
-get_cam_dt /proc/device-tree/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e /proc/device-tree/cam_i2cmux/i2c@1/eg_ec_c@16
-echo "Camera port 1 configuration : $cam"
+   cam=None
+   dione_dev=/proc/device-tree/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e
+   eg_ec_dev=/proc/device-tree/cam_i2cmux/i2c@1/eg_ec_c@16
+   if [[ -d $dione_dev && -d $eg_ec_dev ]]
+   then
+      get_cam_dt $dione_dev $eg_ec_dev
+      echo "Camera port 1 configuration : $cam"
+   fi
+elif [[ $boardtype == 3701 ]] # AGX Orin
+then
+   cam=None
+   dione_dev=/proc/device-tree/i2c@c240000/xenics_dione_ir_g@0e
+   eg_ec_dev=/proc/device-tree/i2c@c240000/eg_ec_g@16
+   if [[ -d $dione_dev && -d $eg_ec_dev ]]
+   then
+      get_cam_dt $dione_dev $eg_ec_dev
+      echo "Camera port AB configuration : $cam"
+   else
+      echo "Camera port AB configuration missing"
+   fi
 
-
-
+   cam=None
+   dione_dev=/proc/device-tree/i2c@31e0000/xenics_dione_ir_a@0e
+   eg_ec_dev=/proc/device-tree/i2c@31e0000/eg_ec_a@16
+   if [[ -d $dione_dev && -d $eg_ec_dev ]]
+   then
+      get_cam_dt $dione_dev $eg_ec_dev
+      echo "Camera port CD configuration : $cam"
+   else
+      echo "Camera port CD configuration missing"
+   fi
+else
+   echo "Unknown board type $boardtype"
+fi
