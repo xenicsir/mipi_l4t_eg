@@ -23,15 +23,15 @@
 		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)BGRA" ! videoconvert ! video/x-raw,format=BGR ! filesink location=video.raw
 	to the screen :
 		gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=4;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
 
 	- YCbYr :
 	to a file (1 image) :
 		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)YUY2" ! filesink location=video.raw
 	to the screen :
 		gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=640, height=480" ! ximagesink sync=false
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! ximagesink sync=false
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=5;gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! ximagesink sync=false
 
 	to a TCP port :
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device=/dev/video0  ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! videoconvert ! video/x-raw,format=Y444 ! x264enc key-int-max=12 byte-stream=true ! mpegtsmux ! tcpserversink host=0.0.0.0 port=50000
+		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=5;gst-launch-1.0 -v v4l2src device=/dev/video0  ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! videoconvert ! video/x-raw,format=Y444 ! x264enc key-int-max=12 byte-stream=true ! mpegtsmux ! tcpserversink host=0.0.0.0 port=50000
 

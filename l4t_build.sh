@@ -1,6 +1,12 @@
 # L4T_r35.1_prepare.sh script must have been executed before
 . environment $@
 
+if [[ ! -d $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source/public ]]
+then
+   echo "Error : $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source/public folder doesn't exist"
+   exit
+fi
+
 mkdir -p $L4T_VERSION
 pushd $L4T_VERSION
 
@@ -29,7 +35,7 @@ sudo cp -fv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/dts/nvidia/*-eg*.dtb* r
 # Copy modules to destination dir
 sudo rsync --exclude nvgpu.ko -iahHAXxvz --progress $JETSON_KERNEL_SOURCES/modules/lib/modules/ rootfs/lib/modules
 
-echo jetson-l4t-${L4T_VERSION}_eg-${GIT_TAG}-${GIT_COMMIT} > version_eg_cams
+echo jetson-l4t-${L4T_VERSION_EXTENDED}_eg-${GIT_TAG}-${GIT_COMMIT} > version_eg_cams
 sudo mv version_eg_cams $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/etc/
 
 #-----------------------------#

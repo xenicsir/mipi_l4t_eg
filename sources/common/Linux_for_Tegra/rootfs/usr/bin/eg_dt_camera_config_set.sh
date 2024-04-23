@@ -7,7 +7,7 @@ if [[ $boardtype == 3668 || $boardtype == 3448 ]] # Xavier NX or Nano
 then
    port1="0"
    port2="1"
-   dtboname=tegra194-p3668-all-p3509-0000-eg-auvidea-cam${1}
+   dtboname=tegra194-p3668-all-p3509-0000-eg-cam${1}
    dtbfile=/boot/eg/tegra194-p3668-0001-p3509-0000-eg-cams.dtb
 elif [[ $boardtype == 3701 ]] # AGX Orin
 then

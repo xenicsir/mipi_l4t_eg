@@ -9,7 +9,7 @@ ifneq ($(filter y,$(CONFIG_ARCH_TEGRA_23x_SOC)),)
 BUILD_ENABLE=y
 endif
 
-dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-p3737-0000-auvidea.dtb
+dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-p3737-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-as-p3701-0004-p3737-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-as-p3767-0004-p3737-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-as-p3767-0003-p3737-0000.dtb
@@ -22,7 +22,7 @@ dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-as-p3767-0000-p3737-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-as-p3767-0001-p3737-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-as-pxxxx-p3737-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-p3737-0000-kexec.dtb
-dtb-$(BUILD_ENABLE) += tegra234-p3701-0004-p3737-0000-auvidea.dtb
+dtb-$(BUILD_ENABLE) += tegra234-p3701-0004-p3737-0000.dtb
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-audio-codec-rt5658.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-audio-codec-rt5640.dtbo
@@ -43,16 +43,6 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-imx390-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-hawk-owl-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3701-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-dual-hawk-ar0234-e3653-overlay.dtbo
-
-dtb-$(BUILD_ENABLE) += tegra234-p3701-0000-p3737-0000-eg-cams-auvidea.dtb
-dtb-$(BUILD_ENABLE) += tegra234-p3701-0004-p3737-0000-eg-cams-auvidea.dtb
-dtbo-$(BUILD_ENABLE) += tegra234-p3701-all-p3737-0000-eg-auvidea-camAB-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3701-all-p3737-0000-eg-auvidea-camAB-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3701-all-p3737-0000-eg-auvidea-camAB-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3701-all-p3737-0000-eg-auvidea-camCD-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3701-all-p3737-0000-eg-auvidea-camCD-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3701-all-p3737-0000-eg-auvidea-camCD-ec-2-lanes.dtbo
-
 
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))

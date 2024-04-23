@@ -1,6 +1,7 @@
 . environment $@
-mkdir -p $L4T_VERSION
-pushd $L4T_VERSION
+
+
+mkdir -p $JETSON_DIR
 
 #----------------------#
 # Get the Nvidia SDK   #
@@ -21,7 +22,11 @@ then
 fi
 if [[ ! -d $LINUX_FOR_TEGRA_DIR ]]
 then
-   tar xvf ${L4T_RELEASE_PACKAGE}
+   sudo rm -rf tmp_$LINUX_FOR_TEGRA_DIR
+   mkdir tmp_$LINUX_FOR_TEGRA_DIR
+   cd tmp_$LINUX_FOR_TEGRA_DIR
+   tar xvf ../${L4T_RELEASE_PACKAGE}
+   sudo mv Linux_for_Tegra ../$LINUX_FOR_TEGRA_DIR
    cd ${JETSON_DIR}/${LINUX_FOR_TEGRA_DIR}/rootfs/
    sudo tar xpvf ../../${SAMPLE_FS_PACKAGE}
    cd ..
@@ -43,11 +48,31 @@ fi
 
 # Decompress Linux sources
 cd $JETSON_DIR
-tar xvf ${JETSON_PUBLIC_SOURCES}
+sudo rm -rf tmp_$LINUX_FOR_TEGRA_DIR
+mkdir tmp_$LINUX_FOR_TEGRA_DIR
+cd tmp_$LINUX_FOR_TEGRA_DIR
+tar xvf ../${JETSON_PUBLIC_SOURCES}
+
+if [[ -d Linux_for_Tegra/source/public ]]
+then
+   rsync -iahHAXxvz --progress Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
+else
+   # This is done because the 36.2 public_sources.tbz2 is not built correctly
+   # The folder tree is Linux_for_Tegra/source/ instead of Linux_for_Tegra/source/public/
+   mkdir -p $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source
+   rsync -iahHAXxvz --progress Linux_for_Tegra/source/* ../${LINUX_FOR_TEGRA_DIR}/source/public
+fi
+
 cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source/public
 mkdir build
 mkdir modules
 tar -xvf kernel_src.tbz2
+
+# Backup the original Linux_for_tegra folder
+if [[ ! -d $JETSON_DIR/Linux_for_Tegra.orig ]]
+then
+   sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/ $JETSON_DIR/Linux_for_Tegra.orig
+fi
 
 cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/
 echo generate_capsule > .gitignore
@@ -68,6 +93,7 @@ git init
 git add *
 git commit -m "Initial state"
 
+sudo rm -rf $JETSON_DIR/tmp_$LINUX_FOR_TEGRA_DIR
 
 # At this step, the Jetson filesystem would be ready to be flashed if no modification has to be made to the Linux kernel.
 # For example :

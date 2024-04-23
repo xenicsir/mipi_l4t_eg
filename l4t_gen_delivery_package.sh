@@ -2,15 +2,21 @@
 
 . environment $@
 
+if [[ ! -d $JETSON_DIR ]]
+then
+   echo "Error : $JETSON_DIR folder doesn't exist"
+   exit
+fi
+
 cd $JETSON_DIR
 
 KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/)
-PACKAGE_NAME=jetson-l4t-${L4T_VERSION}-eg-cams
-sudo rm -rf ${PACKAGE_NAME}*
+PACKAGE_NAME=jetson-l4t-${L4T_VERSION_EXTENDED}-eg-cams
+sudo rm -rf ${PACKAGE_NAME}
 
 INSTALL_DIR=${PACKAGE_NAME}/usr
 mkdir -p $INSTALL_DIR/
-sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/common/${LINUX_FOR_TEGRA_DIR}/rootfs/usr/ ${INSTALL_DIR}/
+sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/common/Linux_for_Tegra/rootfs/usr/ ${INSTALL_DIR}/
 
 INSTALL_DIR=${PACKAGE_NAME}/etc
 mkdir -p $INSTALL_DIR/
@@ -18,7 +24,7 @@ sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/etc/v
 
 INSTALL_DIR=${PACKAGE_NAME}/opt/eg
 mkdir -p $INSTALL_DIR/
-sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/common/${LINUX_FOR_TEGRA_DIR}/rootfs/opt/eg/ ${INSTALL_DIR}/
+sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/common/Linux_for_Tegra/rootfs/opt/eg/ ${INSTALL_DIR}/
 
 INSTALL_DIR=${PACKAGE_NAME}/boot/eg
 mkdir -p $INSTALL_DIR
@@ -47,11 +53,13 @@ tee -a /tmp/postrm > /dev/null <<EOT
 depmod
 EOT
 
-if [[ x${2} = x ]]
+if [[ x${3} = x ]]
 then
-	PACKAGE_VERSION="$GIT_TAG"
+   # Automatic tag version
+   PACKAGE_VERSION="$GIT_TAG"
 else
-	PACKAGE_VERSION="$2"
+   # Manual version
+   PACKAGE_VERSION="$3"
 fi
 echo PACKAGE_VERSION ${PACKAGE_VERSION}
 
