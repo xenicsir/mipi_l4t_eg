@@ -11,7 +11,7 @@ else
 fi
 echo PACKAGE_VERSION ${PACKAGE_VERSION}
 
-PACKAGE_DIR=jetson-l4t-${L4T_VERSION_EXTENDED}-eg-cams-src
+PACKAGE_DIR=jetson-l4t-${L4T_VERSION_EXTENDED}-eg-cams-src_${PACKAGE_VERSION}
 echo PACKAGE_DIR ${PACKAGE_DIR}
 
 sudo rm -rf ${JETSON_DIR}/${PACKAGE_DIR}
@@ -34,10 +34,10 @@ echo "Usage :" > ${JETSON_DIR}/${PACKAGE_DIR}/README.txt
 echo >> ${JETSON_DIR}/${PACKAGE_DIR}/README.txt
 echo "Merge sources from Linux_for_Tegra.tar.gz to Nvidia Linux_for_Tegra folder" >> ${JETSON_DIR}/${PACKAGE_DIR}/README.txt
 
-exit
-
 cd ${JETSON_DIR}
 tar cvzf ${PACKAGE_DIR}.tar.gz ${PACKAGE_DIR}
+
+exit
 
 PACKAGE_DIR=eg_nvidia_l4t_${L4T_VERSION_EXTENDED}_${PACKAGE_VERSION}_patch
 echo PACKAGE_DIR ${PACKAGE_DIR}

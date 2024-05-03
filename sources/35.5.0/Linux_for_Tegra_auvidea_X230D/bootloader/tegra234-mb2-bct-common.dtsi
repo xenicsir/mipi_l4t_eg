@@ -881,7 +881,7 @@
                 enable = <0x0>;
                 /* SW carveout for DRAM ECC error injection */
                 carveout = <0x31>;
-                va = <0x00000000 0x60000000>;²
+                va = <0x00000000 0x60000000>;
                 /* bypass SMMU */
                 physical = <0x1>;
                 /* use bypass StreamID*/
