@@ -24,10 +24,14 @@ static const struct of_device_id eg_ec_mipi_of_match[] = {
 MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
 
 enum {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
 	EC_MIPI_MODE_640x480_RAW16,
+#endif
 	EC_MIPI_MODE_640x480_RGB888,
 	EC_MIPI_MODE_640x480_YUYV,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
 	EC_MIPI_MODE_1280x1024_RAW16,
+#endif
 	EC_MIPI_MODE_1280x1024_RGB888,
 	EC_MIPI_MODE_1280x1024_YUYV,
 };
@@ -37,10 +41,14 @@ enum {
  * device tree!
  */
 static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
 	{{640, 480},	NULL, 0, 0, EC_MIPI_MODE_640x480_RAW16},
+#endif
 	{{640, 480},	NULL, 0, 0, EC_MIPI_MODE_640x480_RGB888},
 	{{640, 480},	NULL, 0, 0, EC_MIPI_MODE_640x480_YUYV},
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
 	{{1280, 1024},	NULL, 0, 0, EC_MIPI_MODE_1280x1024_RAW16},
+#endif
 	{{1280, 1024},	NULL, 0, 0, EC_MIPI_MODE_1280x1024_RGB888},
 	{{1280, 1024},	NULL, 0, 0, EC_MIPI_MODE_1280x1024_YUYV},
 };
@@ -78,9 +86,13 @@ static ssize_t eg_ec_chnod_read(
 	int i;
 	u8 *buffer_i2c = NULL;
 
-    // printk( KERN_NOTICE "eg-ec chnod: Device file read at offset = %i, bytes count = %u\n"
-                // , (int)*position
-                // , (unsigned int)count );
+   // printk( KERN_NOTICE "eg-ec chnod: Device file read at offset = %i, bytes count = %u\n"
+             // , (int)*position
+             // , (unsigned int)count );
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+   // Need this delay to work on Jetson Nano
+   __ecctrl_i2c_usleep(1000);
+#endif
 
 	for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
 	{
@@ -314,13 +326,18 @@ static inline int eg_ec_mipi_read_reg(struct i2c_client * i2c_client, uint16_t a
 		{
 			if (i2c_clients[i].i2c_locked == 0)
 			{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+			printk( KERN_NOTICE "eg_ec_mipi_read_reg: read at address = 0x%x, size = %d\n"
+						, address
+						, size );
+#endif
 				i2c_clients[i].i2c_locked = 1;
 				__ecctrl_i2c_timeout_set(i2c_client, 0);
 				args.data_address = address;
 				args.data = data;
 				args.data_size = size;
 				args.i2c_timeout = 0;
-				args.i2c_tries_max = -1;
+				args.i2c_tries_max = 1;
 				args.cb = NULL;
 				err = __ecctrl_i2c_read_reg(i2c_client, &args);
 				i2c_clients[i].i2c_locked = 0;
@@ -512,9 +529,9 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 	struct eg_ec_mipi *priv;
 	int err;
 	int i;
-	uint32_t upgradeMode;
+	// uint32_t upgradeMode;
 
-	dev_dbg(dev, "probing v4l2 eg_ec_mipi sensor at addr 0x%0x\n", client->addr);
+	dev_err(dev, "probing v4l2 eg_ec_mipi sensor at addr 0x%0x\n", client->addr);
 
 	// Find the first i2c client available
 	for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
@@ -651,3 +668,4 @@ module_i2c_driver(eg_ec_mipi_i2c_driver);
 MODULE_AUTHOR("Xenics Exosens");
 MODULE_DESCRIPTION("Xenics Exosens MIPI camera I2C driver for EngineCore cameras");
 MODULE_LICENSE("GPL v2");
+MODULE_VERSION("1.0");

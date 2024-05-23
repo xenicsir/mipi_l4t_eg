@@ -29,6 +29,8 @@
 #include <linux/string.h>
 #include <linux/ioctl.h>
 #include <linux/i2c.h>
+#include <linux/slab.h>
+#include <linux/delay.h>
 
 #endif // __KERNEL__
 #else // LINUX
@@ -80,7 +82,7 @@
 
 #define __ecctrl_i2c_malloc(size) kmalloc(size, GFP_KERNEL)
 #define __ecctrl_i2c_free kfree
-#define __ecctrl_i2c_usleep fsleep
+#define __ecctrl_i2c_usleep udelay
 #define __ecctrl_i2c_file_t struct i2c_client *
 
 #define __ecctrl_i2c_write(file, buffer, size) i2c_master_send(file, buffer, size)

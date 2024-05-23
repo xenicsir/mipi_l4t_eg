@@ -1,6 +1,50 @@
+Jetson Nano 2GB Developer Kit :
+===============================
+L4T_VERSION=32.7.1, 32.7.4
+
+## Building the l4t_eg environment
+This section is for developers needing to rebuild the drivers.
+
+- build the L4T environment :
+<pre>
+./l4t_prepare.sh $L4T_VERSION nano
+./l4t_copy_sources.sh $L4T_VERSION nano
+./l4t_build.sh $L4T_VERSION nano
+</pre>
+
+- generate the jetson-l4t-$L4T_VERSION-nano-eg-cams_$DRIVERVERSION_arm64.deb package :
+<pre>
+./l4t_gen_delivery_package.sh $L4T_VERSION nano $DRIVERVERSION
+</pre>
+
+## Flashing the board
+Flash the Nano devkit kit following instructions, for example for L4R R32.7.4 : https://developer.nvidia.com/jetpack-sdk-464
+
+## Install the camera drivers on the board
+- install the jetson-l4t-$L4T_VERSION-nano-eg-cams_$DRIVERVERSION_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+<pre>
+sudo dpkg -i jetson-l4t-$L4T_VERSION-nano-eg-cams_$DRIVERVERSION_arm64.deb
+</pre>
+- edit the /boot/extlinux/extlinux.conf file, create a new entry and make it default  :
+<pre>
+DEFAULT eg-cams
+[...]
+LABEL eg-cams
+      MENU LABEL eg-cams kernel
+      LINUX /boot/eg/Image
+      FDT /boot/eg/tegra210-p3448-0000-p3449-0000-b00-eg-cams.dtb
+      INITRD /boot/initrd
+      APPEND ${cbootargs} quiet root=/dev/mmcblk0p1 rw rootwait rootfstype=ext4 console=ttyS0,115200n8 console=tty0 fbcon=map:0 net.ifnames=0 nv-auto-config
+[...]
+</pre>
+Note : the APPEND line may change from a L4T version to another
+- reboot the Jetson board
+
+
+
 Jetson Xavier NX 16GB commercial (no SD) for Jetson Xavier NX devkit :
 ======================================================================
-L4T_VERSION=35.1 or 35.3.1 or 35.4.1
+L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0
 
 ## Building the l4t_eg environment
 This section is for developers needing to rebuild the drivers. Skip the "Flashing with sdkmanager" section.
@@ -51,7 +95,7 @@ Note : the APPEND line may change from a L4T version to another
 
 Jetson AGX Orin for Auvidea X230D kit :
 =======================================
-L4T_VERSION=35.3.1 or 35.4.1
+L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0
 
 ## Building the l4t_eg environment
 This section is for developers needing to rebuild the drivers. Skip the "Flashing with sdkmanager" section.

@@ -1,7 +1,8 @@
 #/bin/bash
 
 DIONE_CFG="Dione"
-ONE_MIPI_LANE_CFG="MicroCube640"
+NANOVIZIR_CFG="nanovizir"
+ONE_MIPI_LANE_CFG="MicroCube640 and nanovizir"
 TWO_MIPI_LANES_CFG="SmartIR640 and Crius1280"
 
 function get_cam_dt {
@@ -41,21 +42,26 @@ function get_cam_dt {
    fi
 }
 
-boardtype=$(cat /proc/device-tree/chosen/ids |awk -F"-" '{print $1}')
-if [[ $boardtype == 3668 ]]
+board_found=0
+for boardtype in "Jetson Nano" "Jetson Xavier NX" "Jetson AGX Orin"
+do
+   grep "$boardtype" /proc/device-tree/model >> /dev/null
+   if [[ $? == 0 ]]
+   then
+      board_found=1
+      break
+   fi
+done
+
+if [[ board_found == 0 ]]
 then
-   echo board type $boardtype : Xavier NX
-fi
-if [[ $boardtype == 3448 ]]
-then
-   echo board type $boardtype : Nano
-fi
-if [[ $boardtype == 3701 ]]
-then
-   echo board type $boardtype : AGX Orin
+   echo "Unsupported board type $(cat /proc/device-tree/model)"
+   exit
 fi
 
-if [[ $boardtype == 3668 || $boardtype == 3448 ]] # Xavier NX or Nano
+echo board type $boardtype
+
+if [[ $boardtype == "Jetson Xavier NX" ]]
 then
    cam=None
    dione_dev=/proc/device-tree/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e
@@ -74,7 +80,26 @@ then
       get_cam_dt $dione_dev $eg_ec_dev
       echo "Camera port 1 configuration : $cam"
    fi
-elif [[ $boardtype == 3701 ]] # AGX Orin
+elif [[ $boardtype == "Jetson Nano" ]]
+then
+   cam=None
+   dione_dev=/proc/device-tree/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e
+   eg_ec_dev=/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_a@16
+   if [[ -d $dione_dev && -d $eg_ec_dev ]]
+   then
+      get_cam_dt $dione_dev $eg_ec_dev
+      echo "Camera port 0 configuration : $cam"
+   fi
+
+   cam=None
+   dione_dev=/proc/device-tree/cam_i2cmux/i2c@1/xenics_dione_ir_e@0e
+   eg_ec_dev=/proc/device-tree/cam_i2cmux/i2c@1/eg_ec_e@16
+   if [[ -d $dione_dev && -d $eg_ec_dev ]]
+   then
+      get_cam_dt $dione_dev $eg_ec_dev
+      echo "Camera port 1 configuration : $cam"
+   fi
+elif [[ $boardtype == "Jetson AGX Orin" ]]
 then
    cam=None
    dione_dev=/proc/device-tree/i2c@c240000/xenics_dione_ir_g@0e
@@ -97,6 +122,4 @@ then
    else
       echo "Camera port CD configuration missing"
    fi
-else
-   echo "Unknown board type $boardtype"
 fi

@@ -5,7 +5,7 @@
 
 #include "ecctrl_i2c_common.h"
 
-// #define I2C_DELAY_ENABLE
+#define I2C_DELAY_ENABLE
 #define I2C_DELAY 10000
 
 #define CRC8_POLYNOMIAL 	0x38
@@ -963,9 +963,3 @@ continue_read_fifo:
       return STATUS_INT_ERR;
    }
 }
-
-#if defined(__KERNEL__)
-MODULE_AUTHOR("Cyril GERMAINE <c.germaine@exosens.com");
-MODULE_DESCRIPTION("Xenics Exosens camera I2C library");
-MODULE_LICENSE("GPL v2");
-#endif

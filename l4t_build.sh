@@ -16,6 +16,7 @@ TEGRA_KERNEL_OUT=$JETSON_KERNEL_SOURCES/build
 KERNEL_MODULES_OUT=$JETSON_KERNEL_SOURCES/modules
 KERNEL_SOURCES=kernel/kernel-*
 make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=-tegra CROSS_COMPILE=${TOOLCHAIN_PREFIX} tegra_defconfig
+#make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=-tegra CROSS_COMPILE=${TOOLCHAIN_PREFIX} menuconfig
 make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=-tegra CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
 make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=-tegra CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
 make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=-tegra CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
@@ -31,6 +32,7 @@ sudo cp -rfv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/Image rootfs/boot/eg
 # Copy device tree to destination dir
 cp -fv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/dts/* kernel/dtb/
 cp -fv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/dts/nvidia/* kernel/dtb/
+sudo cp -fv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/dts/*-eg*.dtb* rootfs/boot/eg
 sudo cp -fv $JETSON_KERNEL_SOURCES/build/arch/arm64/boot/dts/nvidia/*-eg*.dtb* rootfs/boot/eg
 # Copy modules to destination dir
 sudo rsync --exclude nvgpu.ko -iahHAXxvz --progress $JETSON_KERNEL_SOURCES/modules/lib/modules/ rootfs/lib/modules

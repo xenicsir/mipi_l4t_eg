@@ -50,42 +50,42 @@
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode0";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "25000000";
+         pix_clk_hz = "20000000";
 		};
 	};
 	fragment@5 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode1";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "25000000";
+         pix_clk_hz = "20000000";
 		};
 	};
 	fragment@6 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode2";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "25000000";
+         pix_clk_hz = "20000000";
 		};
 	};
 	fragment@7 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "25000000";
+         pix_clk_hz = "20000000";
 		};
 	};
 	fragment@8 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "25000000";
+         pix_clk_hz = "20000000";
 		};
 	};
 	fragment@9 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "25000000";
+         pix_clk_hz = "20000000";
 		};
 	};
 	fragment@10 {
