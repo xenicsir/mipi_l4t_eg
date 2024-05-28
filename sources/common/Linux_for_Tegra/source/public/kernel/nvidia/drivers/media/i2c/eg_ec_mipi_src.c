@@ -529,9 +529,9 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 	struct eg_ec_mipi *priv;
 	int err;
 	int i;
-	// uint32_t upgradeMode;
+	uint32_t upgradeMode;
 
-	dev_err(dev, "probing v4l2 eg_ec_mipi sensor at addr 0x%0x\n", client->addr);
+	dev_dbg(dev, "probing v4l2 eg_ec_mipi sensor at addr 0x%0x\n", client->addr);
 
 	// Find the first i2c client available
 	for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
@@ -648,14 +648,14 @@ static void eg_ec_mipi_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id eg_ec_mipi_id[] = {
-	{ "eg_ec_mipi_i2c", 0 },
+	{ "eg-ec-mipi", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, eg_ec_mipi_id);
 
 static struct i2c_driver eg_ec_mipi_i2c_driver = {
 	.driver = {
-		.name = "eg_ec_mipi_i2c",
+		.name = "eg-ec-mipi",
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(eg_ec_mipi_of_match),
 	},
