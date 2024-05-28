@@ -42,11 +42,9 @@ dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-camera-imx477
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-camera-imx477-imx219.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam0-dione.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam0-ec-1-lane.dtbo
-dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam0-ec-1-lane-nanovizir.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam0-ec-2-lanes.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam1-dione.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam1-ec-1-lane.dtbo
-dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam1-ec-1-lane-nanovizir.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-p3448-all-p3449-0000-eg-cam1-ec-2-lanes.dtbo
 
 ifneq ($(dtb-y),)
