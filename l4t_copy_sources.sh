@@ -18,7 +18,7 @@ then
 fi
 
 # Make a backup of the sources which are not built
-if [[ ! -d ${JETSON_DIR}/${LINUX_FOR_TEGRA_DIR}.src ]]
-then
-   sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/ $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}.src
-fi
+#if [[ ! -d ${JETSON_DIR}/${LINUX_FOR_TEGRA_DIR}.src ]]
+#then
+#   sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/ $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}.src
+#fi

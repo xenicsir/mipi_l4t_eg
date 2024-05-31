@@ -69,10 +69,10 @@ mkdir modules
 tar -xvf kernel_src.tbz2
 
 # Backup the original Linux_for_tegra folder
-if [[ ! -d $JETSON_DIR/Linux_for_Tegra.orig ]]
-then
-   sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/ $JETSON_DIR/Linux_for_Tegra.orig
-fi
+#if [[ ! -d $JETSON_DIR/Linux_for_Tegra.orig ]]
+#then
+#   sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/ $JETSON_DIR/Linux_for_Tegra.orig
+#fi
 
 cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/
 echo generate_capsule > .gitignore
