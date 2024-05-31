@@ -16,6 +16,7 @@ LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${2}
 L4T_VERSION=$1
 L4T_VERSION_EXTENDED=${L4T_VERSION}_${2}
 ROOT_DIR=$(pwd)
+ARCHIVE_DIR=$ROOT_DIR/archives
 . /usr/lib/git-core/git-sh-prompt
 GIT_TAG=$(echo $(__git_ps1) | sed 's/[()]//g')
 GIT_COMMIT=$(git rev-parse --short HEAD)
