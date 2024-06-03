@@ -117,7 +117,7 @@ Note : the APPEND line may change from a L4T version to another
 
 Jetson AGX Orin for Auvidea X230D kit :
 =======================================
-L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0
+L4T_VERSION=35.3.1, 35.4.1 or 35.5.0
 
 IMPORTANT NOTE : for Auvidea X230D kit, the L4T environment must be built AFTER flashing the board, when using the flash.sh script. Unless the screen will not work.
 
