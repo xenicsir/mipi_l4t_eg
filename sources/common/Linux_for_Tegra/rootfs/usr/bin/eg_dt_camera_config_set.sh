@@ -63,7 +63,7 @@ case $2 in
 Dione)
    dtbofile=/boot/eg/${dtboname}-dione.dtbo
    ;;
-MicroCube640|nanovizir)
+MicroCube640)
    dtbofile=/boot/eg/${dtboname}-ec-1-lane.dtbo
    ;;
 SmartIR640|Crius1280)

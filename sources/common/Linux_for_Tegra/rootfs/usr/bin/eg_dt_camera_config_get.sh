@@ -1,8 +1,7 @@
 #/bin/bash
 
 DIONE_CFG="Dione"
-NANOVIZIR_CFG="nanovizir"
-ONE_MIPI_LANE_CFG="MicroCube640 and nanovizir"
+ONE_MIPI_LANE_CFG="MicroCube640"
 TWO_MIPI_LANES_CFG="SmartIR640 and Crius1280"
 
 function get_cam_dt {
