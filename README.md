@@ -13,7 +13,7 @@ It also gives some hints to help integrating the drivers on other L4T versions a
 
 ## Building and installing MIPI drivers on supported SOM / carrier boards
 
-### Jetson Nano 2GB Developer Kit
+### Jetson Nano
 Supported L4T versions :
 L4T_VERSION=32.7.1, 32.7.4
 
@@ -65,7 +65,16 @@ The package is generated in the $L4T_VERSION folder.
 <pre>
 sudo dpkg -i jetson-l4t-$L4T_VERSION-nano-eg-cams_X.Y.Z_arm64.deb
 </pre>
-- edit the /boot/extlinux/extlinux.conf file, create a new entry and make it default  :
+- make the board boot with the patched kernel and use MIPI cameras device tree
+
+The DT file to use depends on the Jetson SOM version and the carrier board.
+
+Check the original device tree file name. For example : 
+<pre>
+$ sudo dmesg |grep dts
+[    0.212290] DTS File Name: /dvs/git/dirty/git-master_linux/kernel/kernel-4.9/arch/arm64/boot/dts/../../../../../../hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-p3448-0000-p3449-0000-b00.dts
+</pre>
+Here the DT file name is tegra210-p3448-0000-p3449-0000-b00. Then create a new entry accordingly in /boot/extlinux/extlinux.conf and make it default :
 <pre>
 DEFAULT eg-cams
 [...]
@@ -77,7 +86,7 @@ LABEL eg-cams
       APPEND ${cbootargs} quiet root=/dev/mmcblk0p1 rw rootwait rootfstype=ext4 console=ttyS0,115200n8 console=tty0 fbcon=map:0 net.ifnames=0 nv-auto-config
 [...]
 </pre>
-Note : the APPEND line may change from an L4T version to another
+Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
 
 #### 5/ Configuring a camera port to support a camera
@@ -150,7 +159,17 @@ The package is generated in the $L4T_VERSION folder.
 <pre>
 sudo dpkg -i jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb
 </pre>
-- edit the /boot/extlinux/extlinux.conf file, create a new entry and make it default  :
+
+- make the board boot with the patched kernel and use MIPI cameras device tree
+
+The DT file to use depends on the Jetson SOM version and the carrier board.
+
+Check the original device tree file name. For example : 
+<pre>
+$ sudo dmesg |grep dts
+[    0.006884] DTS File Name: /dvs/git/dirty/git-master_linux/kernel/kernel-5.10/arch/arm64/boot/dts/../../../../../../hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-p3668-0001-p3509-0000.dts
+</pre>
+Here the DT file name is tegra194-p3668-0001-p3509-0000. Then create a new entry accordingly in /boot/extlinux/extlinux.conf and make it default :
 <pre>
 DEFAULT eg-cams
 [...]
@@ -162,7 +181,7 @@ LABEL eg-cams
       APPEND ${cbootargs} root=/dev/mmcblk0p1 rw rootwait rootfstype=ext4 console=ttyTCU0,115200n8 console=tty0 fbcon=map:0 net.ifnames=0 video=efifb:off
 [...]
 </pre>
-Note : the APPEND line may change from an L4T version to another
+Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
 
 #### 5/ Configuring a camera port to support a camera
@@ -236,7 +255,16 @@ The package is generated in the $L4T_VERSION folder.
 <pre>
 sudo dpkg -i jetson-l4t-$L4T_VERSION-auvidea-x230d-eg-cams_X.Y.Z_arm64.deb
 </pre>
-- edit the /boot/extlinux/extlinux.conf file, create a new entry and make it default  :
+- make the board boot with the patched kernel and use MIPI cameras device tree
+
+The DT file to use depends on the Jetson SOM version and the carrier board.
+
+Check the original device tree file name. For example : 
+<pre>
+$ sudo dmesg |grep dts
+[    0.003491] DTS File Name: source/public/kernel/kernel-5.10/arch/arm64/boot/dts/../../../../../../hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000-auvidea.dts
+</pre>
+Here the DT file name is tegra234-p3701-0004-p3737-0000-auvidea. Then create a new entry accordingly in /boot/extlinux/extlinux.conf and make it default :
 <pre>
 DEFAULT eg-cams
 [...]
@@ -248,7 +276,7 @@ LABEL eg-cams
       APPEND ${cbootargs} root=/dev/mmcblk0p1 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 console=ttyAMA0,115200 console=tty0 firmware_class.path=/etc/firmware fbcon=map:0 net.ifnames=0
 [...]
 </pre>
-Note : the APPEND line may change from an L4T version to another
+Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
 
 #### 5/ Configuring a camera port to support a camera
