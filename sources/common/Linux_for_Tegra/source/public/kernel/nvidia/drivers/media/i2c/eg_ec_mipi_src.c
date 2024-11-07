@@ -299,8 +299,8 @@ static inline int eg_ec_mipi_write_reg(struct i2c_client * i2c_client, uint16_t 
 				args.data_address = address;
 				args.data = data;
 				args.data_size = size;
-				args.i2c_timeout = 0;
-				args.i2c_tries_max = -1;
+				args.i2c_timeout = 100;
+				args.i2c_tries_max = 1;
 				args.cb = NULL;
 				err = __ecctrl_i2c_write_reg(i2c_client, &args);
 				i2c_clients[i].i2c_locked = 0;
@@ -326,11 +326,6 @@ static inline int eg_ec_mipi_read_reg(struct i2c_client * i2c_client, uint16_t a
 		{
 			if (i2c_clients[i].i2c_locked == 0)
 			{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
-			printk( KERN_NOTICE "eg_ec_mipi_read_reg: read at address = 0x%x, size = %d\n"
-						, address
-						, size );
-#endif
 				i2c_clients[i].i2c_locked = 1;
 				__ecctrl_i2c_timeout_set(i2c_client, 0);
 				args.data_address = address;
@@ -489,13 +484,20 @@ static int eg_ec_mipi_set_mode(struct tegracam_device *tc_dev)
 
 static int eg_ec_mipi_start_streaming(struct tegracam_device *tc_dev)
 {
-	// Configuration is done independently by a control application
+   uint8_t data[4];
+	dev_info(tc_dev->dev, "%s\n", __func__);
+   memset(data, 0, sizeof(data));
+   data[0] = 1;
+   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
 	return 0;
 }
 
 static int eg_ec_mipi_stop_streaming(struct tegracam_device *tc_dev)
 {
-	// Configuration is done independently by a control application
+   uint8_t data[4];
+	dev_info(tc_dev->dev, "%s\n", __func__);
+   memset(data, 0, sizeof(data));
+   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
 	return 0;
 }
 
