@@ -6,7 +6,7 @@ import struct
 import time
 
 IOCTL_I2C_SLAVE=0x0703
-
+IOCTL_I2C_TIMEOUT=0x0702
 
 class dioneCtrl(object):
 
@@ -16,6 +16,8 @@ class dioneCtrl(object):
 
     fcntl.ioctl(self.fr, IOCTL_I2C_SLAVE, dev_addr)
     fcntl.ioctl(self.fw, IOCTL_I2C_SLAVE, dev_addr)
+    fcntl.ioctl(self.fr, IOCTL_I2C_TIMEOUT, 100)
+    fcntl.ioctl(self.fw, IOCTL_I2C_TIMEOUT, 100)
 
     self.last_file_op = -1
 
