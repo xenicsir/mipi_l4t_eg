@@ -228,6 +228,7 @@ Or
 
    [Quick Start Guide L4T 35.3.1](https://docs.nvidia.com/jetson/archives/r35.3.1/DeveloperGuide/text/IN/QuickStart.html) (NVIDIA Jetson Orin Nano, Orin NX, Xavier NX and AGX Xavier)
 - use the L4T flash script :
+IMPORTANT : this has to be done before "Building the L4T environment". When l4t_build.sh is done, the flashing doesn't work (the board doesn't start).
 <pre>
 cd $L4T_VERSION/Linux_for_Tegra_auvidea_X230D
 sudo ./flash.sh jetson-agx-orin-devkit mmcblk0p1
@@ -338,7 +339,7 @@ The *source/$L4T_VERSION/Linux_for_Tegra* folder contains the customized files s
 
 If the need is only to implement a new $L4T_VERSION_NEW version :
 * create the *source/$L4T_VERSION_NEW/Linux_for_Tegra* folder, port and adapt the content of an other *source/$L4T_VERSION/Linux_for_Tegra* folder
-* the *source/common* should be kept unchanged, except if there was an important Linux kernel update changing some kernek APIs. In this last case, some modifications may be needed in drivers code (*sources/common/Linux_for_Tegra/source/public/kernel/nvidia/drivers/media/i2c/*)
+* the *source/common* should be kept unchanged, except if there was an important Linux kernel update changing some kernel APIs. In this last case, some modifications may be needed in drivers code (*sources/common/Linux_for_Tegra/source/public/kernel/nvidia/drivers/media/i2c/*)
 
 Note : the *l4t_copy_sources.sh* script is in charge of copying customized files to the original L4T build environment.
 
@@ -404,7 +405,7 @@ Let's take an example :
 * the "*./l4t_copy_sources.sh 35.5.0 agx_orin_devkit*" command would use only *sources/35.5.0/Linux_for_Tegra*, because the AGC Orin devkit is the native carrier board from NVIDIA. **Note that this command has no effect, as this Nvidia devkit is currently not supported.**
 * the "*./l4t_copy_sources.sh 35.5.0 auvidea_X230D*" command uses *sources/35.5.0/Linux_for_Tegra* and *sources/35.5.0/Linux_for_Tegra_auvidea_X230D*, which contains files provided from Auvidea.
 
-Some for a "vendor_board" board : 
+For a new "vendor_board" board : 
 * create the *sources/35.5.0/Linux_for_Tegra_vendor_board* and put specific files in it
 * use build scripts with *vendor_board* argument. For example : "./l4t_copy_sources.sh $L4T_VERSION vendor_board"
 

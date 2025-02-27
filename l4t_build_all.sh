@@ -13,7 +13,7 @@ else
 fi
 echo PACKAGE_VERSION ${PACKAGE_VERSION}
 
-DELIVERY_FOLDER=delivery/jetson-l4t-${PACKAGE_VERSION}
+DELIVERY_FOLDER=delivery/mipi_jetson-l4t-${PACKAGE_VERSION}
 
 mkdir -p $DELIVERY_FOLDER
 for version in 32.7.1 32.7.4 35.1 35.3.1 35.4.1 35.5.0

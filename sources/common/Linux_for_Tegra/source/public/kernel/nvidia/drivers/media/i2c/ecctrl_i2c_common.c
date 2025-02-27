@@ -58,7 +58,7 @@ int __ecctrl_i2c_timeout_set(__ecctrl_i2c_file_t file, int timeout)
 {
 #if (defined (LINUX) || defined (__linux__))
 #if defined(__KERNEL__)
-   file->adapter->timeout = timeout;
+   file->adapter->timeout = msecs_to_jiffies(timeout);
 #else // __KERNEL__
    ioctl(file, ECCTRL_I2C_TIMEOUT_SET, timeout);
 #endif // __KERNEL__

@@ -259,29 +259,241 @@ static struct tegracam_ctrl_ops dione_ir_ctrl_ops = {
 
 static int dione_ir_power_on(struct camera_common_data *s_data)
 {
-	// Power is not managed here
+	int err = 0;
+	struct camera_common_power_rail *pw = s_data->power;
+	struct camera_common_pdata *pdata = s_data->pdata;
+	struct device *dev = s_data->dev;
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+	bool reset = !priv->reva;
+
+	dev_dbg(dev, "%s: power on\n", __func__);
+	if (pdata && pdata->power_on) {
+		err = pdata->power_on(pw);
+		if (err)
+			dev_err(dev, "%s failed.\n", __func__);
+		else
+			pw->state = SWITCH_ON;
+		return err;
+	}
+
+	if (!priv->quick_mode) {
+		if (pw->reset_gpio) {
+			dev_info(dev, "%s camera power off.\n", __func__);
+			if (gpio_cansleep(pw->reset_gpio))
+         {
+				gpio_set_value_cansleep(pw->reset_gpio, reset);
+         }
+			else
+         {
+				gpio_set_value(pw->reset_gpio, reset);
+         }
+		}
+
+		if (unlikely(!(pw->avdd || pw->iovdd || pw->dvdd)))
+			goto skip_power_seqn;
+
+		usleep_range(10, 20);
+
+		if (pw->avdd) {
+			err = regulator_enable(pw->avdd);
+			if (err)
+				goto dione_ir_avdd_fail;
+		}
+
+		if (pw->iovdd) {
+			err = regulator_enable(pw->iovdd);
+			if (err)
+				goto dione_ir_iovdd_fail;
+		}
+
+		if (pw->dvdd) {
+			err = regulator_enable(pw->dvdd);
+			if (err)
+				goto dione_ir_dvdd_fail;
+		}
+
+		usleep_range(10, 20);
+
+skip_power_seqn:
+		if (pw->reset_gpio) {
+			dev_info(dev, "%s camera power on.\n", __func__);
+			if (gpio_cansleep(pw->reset_gpio))
+				gpio_set_value_cansleep(pw->reset_gpio, !reset);
+			else
+				gpio_set_value(pw->reset_gpio, !reset);
+		}
+
+		usleep_range(23000, 23100);
+		msleep(200);
+	}
+
+	pw->state = SWITCH_ON;
+
 	return 0;
+
+dione_ir_dvdd_fail:
+	regulator_disable(pw->iovdd);
+
+dione_ir_iovdd_fail:
+	regulator_disable(pw->avdd);
+
+dione_ir_avdd_fail:
+	dev_err(dev, "%s failed: %d\n", __func__, err);
+
+	return err;
+
+   // return 0;
 }
 
 static int dione_ir_power_off(struct camera_common_data *s_data)
 {
-	// Power is not managed here
-	return 0;
+	int err = 0;
+	struct camera_common_power_rail *pw = s_data->power;
+	struct camera_common_pdata *pdata = s_data->pdata;
+	struct device *dev = s_data->dev;
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+	bool reset = !priv->reva;
 
+	dev_dbg(dev, "%s: power off\n", __func__);
+
+	if (pdata && pdata->power_off) {
+		err = pdata->power_off(pw);
+		if (err) {
+			dev_err(dev, "%s failed\n", __func__);
+			return err;
+		}
+	} else {
+		if (!priv->quick_mode) {
+			if (pw->reset_gpio) {
+            dev_info(dev, "%s camera power off.\n", __func__);
+				if (gpio_cansleep(pw->reset_gpio))
+					gpio_set_value_cansleep(pw->reset_gpio, reset);
+				else
+					gpio_set_value(pw->reset_gpio, reset);
+			}
+
+			usleep_range(10, 10);
+
+			if (pw->dvdd)
+				regulator_disable(pw->dvdd);
+			if (pw->iovdd)
+				regulator_disable(pw->iovdd);
+			if (pw->avdd)
+				regulator_disable(pw->avdd);
+		}
+	}
+
+	pw->state = SWITCH_OFF;
+
+	return 0;
 }
 
 static int dione_ir_power_put(struct tegracam_device *tc_dev)
 {
-	// Power is not managed here
-	return 0;
+	struct camera_common_data *s_data = tc_dev->s_data;
+	struct camera_common_power_rail *pw = s_data->power;
+	struct dione_ir *priv = (struct dione_ir *)tegracam_get_privdata(tc_dev);
 
+	if (unlikely(!pw))
+		return -EFAULT;
+
+	/* really power off module when removing the driver */
+	priv->quick_mode = 0;
+
+	s_data->ops->power_off(s_data);
+
+	if (likely(pw->dvdd))
+		devm_regulator_put(pw->dvdd);
+
+	if (likely(pw->avdd))
+		devm_regulator_put(pw->avdd);
+
+	if (likely(pw->iovdd))
+		devm_regulator_put(pw->iovdd);
+
+	pw->dvdd = NULL;
+	pw->avdd = NULL;
+	pw->iovdd = NULL;
+
+	if (likely(pw->reset_gpio))
+		gpio_free(pw->reset_gpio);
+
+	if (priv->fpga_client != NULL) {
+		i2c_unregister_device(priv->fpga_client);
+		priv->fpga_client = NULL;
+	}
+
+	return 0;
 }
 
 static int dione_ir_power_get(struct tegracam_device *tc_dev)
 {
-	// Power is not managed here
-	return 0;
+	struct device *dev = tc_dev->dev;
+	struct camera_common_data *s_data = tc_dev->s_data;
+	struct camera_common_power_rail *pw = s_data->power;
+	struct camera_common_pdata *pdata = s_data->pdata;
+	struct clk *parent;
+	int err = 0;
 
+	if (!pdata) {
+		dev_err(dev, "pdata missing\n");
+		return -EFAULT;
+	}
+
+	/* Sensor MCLK (aka. INCK) */
+	if (pdata->mclk_name) {
+		pw->mclk = devm_clk_get(dev, pdata->mclk_name);
+		if (IS_ERR(pw->mclk)) {
+			dev_err(dev, "unable to get clock %s\n",
+				pdata->mclk_name);
+			return PTR_ERR(pw->mclk);
+		}
+
+		if (pdata->parentclk_name) {
+			parent = devm_clk_get(dev, pdata->parentclk_name);
+			if (IS_ERR(parent)) {
+				dev_err(dev, "unable to get parent clock %s\n",
+					pdata->parentclk_name);
+			} else
+				clk_set_parent(pw->mclk, parent);
+		}
+	}
+
+	/* analog 2.8v */
+	if (pdata->regulators.avdd)
+		err |= camera_common_regulator_get(dev,
+				&pw->avdd, pdata->regulators.avdd);
+	/* IO 1.8v */
+	if (pdata->regulators.iovdd)
+		err |= camera_common_regulator_get(dev,
+				&pw->iovdd, pdata->regulators.iovdd);
+	/* dig 1.2v */
+	if (pdata->regulators.dvdd)
+		err |= camera_common_regulator_get(dev,
+				&pw->dvdd, pdata->regulators.dvdd);
+	if (err) {
+		dev_err(dev, "%s: unable to get regulator(s)\n", __func__);
+		goto done;
+	}
+
+	/* Reset or ENABLE GPIO */
+	pw->reset_gpio = pdata->reset_gpio;
+   if (pw->reset_gpio)
+   {
+      err = gpio_request(pw->reset_gpio, "cam_reset_gpio");
+      if (err < 0) {
+         dev_err(dev, "%s: unable to request reset_gpio (%d)\n",
+            __func__, err);
+         goto done;
+      }
+   }
+
+done:
+	pw->state = SWITCH_OFF;
+
+	return err;
+   
+   // return 0;
 }
 
 static struct camera_common_pdata *dione_ir_parse_dt(
@@ -291,6 +503,9 @@ static struct camera_common_pdata *dione_ir_parse_dt(
 	struct device_node *np = dev->of_node;
 	struct camera_common_pdata *board_priv_pdata;
 	const struct of_device_id *match;
+	struct camera_common_pdata *ret = NULL;
+	int err = 0;
+	int gpio;
 
 	if (!np)
 		return NULL;
@@ -306,7 +521,39 @@ static struct camera_common_pdata *dione_ir_parse_dt(
 	if (!board_priv_pdata)
 		return NULL;
 
+	gpio = of_get_named_gpio(np, "reset-gpios", 0);
+	if (gpio < 0) {
+      board_priv_pdata->reset_gpio = 0;
+	}
+   else
+   {
+      board_priv_pdata->reset_gpio = gpio;
+   }
+
+	err = of_property_read_string(np, "mclk", &board_priv_pdata->mclk_name);
+	if (err)
+		dev_dbg(dev, "mclk name not present, "
+			"assume sensor driven externally\n");
+
+	err = of_property_read_string(np, "avdd-reg",
+		&board_priv_pdata->regulators.avdd);
+	err |= of_property_read_string(np, "iovdd-reg",
+		&board_priv_pdata->regulators.iovdd);
+	err |= of_property_read_string(np, "dvdd-reg",
+		&board_priv_pdata->regulators.dvdd);
+	if (err)
+		dev_dbg(dev, "avdd, iovdd and/or dvdd reglrs. not present, "
+			"assume sensor powered independently\n");
+
+	board_priv_pdata->has_eeprom =
+		of_property_read_bool(np, "has-eeprom");
+
 	return board_priv_pdata;
+
+// error:
+	// devm_kfree(dev, board_priv_pdata);
+
+	return ret;
 }
 
 static inline int tc358746_sleep_mode(struct regmap *regmap, int enable)
@@ -1150,7 +1397,7 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 		goto error;
 	}
 
-   dev_err(dev, "%s fpga_found\n", __func__);
+   dev_info(dev, "%s fpga_found\n", __func__);
 	priv->fpga_found = true;
 
 	ret = dione_ir_i2c_read(priv->fpga_client, DIONE_IR_REG_FIRMWARE_VERSION,
@@ -1233,7 +1480,7 @@ static int dione_ir_board_setup(struct dione_ir *priv)
 		goto err_reg_probe;
 	}
 
-   dev_err(dev, "%s tc35_found\n", __func__);
+   dev_info(dev, "%s tc35_found\n", __func__);
 	priv->tc35_found = true;
 
 	if (err) {
@@ -1252,7 +1499,13 @@ static int dione_ir_board_setup(struct dione_ir *priv)
 	}
 
 	if (err < 0)
+   {
 		goto err_reg_probe;
+   }
+   else
+   {
+		goto done;
+   }
 
 err_reg_probe:
 	s_data->ops->power_off(s_data);
