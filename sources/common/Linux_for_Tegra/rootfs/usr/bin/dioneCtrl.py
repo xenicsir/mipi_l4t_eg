@@ -40,7 +40,10 @@ class dioneCtrl(object):
     ret=self.fr.read(6)
     # print(ret)
     val=struct.unpack('<L', ret[2:])
-    return struct.unpack('!f', bytes.fromhex(f'{val[0]:x}'))[0]
+    if (val[0] == 0):
+       return  0.0
+    else :
+       return struct.unpack('!f', bytes.fromhex(f'{val[0]:x}'))[0]
 
   def write_reg32(self, reg_addr, val):
     out=bytearray(reg_addr.to_bytes(4, 'little')) \
