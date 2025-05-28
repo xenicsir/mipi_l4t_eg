@@ -32,11 +32,31 @@ class dioneCtrl(object):
     val=struct.unpack('<L', ret[2:])
     return val[0]
 
+  def read_reg32f(self, reg_addr):
+    time.sleep(0.01)
+    out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
+    self.fw.write(out)
+    time.sleep(0.01)
+    ret=self.fr.read(6)
+    # print(ret)
+    val=struct.unpack('<L', ret[2:])
+    if (val[0] == 0):
+       return  0.0
+    else :
+       return struct.unpack('!f', bytes.fromhex(f'{val[0]:x}'))[0]
 
   def write_reg32(self, reg_addr, val):
     out=bytearray(reg_addr.to_bytes(4, 'little')) \
         +bytearray([0x04, 0x00]) \
         +bytearray(val.to_bytes(4, 'little'))
+    time.sleep(0.01)
+    ret=self.fw.write(out)
+    return ret
+
+  def write_reg32f(self, reg_addr, val):
+    out=bytearray(reg_addr.to_bytes(4, 'little')) \
+        +bytearray([0x04, 0x00]) \
+        +bytearray(struct.pack('<f', val))
     time.sleep(0.01)
     ret=self.fw.write(out)
     return ret
