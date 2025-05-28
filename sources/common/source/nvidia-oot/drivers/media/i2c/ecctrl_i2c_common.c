@@ -18,6 +18,8 @@
 #define STATUS_INT_ERR -128
 #define STATUS_FIFO_EMPTY 1
 
+int _ecctrl_i2c_write(__ecctrl_i2c_file_t file, uint8_t *buffer_i2c, int buffer_size, int timeout);
+int _ecctrl_i2c_read(__ecctrl_i2c_file_t file, uint8_t *buffer_i2c, int buffer_size, int timeout);
 
 static uint8_t crc8_table[CRC8_TABLE_SIZE];
 

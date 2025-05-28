@@ -32,15 +32,43 @@ sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
 
 DRIVER_DIR=kernel/drivers/media/i2c
 INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
-mkdir -p $INSTALL_DIR
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/dione_ir.ko
 if [[ -f $file ]]
 then
+   mkdir -p $INSTALL_DIR
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/eg-ec-mipi.ko
 if [[ -f $file ]]
 then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+DRIVER_DIR=updates/drivers/video/tegra/camera
+INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/tegra_camera_platform.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+DRIVER_DIR=updates/drivers/media/platform/tegra/camera
+INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/tegra-camera.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+DRIVER_DIR=updates/drivers/video/tegra/host/nvcsi
+INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nvhost-nvcsi-t194.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
 

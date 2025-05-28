@@ -117,8 +117,8 @@ L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION xavier
-./l4t_copy_sources.sh $L4T_VERSION xavier
+./l4t_prepare.sh $L4T_VERSION xavier_nx
+./l4t_copy_sources.sh $L4T_VERSION xavier_nx
 </pre>
 
 #### 2/ Flashing the board
@@ -133,7 +133,7 @@ Or
    [Quick Start Guide L4T 32.7.3](https://docs.nvidia.com/jetson/archives/l4t-archived/l4t-3273/index.html#page/Tegra%20Linux%20Driver%20Package%20Development%20Guide/quick_start.html) (NVIDIA Jetson Nano, TX2, Xavier NX and AGX Xavier)
 - use the L4T flash script :
 <pre>
-cd $L4T_VERSION/Linux_for_Tegra_xavier
+cd $L4T_VERSION/Linux_for_Tegra_xavier_nx
 sudo ./flash.sh jetson-xavier-nx-devkit-emmc mmcblk0p1
 </pre>
 
@@ -142,24 +142,24 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION xavier
+./l4t_build.sh $L4T_VERSION xavier_nx
 </pre>
 
-- Generate the jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
+- Generate the jetson-l4t-$L4T_VERSION-xavier-nx-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION xavier
+./l4t_gen_delivery_package.sh $L4T_VERSION xavier_nx
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION xavier X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION xavier_nx X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
 #### 4/ Installing the MIPI drivers on the board
-- install the jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+- install the jetson-l4t-$L4T_VERSION-xavier-nx-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg -i jetson-l4t-$L4T_VERSION-xavier-nx-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
 - make the board boot with the patched kernel and use MIPI cameras device tree
@@ -203,7 +203,6 @@ To get the ports configuration (<ins>after a reboot</ins>, when the set command 
 <pre>
 eg_dt_camera_config_get.sh
 </pre>
-
 
 ### Jetson AGX Orin / Auvidea X230D kit
 Supported L4T versions :
@@ -300,6 +299,101 @@ To get the ports configuration (<ins>after a reboot</ins>, when the set command 
 eg_dt_camera_config_get.sh
 </pre>
 
+
+### Jetson Orin NX 16 GB / Waveshare devkit
+Supported L4T versions :
+L4T_VERSION=36.4.3
+
+#### 1/ Preparing the L4T environment
+This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
+
+<pre>
+./l4t_prepare.sh $L4T_VERSION orin_nx
+./l4t_copy_sources.sh $L4T_VERSION orin_nx
+</pre>
+
+#### 2/ Flashing the board
+
+Install the JetPack 6 : 
+https://developer.nvidia.com/embedded/jetpack-sdk-62
+
+Or 
+- enter recovery mode by following the instructions of the guide:
+
+   [Quick Start Guide L4T 36.4.3](https://docs.nvidia.com/jetson/archives/r36.4.3/DeveloperGuide/IN/QuickStart.html#in-quickstart)
+- use the L4T flash script : https://docs.nvidia.com/jetson/archives/r36.4.3/DeveloperGuide/SD/FlashingSupport.html#sd-flashingsupport-flashshorinnxnano
+<pre>
+cd $L4T_VERSION/Linux_for_Tegra_orin_nx
+sudo ./flash.sh jetson-orin-nano-devkit-super-nvme internal
+</pre>
+
+#### 3/ Building the L4T environment
+This section is for developers needing to rebuild the drivers.
+
+- Build :
+<pre>
+./l4t_build.sh $L4T_VERSION orin_nx
+</pre>
+
+- Generate the jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
+<pre>
+./l4t_gen_delivery_package.sh $L4T_VERSION orin_nx
+</pre>
+X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
+It it possible to force the version with the following command : 
+<pre>
+./l4t_gen_delivery_package.sh $L4T_VERSION orin_nx X.Y.Z
+</pre>
+The package is generated in the $L4T_VERSION folder.
+
+#### 4/ Installing the MIPI drivers on the board
+- install the jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+<pre>
+sudo dpkg -i jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb
+</pre>
+- make the board boot with the patched kernel and use MIPI cameras device tree
+
+The DT file to use depends on the Jetson SOM version and the carrier board.
+
+Check the original device tree file name. For example : 
+<pre>
+$ sudo dmesg |grep dts
+[    0.003491] DTS File Name: source/public/kernel/kernel-5.10/arch/arm64/boot/dts/../../../../../../hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000-auvidea.dts
+</pre>
+Here the DT file name is tegra234-p3701-0004-p3737-0000-auvidea. Then create a new entry accordingly in /boot/extlinux/extlinux.conf and make it default :
+<pre>
+DEFAULT eg-cams
+[...]
+LABEL eg-cams
+      MENU LABEL eg-cams kernel
+      LINUX /boot/eg/Image
+      FDT /boot/eg/tegra234-p3701-0004-p3737-0000-eg-cams-auvidea.dtb
+      INITRD /boot/initrd
+      APPEND ${cbootargs} root=/dev/mmcblk0p1 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 console=ttyAMA0,115200 console=tty0 firmware_class.path=/etc/firmware fbcon=map:0 net.ifnames=0
+[...]
+</pre>
+Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
+- reboot the Jetson board
+
+#### 5/ Configuring a camera port to support a camera
+There are 2 camera ports on the Waveshare Orin NX devkit, "cam0" and "cam1".
+
+After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
+
+To change the configuration, use this command, <ins>then reboot</ins> : 
+<pre>
+eg_dt_camera_config_set.sh $CAMPORT_NUMBER $CAM_TYPE
+</pre>
+With CAMPORT_NUMBER = 0 or 1
+
+With CAM_TYPE = Dione, MicroCube640, SmartIR640 or Crius1280
+
+To get the ports configuration (<ins>after a reboot</ins>, when the set command was used), use this command : 
+<pre>
+eg_dt_camera_config_get.sh
+</pre>
+
+
 ## Hints to help integrating the drivers on other L4T versions and other SOM/carrier boards
 
 Adding a new L4T version and support new SOM/carrier board consist of :
@@ -313,7 +407,7 @@ Adding a new L4T version and support new SOM/carrier board consist of :
 <pre>
 35.3.1)
    case "${2}" in
-   xavier|auvidea_X230D)
+   xavier_nx|auvidea_X230D)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -326,7 +420,7 @@ Adding a new L4T version and support new SOM/carrier board consist of :
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier or auvidea_X230D"
+      echo "Incorrect board. $1 is compatible with xavier_nx or auvidea_X230D"
       exit
       ;;
    esac

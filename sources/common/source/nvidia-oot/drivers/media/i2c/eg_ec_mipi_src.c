@@ -17,6 +17,9 @@
 
 #define MAX_I2C_CLIENTS_NUMBER 128
 
+int eg_ec_chnod_open (struct inode * pInode, struct file * file);
+int eg_ec_chnod_release (struct inode * pInode, struct file * file);
+
 static const struct of_device_id eg_ec_mipi_of_match[] = {
 	{ .compatible = "xenics,eg-ec-mipi", },
 	{ },

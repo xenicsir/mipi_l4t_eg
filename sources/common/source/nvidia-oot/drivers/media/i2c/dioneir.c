@@ -55,6 +55,9 @@ static int quick_mode = 1;
 module_param(test_mode, int, 0644);
 module_param(quick_mode, int, 0644);
 
+int dione_ir_chnod_open (struct inode * pInode, struct file * file);
+int dione_ir_chnod_release (struct inode * pInode, struct file * file);
+
 enum {
 	DIONE_IR_MODE_640x480_60FPS,
 	DIONE_IR_MODE_1280x1024_60FPS,
