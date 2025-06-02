@@ -1,4 +1,4 @@
-# Exosens cameras MIPI CSI-2 driver for NVIDIA Jetson Nano, Jetson Xavier NX 16GB and AGX Orin (Auvidea X230D carried board)
+# Exosens cameras MIPI CSI-2 driver for NVIDIA Jetson boards
 
 This document describes how to build and install the MIPI drivers for different Jetson SOM (System On Module) and carrier boards, based on Nvidia BSP (L4T, Linux For Tegra).
 
@@ -10,8 +10,8 @@ The MIPI_deployment.xlsx sheet presents an overview of the supported cameras/SOM
 
 ### Host PC
 
-* Recommended OS is Ubuntu 18.04 LTS or Ubuntu 20.04 LTS
-* You need git to clone this repository
+* Recommended OS is Ubuntu 20.04 LTS or Ubuntu 22.04 LTS
+* Git is needed to clone this repository
 
 ## Building and installing MIPI drivers on supported SOM / carrier boards
 
@@ -314,18 +314,9 @@ This section is for developers needing to rebuild the drivers or flash the board
 
 #### 2/ Flashing the board
 
-Install the JetPack 6 : 
+Install JetPack 6 : 
 https://developer.nvidia.com/embedded/jetpack-sdk-62
-
-Or 
-- enter recovery mode by following the instructions of the guide:
-
-   [Quick Start Guide L4T 36.4.3](https://docs.nvidia.com/jetson/archives/r36.4.3/DeveloperGuide/IN/QuickStart.html#in-quickstart)
-- use the L4T flash script : https://docs.nvidia.com/jetson/archives/r36.4.3/DeveloperGuide/SD/FlashingSupport.html#sd-flashingsupport-flashshorinnxnano
-<pre>
-cd $L4T_VERSION/Linux_for_Tegra_orin_nx
-sudo ./flash.sh jetson-orin-nano-devkit-super-nvme internal
-</pre>
+https://www.waveshare.com/wiki/JETSON-ORIN-NX-16G-DEV-KIT
 
 #### 3/ Building the L4T environment
 This section is for developers needing to rebuild the drivers.
@@ -349,49 +340,9 @@ The package is generated in the $L4T_VERSION folder.
 #### 4/ Installing the MIPI drivers on the board
 - install the jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb
 </pre>
-- make the board boot with the patched kernel and use MIPI cameras device tree
-
-The DT file to use depends on the Jetson SOM version and the carrier board.
-
-Check the original device tree file name. For example : 
-<pre>
-$ sudo dmesg |grep dts
-[    0.003491] DTS File Name: source/public/kernel/kernel-5.10/arch/arm64/boot/dts/../../../../../../hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000-auvidea.dts
-</pre>
-Here the DT file name is tegra234-p3701-0004-p3737-0000-auvidea. Then create a new entry accordingly in /boot/extlinux/extlinux.conf and make it default :
-<pre>
-DEFAULT eg-cams
-[...]
-LABEL eg-cams
-      MENU LABEL eg-cams kernel
-      LINUX /boot/eg/Image
-      FDT /boot/eg/tegra234-p3701-0004-p3737-0000-eg-cams-auvidea.dtb
-      INITRD /boot/initrd
-      APPEND ${cbootargs} root=/dev/mmcblk0p1 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 console=ttyAMA0,115200 console=tty0 firmware_class.path=/etc/firmware fbcon=map:0 net.ifnames=0
-[...]
-</pre>
-Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
-
-#### 5/ Configuring a camera port to support a camera
-There are 2 camera ports on the Waveshare Orin NX devkit, "cam0" and "cam1".
-
-After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
-
-To change the configuration, use this command, <ins>then reboot</ins> : 
-<pre>
-eg_dt_camera_config_set.sh $CAMPORT_NUMBER $CAM_TYPE
-</pre>
-With CAMPORT_NUMBER = 0 or 1
-
-With CAM_TYPE = Dione, MicroCube640, SmartIR640 or Crius1280
-
-To get the ports configuration (<ins>after a reboot</ins>, when the set command was used), use this command : 
-<pre>
-eg_dt_camera_config_get.sh
-</pre>
 
 
 ## Hints to help integrating the drivers on other L4T versions and other SOM/carrier boards
