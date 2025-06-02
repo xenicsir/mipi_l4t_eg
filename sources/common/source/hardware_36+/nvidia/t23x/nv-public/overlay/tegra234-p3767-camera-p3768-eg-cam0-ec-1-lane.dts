@@ -10,12 +10,12 @@
 /dts-v1/;
 /plugin/;
 
-//#include <dt-bindings/tegra234-p3767-0000-common.h>
+#include <dt-bindings/tegra234-p3767-0000-common.h>
 
 / {
-//	overlay-name = "Exosens Cameras. CAM1:EC_1_lane";
-//	jetson-header-name = "Jetson 24pin CSI Connector";
-//	compatible = JETSON_COMPATIBLE_P3768;
+	overlay-name = "Exosens Cameras. CAM0:EC_1_lane";
+	jetson-header-name = "Jetson 24pin CSI Connector";
+	compatible = JETSON_COMPATIBLE_P3768;
 
 	fragment@10 {
 		target-path = "/tegra-capture-vi/ports/port@0/endpoint";

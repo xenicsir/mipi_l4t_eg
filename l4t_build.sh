@@ -34,15 +34,15 @@ export KERNEL_HEADERS=$L4T_SRC/$KERNEL_SOURCES
 #export KERNEL_OUTPUT=$TEGRA_KERNEL_OUT
 export INSTALL_MOD_PATH=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs
 ##export INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
-#make -C kernel
-#sudo -E make install -C kernel
+make -C kernel
+sudo -E make install -C kernel
 ##export IGNORE_PREEMPT_RT_PRESENCE=1
-#make modules
-#sudo -E make modules_install
+make modules
+sudo -E make modules_install
 make dtbs
-exit
+#exit
 # Copy device tree to destination dir
-sudo cp -fv $L4T_SRC/kernel-devicetree/generic-dts/dtbs/*-eg*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg
+sudo cp -fv $L4T_SRC/kernel-devicetree/generic-dts/dtbs/*-eg*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
 
 #fi
 
