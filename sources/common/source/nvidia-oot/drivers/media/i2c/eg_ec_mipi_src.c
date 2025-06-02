@@ -488,7 +488,6 @@ static int eg_ec_mipi_set_mode(struct tegracam_device *tc_dev)
 static int eg_ec_mipi_start_streaming(struct tegracam_device *tc_dev)
 {
    uint8_t data[4];
-	dev_info(tc_dev->dev, "%s\n", __func__);
    memset(data, 0, sizeof(data));
    data[0] = 1;
    eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
@@ -498,7 +497,6 @@ static int eg_ec_mipi_start_streaming(struct tegracam_device *tc_dev)
 static int eg_ec_mipi_stop_streaming(struct tegracam_device *tc_dev)
 {
    uint8_t data[4];
-	dev_info(tc_dev->dev, "%s\n", __func__);
    memset(data, 0, sizeof(data));
    eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
 	return 0;
