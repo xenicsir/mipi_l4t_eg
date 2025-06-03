@@ -39,25 +39,32 @@ enum {
 	EC_MIPI_MODE_1280x1024_YUYV,
 };
 
+static const int eg_ec_mipi_60fps[] = {
+	60,
+};
+
 /*
  * WARNING: frmfmt ordering need to match mode definition in
  * device tree!
  */
 static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
-	{{640, 480},	NULL, 0, 0, EC_MIPI_MODE_640x480_RAW16},
+	{{640, 480},	eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RAW16},
 #endif
-	{{640, 480},	NULL, 0, 0, EC_MIPI_MODE_640x480_RGB888},
-	{{640, 480},	NULL, 0, 0, EC_MIPI_MODE_640x480_YUYV},
+	{{640, 480},	eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RGB888},
+	{{640, 480},	eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_YUYV},
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
-	{{1280, 1024},	NULL, 0, 0, EC_MIPI_MODE_1280x1024_RAW16},
+	{{1280, 1024},	eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RAW16},
 #endif
-	{{1280, 1024},	NULL, 0, 0, EC_MIPI_MODE_1280x1024_RGB888},
-	{{1280, 1024},	NULL, 0, 0, EC_MIPI_MODE_1280x1024_YUYV},
+	{{1280, 1024},	eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RGB888},
+	{{1280, 1024},	eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_YUYV},
 };
 
 
 static const u32 ctrl_cid_list[] = {
+	TEGRA_CAMERA_CID_GAIN,
+	TEGRA_CAMERA_CID_EXPOSURE,
+	TEGRA_CAMERA_CID_FRAME_RATE,
 	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
 };
 
@@ -420,36 +427,64 @@ static inline int eg_ec_mipi_read_fifo(struct i2c_client * i2c_client, uint16_t 
 static int eg_ec_mipi_set_group_hold(struct tegracam_device *tc_dev, bool val)
 {
 	// group hold is not supported
+	dev_dbg(tc_dev->dev, "%s val=%d\n", __func__, val);
+	return 0;
+}
+
+static int eg_ec_mipi_ir_set_gain(struct tegracam_device *tc_dev, s64 val)
+{
+	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
+	return 0;
+}
+
+static int eg_ec_mipi_ir_set_frame_rate(struct tegracam_device *tc_dev, s64 val)
+{
+	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
+	return 0;
+}
+
+static int eg_ec_mipi_ir_set_exposure(struct tegracam_device *tc_dev, s64 val)
+{
+	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
 	return 0;
 }
 
 static struct tegracam_ctrl_ops eg_ec_mipi_ctrl_ops = {
 	.numctrls = ARRAY_SIZE(ctrl_cid_list),
 	.ctrl_cid_list = ctrl_cid_list,
+	.set_gain = eg_ec_mipi_ir_set_gain,
+	.set_exposure = eg_ec_mipi_ir_set_exposure,
+	.set_frame_rate = eg_ec_mipi_ir_set_frame_rate,
 	.set_group_hold = eg_ec_mipi_set_group_hold,
 };
 
 static int eg_ec_mipi_power_on(struct camera_common_data *s_data)
 {
 	// Power is not managed here
+	struct device *dev = s_data->dev;
+	dev_dbg(dev, "%s\n", __func__);
 	return 0;
 }
 
 static int eg_ec_mipi_power_off(struct camera_common_data *s_data)
 {
 	// Power is not managed here
+	struct device *dev = s_data->dev;
+	dev_dbg(dev, "%s\n", __func__);
 	return 0;
 }
 
 static int eg_ec_mipi_power_put(struct tegracam_device *tc_dev)
 {
 	// Power is not managed here
+	dev_dbg(tc_dev->dev, "%s\n", __func__);
 	return 0;
 }
 
 static int eg_ec_mipi_power_get(struct tegracam_device *tc_dev)
 {
 	// Power is not managed here
+	dev_dbg(tc_dev->dev, "%s\n", __func__);
 	return 0;
 }
 
@@ -482,6 +517,7 @@ static struct camera_common_pdata *eg_ec_mipi_parse_dt(
 static int eg_ec_mipi_set_mode(struct tegracam_device *tc_dev)
 {
 	// Configuration is done independently by a control application
+	dev_dbg(tc_dev->dev, "%s\n", __func__);
 	return 0;
 }
 
@@ -535,7 +571,7 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 	uint32_t upgradeMode;
 
 	dev_dbg(dev, "probing v4l2 eg_ec_mipi sensor at addr 0x%0x\n", client->addr);
-
+	
 	// Find the first i2c client available
 	for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
 	{
@@ -598,6 +634,7 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 	err = tegracam_v4l2subdev_register(tc_dev, true);
 	if (err) {
 		dev_err(dev, "tegra camera subdev registration failed\n");
+		tegracam_device_unregister(tc_dev);
 		goto err_camera_register;
 	}
 
