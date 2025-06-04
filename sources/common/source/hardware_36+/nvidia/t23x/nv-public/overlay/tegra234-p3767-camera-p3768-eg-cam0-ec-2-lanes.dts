@@ -13,7 +13,7 @@
 #include <dt-bindings/tegra234-p3767-0000-common.h>
 
 / {
-	overlay-name = "Exosens Cameras. CAM0:EC_1_lane";
+	overlay-name = "Exosens Cameras. CAM0:EC_2_lanes";
 	jetson-header-name = "Jetson 24pin CSI Connector";
 	compatible = JETSON_COMPATIBLE_P3768;
 

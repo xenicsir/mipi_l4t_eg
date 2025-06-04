@@ -60,7 +60,9 @@ def configure_jetson(jetson, header, hw):
 
 
 def parse_hw_args(hw_args, num_headers):
-    hw_mods = [None] * num_headers
+    hw_mods = [[None]]
+    for n in range(num_headers-1):
+      hw_mods.append([])
 
     for arg in hw_args:
         res = re.match(r'([0-9]+)=(.+)', arg)
@@ -74,11 +76,7 @@ def parse_hw_args(hw_args, num_headers):
         if (idx < 0) or (idx >= num_headers):
             raise IndexError("Invalid Header number %d!" % (idx + 1))
 
-        if hw_mods[idx] is None:
-            hw_mods[idx] = hw_mod
-        else:
-            raise NameError("More than one HW module on Header %d!" \
-                            % (idx + 1))
+        hw_mods[idx].append(hw_mod)
 
     return hw_mods
 
@@ -114,14 +112,16 @@ def main():
 
             show_hardware(jetson, header)
         else:
-            hw = hw_mods[idx]
-            if hw:
-                if (hw == "Exosens Cameras"):
-                    eg = 1
-                else :
-                    eg = 0
-                dtbo = configure_jetson(jetson, header, hw)
-                dtbos.append(dtbo)
+            hws = hw_mods[idx]
+            for i in range(len(hws)):
+              hw = hws[i]
+              if hw:
+                  if (hw == "Exosens Cameras"):
+                      eg = 1
+                  else :
+                      eg = 0
+                  dtbo = configure_jetson(jetson, header, hw)
+                  dtbos.append(dtbo)
 
     if len(dtbos) >= 1:
         configure_dt(jetson, dtbos, eg)
