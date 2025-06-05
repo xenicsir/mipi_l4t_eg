@@ -35,16 +35,19 @@ then
 fi
 
 INSTALL_DIR=${PACKAGE_NAME}/boot/eg
-mkdir -p $INSTALL_DIR
+mkdir -p $INSTALL_DIR		
 sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg/* ${INSTALL_DIR}/
 
-INSTALL_DIR=${PACKAGE_NAME}/boot
-sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/*-eg*.dtb* ${INSTALL_DIR}/
-
-# L4T >= 36
-DRIVER_DIR=updates/drivers/media/i2c
-#else L4T < 36
-#DRIVER_DIR=kernel/drivers/media/i2c
+if [[ $L4T_VERSION_MAJOR < 36 ]]
+then
+	INSTALL_DIR=${PACKAGE_NAME}/boot/eg
+	sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg/*-eg-*.dtb* ${INSTALL_DIR}/
+	DRIVER_DIR=kernel/drivers/media/i2c
+else
+	INSTALL_DIR=${PACKAGE_NAME}/boot/
+	sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/*-eg-*.dtb* ${INSTALL_DIR}/
+	DRIVER_DIR=updates/drivers/media/i2c
+fi
 
 INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/dione_ir.ko
@@ -88,6 +91,13 @@ then
 fi
 
 rm -f /tmp/postinst
+
+if [[ $L4T_VERSION_MAJOR < 36 ]]
+then
+tee -a /tmp/postinst > /dev/null <<EOT
+depmod
+EOT
+else
 tee -a /tmp/postinst > /dev/null <<EOT
 depmod
 grep DEFAULT /boot/extlinux/extlinux.conf | grep JetsonIO > /dev/null
@@ -96,6 +106,8 @@ then
    python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras"
 fi
 EOT
+fi
+
 rm -f /tmp/postrm
 tee -a /tmp/postrm > /dev/null <<EOT
 depmod

@@ -14,6 +14,7 @@ fi
 
 LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${2}
 L4T_VERSION=$1
+L4T_VERSION_MAJOR=$(echo $L4T_VERSION | awk -F '.' '{print $1}')
 L4T_VERSION_EXTENDED=${L4T_VERSION}_${2}
 ROOT_DIR=$(pwd)
 ARCHIVE_DIR=$ROOT_DIR/archives
@@ -74,7 +75,7 @@ case "${1}" in
 
 35.1)
    case "${2}" in
-   generic|xavier_nx)
+   generic|xavier)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -87,7 +88,7 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier_nx"
+      echo "Incorrect board. $1 is compatible with xavier"
       exit
       ;;
    esac
@@ -95,7 +96,7 @@ case "${1}" in
 
 35.3.1)
    case "${2}" in
-   generic|xavier_nx|agx_orin_auvidea_X230D)
+   generic|xavier|auvidea_X230D)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -108,7 +109,7 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier_nx or agx_orin_auvidea_X230D"
+      echo "Incorrect board. $1 is compatible with xavier or auvidea_X230D"
       exit
       ;;
    esac
@@ -116,7 +117,7 @@ case "${1}" in
 
 35.4.1)
    case "${2}" in
-   generic|xavier_nx|agx_orin_auvidea_X230D)
+   generic|xavier|auvidea_X230D)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -129,7 +130,7 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier_nx or agx_orin_auvidea_X230D"
+      echo "Incorrect board. $1 is compatible with xavier or auvidea_X230D"
       exit
       ;;
    esac
@@ -137,7 +138,7 @@ case "${1}" in
 
 35.5.0)
    case "${2}" in
-   generic|xavier_nx|agx_orin_auvidea_X230D)
+   generic|xavier|auvidea_X230D|orin_nx)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -150,7 +151,7 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier_nx or agx_orin_auvidea_X230D"
+      echo "Incorrect board. $1 is compatible with xavier, auvidea_X230D or orin_nx"
       exit
       ;;
    esac
@@ -158,7 +159,7 @@ case "${1}" in
 
 #36.3)
 #   case "${2}" in
-#   generic|agx_orin_auvidea_X230D|orin_nx)
+#   generic|auvidea_X230D|orin_nx)
 #      JETSON_PUBLIC_SOURCES=public_sources.tbz2
 #      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/sources/${JETSON_PUBLIC_SOURCES}
 #      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -171,7 +172,7 @@ case "${1}" in
 #      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/release/${SAMPLE_FS_PACKAGE}
 #      ;;
 #   *)
-#      echo "Incorrect board. $1 is compatible with agx_orin_auvidea_X230D and Orin NX"
+#      echo "Incorrect board. $1 is compatible with auvidea_X230D and orin_nx"
 #      exit
 #      ;;
 #   esac
@@ -179,7 +180,7 @@ case "${1}" in
 
 #36.4)
 #   case "${2}" in
-#   generic|agx_orin_auvidea_X230D|orin_nx)
+#   generic|auvidea_X230D|orin_nx)
 #      JETSON_PUBLIC_SOURCES=public_sources.tbz2
 #      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/sources/${JETSON_PUBLIC_SOURCES}
 #      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -192,7 +193,7 @@ case "${1}" in
 #      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/release/${SAMPLE_FS_PACKAGE}
 #      ;;
 #   *)
-#      echo "Incorrect board. $1 is compatible with agx_orin_auvidea_X230D and Orin NX"
+#      echo "Incorrect board. $1 is compatible with auvidea_X230D and orin_nx"
 #      exit
 #      ;;
 #   esac
@@ -200,7 +201,7 @@ case "${1}" in
 
 36.4.3)
    case "${2}" in
-   generic|agx_orin_auvidea_X230D|orin_nx)
+   generic|auvidea_X230D|orin_nx)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -213,7 +214,7 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with agx_orin_auvidea_X230D and Orin NX"
+      echo "Incorrect board. $1 is compatible with auvidea_X230D and orin_nx"
       exit
       ;;
    esac

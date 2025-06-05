@@ -117,8 +117,8 @@ L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION xavier_nx
-./l4t_copy_sources.sh $L4T_VERSION xavier_nx
+./l4t_prepare.sh $L4T_VERSION xavier
+./l4t_copy_sources.sh $L4T_VERSION xavier
 </pre>
 
 #### 2/ Flashing the board
@@ -133,8 +133,8 @@ Or
    [Quick Start Guide L4T 32.7.3](https://docs.nvidia.com/jetson/archives/l4t-archived/l4t-3273/index.html#page/Tegra%20Linux%20Driver%20Package%20Development%20Guide/quick_start.html) (NVIDIA Jetson Nano, TX2, Xavier NX and AGX Xavier)
 - use the L4T flash script :
 <pre>
-cd $L4T_VERSION/Linux_for_Tegra_xavier_nx
-sudo ./flash.sh jetson-xavier-nx-devkit-emmc mmcblk0p1
+cd $L4T_VERSION/Linux_for_Tegra_xavier
+sudo ./flash.sh jetson-xavier-devkit-emmc mmcblk0p1
 </pre>
 
 #### 3/ Building the L4T environment
@@ -142,24 +142,24 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION xavier_nx
+./l4t_build.sh $L4T_VERSION xavier
 </pre>
 
-- Generate the jetson-l4t-$L4T_VERSION-xavier-nx-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
+- Generate the jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION xavier_nx
+./l4t_gen_delivery_package.sh $L4T_VERSION xavier
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION xavier_nx X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION xavier X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
 #### 4/ Installing the MIPI drivers on the board
-- install the jetson-l4t-$L4T_VERSION-xavier-nx-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+- install the jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-xavier-nx-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg -i jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
 - make the board boot with the patched kernel and use MIPI cameras device tree
@@ -214,8 +214,8 @@ IMPORTANT NOTE : for Auvidea X230D kit, the L4T environment must be built AFTER 
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION agx_orin_auvidea_X230D
-./l4t_copy_sources.sh $L4T_VERSION agx_orin_auvidea_X230D
+./l4t_prepare.sh $L4T_VERSION auvidea_X230D
+./l4t_copy_sources.sh $L4T_VERSION auvidea_X230D
 </pre>
 
 #### 2/ Flashing the board
@@ -238,17 +238,17 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION agx_orin_auvidea_X230D
+./l4t_build.sh $L4T_VERSION auvidea_X230D
 </pre>
 
 - Generate the jetson-l4t-$L4T_VERSION-auvidea-x230d-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION agx_orin_auvidea_X230D
+./l4t_gen_delivery_package.sh $L4T_VERSION auvidea_X230D
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION agx_orin_auvidea_X230D X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION auvidea_X230D X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
@@ -414,7 +414,7 @@ Adding a new L4T version and support new SOM/carrier board consist of :
 <pre>
 35.3.1)
    case "${2}" in
-   xavier_nx|agx_orin_auvidea_X230D)
+   xavier|auvidea_X230D)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -427,7 +427,7 @@ Adding a new L4T version and support new SOM/carrier board consist of :
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier_nx or agx_orin_auvidea_X230D"
+      echo "Incorrect board. $1 is compatible with xavier or auvidea_X230D"
       exit
       ;;
    esac
@@ -504,7 +504,7 @@ Some board vendors provide specific files and/or patches. They need to be applie
 
 Let's take an example :
 * the "*./l4t_copy_sources.sh 35.5.0 agx_orin_devkit*" command would use only *sources/35.5.0/Linux_for_Tegra*, because the AGC Orin devkit is the native carrier board from NVIDIA. **Note that this command has no effect, as this Nvidia devkit is currently not supported.**
-* the "*./l4t_copy_sources.sh 35.5.0 agx_orin_auvidea_X230D*" command uses *sources/35.5.0/Linux_for_Tegra* and *sources/35.5.0/Linux_for_Tegra_agx_orin_auvidea_X230D*, which contains files provided from Auvidea.
+* the "*./l4t_copy_sources.sh 35.5.0 auvidea_X230D*" command uses *sources/35.5.0/Linux_for_Tegra* and *sources/35.5.0/Linux_for_Tegra_agx_orin_auvidea_X230D*, which contains files provided from Auvidea.
 
 For a new "vendor_board" board : 
 * create the *sources/35.5.0/Linux_for_Tegra_vendor_board* and put specific files in it
