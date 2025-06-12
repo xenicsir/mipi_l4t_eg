@@ -284,6 +284,7 @@
 							 mode0 { /* DIONE_IR_MODE_640x480_60FPS */
 								mclk_khz = "24000";
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "no";
@@ -330,6 +331,7 @@
 							 mode1 { /* DIONE_IR_MODE_1280x1024_60FPS */
 								mclk_khz = "24000";
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "no";
@@ -376,6 +378,7 @@
 							 mode2 { /* DIONE_IR_MODE_320x240_60FPS */
 								mclk_khz = "24000";
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "no";
@@ -422,6 +425,7 @@
 							 mode3 { /* DIONE_IR_MODE_1024x768_60FPS */
 								mclk_khz = "24000";
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "no";
@@ -474,7 +478,7 @@
 									  port-index = <1>;
 									  bus-width = <2>;
 									  remote-endpoint = <&eg_cams_csi_in0>;
-									  link-frequencies = /bits/ 64 <240000000 497000000>;
+									  link-frequencies = /bits/ 64 <120000000 497000000>;
 								   };
 								};
 							 };
@@ -575,6 +579,7 @@
 							 */
 							 mode0 { // EC_MODE_640x480_RAW16
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "yes";
@@ -614,6 +619,7 @@
 							 };
 							 mode1 { // EC_MODE_640x480_RGB888
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "yes";
@@ -653,6 +659,7 @@
 							 };
 							 mode2 { // EC_MODE_640x480_YUYV
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "yes";
@@ -689,9 +696,10 @@
 								max_exp_time = "683709"; /* us */
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
-};
+							};
 							 mode3 { // EC_MODE_1280x1024_RAW16
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "yes";
@@ -731,6 +739,7 @@
 							 };
 							 mode4 { // EC_MODE_1280x1024_RGB888
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "yes";
@@ -770,6 +779,7 @@
 							 };
 							 mode5 { // EC_MODE_1280x1024_YUYV
 								num_lanes = "2";
+								lane_polarity = "6";
 								tegra_sinterface = "serial_b";
 								phy_mode = "DPHY";
 								discontinuous_clk = "yes";
@@ -1033,7 +1043,7 @@
 									  port-index = <2>;
 									  bus-width = <2>;
 									  remote-endpoint = <&eg_cams_csi_in1>;
-									  link-frequencies = /bits/ 64 <240000000 497000000>;
+									  link-frequencies = /bits/ 64 <120000000 497000000>;
 								   };
 								};
 							 };
