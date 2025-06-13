@@ -347,8 +347,6 @@ sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm
 #### 5/ Configuring a camera port to support a camera
 There are 2 camera ports on the Jetson Orin NX devkit, "CAM0" and "CAM1".
 
-<span style="color:red">***Currently, only the CAM1 port works.***</span>
-
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
 
 To change the configuration, use this command, <ins>then reboot</ins> : 
@@ -402,6 +400,14 @@ For example, MicroCube640 on CAM0 port and Crius1280 on CAM1 :
     OVERLAYS /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
 [...]
 </pre>
+
+<span>***IMPORTANT NOTE : CSI diff pair swap on Jetson Orin Nano devkit***</span>
+https://nvidia-jetson.piveral.com/jetson-orin-nano/csi-diff-pair-polarity-swap-on-nvidia-jetson-orin-nano-dev-board/
+<pre>
+lane_polarity = "6"; 
+</pre>
+has been added in this devicetree overlay as a workaround for that issue : tegra234-p3767-camera-p3768-eg-cams-dione.dts
+To port the devicetree on a custom carrier board embedding the Orin NX, this lane polarity parameter may have to be removed.
 
 ## Hints to help integrating the drivers on other L4T versions and other SOM/carrier boards
 
