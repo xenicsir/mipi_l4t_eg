@@ -62,6 +62,18 @@ then
    mkdir -p $INSTALL_DIR
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nv_imx219.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nv_imx477.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
 
 DRIVER_DIR=updates/drivers/video/tegra/camera
 INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}

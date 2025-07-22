@@ -70,6 +70,11 @@ dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx219.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
 
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
