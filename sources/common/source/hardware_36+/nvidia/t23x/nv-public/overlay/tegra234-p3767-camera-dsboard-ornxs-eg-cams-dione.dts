@@ -4,5 +4,12 @@
 /dts-v1/;
 /plugin/;
 
+#define DSBOARD_ORNXS
+
 #include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
 
+/ {
+	overlay-name = "Exosens Cameras for DSBOARD-ORNXS";
+	jetson-header-name = "Jetson 24pin CSI Connector";
+	compatible = JETSON_COMPATIBLE_P3768;
+};
