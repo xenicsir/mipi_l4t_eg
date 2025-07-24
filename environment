@@ -180,7 +180,7 @@ case "${1}" in
 
 36.4)
    case "${2}" in
-   generic|auvidea_X230D|orin_nx)
+   generic|auvidea_X230D|orin_nx|dsboard_ornxs)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
