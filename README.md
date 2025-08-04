@@ -1,30 +1,32 @@
 # Exosens cameras MIPI CSI-2 driver for NVIDIA Jetson boards
 
-This document describes how to build and install the MIPI drivers for different Jetson SOM (System On Module) and carrier boards, based on Nvidia BSP (L4T, Linux For Tegra).
+This document describes how to build and install the MIPI drivers for different Jetson SoM (System On Module) and carrier boards, based on Nvidia BSP (L4T, Linux For Tegra).
 
 It also gives some hints to help integrating the drivers on other L4T versions and other carrier boards.
 
-The MIPI_deployment.xlsx sheet presents an overview of the supported cameras/SOM/carrier boards/L4T versions.
+The MIPI_deployment.xlsx sheet presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
 
 ## Prerequisites for cross-compiling
 
 ### Host PC
 
-* Recommended OS is Ubuntu 20.04 LTS or Ubuntu 22.04 LTS
+* Recommended OS is Ubuntu 20.04 LTS, 22.04 LTS or 22.04 LTS, depending on L4T version.
 * Git is needed to clone this repository
 
-## Building and installing MIPI drivers on supported SOM / carrier boards
+## Building and installing MIPI drivers on supported SoM / carrier boards
 
-### Jetson Nano
+### Jetson Nano SoM / Jetson Nano devkit
 Supported L4T versions :
 L4T_VERSION=32.7.1, 32.7.4
+
+SOM_BOARD=nano
 
 #### 1/ Preparing the L4T environment
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION nano
-./l4t_copy_sources.sh $L4T_VERSION nano
+./l4t_prepare.sh $L4T_VERSION $SOM_BOARD
+./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
 #### 2/ Flashing the board
@@ -39,7 +41,7 @@ Or
    [Quick Start Guide L4T 32.7.3](https://docs.nvidia.com/jetson/archives/l4t-archived/l4t-3273/index.html#page/Tegra%20Linux%20Driver%20Package%20Development%20Guide/quick_start.html) (NVIDIA Jetson Nano, TX2, Xavier NX and AGX Xavier)
 - use the L4T flash script :
 <pre>
-cd $L4T_VERSION/Linux_for_Tegra_nano
+cd $L4T_VERSION/Linux_for_Tegra_$SOM_BOARD
 sudo ./flash.sh jetson-nano-devkit mmcblk0p1
 </pre>
 
@@ -48,28 +50,28 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION nano
+./l4t_build.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-- Generate the jetson-l4t-$L4T_VERSION-nano-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
+- Generate the jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION nano
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION nano X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
 #### 4/ Installing the MIPI drivers on the board
-- install the jetson-l4t-$L4T_VERSION-nano-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+- install the jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-nano-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg -i jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb
 </pre>
 - make the board boot with the patched kernel and use MIPI cameras device tree
 
-The DT file to use depends on the Jetson SOM version and the carrier board.
+The DT file to use depends on the Jetson SoM version and the carrier board.
 
 Check the original device tree file name. For example : 
 <pre>
@@ -91,7 +93,7 @@ LABEL eg-cams
 Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
 
-#### 5/ Configuring a camera port to support a camera
+#### 5/ Configuring a camera port
 There are 2 camera ports on the Jetson Nano 2GB Developer Kit, "cam0" and "cam1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -109,16 +111,18 @@ To get the ports configuration (<ins>after a reboot</ins>, when the set command 
 eg_dt_camera_config_get.sh
 </pre>
 
-### Jetson Xavier NX 16GB (no SD) / Jetson Xavier NX devkit
+### Jetson Xavier NX 16GB (no SD) SoM / Jetson Xavier NX devkit
 Supported L4T versions :
 L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0
+
+SOM_BOARD=xavier
 
 #### 1/ Preparing the L4T environment
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION xavier
-./l4t_copy_sources.sh $L4T_VERSION xavier
+./l4t_prepare.sh $L4T_VERSION $SOM_BOARD
+./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
 #### 2/ Flashing the board
@@ -142,29 +146,29 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION xavier
+./l4t_build.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-- Generate the jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
+- Generate the jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION xavier
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION xavier X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
 #### 4/ Installing the MIPI drivers on the board
-- install the jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+- install the jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-xavier-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg -i jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
 - make the board boot with the patched kernel and use MIPI cameras device tree
 
-The DT file to use depends on the Jetson SOM version and the carrier board.
+The DT file to use depends on the Jetson SoM version and the carrier board.
 
 Check the original device tree file name. For example : 
 <pre>
@@ -186,7 +190,7 @@ LABEL eg-cams
 Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
 
-#### 5/ Configuring a camera port to support a camera
+#### 5/ Configuring a camera port
 There are 2 camera ports on the Jetson Xavier NX devkit, "cam0" and "cam1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -204,9 +208,11 @@ To get the ports configuration (<ins>after a reboot</ins>, when the set command 
 eg_dt_camera_config_get.sh
 </pre>
 
-### Jetson AGX Orin / Auvidea X230D kit
+### Jetson AGX Orin SoM / Auvidea X230D kit
 Supported L4T versions :
 L4T_VERSION=35.3.1, 35.4.1 or 35.5.0
+
+SOM_BOARD=auvidea_X230D
 
 IMPORTANT NOTE : for Auvidea X230D kit, the L4T environment must be built AFTER flashing the board, when using the flash.sh script. Unless the screen will not work.
 
@@ -214,8 +220,8 @@ IMPORTANT NOTE : for Auvidea X230D kit, the L4T environment must be built AFTER 
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION auvidea_X230D
-./l4t_copy_sources.sh $L4T_VERSION auvidea_X230D
+./l4t_prepare.sh $L4T_VERSION $SOM_BOARD
+./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
 #### 2/ Flashing the board
@@ -238,17 +244,17 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION auvidea_X230D
+./l4t_build.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
 - Generate the jetson-l4t-$L4T_VERSION-auvidea-x230d-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION auvidea_X230D
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION auvidea_X230D X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
@@ -259,7 +265,7 @@ sudo dpkg -i jetson-l4t-$L4T_VERSION-auvidea-x230d-eg-cams_X.Y.Z_arm64.deb
 </pre>
 - make the board boot with the patched kernel and use MIPI cameras device tree
 
-The DT file to use depends on the Jetson SOM version and the carrier board.
+The DT file to use depends on the Jetson SoM version and the carrier board.
 
 Check the original device tree file name. For example : 
 <pre>
@@ -281,7 +287,7 @@ LABEL eg-cams
 Note : the APPEND line may change from an L4T version to another. Base it on the primary entry. 
 - reboot the Jetson board
 
-#### 5/ Configuring a camera port to support a camera
+#### 5/ Configuring a camera port
 There are 2 camera ports on the Auvidea X230D kit, "AB" and "CD".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -300,16 +306,20 @@ eg_dt_camera_config_get.sh
 </pre>
 
 
-### Jetson Orin NX
+### Jetson Orin NX or Nano SoM / Jetson Orin Nano devkit
 Supported L4T versions :
-L4T_VERSION=36.4.3
+L4T_VERSION=36.4, 36.4.3 or 36.4.4
+
+SOM_BOARD=orin_nx
+
+Note : the SoM/board name here is orin_nx, but it is also supported by Orin Nano, as it shares the same SoM base and the same carrier board.
 
 #### 1/ Preparing the L4T environment
-This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
+This section is for developers needing to rebuild the drivers.
 
 <pre>
-./l4t_prepare.sh $L4T_VERSION orin_nx
-./l4t_copy_sources.sh $L4T_VERSION orin_nx
+./l4t_prepare.sh $L4T_VERSION $SOM_BOARD
+./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
 #### 2/ Flashing the board
@@ -323,17 +333,17 @@ This section is for developers needing to rebuild the drivers.
 
 - Build :
 <pre>
-./l4t_build.sh $L4T_VERSION orin_nx
+./l4t_build.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
 - Generate the jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION orin_nx
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD
 </pre>
 X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
 It it possible to force the version with the following command : 
 <pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION orin_nx X.Y.Z
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD X.Y.Z
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
@@ -344,8 +354,8 @@ sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm
 </pre>
 - reboot the Jetson board
 
-#### 5/ Configuring a camera port to support a camera
-There are 2 camera ports on the Jetson Orin NX devkit, "CAM0" and "CAM1".
+#### 5/ Configuring a camera port
+There are 2 camera ports on the Jetson Orin NX/Nano devkit, "CAM0" and "CAM1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
 
@@ -355,6 +365,7 @@ sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n $COMMAND
 </pre>
 Note : the jetson-io scripts have been patched
 
+##### Exosens cameras
 Here are the different values for $COMMAND, depending on camera types and ports, and the corresponding OVERLAYS entry in the /boot/extlinux/extlinux.conf file : 
 
 | Dione     |          | MicroCube640 |          | Crius1280/SmartIR640 |          |                                                                                                |                                                                                                                                                                          |
@@ -406,15 +417,180 @@ https://nvidia-jetson.piveral.com/jetson-orin-nano/csi-diff-pair-polarity-swap-o
 <pre>
 lane_polarity = "6"; 
 </pre>
-has been added in this devicetree overlay as a workaround for that issue : tegra234-p3767-camera-p3768-eg-cams-dione.dts
-To port the devicetree on a custom carrier board embedding the Orin NX, this lane polarity parameter may have to be removed.
+has been added in this devicetree overlay as a workaround for that issue : tegra234-p3767-camera-common-eg-cams-dione.dtsi
 
-## Hints to help integrating the drivers on other L4T versions and other SOM/carrier boards
+To port the devicetree on a custom carrier board embedding the Orin NX/Nano, this lane polarity parameter may have to be removed.
 
-Adding a new L4T version and support new SOM/carrier board consist of :
+##### Other cameras
+Jetson L4T supports IMX219 and IMX477 cameras. Device tree overlays are provided to offer the possibility to mix IMX219/477 and Exosens cameras on both CAM0 and CAM1 ports. IMX219/477 device trees were ported as is, a basic video streaming test was done with IMX219.
+
+| IMX219    |          |                                                                                                |                                                                                                                                                                          |
+|-----------|----------|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| **CAM0**  | **CAM1** | **config-by-hardware.py -n $COMMAND**                | **OVERLAYS in /boot/extlinux/extlinux.conf**                                                                     |
+| x         |          | 2="Exosens Cameras" 2="Exosens Cameras. CAM0:imx219" | /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-imx219.dtbo       |
+|           | x        | 2="Exosens Cameras" 2="Exosens Cameras. CAM1:imx219" | /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo       |
+
+| IMX477    |          |                                                                                                |                                                                                                                                                                          |
+|-----------|----------|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| **CAM0**  | **CAM1** | **config-by-hardware.py -n $COMMAND**                        | **OVERLAYS in /boot/extlinux/extlinux.conf**                                                                        |
+| x         |          | 2="Exosens Cameras" 2="Exosens Cameras. CAM0:imx477"         | /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo          |
+| x 4 lanes |          | 2="Exosens Cameras" 2="Exosens Cameras. CAM0:imx477-4-lanes" | /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo  |
+|           | x        | 2="Exosens Cameras" 2="Exosens Cameras. CAM1:imx477"         | /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo          |
+
+For example, configure Dione on CAM0 port and IMX219 on CAM1 : 
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras" 2="Exosens Cameras. CAM1:imx219"
+</pre>
+For example, configure IMX477 on CAM0 and MicroCube640 on CAM1 : 
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras" 2="Exosens Cameras. CAM0:imx477" 2="Exosens Cameras. CAM1:EC_1_lane"
+</pre>
+
+### Jetson Orin NX or Nano SoM / Forecr DSBOARD-ORNXS
+https://www.forecr.io/products/dsboard-ornxs
+
+Supported L4T versions :
+L4T_VERSION=36.4, 36.4.3 or 36.4.4
+
+SOM_BOARD=dsboard_ornxs
+
+#### 1/ Preparing the L4T environment
+This section is for developers needing to rebuild the drivers.
+
+<pre>
+./l4t_prepare.sh $L4T_VERSION $SOM_BOARD
+./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
+</pre>
+
+#### 2/ Flashing the board
+
+Install JetPack 6 : 
+https://www.forecr.io/blogs/installation/jetpack-6-x-installation-for-dsboard-ornxs
+
+#### 3/ Building the L4T environment
+This section is for developers needing to rebuild the drivers.
+
+- Build :
+<pre>
+./l4t_build.sh $L4T_VERSION $SOM_BOARD
+</pre>
+
+- Generate the jetson-l4t-$L4T_VERSION-dsboard-ornxs-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
+<pre>
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD
+</pre>
+X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
+It it possible to force the version with the following command : 
+<pre>
+./l4t_gen_delivery_package.sh $L4T_VERSION $SOM_BOARD X.Y.Z
+</pre>
+The package is generated in the $L4T_VERSION folder.
+
+#### 4/ Installing the MIPI drivers on the board
+- install the jetson-l4t-$L4T_VERSION-dsboard-ornxs-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
+<pre>
+sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-dsboard-ornxs-eg-cams_X.Y.Z_arm64.deb
+</pre>
+- reboot the Jetson board
+
+#### 5/ Configuring a camera port
+There are 2 camera ports on the DSBOARD-ORNXS carrier board. They are not marked, but let's use the same names as for the Jetson Orin NX/Nano devkit, "CAM0" and "CAM1".
+
+After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
+
+To change the configuration, use this command, <ins>then reboot</ins> : 
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n $COMMAND
+</pre>
+Note : the jetson-io scripts have been patched
+
+##### Exosens cameras
+Here are the different values for $COMMAND, depending on camera types and ports, and the corresponding OVERLAYS entry in the /boot/extlinux/extlinux.conf file : 
+
+| Dione     |          | MicroCube640 |          | Crius1280/SmartIR640 |          |                                                                                                |                                                                                                                                                                          |
+|-----------|----------|--------------|----------|----------------------|----------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **CAM0**  | **CAM1** | **CAM0**     | **CAM1** | **CAM0**             | **CAM1** | **config-by-hardware.py -n $COMMAND**                                                          | **OVERLAYS in /boot/extlinux/extlinux.conf**                                                                                                                             |
+| x         | x        |              |          |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS"                                                                            | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo                                                                                                                     |
+| x         |          |              | x        |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_1_lane"                                        | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo                                                            |
+| x         |          |              |          |                      | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_2_lanes"                                       | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lane2.dtbo                                                           |
+|           | x        | x            |          |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"                                        | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo                                                            |
+|           | x        |              |          | x                    |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_2_lanes"                                       | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo                                                           |
+|           |          | x            | x        |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_1_lane"   | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo   |
+|           |          | x            |          |                      | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_2_lanes"  | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo  |
+|           |          |              | x        | x                    |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_2_lanes" 2="Exosens Cameras. CAM1:EC_1_lane"   | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo  |
+|           |          |              | x        |                      | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_2_lanes" 2="Exosens Cameras. CAM1:EC_2_lanes"  | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo |
+
+For example, configure Dione on CAM0 port and MicroCube640 on CAM1 : 
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_1_lane" 
+</pre>
+For example, configure MicroCube640 on CAM0 port and Crius1280 on CAM1 :
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_2_lanes"
+</pre>
+
+To check the ports configuration, open the /boot/extlinux/extlinux.conf file, JetsonIO label part, OVERLAYS entry.
+
+For example, Dione on CAM0 port and MicroCube640 on CAM1 : 
+<pre>
+[...]
+LABEL JetsonIO
+        MENU LABEL Custom Header Config: <CSI Exosens Cameras> <CSI Exosens Cameras. CAM1:EC_1_lane>
+        LINUX /boot/eg/Image
+        FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
+        INITRD /boot/initrd
+        APPEND ${cbootargs} root=PARTUUID=fb79911a-6ada-43b3-b983-0ec29fc92323 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 firmware_class.path=/etc/firmware fbcon=map:0 nospectre_bhb video=efifb:off console=tty0 nv-auto-config
+        <b>OVERLAYS /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo</b>
+[...]
+</pre>
+
+For example, MicroCube640 on CAM0 port and Crius1280 on CAM1 :
+<pre>
+[...]
+    OVERLAYS /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
+[...]
+</pre>
+
+<span>***IMPORTANT NOTE : CSI diff pair swap on Jetson Orin Nano devkit***</span>
+https://nvidia-jetson.piveral.com/jetson-orin-nano/csi-diff-pair-polarity-swap-on-nvidia-jetson-orin-nano-dev-board/
+<pre>
+lane_polarity = "6"; 
+</pre>
+has been added in this devicetree overlay as a workaround for that issue : tegra234-p3767-camera-common-eg-cams-dione.dtsi
+
+To port the devicetree on a custom carrier board embedding the Orin NX/Nano, this lane polarity parameter may have to be removed.
+
+##### Other cameras
+Jetson L4T supports IMX219 and IMX477 cameras. Device tree overlays are provided to offer the possibility to mix IMX219/477 and Exosens cameras on both CAM0 and CAM1 ports. IMX219/477 device trees were ported as is, a basic video streaming test was done with IMX219.
+
+| IMX219    |          |                                                                                                |                                                                                                                                                                          |
+|-----------|----------|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| **CAM0**  | **CAM1** | **config-by-hardware.py -n $COMMAND**                | **OVERLAYS in /boot/extlinux/extlinux.conf**                                                                     |
+| x         |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:imx219" | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-imx219.dtbo       |
+|           | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:imx219" | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo       |
+
+| IMX477    |          |                                                                                                |                                                                                                                                                                          |
+|-----------|----------|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| **CAM0**  | **CAM1** | **config-by-hardware.py -n $COMMAND**                        | **OVERLAYS in /boot/extlinux/extlinux.conf**                                                                        |
+| x         |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:imx477"         | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo          |
+| x 4 lanes |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:imx477-4-lanes" | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo  |
+|           | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:imx477"         | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo          |
+
+For example, configure Dione on CAM0 port and IMX219 on CAM1 : 
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:imx219"
+</pre>
+For example, configure IMX477 on CAM0 and MicroCube640 on CAM1 : 
+<pre>
+sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:imx477" 2="Exosens Cameras. CAM1:EC_1_lane"
+</pre>
+
+## Hints to help integrating the drivers on other L4T versions and other SoM/carrier boards
+
+Adding a new L4T version and support new SoM/carrier board consist of :
 ### Getting the L4T archives files
 
-* First check the compatibility of L4T_VERSION with the SOM target : https://developer.nvidia.com/embedded/jetson-linux-archive
+* First check the compatibility of L4T_VERSION with the SoM target : https://developer.nvidia.com/embedded/jetson-linux-archive
 
 * modify the *environment* file and add a new entry. For example the L4T version 35.3.1 for Xavier NX and AGX Orin/Auvidea X320D : 
 <pre>
@@ -450,10 +626,10 @@ If the need is only to implement a new $L4T_VERSION_NEW version :
 
 Note : the *l4t_copy_sources.sh* script is in charge of copying customized files to the original L4T build environment.
 
-### Creating a camera device tree for a new SOM / carrier board
+### Creating a camera device tree for a new SoM / carrier board
 Device tree source files are in the *sources/common/Linux_for_Tegra/source/public/hardware/nvidia/platform* folder.
 To create a new DT for the MIPI cameras, here are the steps : 
-* find out the one related to the new SOM, check the *FDT* entry in the */boot/extlinux/extlinux.conf* on the target board. For example on Jetson Xavier NX 16GB : 
+* find out the one related to the new SoM, check the *FDT* entry in the */boot/extlinux/extlinux.conf* on the target board. For example on Jetson Xavier NX 16GB : 
 <pre>
    FDT /boot/dtb/kernel_tegra194-p3668-0001-p3509-0000.dtb
 </pre>
