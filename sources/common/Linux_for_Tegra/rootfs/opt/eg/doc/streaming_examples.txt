@@ -27,6 +27,13 @@ Jetson boards except Nano :
 	to the screen :
 		gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
 		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=4;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+	to a UDP port for gstreamer, host address 192.168.1.1 :
+		gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=(string)RGB, width=640, height=480" ! videoconvert ! x264enc tune=zerolatency ! rtph264pay ! udpsink host=192.168.1.1 port=50000
+		Command for the receiver host : gst-launch-1.0 udpsrc port=50000 caps="application/x-rtp, media=video, encoding-name=H264" ! rtph264depay ! avdec_h264 ! autovideosink sync=false
+    to a UDP port for VLC, host address 192.168.1.1 :
+	    gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=(string)RGB, width=640, height=480" ! videoconvert ! x264enc key-int-max=12 ! mpegtsmux ! udpsink host=192.168.1.1 port=50000
+    to a TCP port for VLC: 
+	    gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=(string)RGB, width=640, height=480" ! videoconvert ! x264enc key-int-max=12 ! mpegtsmux ! tcpserversink host=0.0.0.0 port=50000
 
 	- YCbYr :
 	to a file (1 image) :

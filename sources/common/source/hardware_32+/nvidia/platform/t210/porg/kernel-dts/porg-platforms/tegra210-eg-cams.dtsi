@@ -924,7 +924,7 @@
 		 */
 		modules {
 			cam_module0: module0 {
-				badge = "porg_front_eg_cam";
+				badge = "front_eg_cam";
 				position = "front";
 				orientation = "1";
 				cam_module0_drivernode0: drivernode0 {
@@ -934,7 +934,7 @@
 				};
 			};
 			cam_module1: module1 {
-				badge = "porg_rear_eg_cam";
+				badge = "rear_eg_cam";
 				position = "rear";
 				orientation = "1";
 				cam_module1_drivernode0: drivernode0 {

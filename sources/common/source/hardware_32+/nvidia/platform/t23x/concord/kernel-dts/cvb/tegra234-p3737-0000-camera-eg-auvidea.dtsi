@@ -1743,7 +1743,7 @@
 
 		modules {
 			module0 {
-				badge = "jakku_topright_eg_cam";
+				badge = "topright_eg_cam";
 				position = "topright";
 				orientation = "1";
 				cam_module0_drivernode0: drivernode0 {
@@ -1753,7 +1753,7 @@
 				};
 			};
 			module1 {
-				badge = "jakku_bottomright_eg_cam";
+				badge = "bottomright_eg_cam";
 				position = "bottomright";
 				orientation = "1";
 				cam_module1_drivernode0: drivernode0 {
@@ -1763,7 +1763,7 @@
 				};
 			};
 			module2 {
-				badge = "jakku_topleft_eg_cam";
+				badge = "topleft_eg_cam";
 				position = "topleft";
 				orientation = "1";
 				cam_module2_drivernode0: drivernode0 {
@@ -1773,7 +1773,7 @@
 				};
 			};
 			module3 {
-				badge = "jakku_bottomleft_eg_cam";
+				badge = "bottomleft_eg_cam";
 				position = "bottomleft";
 				orientation = "1";
 				cam_module3_drivernode0: drivernode0 {

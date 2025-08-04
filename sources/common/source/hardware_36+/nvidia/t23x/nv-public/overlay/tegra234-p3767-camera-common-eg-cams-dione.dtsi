@@ -101,7 +101,7 @@
 				 */
 				modules {
 					module0 {
-						badge = "jakku_rear_RBP194";
+						badge = "front_eg_cam";
 						position = "front";
 						orientation = "1";
 						cam_module0_drivernode0: drivernode0 {
@@ -114,7 +114,7 @@
 						};
 					};
 					module1 {
-						badge = "jakku_rear_RBP194";
+						badge = "rear_eg_cam";
 						position = "rear";
 						orientation = "1";
 						drivernode0 {
