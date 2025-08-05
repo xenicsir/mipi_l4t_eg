@@ -5,37 +5,47 @@
       + [Host PC](#host-pc)
    * [Building and installing MIPI drivers on supported SoM / carrier boards](#building-and-installing-mipi-drivers-on-supported-som-carrier-boards)
       + [Jetson Nano SoM / Jetson Nano devkit](#jetson-nano-som-jetson-nano-devkit)
-         - [1/ Preparing the L4T environment](#1-preparing-the-l4t-environment)
-         - [2/ Flashing the board](#2-flashing-the-board)
-         - [3/ Building the L4T environment](#3-building-the-l4t-environment)
-         - [4/ Installing the MIPI drivers on the board](#4-installing-the-mipi-drivers-on-the-board)
-         - [5/ Configuring a camera port](#5-configuring-a-camera-port)
+         - [Preparing the L4T environment](#preparing-the-l4t-environment)
+         - [Flashing the board](#flashing-the-board)
+         - [Building the L4T environment](#building-the-l4t-environment)
+         - [Installing the MIPI drivers on the board](#installing-the-mipi-drivers-on-the-board)
+            * [Package installation](#package-installation)
+            * [Linux boot](#linux-boot)
+         - [Configuring a camera port](#configuring-a-camera-port)
       + [Jetson Xavier NX 16GB (no SD) SoM / Jetson Xavier NX devkit](#jetson-xavier-nx-16gb-no-sd-som-jetson-xavier-nx-devkit)
-         - [1/ Preparing the L4T environment](#1-preparing-the-l4t-environment-1)
-         - [2/ Flashing the board](#2-flashing-the-board-1)
-         - [3/ Building the L4T environment](#3-building-the-l4t-environment-1)
-         - [4/ Installing the MIPI drivers on the board](#4-installing-the-mipi-drivers-on-the-board-1)
-         - [5/ Configuring a camera port](#5-configuring-a-camera-port-1)
+         - [Preparing the L4T environment](#preparing-the-l4t-environment-1)
+         - [Flashing the board](#flashing-the-board-1)
+         - [Building the L4T environment](#building-the-l4t-environment-1)
+         - [Installing the MIPI drivers on the board](#installing-the-mipi-drivers-on-the-board-1)
+            * [Package installation](#package-installation-1)
+            * [Linux boot](#linux-boot-1)
+         - [Configuring a camera port](#configuring-a-camera-port-1)
       + [Jetson AGX Orin SoM / Auvidea X230D kit](#jetson-agx-orin-som-auvidea-x230d-kit)
-         - [1/ Preparing the L4T environment](#1-preparing-the-l4t-environment-2)
-         - [2/ Flashing the board](#2-flashing-the-board-2)
-         - [3/ Building the L4T environment](#3-building-the-l4t-environment-2)
-         - [4/ Installing the MIPI drivers on the board](#4-installing-the-mipi-drivers-on-the-board-2)
-         - [5/ Configuring a camera port](#5-configuring-a-camera-port-2)
+         - [Preparing the L4T environment](#preparing-the-l4t-environment-2)
+         - [Flashing the board](#flashing-the-board-2)
+         - [Building the L4T environment](#building-the-l4t-environment-2)
+         - [Installing the MIPI drivers on the board](#installing-the-mipi-drivers-on-the-board-2)
+            * [Package installation](#package-installation-2)
+            * [Linux boot](#linux-boot-2)
+         - [Configuring a camera port](#configuring-a-camera-port-2)
       + [Jetson Orin NX or Nano SoM / Jetson Orin Nano devkit](#jetson-orin-nx-or-nano-som-jetson-orin-nano-devkit)
-         - [1/ Preparing the L4T environment](#1-preparing-the-l4t-environment-3)
-         - [2/ Flashing the board](#2-flashing-the-board-3)
-         - [3/ Building the L4T environment](#3-building-the-l4t-environment-3)
-         - [4/ Installing the MIPI drivers on the board](#4-installing-the-mipi-drivers-on-the-board-3)
-         - [5/ Configuring a camera port](#5-configuring-a-camera-port-3)
+         - [Preparing the L4T environment](#preparing-the-l4t-environment-3)
+         - [Flashing the board](#flashing-the-board-3)
+         - [Building the L4T environment](#building-the-l4t-environment-3)
+         - [Installing the MIPI drivers on the board](#installing-the-mipi-drivers-on-the-board-3)
+            * [Package installation](#package-installation-3)
+            * [Linux boot](#linux-boot-3)
+         - [Configuring a camera port](#configuring-a-camera-port-3)
             * [Exosens cameras](#exosens-cameras)
             * [Other cameras](#other-cameras)
       + [Jetson Orin NX or Nano SoM / Forecr DSBOARD-ORNXS](#jetson-orin-nx-or-nano-som-forecr-dsboard-ornxs)
-         - [1/ Preparing the L4T environment](#1-preparing-the-l4t-environment-4)
-         - [2/ Flashing the board](#2-flashing-the-board-4)
-         - [3/ Building the L4T environment](#3-building-the-l4t-environment-4)
-         - [4/ Installing the MIPI drivers on the board](#4-installing-the-mipi-drivers-on-the-board-4)
-         - [5/ Configuring a camera port](#5-configuring-a-camera-port-4)
+         - [Preparing the L4T environment](#preparing-the-l4t-environment-4)
+         - [Flashing the board](#flashing-the-board-4)
+         - [Building the L4T environment](#building-the-l4t-environment-4)
+         - [Installing the MIPI drivers on the board](#installing-the-mipi-drivers-on-the-board-4)
+            * [Package installation](#package-installation-4)
+            * [Linux boot](#linux-boot-4)
+         - [Configuring a camera port](#configuring-a-camera-port-4)
             * [Exosens cameras](#exosens-cameras-1)
             * [Other cameras](#other-cameras-1)
    * [Hints to help integrating the drivers on other L4T versions and other SoM/carrier boards <a name="hints"></a>](#hints-to-help-integrating-the-drivers-on-other-l4t-versions-and-other-somcarrier-boards)
@@ -73,8 +83,8 @@ Supported L4T versions :
 L4T_VERSION=32.7.1, 32.7.4  
 SOM_BOARD=nano
 
-<!-- TOC --><a name="1-preparing-the-l4t-environment"></a>
-#### 1/ Preparing the L4T environment
+<!-- TOC --><a name="preparing-the-l4t-environment"></a>
+#### Preparing the L4T environment
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
@@ -82,8 +92,8 @@ This section is for developers needing to rebuild the drivers or flash the board
 ./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-<!-- TOC --><a name="2-flashing-the-board"></a>
-#### 2/ Flashing the board
+<!-- TOC --><a name="flashing-the-board"></a>
+#### Flashing the board
 - Flash the Nano devkit kit following instructions, for example for L4R R32.7.1 : https://developer.nvidia.com/embedded/jetpack-sdk-461
 
 Or
@@ -97,8 +107,8 @@ cd $L4T_VERSION/Linux_for_Tegra_$SOM_BOARD
 sudo ./flash.sh jetson-nano-devkit mmcblk0p1
 </pre>
 
-<!-- TOC --><a name="3-building-the-l4t-environment"></a>
-#### 3/ Building the L4T environment
+<!-- TOC --><a name="building-the-l4t-environment"></a>
+#### Building the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 - Build :
@@ -117,16 +127,18 @@ It it possible to force the version with the following command :
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
-<!-- TOC --><a name="4-installing-the-mipi-drivers-on-the-board"></a>
-#### 4/ Installing the MIPI drivers on the board
-4.1 Package installation
+<!-- TOC --><a name="installing-the-mipi-drivers-on-the-board"></a>
+#### Installing the MIPI drivers on the board
+<!-- TOC --><a name="package-installation"></a>
+##### Package installation
 
 Install the jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
 sudo dpkg -i jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
-4.2 Linux boot
+<!-- TOC --><a name="linux-boot"></a>
+##### Linux boot
 
 Make the board boot with the patched kernel and use MIPI cameras device tree.  
 The devicetree file to use depends on the Jetson SoM version and the carrier board.  
@@ -154,8 +166,8 @@ Notes :
 
 Finally, reboot the Jetson board.
 
-<!-- TOC --><a name="5-configuring-a-camera-port"></a>
-#### 5/ Configuring a camera port
+<!-- TOC --><a name="configuring-a-camera-port"></a>
+#### Configuring a camera port
 There are 2 camera ports on the Jetson Nano 2GB Developer Kit, "cam0" and "cam1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -178,8 +190,8 @@ Supported L4T versions :
 L4T_VERSION=35.1, 35.3.1, 35.4.1 or 35.5.0  
 SOM_BOARD=xavier
 
-<!-- TOC --><a name="1-preparing-the-l4t-environment-1"></a>
-#### 1/ Preparing the L4T environment
+<!-- TOC --><a name="preparing-the-l4t-environment-1"></a>
+#### Preparing the L4T environment
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
@@ -187,8 +199,8 @@ This section is for developers needing to rebuild the drivers or flash the board
 ./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-<!-- TOC --><a name="2-flashing-the-board-1"></a>
-#### 2/ Flashing the board
+<!-- TOC --><a name="flashing-the-board-1"></a>
+#### Flashing the board
 - Flash the Xavier devkit kit following these instructions https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson/index.html
 
 Or
@@ -202,8 +214,8 @@ cd $L4T_VERSION/Linux_for_Tegra_xavier
 sudo ./flash.sh jetson-xavier-devkit-emmc mmcblk0p1
 </pre>
 
-<!-- TOC --><a name="3-building-the-l4t-environment-1"></a>
-#### 3/ Building the L4T environment
+<!-- TOC --><a name="building-the-l4t-environment-1"></a>
+#### Building the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 - Build :
@@ -222,17 +234,17 @@ It it possible to force the version with the following command :
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
-<!-- TOC --><a name="4-installing-the-mipi-drivers-on-the-board-1"></a>
-#### 4/ Installing the MIPI drivers on the board
-4.1 Package installation
-
+<!-- TOC --><a name="installing-the-mipi-drivers-on-the-board-1"></a>
+#### Installing the MIPI drivers on the board
+<!-- TOC --><a name="package-installation-1"></a>
+##### Package installation
 Install the jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
 sudo dpkg -i jetson-l4t-$L4T_VERSION-$SOM_BOARD-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
-4.2 Linux boot
-
+<!-- TOC --><a name="linux-boot-1"></a>
+##### Linux boot
 Make the board boot with the patched kernel and use MIPI cameras device tree.  
 The devicetree file to use depends on the Jetson SoM version and the carrier board.  
 Check the original device tree file name. For example : 
@@ -259,8 +271,8 @@ Notes :
 
 Finally, reboot the Jetson board.
 
-<!-- TOC --><a name="5-configuring-a-camera-port-1"></a>
-#### 5/ Configuring a camera port
+<!-- TOC --><a name="configuring-a-camera-port-1"></a>
+#### Configuring a camera port
 There are 2 camera ports on the Jetson Xavier NX devkit, "cam0" and "cam1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -285,8 +297,8 @@ SOM_BOARD=auvidea_X230D
 
 IMPORTANT NOTE : for Auvidea X230D kit, the L4T environment must be built AFTER flashing the board, when using the flash.sh script. Unless the screen will not work.
 
-<!-- TOC --><a name="1-preparing-the-l4t-environment-2"></a>
-#### 1/ Preparing the L4T environment
+<!-- TOC --><a name="preparing-the-l4t-environment-2"></a>
+#### Preparing the L4T environment
 This section is for developers needing to rebuild the drivers or flash the board with the Nvidia flash.sh script.
 
 <pre>
@@ -294,8 +306,8 @@ This section is for developers needing to rebuild the drivers or flash the board
 ./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-<!-- TOC --><a name="2-flashing-the-board-2"></a>
-#### 2/ Flashing the board
+<!-- TOC --><a name="flashing-the-board-2"></a>
+#### Flashing the board
 Only if using L4T_VERSION 35.3.1, it is possible to flash the Auvidea X230D kit following the instructions in the SW Setup Guide https://auvidea.eu/download/Software. Use JetPack 5.1.1.
 
 Or 
@@ -310,8 +322,8 @@ cd $L4T_VERSION/Linux_for_Tegra_auvidea_X230D
 sudo ./flash.sh jetson-agx-orin-devkit mmcblk0p1
 </pre>
 
-<!-- TOC --><a name="3-building-the-l4t-environment-2"></a>
-#### 3/ Building the L4T environment
+<!-- TOC --><a name="building-the-l4t-environment-2"></a>
+#### Building the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 - Build :
@@ -330,16 +342,18 @@ It it possible to force the version with the following command :
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
-<!-- TOC --><a name="4-installing-the-mipi-drivers-on-the-board-2"></a>
-#### 4/ Installing the MIPI drivers on the board
-4.1 Package installation
+<!-- TOC --><a name="installing-the-mipi-drivers-on-the-board-2"></a>
+#### Installing the MIPI drivers on the board
+<!-- TOC --><a name="package-installation-2"></a>
+##### Package installation
 
 Install the jetson-l4t-$L4T_VERSION-auvidea-x230d-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
 sudo dpkg -i jetson-l4t-$L4T_VERSION-auvidea-x230d-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
-4.2 Linux boot
+<!-- TOC --><a name="linux-boot-2"></a>
+##### Linux boot
 
 Make the board boot with the patched kernel and use MIPI cameras device tree.  
 The devicetree file to use depends on the Jetson SoM version and the carrier board.  
@@ -367,8 +381,8 @@ Notes :
 
 Finally, reboot the Jetson board.
 
-<!-- TOC --><a name="5-configuring-a-camera-port-2"></a>
-#### 5/ Configuring a camera port
+<!-- TOC --><a name="configuring-a-camera-port-2"></a>
+#### Configuring a camera port
 There are 2 camera ports on the Auvidea X230D kit, "AB" and "CD".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -394,8 +408,8 @@ SOM_BOARD=orin_nx
 
 Note : the SoM/board name here is orin_nx, but it is also supported by Orin Nano, as it shares the same SoM base and the same carrier board.
 
-<!-- TOC --><a name="1-preparing-the-l4t-environment-3"></a>
-#### 1/ Preparing the L4T environment
+<!-- TOC --><a name="preparing-the-l4t-environment-3"></a>
+#### Preparing the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 <pre>
@@ -403,15 +417,15 @@ This section is for developers needing to rebuild the drivers.
 ./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-<!-- TOC --><a name="2-flashing-the-board-3"></a>
-#### 2/ Flashing the board
+<!-- TOC --><a name="flashing-the-board-3"></a>
+#### Flashing the board
 
 Install JetPack 6 :  
 https://developer.nvidia.com/embedded/jetpack-sdk-62  
 https://www.waveshare.com/wiki/JETSON-ORIN-NX-16G-DEV-KIT
 
-<!-- TOC --><a name="3-building-the-l4t-environment-3"></a>
-#### 3/ Building the L4T environment
+<!-- TOC --><a name="building-the-l4t-environment-3"></a>
+#### Building the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 - Build :
@@ -430,16 +444,18 @@ It it possible to force the version with the following command :
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
-<!-- TOC --><a name="4-installing-the-mipi-drivers-on-the-board-3"></a>
-#### 4/ Installing the MIPI drivers on the board
-4.1 Package installation
+<!-- TOC --><a name="installing-the-mipi-drivers-on-the-board-3"></a>
+#### Installing the MIPI drivers on the board
+<!-- TOC --><a name="package-installation-3"></a>
+##### Package installation
 
 Install the jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
 sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-orin-nx-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
-4.2 Linux boot
+<!-- TOC --><a name="linux-boot-3"></a>
+##### Linux boot
 
 After the first package installation, a new JetsonIO label is automatically created in /boot/extlinux/extlinux.conf, and the system will boot on it.  
 <pre>
@@ -460,8 +476,8 @@ Notes :
 
 Finally, reboot the Jetson board.
 
-<!-- TOC --><a name="5-configuring-a-camera-port-3"></a>
-#### 5/ Configuring a camera port
+<!-- TOC --><a name="configuring-a-camera-port-3"></a>
+#### Configuring a camera port
 There are 2 camera ports on the Jetson Orin NX/Nano devkit, "CAM0" and "CAM1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
@@ -563,8 +579,8 @@ Supported L4T versions :
 L4T_VERSION=36.4, 36.4.3 or 36.4.4  
 SOM_BOARD=dsboard_ornxs
 
-<!-- TOC --><a name="1-preparing-the-l4t-environment-4"></a>
-#### 1/ Preparing the L4T environment
+<!-- TOC --><a name="preparing-the-l4t-environment-4"></a>
+#### Preparing the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 <pre>
@@ -572,14 +588,14 @@ This section is for developers needing to rebuild the drivers.
 ./l4t_copy_sources.sh $L4T_VERSION $SOM_BOARD
 </pre>
 
-<!-- TOC --><a name="2-flashing-the-board-4"></a>
-#### 2/ Flashing the board
+<!-- TOC --><a name="flashing-the-board-4"></a>
+#### Flashing the board
 
 Install JetPack 6 : 
 https://www.forecr.io/blogs/installation/jetpack-6-x-installation-for-dsboard-ornxs
 
-<!-- TOC --><a name="3-building-the-l4t-environment-4"></a>
-#### 3/ Building the L4T environment
+<!-- TOC --><a name="building-the-l4t-environment-4"></a>
+#### Building the L4T environment
 This section is for developers needing to rebuild the drivers.
 
 - Build :
@@ -598,16 +614,18 @@ It it possible to force the version with the following command :
 </pre>
 The package is generated in the $L4T_VERSION folder.
 
-<!-- TOC --><a name="4-installing-the-mipi-drivers-on-the-board-4"></a>
-#### 4/ Installing the MIPI drivers on the board
-4.1 Package installation
+<!-- TOC --><a name="installing-the-mipi-drivers-on-the-board-4"></a>
+#### Installing the MIPI drivers on the board
+<!-- TOC --><a name="package-installation-4"></a>
+##### Package installation
 
 Install the jetson-l4t-$L4T_VERSION-dsboard-ornxs-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered or locally built previously :
 <pre>
 sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-dsboard-ornxs-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
-4.2 Linux boot
+<!-- TOC --><a name="linux-boot-4"></a>
+##### Linux boot
 
 After the first package installation, a new JetsonIO label is automatically created in /boot/extlinux/extlinux.conf, and the system will boot on it.  
 <pre>
@@ -628,8 +646,8 @@ Notes :
 
 Finally, reboot the Jetson board.
 
-<!-- TOC --><a name="5-configuring-a-camera-port-4"></a>
-#### 5/ Configuring a camera port
+<!-- TOC --><a name="configuring-a-camera-port-4"></a>
+#### Configuring a camera port
 There are 2 camera ports on the DSBOARD-ORNXS carrier board. They are not marked, but let's use the same names as for the Jetson Orin NX/Nano devkit, "CAM0" and "CAM1".
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
