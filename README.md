@@ -4,7 +4,7 @@ This document describes how to build and install the MIPI drivers for different 
 
 It also gives some hints to help integrating the drivers on other L4T versions and other carrier boards.
 
-The ==MIPI_deployment.xlsx== sheet presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
+The **MIPI_deployment.xlsx** sheet presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
 
 ## Prerequisites for cross-compiling
 
