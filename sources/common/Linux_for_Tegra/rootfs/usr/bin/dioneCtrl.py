@@ -1,43 +1,81 @@
 #!/usr/bin/python3
 
+import platform
 import io, os
-import fcntl
+if (platform.system() == "Linux") :
+    import fcntl
 import struct
 import time
+import serial
 
 IOCTL_I2C_SLAVE=0x0703
 IOCTL_I2C_TIMEOUT=0x0702
 
 class dioneCtrl(object):
 
-  def __init__(self, bus=6, dev_addr=0x5a):
-    self.fr=io.open("/dev/i2c-"+str(bus), "rb", buffering=0)
-    self.fw=io.open("/dev/i2c-"+str(bus), "wb", buffering=0)
+  def __init__(self, bus=6, dev_addr=0x5a, com_device="COM0", device_type="I2C"):
+    
+    self.device_type = device_type
+    if (platform.system() == "Windows") :
+        self.device_type = "USB"
+    
+    if (self.device_type == "I2C") :
+        self.fr=io.open("/dev/i2c-"+str(bus), "rb", buffering=0)
+        self.fw=io.open("/dev/i2c-"+str(bus), "wb", buffering=0)
 
-    fcntl.ioctl(self.fr, IOCTL_I2C_SLAVE, dev_addr)
-    fcntl.ioctl(self.fw, IOCTL_I2C_SLAVE, dev_addr)
-    fcntl.ioctl(self.fr, IOCTL_I2C_TIMEOUT, 100)
-    fcntl.ioctl(self.fw, IOCTL_I2C_TIMEOUT, 100)
+        fcntl.ioctl(self.fr, IOCTL_I2C_SLAVE, dev_addr)
+        fcntl.ioctl(self.fw, IOCTL_I2C_SLAVE, dev_addr)
+        fcntl.ioctl(self.fr, IOCTL_I2C_TIMEOUT, 100)
+        fcntl.ioctl(self.fw, IOCTL_I2C_TIMEOUT, 100)
+    else :
+        self.com_device = com_device
 
     self.last_file_op = -1
 
+  def open_device(self):
+    if (self.device_type == "USB") :
+        self.ser = serial.Serial(self.com_device, timeout = 1)
+
+  def close_device(self):
+    if (self.device_type == "USB") :
+        self.ser.close()
+
+  def write_device(self, out):
+    if (self.device_type == "USB") :
+        ret = self.ser.write(out)
+        self.ser.flush()
+    else :
+        ret = self.fw.write(out)
+    return ret
+
+  def read_device(self, len):
+    if (self.device_type == "USB") :
+        ret = self.ser.read(len)
+        self.ser.flush()
+    else :
+        ret = self.fr.read(len)
+    return ret
 
   def read_reg32(self, reg_addr):
+    self.open_device()
     time.sleep(0.01)
     out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
-    self.fw.write(out)
+    self.write_device(out)
     time.sleep(0.01)
-    ret=self.fr.read(6)
+    ret=self.read_device(6)
+    self.close_device()
     # print(ret)
     val=struct.unpack('<L', ret[2:])
     return val[0]
 
   def read_reg32f(self, reg_addr):
+    self.open_device()
     time.sleep(0.01)
     out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
-    self.fw.write(out)
+    self.write_device(out)
     time.sleep(0.01)
-    ret=self.fr.read(6)
+    ret=self.read_device(6)
+    self.close_device()
     # print(ret)
     val=struct.unpack('<L', ret[2:])
     if (val[0] == 0):
@@ -46,19 +84,23 @@ class dioneCtrl(object):
        return struct.unpack('!f', bytes.fromhex(f'{val[0]:x}'))[0]
 
   def write_reg32(self, reg_addr, val):
+    self.open_device()
     out=bytearray(reg_addr.to_bytes(4, 'little')) \
         +bytearray([0x04, 0x00]) \
         +bytearray(val.to_bytes(4, 'little'))
     time.sleep(0.01)
-    ret=self.fw.write(out)
+    ret=self.write_device(out)
+    self.close_device()
     return ret
 
   def write_reg32f(self, reg_addr, val):
+    self.open_device()
     out=bytearray(reg_addr.to_bytes(4, 'little')) \
         +bytearray([0x04, 0x00]) \
         +bytearray(struct.pack('<f', val))
     time.sleep(0.01)
-    ret=self.fw.write(out)
+    ret=self.write_device(out)
+    self.close_device()
     return ret
 
 
@@ -86,12 +128,14 @@ class dioneCtrl(object):
     """! reads <length> bytes from <reg_addr>
     """
 
+    self.open_device()
     out=bytearray(reg_addr.to_bytes(4, 'little')) \
         + bytearray(length.to_bytes(2, 'little'))
     time.sleep(0.01)
-    self.fw.write(out)
+    self.write_device(out)
     time.sleep(0.01)
-    ret=self.fr.read(2+length)
+    ret=self.read_device(2+length)
+    self.close_device()
     return ret
 
 
@@ -99,12 +143,14 @@ class dioneCtrl(object):
     """! writes <buf> to <reg_addr>
     """
 
+    self.open_device()
     out=bytearray(reg_addr.to_bytes(4, 'little')) \
         + bytearray(len(buf).to_bytes(2, 'little')) + buf
     time.sleep(0.01)
-    self.fw.write(out)
+    self.write_device(out)
     time.sleep(0.01)
-    # print(self.fr.read(2))
+    # print(self.read_device(2))
+    self.close_device()
 
 
   def exec_file_op(self, op):
