@@ -990,9 +990,6 @@ static int dione_ir_set_mode(struct tegracam_device *tc_dev)
 		return -EINVAL;
 	}
 
-	dev_dbg(tc_dev->dev, "link_frequency = %lld\n", input.link_frequency);
-
-
 	err = 0;
 	if (test_mode) {
 #ifdef DIONE_IR_STARTUP_TMO_MS
@@ -1018,6 +1015,7 @@ static int dione_ir_set_mode(struct tegracam_device *tc_dev)
 	}
 
 #ifdef DBG_TC358746
+   printk("tc358746_calculate input.link_frequency = %lld\n", input.link_frequency);
    printk("tc358746_calculate input.mbus_fmt = 0x%x\n", input.mbus_fmt);
    printk("tc358746_calculate input.refclk = %d\n", input.refclk);
    printk("tc358746_calculate input.num_lanes = %d\n", input.num_lanes);
