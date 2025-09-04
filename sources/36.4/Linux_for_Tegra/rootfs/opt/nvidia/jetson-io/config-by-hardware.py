@@ -116,7 +116,7 @@ def main():
             for i in range(len(hws)):
               hw = hws[i]
               if hw:
-                  if (hw == "Exosens Cameras"):
+                  if ("Exosens Cameras" in hw):
                       eg = 1
                   else :
                       eg = 0

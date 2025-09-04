@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	overlay-name = "Exosens Cameras. CAM0:EC_1_lane";
+	jetson-header-name = "Jetson AGX CSI Connector";
+	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
+
+	fragment@0 {
+		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
+		__overlay__ {
+			bus-width=<1>;
+		};
+	};
+
+	fragment@1 {
+		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
+		__overlay__ {
+			bus-width=<1>;
+			remote-endpoint = <&eg_ec_out0>;
+		};
+	};
+
+   // Disable Dione cameras
+	fragment@2 {
+		target-path = "/i2c@31e0000/xenics_dione_ir_a@0e";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+   // Enable EngineCore cameras
+	fragment@3 {
+		target-path = "/i2c@31e0000/eg_ec_a@16";
+		__overlay__ {
+         status = "okay";
+		};
+	};
+	fragment@4 {   
+		target-path = "/i2c@31e0000/eg_ec_a@16/mode0";
+		__overlay__ {
+         num_lanes = "1";
+         pix_clk_hz = "20000000";
+		};
+	};
+	fragment@5 {
+		target-path = "/i2c@31e0000/eg_ec_a@16/mode1";
+		__overlay__ {
+         num_lanes = "1";
+         pix_clk_hz = "20000000";
+		};
+	};
+	fragment@6 {
+		target-path = "/i2c@31e0000/eg_ec_a@16/mode2";
+		__overlay__ {
+         num_lanes = "1";
+         pix_clk_hz = "20000000";
+		};
+	};
+	fragment@7 {
+		target-path = "/i2c@31e0000/eg_ec_a@16/mode3";
+		__overlay__ {
+         num_lanes = "1";
+         pix_clk_hz = "20000000";
+		};
+	};
+	fragment@8 {
+		target-path = "/i2c@31e0000/eg_ec_a@16/mode4";
+		__overlay__ {
+         num_lanes = "1";
+         pix_clk_hz = "20000000";
+		};
+	};
+	fragment@9 {
+		target-path = "/i2c@31e0000/eg_ec_a@16/mode5";
+		__overlay__ {
+         num_lanes = "1";
+         pix_clk_hz = "20000000";
+		};
+	};
+	fragment@10 {
+		target-path = "/i2c@31e0000/eg_ec_a@16/ports/port@0/endpoint";
+		__overlay__ {
+			bus-width=<1>;
+		};
+	};
+
+	fragment@11 {
+		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
+		__overlay__ {
+         devname = "eg_ec 8-0016";
+			proc-device-tree = "/proc/device-tree/i2c@31e0000/eg_ec_a@16";
+		};
+	};
+
+};

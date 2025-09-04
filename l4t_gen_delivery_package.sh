@@ -38,17 +38,20 @@ INSTALL_DIR=${PACKAGE_NAME}/boot/eg
 mkdir -p $INSTALL_DIR		
 sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg/* ${INSTALL_DIR}/
 
-if [[ $L4T_VERSION_MAJOR < 36 ]]
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/*-eg-*.dtb*
+ls $file
+if [[ $? == 0 ]]
 then
-	INSTALL_DIR=${PACKAGE_NAME}/boot/eg
-	sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg/*-eg-*.dtb* ${INSTALL_DIR}/
-	DRIVER_DIR=kernel/drivers/media/i2c
-else
 	INSTALL_DIR=${PACKAGE_NAME}/boot/
-	sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/*-eg-*.dtb* ${INSTALL_DIR}/
-	DRIVER_DIR=updates/drivers/media/i2c
+	sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
 
+if [[ $L4T_VERSION_MAJOR < 36 ]]
+then
+	DRIVER_DIR=kernel/drivers/media/i2c
+else
+	DRIVER_DIR=updates/drivers/media/i2c
+fi
 INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/dione_ir.ko
 if [[ -f $file ]]
@@ -62,6 +65,7 @@ then
    mkdir -p $INSTALL_DIR
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
+
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nv_imx219.ko
 if [[ -f $file ]]
 then

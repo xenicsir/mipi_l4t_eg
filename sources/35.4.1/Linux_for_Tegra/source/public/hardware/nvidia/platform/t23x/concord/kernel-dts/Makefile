@@ -46,6 +46,20 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-hawk-owl-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3701-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-dual-hawk-ar0234-e3653-overlay.dtbo
 
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cams-dione.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ec-1-lane.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ec-2-lanes.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ec-imx219.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam1-ec-1-lane.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam1-ec-2-lanes.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam1-ec-imx219.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam2-ec-1-lane.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam2-ec-2-lanes.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam2-ec-imx219.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam3-ec-1-lane.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam3-ec-2-lanes.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam3-ec-imx219.dtbo
+
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 endif

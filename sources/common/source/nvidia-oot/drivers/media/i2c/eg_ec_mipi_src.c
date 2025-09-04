@@ -62,9 +62,11 @@ static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
 
 
 static const u32 ctrl_cid_list[] = {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
 	TEGRA_CAMERA_CID_GAIN,
 	TEGRA_CAMERA_CID_EXPOSURE,
 	TEGRA_CAMERA_CID_FRAME_RATE,
+#endif
 	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
 };
 
@@ -431,6 +433,7 @@ static int eg_ec_mipi_set_group_hold(struct tegracam_device *tc_dev, bool val)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
 static int eg_ec_mipi_ir_set_gain(struct tegracam_device *tc_dev, s64 val)
 {
 	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
@@ -448,13 +451,16 @@ static int eg_ec_mipi_ir_set_exposure(struct tegracam_device *tc_dev, s64 val)
 	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
 	return 0;
 }
+#endif
 
 static struct tegracam_ctrl_ops eg_ec_mipi_ctrl_ops = {
 	.numctrls = ARRAY_SIZE(ctrl_cid_list),
 	.ctrl_cid_list = ctrl_cid_list,
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
 	.set_gain = eg_ec_mipi_ir_set_gain,
 	.set_exposure = eg_ec_mipi_ir_set_exposure,
 	.set_frame_rate = eg_ec_mipi_ir_set_frame_rate,
+#endif
 	.set_group_hold = eg_ec_mipi_set_group_hold,
 };
 

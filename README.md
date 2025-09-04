@@ -309,6 +309,7 @@ This section is for developers needing to rebuild the drivers or flash the board
 <!-- TOC --><a name="flashing-the-board-2"></a>
 #### Flashing the board
 Only if using L4T_VERSION 35.3.1, it is possible to flash the Auvidea X230D kit following the instructions in the SW Setup Guide https://auvidea.eu/download/Software. Use JetPack 5.1.1.
+https://auvidea.eu/firmware/
 
 Or 
 

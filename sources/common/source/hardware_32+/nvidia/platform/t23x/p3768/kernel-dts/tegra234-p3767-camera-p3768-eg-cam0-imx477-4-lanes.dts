@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-common/jetson/tegra234-p3767-0000-common.h>
+
+/ {
+	overlay-name = "Exosens Cameras. CAM0:imx477-4-lanes";
+	jetson-header-name = "Jetson 24pin CSI Connector";
+	compatible = JETSON_COMPATIBLE_P3768;
+
+	fragment@10 {
+		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
+		__overlay__ {
+			bus-width=<4>;
+		};
+	};
+
+	fragment@11 {
+		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
+		__overlay__ {
+			bus-width=<4>;
+         remote-endpoint = <&rbpcv3_imx477_out0>;
+		};
+	};
+
+   // Disable Dione cameras
+	fragment@12 {
+		target-path = "/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+   // Disable EngineCore cameras
+	fragment@13 {
+		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+  // Disable other cameras 
+	fragment@30 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+	// Enable imx477
+	fragment@31 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
+		__overlay__ {
+         status = "okay";
+		};
+	};
+
+	fragment@32 {
+		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
+		__overlay__ {
+			sysfs-device-tree = "/sys/firmware/devicetree/base/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
+		};
+	};
+
+	fragment@33 {
+		target-path = "/tegra-camera-platform/modules/module0";
+		__overlay__ {
+			badge = "jakku_front_RBP194";
+		};
+	};
+
+	fragment@34 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a/ports/port@0/endpoint";
+		__overlay__ {
+			bus-width=<4>;
+		};
+	};
+
+	fragment@35 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a/mode0";
+		__overlay__ {
+         num_lanes = "4";
+         line_length = "5832";
+         pix_clk_hz = "600000000";
+		};
+	};
+	fragment@36 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a/mode1";
+		__overlay__ {
+         num_lanes = "4";
+         line_length = "3076";
+         pix_clk_hz = "600000000";
+		};
+	};
+
+
+};

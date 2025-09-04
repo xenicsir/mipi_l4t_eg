@@ -14,6 +14,7 @@ dtb-$(BUILD_ENABLE) += tegra194-p3668-0000-p3509-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0001-p3509-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0000-p3509-0000-eg-cams.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0001-p3509-0000-eg-cams.dtb
+dtbo-$(BUILD_ENABLE) += tegra194-camera-common-eg-cams-dione.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam0-ec-1-lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam1-ec-1-lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam0-ec-2-lanes.dtbo

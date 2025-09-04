@@ -28,8 +28,14 @@ then
 	# Copy device tree to destination dir
 	cp -fv $L4T_SRC/build/arch/arm64/boot/dts/* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/kernel/dtb/
 	cp -fv $L4T_SRC/build/arch/arm64/boot/dts/nvidia/* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/kernel/dtb/
+if [[ $L4T_VERSION_MAJOR < 34 ]]
+then
 	sudo cp -fv $L4T_SRC/build/arch/arm64/boot/dts/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg
 	sudo cp -fv $L4T_SRC/build/arch/arm64/boot/dts/nvidia/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg
+else
+	sudo cp -fv $L4T_SRC/build/arch/arm64/boot/dts/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
+	sudo cp -fv $L4T_SRC/build/arch/arm64/boot/dts/nvidia/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot
+fi
 	# Copy modules to destination dir
 	sudo rsync --exclude nvgpu.ko -iahHAXxvz --progress $L4T_SRC/modules/lib/modules/ $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules
 
