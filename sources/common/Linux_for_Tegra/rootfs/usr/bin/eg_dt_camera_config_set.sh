@@ -1,94 +1,78 @@
 #!/bin/bash
 
-board_found=0
-for boardtype in "Jetson Nano" "Jetson Xavier NX" "Jetson AGX Orin"
-do
-   grep "$boardtype" /proc/device-tree/model >> /dev/null
-   if [[ $? == 0 ]]
-   then
-      board_found=1
-      break
-   fi
+if (( $# % 2 ))
+then
+   echo "Error. Arguments number must be a multiple of 2 : pairs port_number camera_type"
+   exit
+fi
+
+arguments=( "$@" )
+dtboarg=()
+
+for (( i=0; i<${#arguments[@]}; i=i+2 )); do
+	port_number=${arguments[$i]}
+	camera_type=${arguments[(($i+1))]}
+	
+	if [[ $port_number != 0 && $port_number != 1 && $port_number != 2 && $port_number != 3 && $port_number != 4 && $port_number != 5 && $port_number != 6 && $port_number != 7 ]]
+	then
+	   echo "Error : invalid port number $port_number"
+	   exit
+	fi
+	
+	case $camera_type in
+	Dione)
+	   ;;
+	MicroCube640)
+	   dtboarg+=("2=Exosens Cameras. CAM$port_number:EC_1_lane")
+	   ;;
+	SmartIR640|Crius1280)
+	   dtboarg+=("2=Exosens Cameras. CAM$port_number:EC_2_lanes")
+	   ;;
+	*)
+	   echo "Unknown camera type $camera_type. Dione, MicroCube640, SmartIR640 or Crius1280 are supported"
+	   exit
+	   ;;
+	esac
+
+    echo "Port number : $port_number"
+    echo "Camera type : $camera_type"
+
 done
 
-if [[ board_found == 0 ]]
-then
-   echo "Unsupported board type $(cat /proc/device-tree/model)"
-   exit
-fi
+for (( i=0; i<${#dtboarg[@]}; i++ )); do
+	echo overlay ${dtboarg[$i]}
+done
 
-# Get device tree filename. Must be part of the eg-cams label, which must be the default one
-dtbfile=$(grep -A 5  "LABEL eg-cams" /boot/extlinux/extlinux.conf |grep FDT | awk '{print $2}')
+cmd="python /opt/nvidia/jetson-io/config-by-hardware.py -n"
 
-if [[ $boardtype == "Jetson Xavier NX" ]]
+if [[ ${#dtboarg[@]} == 0 ]]
 then
-   port1="0"
-   port2="1"
-   dtboname=tegra194-p3668-all-p3509-0000-eg-cam${1}
-elif [[ $boardtype == "Jetson Nano" ]]
+   sudo $cmd "2=Exosens Cameras"
+elif [[ ${#dtboarg[@]} == 1 ]]
 then
-   port1="0"
-   port2="1"
-   dtboname=tegra210-p3448-all-p3449-0000-eg-cam${1}
-elif [[ $boardtype == "Jetson AGX Orin" ]]
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}"
+elif [[ ${#dtboarg[@]} == 2 ]]
 then
-   port1="AB"
-   port2="CD"
-   dtboname=tegra234-p3701-all-p3737-0000-eg-auvidea-cam${1}
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}"
+elif [[ ${#dtboarg[@]} == 3 ]]
+then
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}"
+elif [[ ${#dtboarg[@]} == 4 ]]
+then
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}"
+elif [[ ${#dtboarg[@]} == 5 ]]
+then
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}"
+elif [[ ${#dtboarg[@]} == 6 ]]
+then
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}" "${dtboarg[5]}"
+elif [[ ${#dtboarg[@]} == 7 ]]
+then
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}" "${dtboarg[5]}" "${dtboarg[6]}"
+elif [[ ${#dtboarg[@]} == 8 ]]
+then
+   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}" "${dtboarg[5]}" "${dtboarg[6]}" "${dtboarg[6]}"
 else
-   echo "Unknown board type $boardtype"
+   echo "Too many camera configurations"
 fi
-
-
-if [[ x$1 == x ]]
-then
-   echo "Error : please specify the camera port number : $port1 or $port2"
-   exit
-fi
-
-if [[ $1 != $port1 && $1 != $port2  ]]
-then
-   echo "Error : the camera port number must be $port1 or $port2"
-   exit
-fi
-
-
-if [[ x$2 == x ]]
-then
-   echo "Error : please specify the camera type: Dione, MicroCube640, SmartIR640 or Crius1280"
-   exit
-fi
-
-case $2 in
-Dione)
-   dtbofile=/boot/eg/${dtboname}-dione.dtbo
-   ;;
-MicroCube640)
-   dtbofile=/boot/eg/${dtboname}-ec-1-lane.dtbo
-   ;;
-SmartIR640|Crius1280)
-   dtbofile=/boot/eg/${dtboname}-ec-2-lanes.dtbo
-   ;;
-*)
-   echo "Unknown camera type. Dione, MicroCube640, SmartIR640 or Crius1280 are supported"
-   exit
-   ;;
-esac
-
-if [[ ! -f $dtbfile ]]
-then
-   echo "Error : $dtbfile doesn't exist"
-   exit
-fi
-
-if [[ ! -f $dtbofile ]]
-then
-   echo "Error : $dtbofile doesn't exist"
-   exit
-fi
-
-echo Patching overlay $dtbofile to $dtbfile
-
-sudo cp $dtbfile $dtbfile.bak
-sudo fdtoverlay -i $dtbfile.bak -o $dtbfile $dtbofile
 

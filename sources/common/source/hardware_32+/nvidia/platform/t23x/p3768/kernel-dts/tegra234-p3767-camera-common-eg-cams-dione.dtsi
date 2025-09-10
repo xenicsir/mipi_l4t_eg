@@ -91,11 +91,11 @@
 						orientation = "1";
 						cam_module0_drivernode0: drivernode0 {
 							pcl_id = "v4l2_sensor";
-							sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
+							sysfs-device-tree = "/sys/firmware/devicetree/base/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
 						};
 						drivernode1 {
 							pcl_id = "v4l2_lens";
-							sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/lens_imx219@RBPCV2";
+							sysfs-device-tree = "/sys/firmware/devicetree/base/lens_imx219@RBPCV2";
 						};
 					};
 					module1 {
@@ -104,11 +104,11 @@
 						orientation = "1";
 						drivernode0 {
 							pcl_id = "v4l2_sensor";
-							sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
+							sysfs-device-tree = "/sys/firmware/devicetree/base/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
 						};
 						drivernode1 {
 							pcl_id = "v4l2_lens";
-							sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/lens_imx219@RBPCV2";
+							sysfs-device-tree = "/sys/firmware/devicetree/base/lens_imx219@RBPCV2";
 						};
 					};
 				};

@@ -12,15 +12,6 @@ endif
 dtb-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0000-p3509-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0001-p3509-0000.dtb
-dtb-$(BUILD_ENABLE) += tegra194-p3668-0000-p3509-0000-eg-cams.dtb
-dtb-$(BUILD_ENABLE) += tegra194-p3668-0001-p3509-0000-eg-cams.dtb
-dtbo-$(BUILD_ENABLE) += tegra194-camera-common-eg-cams-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam0-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam1-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam0-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam1-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam0-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-eg-cam1-dione.dtbo
 dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-p3668-all-p3509-0000-kexec.dtb
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-hdr40.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-adafruit-sph0645lm4h.dtbo
@@ -33,6 +24,17 @@ dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx477-imx219.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx477-dual.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx219-dual.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-p3509-overlay.dtbo
+
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cams-dione.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-ec-1-lane.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-ec-2-lanes.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-imx219.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-imx477.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ec-1-lane.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ec-2-lanes.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx219.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx477.dtbo
+
 
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))

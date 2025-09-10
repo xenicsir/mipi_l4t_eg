@@ -108,12 +108,6 @@ fi
 
 rm -f /tmp/postinst
 
-if [[ $L4T_VERSION_MAJOR < 36 ]]
-then
-tee -a /tmp/postinst > /dev/null <<EOT
-depmod
-EOT
-else
 tee -a /tmp/postinst > /dev/null <<EOT
 depmod
 grep DEFAULT /boot/extlinux/extlinux.conf | grep JetsonIO > /dev/null
@@ -122,7 +116,6 @@ then
    python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras"
 fi
 EOT
-fi
 
 rm -f /tmp/postrm
 tee -a /tmp/postrm > /dev/null <<EOT

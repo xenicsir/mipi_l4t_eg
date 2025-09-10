@@ -101,7 +101,7 @@
 						drivernode0 {
 							pcl_id = "v4l2_sensor";
 							devname = "dione_ir 2-0016";
-							proc-device-tree = "/proc/device-tree/i2c@3180000/xenics_dione_ir_e@0e";
+							proc-device-tree = "/proc/device-tree/i2c@3180000/xenics_dione_ir_c@0e";
 						};
 					};
 				};
