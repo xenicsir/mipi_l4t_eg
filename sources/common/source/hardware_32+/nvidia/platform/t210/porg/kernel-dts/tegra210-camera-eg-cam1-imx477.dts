@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	overlay-name = "Exosens Cameras. CAM1:imx477";
+	jetson-header-name = "Jetson Nano CSI Connector";
+	compatible = "nvidia,p3449-0000-b00+p3448-0000-b00", "nvidia,p3449-0000-b00+p3448-0002-b00";
+
+	fragment@10 {
+		target-path = "/host1x/vi/ports/port@1/endpoint";
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@11 {
+		target-path = "/host1x/nvcsi/channel@1/ports/port@2/endpoint@2";
+		__overlay__ {
+			bus-width=<2>;
+         remote-endpoint = <&rbpcv3_imx477_out1>;
+		};
+	};
+
+   // Disable Dione cameras
+	fragment@12 {
+		target-path = "/cam_i2cmux/i2c@1/xenics_dione_ir_e@0e";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+   // Disable EngineCore cameras
+	fragment@13 {
+		target-path = "/cam_i2cmux/i2c@1/eg_ec_e@16";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+  // Disable other cameras 
+	fragment@30 {
+		target-path = "/cam_i2cmux/i2c@1/rbpcv2_imx219_e@10";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+	// Enable imx477
+	fragment@31 {
+		target-path = "/cam_i2cmux/i2c@1/rbpcv3_imx477_e@1a";
+		__overlay__ {
+         status = "okay";
+		};
+	};
+
+	fragment@32 {
+		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
+		__overlay__ {
+			sysfs-device-tree = "/sys/firmware/devicetree/base/i2c@1/cam_i2cmux/rbpcv3_imx477_e@1a";
+		};
+	};
+
+	fragment@33 {
+		target-path = "/tegra-camera-platform/modules/module1";
+		__overlay__ {
+			badge = "porg_rear_RBPCV2";
+		};
+	};
+
+};

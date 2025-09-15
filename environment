@@ -6,16 +6,18 @@ then
    exit
 fi
 
-if [[ x$2 = x ]]
-then
-   echo "Please specify a board"
-   exit
-fi
-
-LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${2}
 L4T_VERSION=$1
+if [[ x$2 = x || $2 = "generic" ]]
+then
+   module=generic
+   LINUX_FOR_TEGRA_DIR=Linux_for_Tegra
+   L4T_VERSION_EXTENDED=${L4T_VERSION}
+else
+   module=$2
+   LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${2}
+   L4T_VERSION_EXTENDED=${L4T_VERSION}_${2}
+fi
 L4T_VERSION_MAJOR=$(echo $L4T_VERSION | awk -F '.' '{print $1}')
-L4T_VERSION_EXTENDED=${L4T_VERSION}_${2}
 ROOT_DIR=$(pwd)
 ARCHIVE_DIR=$ROOT_DIR/archives
 . /usr/lib/git-core/git-sh-prompt
@@ -32,8 +34,8 @@ fi
 
 case "${1}" in
 32.7.1)
-   case "${2}" in
-   nano)
+   case "$module" in
+   generic)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.1/sources/t210/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
@@ -46,15 +48,15 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.1/t210/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with nan"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 32.7.4)
-   case "${2}" in
-   nano)
+   case "$module" in
+   generic)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.4/sources/t210/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
@@ -67,15 +69,57 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.4/t210/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with nano"
+      echo "Incorrect $module module"
+      exit
+      ;;
+   esac
+   ;;
+
+32.7.5)
+   case "$module" in
+   generic)
+      JETSON_PUBLIC_SOURCES=public_sources.tbz2
+      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.5/sources/t210/${JETSON_PUBLIC_SOURCES}
+      JETSON_TOOCHAIN_ARCHIVE=gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+      JETSON_TOOCHAIN_ARCHIVE_URL=https://developer.nvidia.com/embedded/dlc/l4t-gcc-7-3-1-toolchain-64-bit
+      TOOLCHAIN_DIR=l4t-gcc
+      TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+      L4T_RELEASE_PACKAGE=jetson-210_linux_r32.7.5_aarch64.tbz2
+      L4T_RELEASE_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.5/t210/${L4T_RELEASE_PACKAGE}
+      SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r32.7.5_aarch64.tbz2
+      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.5/t210/${SAMPLE_FS_PACKAGE}
+      ;;
+   *)
+      echo "Incorrect $module module"
+      exit
+      ;;
+   esac
+   ;;
+
+32.7.6)
+   case "$module" in
+   generic)
+      JETSON_PUBLIC_SOURCES=public_sources.tbz2
+      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.6/sources/t210/${JETSON_PUBLIC_SOURCES}
+      JETSON_TOOCHAIN_ARCHIVE=gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+      JETSON_TOOCHAIN_ARCHIVE_URL=https://developer.nvidia.com/embedded/dlc/l4t-gcc-7-3-1-toolchain-64-bit
+      TOOLCHAIN_DIR=l4t-gcc
+      TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+      L4T_RELEASE_PACKAGE=jetson-210_linux_r32.7.6_aarch64.tbz2
+      L4T_RELEASE_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.6/t210/${L4T_RELEASE_PACKAGE}
+      SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r32.7.6_aarch64.tbz2
+      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.6/t210/${SAMPLE_FS_PACKAGE}
+      ;;
+   *)
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 35.1)
-   case "${2}" in
-   generic|xavier)
+   case "$module" in
+   generic)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -88,15 +132,15 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 35.3.1)
-   case "${2}" in
-   generic|xavier|agx_orin|orin_nx)
+   case "$module" in
+   generic)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -109,15 +153,15 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier, agx_orin or orin_nx"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 35.4.1)
-   case "${2}" in
-   generic|xavier|agx_orin|orin_nx)
+   case "$module" in
+   generic)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -130,15 +174,15 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier, agx_orin or orin_nx"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 35.5.0)
-   case "${2}" in
-   generic|xavier|agx_orin|orin_nx)
+   case "$module" in
+   generic)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
@@ -151,15 +195,78 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with xavier, agx_orin or orin_nx"
+      echo "Incorrect $module module"
+      exit
+      ;;
+   esac
+   ;;
+
+35.6.0)
+   case "$module" in
+   generic)
+      JETSON_PUBLIC_SOURCES=public_sources.tbz2
+      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.0/sources/${JETSON_PUBLIC_SOURCES}
+      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
+      JETSON_TOOCHAIN_ARCHIVE_URL=https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      TOOLCHAIN_DIR=l4t-gcc
+      TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/bin/aarch64-buildroot-linux-gnu-
+      L4T_RELEASE_PACKAGE=jetson_linux_r35.6.0_aarch64.tbz2
+      L4T_RELEASE_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.0/release/${L4T_RELEASE_PACKAGE}
+      SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r35.6.0_aarch64.tbz2
+      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.0/release/${SAMPLE_FS_PACKAGE}
+      ;;
+   *)
+      echo "Incorrect $module module"
+      exit
+      ;;
+   esac
+   ;;
+
+35.6.1)
+   case "$module" in
+   generic)
+      JETSON_PUBLIC_SOURCES=public_sources.tbz2
+      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.1/sources/${JETSON_PUBLIC_SOURCES}
+      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
+      JETSON_TOOCHAIN_ARCHIVE_URL=https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      TOOLCHAIN_DIR=l4t-gcc
+      TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/bin/aarch64-buildroot-linux-gnu-
+      L4T_RELEASE_PACKAGE=jetson_linux_r35.6.1_aarch64.tbz2
+      L4T_RELEASE_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.1/release/${L4T_RELEASE_PACKAGE}
+      SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r35.6.1_aarch64.tbz2
+      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.1/${SAMPLE_FS_PACKAGE}
+      ;;
+   *)
+      echo "Incorrect $module module"
+      exit
+      ;;
+   esac
+   ;;
+
+35.6.2)
+   case "$module" in
+   generic)
+      JETSON_PUBLIC_SOURCES=public_sources.tbz2
+      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.2/sources/${JETSON_PUBLIC_SOURCES}
+      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-final.tar.gz
+      JETSON_TOOCHAIN_ARCHIVE_URL=https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      TOOLCHAIN_DIR=l4t-gcc
+      TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/bin/aarch64-buildroot-linux-gnu-
+      L4T_RELEASE_PACKAGE=jetson_linux_r35.6.2_aarch64.tbz2
+      L4T_RELEASE_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.2/release/${L4T_RELEASE_PACKAGE}
+      SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r35.6.2_aarch64.tbz2
+      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.2/${SAMPLE_FS_PACKAGE}
+      ;;
+   *)
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 #36.3)
-#   case "${2}" in
-#   generic|auvidea_X230D|orin_nx)
+#   case "$module" in
+#   generic)
 #      JETSON_PUBLIC_SOURCES=public_sources.tbz2
 #      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/sources/${JETSON_PUBLIC_SOURCES}
 #      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -172,15 +279,15 @@ case "${1}" in
 #      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/release/${SAMPLE_FS_PACKAGE}
 #      ;;
 #   *)
-#      echo "Incorrect board. $1 is compatible with auvidea_X230D and orin_nx"
+#      echo "Incorrect $module module"
 #      exit
 #      ;;
 #   esac
 #   ;;
 
 36.4)
-   case "${2}" in
-   generic|agx_orin|orin_nx|dsboard_ornxs)
+   case "$module" in
+   generic|dsboard_ornxs)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -193,15 +300,15 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with agx_orin, orin_nx and dsboard_ornxs"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 36.4.3)
-   case "${2}" in
-   generic|agx_orin|orin_nx|dsboard_ornxs)
+   case "$module" in
+   generic|dsboard_ornxs)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -214,15 +321,15 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with agx_orin, orin_nx and dsboard_ornxs"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 36.4.4)
-   case "${2}" in
-   generic|agx_orin|orin_nx|dsboard_ornxs)
+   case "$module" in
+   generic|dsboard_ornxs)
       JETSON_PUBLIC_SOURCES=public_sources.tbz2
       JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/sources/${JETSON_PUBLIC_SOURCES}
       JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
@@ -235,14 +342,14 @@ case "${1}" in
       SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/release/${SAMPLE_FS_PACKAGE}
       ;;
    *)
-      echo "Incorrect board. $1 is compatible with agx_orin, orin_nx and dsboard_ornxs"
+      echo "Incorrect $module module"
       exit
       ;;
    esac
    ;;
 
 *)
-   echo "Incorrect version. Versions 32.7.1, 32.7.4, 35.1, 35.3.1, 35.4.1, 35.5.0 36.4, 36.4.3, 36.4.4 are supported"
+   echo "Incorrect version. Versions 32.7.1, 32.7.4, 32.7.5, 32.7.6, 35.1, 35.3.1, 35.4.1, 35.5.0, 35.6.0, 35.6.1, 35.6.2, 36.4, 36.4.3, 36.4.4 are supported"
    exit
    ;;
 esac
