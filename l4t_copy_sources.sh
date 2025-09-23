@@ -6,8 +6,19 @@ then
    exit
 fi
 
-sudo rsync -iahHAXxvz --progress sources/common/Linux_for_Tegra/ $L4T_VERSION/$LINUX_FOR_TEGRA_DIR/
-sudo rsync -iahHAXxvz --progress sources/$L4T_VERSION/Linux_for_Tegra/ $L4T_VERSION/$LINUX_FOR_TEGRA_DIR/
+if [[ -d sources/common/Linux_for_Tegra ]]
+then
+   sudo rsync -iahHAXxvz --progress sources/common/Linux_for_Tegra/ $L4T_VERSION/$LINUX_FOR_TEGRA_DIR/
+fi
+if [[ -d sources/$L4T_VERSION/Linux_for_Tegra ]]
+then
+   sudo rsync -iahHAXxvz --progress sources/$L4T_VERSION/Linux_for_Tegra/ $L4T_VERSION/$LINUX_FOR_TEGRA_DIR/
+fi
+
+if [[ -d sources/${L4T_VERSION}_common/Linux_for_Tegra ]]
+then
+   sudo rsync -iahHAXxvzk --progress sources/${L4T_VERSION}_common/Linux_for_Tegra/ $L4T_VERSION/$LINUX_FOR_TEGRA_DIR/
+fi
 
 if [[ x$2 != x ]]
 then

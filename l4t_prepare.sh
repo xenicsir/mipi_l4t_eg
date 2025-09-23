@@ -1,6 +1,5 @@
 . environment $@
 
-
 mkdir -p $JETSON_DIR
 
 if [[ ! -d $ARCHIVE_DIR/$L4T_VERSION ]]
@@ -57,27 +56,44 @@ sudo rm -rf tmp_$LINUX_FOR_TEGRA_DIR
 mkdir tmp_$LINUX_FOR_TEGRA_DIR
 cd tmp_$LINUX_FOR_TEGRA_DIR
 tar xvf $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}
+rsync -iahHAXxvz --progress Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
 
-if [[ -d Linux_for_Tegra/source/public ]]
-then
-   rsync -iahHAXxvz --progress Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
-else
-   # This is done because the 36.2 public_sources.tbz2 is not built correctly
-   # The folder tree is Linux_for_Tegra/source/ instead of Linux_for_Tegra/source/public/
-   mkdir -p $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source
-   rsync -iahHAXxvz --progress Linux_for_Tegra/source/* ../${LINUX_FOR_TEGRA_DIR}/source/public
-fi
-
-cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source/public
+cd $ROOT_DIR
+. environment $@
+cd $L4T_SRC
 mkdir build
 mkdir modules
+
 tar -xvf kernel_src.tbz2
+if [[ -f kernel_oot_modules_src.tbz2 ]]
+then
+   tar -xvf kernel_oot_modules_src.tbz2
+fi
+if [[ -f nvidia_kernel_display_driver_source.tbz2 ]]
+then
+   tar -xvf nvidia_kernel_display_driver_source.tbz2
+fi
+#if [[ -f generic_rt_build.sh ]]
+#then
+#   ./generic_rt_build.sh "enable"
+#fi
 
 # Backup the original Linux_for_tegra folder
 #if [[ ! -d $JETSON_DIR/Linux_for_Tegra.orig ]]
 #then
 #   sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/ $JETSON_DIR/Linux_for_Tegra.orig
 #fi
+
+# Create de tegra_config file if it doesn't exist
+#KERNEL_SRC_DIR=$(ls -d $L4T_SRC/kernel/kernel-*)
+#if [ ! -f ${KERNEL_SRC_DIR}/arch/arm64/configs/tegra_defconfig ]
+#then
+#   ln -s defconfig ${KERNEL_SRC_DIR}/arch/arm64/configs/tegra_defconfig 
+#fi
+
+#************************************************************************
+# Create local git repos for convenient source changes identification
+#************************************************************************
 
 cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/
 echo generate_capsule > .gitignore
@@ -89,14 +105,52 @@ echo kernel >> .gitignore
 git init
 git add * .gitignore
 git commit -m "Initial state"
-cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source/public/kernel
-git init
-git add *
-git commit -m "Initial state"
-cd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/source/public/hardware
-git init
-git add *
-git commit -m "Initial state"
+
+if [[ -d $L4T_SRC/kernel ]]
+then
+   cd $L4T_SRC/kernel
+   echo *.o >> .gitignore
+   echo *.cmd >> .gitignore
+   echo *.ko >> .gitignore
+   echo *.mod* >> .gitignore
+   echo *.d >> .gitignore
+   echo *.order >> .gitignore
+   echo *.dtb* >> .gitignore
+   echo *.a >> .gitignore
+   echo *.cpio >> .gitignore
+   echo Module.symvers >> .gitignore
+   git init
+   git add *
+   git commit -m "Initial state"
+fi
+
+if [[ -d $L4T_SRC/hardware ]]
+then
+   cd $L4T_SRC/hardware
+   git init
+   git add *
+   git commit -m "Initial state"
+fi
+
+if [[ -d $L4T_SRC/nvidia-oot ]]
+then
+   cd $L4T_SRC/nvidia-oot
+   echo *.o >> .gitignore
+   echo *.cmd >> .gitignore
+   echo *.ko >> .gitignore
+   echo *.mod* >> .gitignore
+   echo *.d >> .gitignore
+   echo *.order >> .gitignore
+   echo *.dtb* >> .gitignore
+   echo Module.symvers >> .gitignore
+   git init
+   git add *
+   git commit -m "Initial state"
+fi
+
+#************************************************************************
+# End of git repos
+#************************************************************************
 
 sudo rm -rf $JETSON_DIR/tmp_$LINUX_FOR_TEGRA_DIR
 

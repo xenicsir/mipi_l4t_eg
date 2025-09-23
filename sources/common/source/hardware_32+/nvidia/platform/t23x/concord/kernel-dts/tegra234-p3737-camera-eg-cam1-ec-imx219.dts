@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	overlay-name = "Exosens Cameras. CAM1:imx219";
+	jetson-header-name = "Jetson AGX CSI Connector";
+	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
+
+	fragment@0 {
+		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@1 {
+		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@0";
+		__overlay__ {
+			bus-width=<2>;
+			remote-endpoint = <&rbpcv2_imx219_out1>;
+		};
+	};
+
+   // Disable Dione cameras
+	fragment@2 {
+		target-path = "/i2c@c240000/xenics_dione_ir_g@0e";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+	// Enable imx219
+	fragment@3 {
+		target-path = "/i2c@c240000/rbpcv2_imx219_g@10";
+		__overlay__ {
+         status = "okay";
+		};
+	};
+
+	fragment@4 {
+		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
+		__overlay__ {
+			devname = "imx219 1-0010";
+			proc-device-tree = "/proc/device-tree/i2c@c240000/rbpcv2_imx219_g@10";
+		};
+	};
+
+	fragment@5 {
+		target-path = "/tegra-camera-platform/modules/module1";
+		__overlay__ {
+			badge = "imx219_bottomright_RBPCV2";
+		};
+	};
+
+};

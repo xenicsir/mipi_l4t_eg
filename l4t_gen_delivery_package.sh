@@ -26,28 +26,97 @@ INSTALL_DIR=${PACKAGE_NAME}/opt/eg
 mkdir -p $INSTALL_DIR/
 sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/common/Linux_for_Tegra/rootfs/opt/eg/ ${INSTALL_DIR}/
 
+INSTALL_DIR=${PACKAGE_NAME}/opt/nvidia
+folder=$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/rootfs/opt/nvidia/
+if [[ -d $folder ]]
+then
+	mkdir -p $INSTALL_DIR/
+	sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/rootfs/opt/nvidia/ ${INSTALL_DIR}/
+fi
+
 INSTALL_DIR=${PACKAGE_NAME}/boot/eg
-mkdir -p $INSTALL_DIR
+mkdir -p $INSTALL_DIR		
 sudo rsync -iahHAXxvz --progress $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg/* ${INSTALL_DIR}/
 
-DRIVER_DIR=kernel/drivers/media/i2c
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/*-eg-*.dtb*
+ls $file
+if [[ $? == 0 ]]
+then
+	INSTALL_DIR=${PACKAGE_NAME}/boot/
+	sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+if [[ $L4T_VERSION_MAJOR < 36 ]]
+then
+	DRIVER_DIR=kernel/drivers/media/i2c
+else
+	DRIVER_DIR=updates/drivers/media/i2c
+fi
 INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
-mkdir -p $INSTALL_DIR
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/dione_ir.ko
 if [[ -f $file ]]
 then
+   mkdir -p $INSTALL_DIR
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
 file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/eg-ec-mipi.ko
 if [[ -f $file ]]
 then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nv_imx219.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nv_imx477.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+DRIVER_DIR=updates/drivers/video/tegra/camera
+INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/tegra_camera_platform.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+DRIVER_DIR=updates/drivers/media/platform/tegra/camera
+INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/tegra-camera.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
+   sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
+fi
+
+DRIVER_DIR=updates/drivers/video/tegra/host/nvcsi
+INSTALL_DIR=${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}
+file=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/${KERNEL_VERSION}/${DRIVER_DIR}/nvhost-nvcsi-t194.ko
+if [[ -f $file ]]
+then
+   mkdir -p $INSTALL_DIR
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
 
 rm -f /tmp/postinst
+
 tee -a /tmp/postinst > /dev/null <<EOT
 depmod
+grep DEFAULT /boot/extlinux/extlinux.conf | grep JetsonIO > /dev/null
+if [ \$? -ne 0 ]
+then
+   python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras"
+fi
 EOT
+
 rm -f /tmp/postrm
 tee -a /tmp/postrm > /dev/null <<EOT
 depmod

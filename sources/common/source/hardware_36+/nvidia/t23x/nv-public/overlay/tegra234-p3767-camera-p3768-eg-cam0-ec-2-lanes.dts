@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/tegra234-p3767-0000-common.h>
+
+/ {
+	overlay-name = "Exosens Cameras. CAM0:EC_2_lanes";
+	jetson-header-name = "Jetson 24pin CSI Connector";
+	compatible = JETSON_COMPATIBLE_P3768;
+
+	fragment@10 {
+		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@11 {
+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
+		__overlay__ {
+			bus-width=<2>;
+         remote-endpoint = <&eg_ec_out0>;
+		};
+	};
+
+   // Disable Dione cameras
+	fragment@12 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+   // Enable EngineCore cameras
+	fragment@13 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16";
+		__overlay__ {
+         status = "okay";
+		};
+	};
+	fragment@14 {   
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode0";
+		__overlay__ {
+         num_lanes = "2";
+         pix_clk_hz = "100000000";
+		};
+	};
+	fragment@15 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode1";
+		__overlay__ {
+         num_lanes = "2";
+         pix_clk_hz = "100000000";
+		};
+	};
+	fragment@16 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode2";
+		__overlay__ {
+         num_lanes = "2";
+         pix_clk_hz = "100000000";
+		};
+	};
+	fragment@17 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode3";
+		__overlay__ {
+         num_lanes = "2";
+         pix_clk_hz = "133333336";
+		};
+	};
+	fragment@18 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode4";
+		__overlay__ {
+         num_lanes = "2";
+         pix_clk_hz = "100000000";
+		};
+	};
+	fragment@19 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode5";
+		__overlay__ {
+         num_lanes = "2";
+         pix_clk_hz = "133333336";
+		};
+	};
+	fragment@20 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/ports/port@0/endpoint";
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@21 {
+		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
+		__overlay__ {
+         devname = "eg_ec 9-0016";
+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_b@16";
+		};
+	};
+
+  // Disable other cameras 
+	fragment@30 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+	fragment@31 {
+		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+
+};
