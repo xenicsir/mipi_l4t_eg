@@ -26,12 +26,20 @@ INSTALL_DIR=${PACKAGE_NAME}/opt/eg
 mkdir -p $INSTALL_DIR/
 sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/common/Linux_for_Tegra/rootfs/opt/eg/ ${INSTALL_DIR}/
 
-INSTALL_DIR=${PACKAGE_NAME}/opt/nvidia
-folder=$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/rootfs/opt/nvidia/
+INSTALL_DIR=${PACKAGE_NAME}/opt/nvidia/jetson-io/
+folder=$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/rootfs/opt/nvidia/jetson-io/
 if [[ -d $folder ]]
 then
 	mkdir -p $INSTALL_DIR/
-	sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/rootfs/opt/nvidia/ ${INSTALL_DIR}/
+	sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/rootfs/opt/nvidia/jetson-io/ ${INSTALL_DIR}/
+fi
+
+INSTALL_DIR=${PACKAGE_NAME}/opt/nvidia/jetson-io/
+folder=$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_$2/rootfs/opt/nvidia/jetson-io/
+if [[ -d $folder ]]
+then
+	mkdir -p $INSTALL_DIR/
+	sudo rsync -iahHAXxvz --progress $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_$2/rootfs/opt/nvidia/jetson-io/ ${INSTALL_DIR}/
 fi
 
 INSTALL_DIR=${PACKAGE_NAME}/boot/eg

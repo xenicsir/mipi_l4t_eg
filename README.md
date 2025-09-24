@@ -82,6 +82,8 @@ Then, the scripts execution is :
 ./l4t_build.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
 ./l4t_gen_delivery_package.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
 
+Note : for the *forecr* specicific board, L4T versions 36.x, the kernel Image is built but not used, because some modules need the original kernel. So an EG kernel patch about I2C timeout is missing. This impacts EngineCore cameras (MicroCube, SmartIR640, Crius1280) control protocole (doesn't manage correctly an error timeout) but doesn't impact video streaming.
+
 <!-- TOC --><a name="installing-and-configuring-the-mipi-drivers-on-the-board"></a>
 ### Installing and configuring the MIPI drivers on the board
 <!-- TOC --><a name="package-installation"></a>
@@ -205,6 +207,7 @@ Description :
    - using the /boot/eg/Image is not mandatory for video streaming to be functional for 36.x L4T version
    - customer can add their own patches in the dedicated kernel source folder
    - consult the support team for more information
+Note : for the *forecr* specicific board, L4T versions 36.x, the /boot/eg/Image is not used, because some modules need the original kernel. So an EG kernel patch about I2C timeout is missing. This impacts EngineCore cameras (MicroCube, SmartIR640, Crius1280) control protocole (doesn't manage correctly an error timeout) but doesn't impact video streaming.
 - FDT line : native devicetree file
 - OVERLAYS : list of overlay files to apply
 
