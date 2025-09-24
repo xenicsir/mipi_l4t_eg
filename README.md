@@ -164,7 +164,7 @@ For example, Dione on CAM0 port and MicroCube640 on CAM1 :
 [...]
 LABEL JetsonIO
         MENU LABEL Custom Header Config: <CSI Exosens Cameras for DSBOARD-ORNXS> <CSI Exosens Cameras. CAM1:EC_1_lane>
-        LINUX /boot/eg/Image
+        LINUX /boot/Image
         FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
         INITRD /boot/initrd
         APPEND ${cbootargs} root=PARTUUID=fb79911a-6ada-43b3-b983-0ec29fc92323 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 firmware_class.path=/etc/firmware fbcon=map:0 nospectre_bhb video=efifb:off console=tty0 nv-auto-config
