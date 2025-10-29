@@ -93,8 +93,9 @@ Note : if a 1.x.x $L4T_VERSION is already installed on the target, uninstall it.
 
 Install the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered (refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet) or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
 </pre>
+Note : the /opt/nvidia/jetson-io scripts have been patched, that's why we use the --force-overwrite is used
 
 <!-- TOC --><a name="configuring-a-camera-port-on-non-specific-nvidia-generic-carrier-boards"></a>
 #### Configuring a camera port on non specific (Nvidia generic) carrier boards
