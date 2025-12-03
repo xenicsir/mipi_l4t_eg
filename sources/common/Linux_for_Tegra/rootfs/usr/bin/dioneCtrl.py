@@ -7,18 +7,34 @@ if (platform.system() == "Linux") :
 import struct
 import time
 import serial
+import numpy as np
+import ctypes
 
 IOCTL_I2C_SLAVE=0x0703
 IOCTL_I2C_TIMEOUT=0x0702
 
+GencpStatus = {
+               'GENCP_SUCCESS':0x0000,
+               'GENCP_NOT_IMPLEMENTED':0x8001,
+               'GENCP_INVALID_PARAMETER':0x8002,
+               'GENCP_INVALID_ADDRESS':0x8003,
+               'GENCP_WRITE_PROTECT':0x8004,
+               'GENCP_BAD_ALIGNEMENT':0x8005,
+               'GENCP_ACCESS_DENIED':0x8006,
+               'GENCP_BUSY':0x8007,
+               'GENCP_MSG TIMEOUT':0x800B,
+               'GENCP_INVALID_HEADER':0x800E,
+               'GENCP_WRONG_CONFIG':0x800F,
+               'GENCP_ERROR':0x8FFF}
+
 class dioneCtrl(object):
 
-  def __init__(self, bus=6, dev_addr=0x5a, com_device="COM0", device_type="I2C"):
-    
+  def __init__(self, bus=6, dev_addr=0x5a, com_device="COM0", device_type="I2C", gencp_enable=False):
+
     self.device_type = device_type
     if (platform.system() == "Windows") :
         self.device_type = "USB"
-    
+
     if (self.device_type == "I2C") :
         self.fr=io.open("/dev/i2c-"+str(bus), "rb", buffering=0)
         self.fw=io.open("/dev/i2c-"+str(bus), "wb", buffering=0)
@@ -31,6 +47,8 @@ class dioneCtrl(object):
         self.com_device = com_device
 
     self.last_file_op = -1
+    self.gencp_enable = gencp_enable
+    self.RequestId = 0x0000
 
   def open_device(self):
     if (self.device_type == "USB") :
@@ -59,25 +77,57 @@ class dioneCtrl(object):
   def read_reg32(self, reg_addr):
     self.open_device()
     time.sleep(0.01)
-    out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
-    self.write_device(out)
-    time.sleep(0.01)
-    ret=self.read_device(6)
+
+    if self.gencp_enable:
+        if self.device_type == "USB":
+            write_dev = self.ser
+            read_dev = self.ser
+        else:  # I2C
+            write_dev = self.fw
+            read_dev = self.fr
+        Status, Data = self.ReadGencpReg(write_dev, read_dev, reg_addr, 4)
+        ret = b'\x00\x00' + Data  # Add 2-byte prefix for compatibility
+    else:
+        out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
+        self.write_device(out)
+        time.sleep(0.01)
+        ret=self.read_device(6)
+
     self.close_device()
-    # print(ret)
-    val=struct.unpack('<L', ret[2:])
+    #print(ret)
+    if self.gencp_enable:
+        val=struct.unpack('>L', ret[2:])
+    else:
+        val=struct.unpack('<L', ret[2:])
+        
     return val[0]
 
   def read_reg32f(self, reg_addr):
     self.open_device()
     time.sleep(0.01)
-    out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
-    self.write_device(out)
-    time.sleep(0.01)
-    ret=self.read_device(6)
+
+    if self.gencp_enable:
+        if self.device_type == "USB":
+            write_dev = self.ser
+            read_dev = self.ser
+        else:  # I2C
+            write_dev = self.fw
+            read_dev = self.fr
+        Status, Data = self.ReadGencpReg(write_dev, read_dev, reg_addr, 4)
+        ret = b'\x00\x00' + Data  # Add 2-byte prefix for compatibility
+    else:
+        out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
+        self.write_device(out)
+        time.sleep(0.01)
+        ret=self.read_device(6)
+
     self.close_device()
-    # print(ret)
-    val=struct.unpack('<L', ret[2:])
+    #print(ret)
+    if self.gencp_enable:
+        val=struct.unpack('>L', ret[2:])
+    else:
+        val=struct.unpack('<L', ret[2:])
+
     if (val[0] == 0):
        return  0.0
     else :
@@ -85,21 +135,49 @@ class dioneCtrl(object):
 
   def write_reg32(self, reg_addr, val):
     self.open_device()
-    out=bytearray(reg_addr.to_bytes(4, 'little')) \
-        +bytearray([0x04, 0x00]) \
-        +bytearray(val.to_bytes(4, 'little'))
     time.sleep(0.01)
-    ret=self.write_device(out)
+
+    if self.gencp_enable:
+        if self.device_type == "USB":
+            write_dev = self.ser
+            read_dev = self.ser
+        else:  # I2C
+            write_dev = self.fw
+            read_dev = self.fr
+        data = bytearray(val.to_bytes(4, 'big'))
+        Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, data)
+        ret = Status
+    else:
+        out=bytearray(reg_addr.to_bytes(4, 'little')) \
+            +bytearray([0x04, 0x00]) \
+            +bytearray(val.to_bytes(4, 'little'))
+        time.sleep(0.01)
+        ret=self.write_device(out)
+
     self.close_device()
     return ret
 
   def write_reg32f(self, reg_addr, val):
     self.open_device()
-    out=bytearray(reg_addr.to_bytes(4, 'little')) \
-        +bytearray([0x04, 0x00]) \
-        +bytearray(struct.pack('<f', val))
     time.sleep(0.01)
-    ret=self.write_device(out)
+
+    if self.gencp_enable:
+        if self.device_type == "USB":
+            write_dev = self.ser
+            read_dev = self.ser
+        else:  # I2C
+            write_dev = self.fw
+            read_dev = self.fr
+        data = bytearray(struct.pack('<f', val))
+        Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, data)
+        ret = Status
+    else:
+        out=bytearray(reg_addr.to_bytes(4, 'little')) \
+            +bytearray([0x04, 0x00]) \
+            +bytearray(struct.pack('<f', val))
+        time.sleep(0.01)
+        ret=self.write_device(out)
+
     self.close_device()
     return ret
 
@@ -129,12 +207,25 @@ class dioneCtrl(object):
     """
 
     self.open_device()
-    out=bytearray(reg_addr.to_bytes(4, 'little')) \
-        + bytearray(length.to_bytes(2, 'little'))
     time.sleep(0.01)
-    self.write_device(out)
-    time.sleep(0.01)
-    ret=self.read_device(2+length)
+
+    if self.gencp_enable:
+        if self.device_type == "USB":
+            write_dev = self.ser
+            read_dev = self.ser
+        else:  # I2C
+            write_dev = self.fw
+            read_dev = self.fr
+        Status, Data = self.ReadGencpReg(write_dev, read_dev, reg_addr, length)
+        ret = b'\x00\x00' + Data  # Add 2-byte prefix for compatibility
+    else:
+        out=bytearray(reg_addr.to_bytes(4, 'little')) \
+            + bytearray(length.to_bytes(2, 'little'))
+        time.sleep(0.01)
+        self.write_device(out)
+        time.sleep(0.01)
+        ret=self.read_device(2+length)
+
     self.close_device()
     return ret
 
@@ -144,12 +235,25 @@ class dioneCtrl(object):
     """
 
     self.open_device()
-    out=bytearray(reg_addr.to_bytes(4, 'little')) \
-        + bytearray(len(buf).to_bytes(2, 'little')) + buf
     time.sleep(0.01)
-    self.write_device(out)
-    time.sleep(0.01)
-    # print(self.read_device(2))
+
+    if self.gencp_enable:
+        if self.device_type == "USB":
+            write_dev = self.ser
+            read_dev = self.ser
+        else:  # I2C
+            write_dev = self.fw
+            read_dev = self.fr
+        Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, buf)
+        # No need to read response for write operation
+    else:
+        out=bytearray(reg_addr.to_bytes(4, 'little')) \
+            + bytearray(len(buf).to_bytes(2, 'little')) + buf
+        time.sleep(0.01)
+        self.write_device(out)
+        time.sleep(0.01)
+        # print(self.read_device(2))
+
     self.close_device()
 
 
@@ -509,3 +613,169 @@ class dioneCtrl(object):
 
     self.close_file()
     print(f'Written {ofs} bytes')
+
+
+  def ComputeCrc(self, Data, ScdDataNumber):
+    ComputedCrc_u32 = np.uint32(0)
+    test = 0
+    i = 0
+    for element in Data:
+      if(ScdDataNumber%2 != 0 and i == (len(Data) - 1)):
+        test = ctypes.c_uint16(~(element<<8)).value
+      else:
+        test = ctypes.c_uint16(~element).value
+      ComputedCrc_u32 = ComputedCrc_u32 + test
+      i+=1
+
+      if ComputedCrc_u32 > 0xFFFF:
+        ComputedCrc_u32 = (ComputedCrc_u32 & 0xffff) + 1
+    return ctypes.c_uint16(ComputedCrc_u32).value
+
+
+  def ReadGencpReg(self, write_device, read_device, Address, NumberOfByte):
+    MAX_RETRIES = 3
+    SERIAL_TIMEOUT = 300
+    NoRetries = 0
+    ErrFound = 'None'
+
+    DataToWrite_u16 = [0]*14
+    DataToWrite_u16[0] = 0x0100 # Preamble
+    DataToWrite_u16[3] = 0x0000 # Channel ID
+    DataToWrite_u16[4] = 0x4000 # Flag
+    DataToWrite_u16[5] = 0x0800 # Command ID
+    DataToWrite_u16[6] = 0x000C # Length of SCD (12 Bytes for read)
+    DataToWrite_u16[7] = self.RequestId
+    DataToWrite_u16[8] = 0x0000 # RegAddr 3
+    DataToWrite_u16[9] = 0x0000 # RegAddr 2
+    DataToWrite_u16[10] = (Address >> 16) & 0xffff # RegAddr 1
+    DataToWrite_u16[11] = Address & 0xffff # RegAddr 0
+    DataToWrite_u16[12] = 0x0000 # Reserved
+    DataToWrite_u16[13] = NumberOfByte & 0xffff # Rd Length
+
+    CcdCrcArray = [0]*5
+    for x in range(0, 5):
+      CcdCrcArray[x] = DataToWrite_u16[3+x]
+
+    ScdCrcArray = [0]*11
+    for x in range(0, 11):
+      ScdCrcArray[x] = DataToWrite_u16[3+x]
+
+    DataToWrite_u16[1] = self.ComputeCrc(CcdCrcArray,0) # CCD-CRC
+    DataToWrite_u16[2] = self.ComputeCrc(ScdCrcArray,4) # SCD-CRC
+
+    ByteArray = [0]*28
+    i=0;
+    for element in DataToWrite_u16:
+      ByteArray[i*2 + 1] = element & 0xff
+      ByteArray[i*2] = (element >> 8) & 0xff
+      i=i+1
+
+    write_device.write(ByteArray)
+
+    self.RequestId +=1
+    # get current time in ms
+    start = int(round(time.time() * 1000))
+
+    i = 0
+    resp = read_device.read((NumberOfByte + 16))
+    while (((round(time.time() * 1000) - start) < SERIAL_TIMEOUT) and len(resp) < (NumberOfByte + 16)):
+      pass
+
+    Status = 'Error'
+    Data = b'\xFF'
+
+    if(len(resp) == (NumberOfByte + 16) or len(resp) == 16):
+      for key,val in GencpStatus.items():
+        if val == ((resp[8] << 8) + resp[9]):
+          Status = key
+
+      if len(resp) == (NumberOfByte + 16):
+        for x in range(NumberOfByte):
+          Data = resp[16:(16+NumberOfByte)]
+      else:
+        Data = b'\x00'
+
+    return Status,Data
+
+
+  def WriteGencpReg(self, write_device, read_device, Address, WrittenData):
+    MAX_RETRIES = 3
+    SERIAL_TIMEOUT = 300
+    NoRetries = 0
+    ErrFound = 'None'
+    Data = 0
+
+    WrittenDataArray = WrittenData
+
+    try:
+      NbrOfWord = int((len(WrittenDataArray)+1)/2)
+    except:
+      print('Use Vector')
+      return
+
+    DataToWrite_u16 = [0]*int(12 + NbrOfWord)
+    DataToWrite_u16[0] = 0x0100 # Preamble
+    DataToWrite_u16[3] = 0x0000 # Channel ID
+    DataToWrite_u16[4] = 0x4000 # Flag
+    DataToWrite_u16[5] = 0x0802 # Command ID
+    DataToWrite_u16[6] = 8 + len(WrittenDataArray) # Length of SCD
+    DataToWrite_u16[7] = self.RequestId
+    DataToWrite_u16[8] = 0x0000 # RegAddr 3
+    DataToWrite_u16[9] = 0x0000 # RegAddr 2
+    DataToWrite_u16[10] = (Address >> 16) & 0xffff # RegAddr 1
+    DataToWrite_u16[11] = Address & 0xffff # RegAddr 0
+
+    for x in range(0,NbrOfWord):
+      if ((x*2+1) == len(WrittenDataArray)) and ((len(WrittenDataArray)%2) != 0) :
+        try:
+          DataToWrite_u16[12+x] = ord(WrittenDataArray[x*2])
+        except:
+          DataToWrite_u16[12+x] = WrittenDataArray[x*2]
+      else:
+        try:
+          DataToWrite_u16[12+x] = (ord(WrittenDataArray[x*2])<< 8) + ord(WrittenDataArray[x*2+1])
+        except:
+          DataToWrite_u16[12+x] = (WrittenDataArray[x*2]<< 8) + WrittenDataArray[x*2+1]
+
+    CcdCrcArray = [0]*5
+    for x in range(0, 5):
+      CcdCrcArray[x] = DataToWrite_u16[3+x]
+
+    ScdCrcArray = [0]*(9+NbrOfWord)
+    for x in range(0, (9+NbrOfWord)):
+      ScdCrcArray[x] = DataToWrite_u16[3+x]
+
+    DataToWrite_u16[1] = self.ComputeCrc(CcdCrcArray,0) # CCD-CRC
+    DataToWrite_u16[2] = self.ComputeCrc(ScdCrcArray,len(WrittenDataArray)) # SCD-CRC
+
+    ByteArray = [0]*(24 + len(WrittenDataArray))
+    i=0;
+    for element in DataToWrite_u16:
+      try:
+        ByteArray[i*2 + 1] = element & 0xff
+        ByteArray[i*2] = (element >> 8) & 0xff
+      except:
+        ByteArray[i*2] = element & 0xff
+      i=i+1
+
+    write_device.write(ByteArray)
+
+    self.RequestId +=1
+    # get current time in ms
+    start = int(round(time.time() * 1000))
+
+    i = 0
+    resp = read_device.read(16)
+    while (((round(time.time() * 1000) - start) < SERIAL_TIMEOUT) and len(resp) < 16):
+      pass
+
+    Status = 'Error'
+
+    if(len(resp) == 16):
+      for key,val in GencpStatus.items():
+        if val == ((resp[8] << 8) + resp[9]):
+          Status = key
+
+    return Status
+
+
