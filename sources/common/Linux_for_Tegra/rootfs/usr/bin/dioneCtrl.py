@@ -168,7 +168,7 @@ class dioneCtrl(object):
         else:  # I2C
             write_dev = self.fw
             read_dev = self.fr
-        data = bytearray(struct.pack('<f', val))
+        data = bytearray(struct.pack('>f', val))
         Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, data)
         ret = Status
     else:
