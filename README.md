@@ -82,6 +82,8 @@ Then, the scripts execution is :
 ./l4t_build.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
 ./l4t_gen_delivery_package.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
 
+Note : for the *forecr* specicific board, L4T versions 36.x, the kernel Image is built but not used, because some modules need the original kernel. So an EG kernel patch about I2C timeout is missing. This impacts EngineCore cameras (MicroCube, SmartIR640, Crius1280) control protocole (doesn't manage correctly an error timeout) but doesn't impact video streaming.
+
 <!-- TOC --><a name="installing-and-configuring-the-mipi-drivers-on-the-board"></a>
 ### Installing and configuring the MIPI drivers on the board
 <!-- TOC --><a name="package-installation"></a>
@@ -91,8 +93,9 @@ Note : if a 1.x.x $L4T_VERSION is already installed on the target, uninstall it.
 
 Install the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered (refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet) or locally built previously :
 <pre>
-sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
 </pre>
+Note : the /opt/nvidia/jetson-io scripts have been patched, that's why we use the --force-overwrite is used
 
 <!-- TOC --><a name="configuring-a-camera-port-on-non-specific-nvidia-generic-carrier-boards"></a>
 #### Configuring a camera port on non specific (Nvidia generic) carrier boards
@@ -162,7 +165,7 @@ For example, Dione on CAM0 port and MicroCube640 on CAM1 :
 [...]
 LABEL JetsonIO
         MENU LABEL Custom Header Config: <CSI Exosens Cameras for DSBOARD-ORNXS> <CSI Exosens Cameras. CAM1:EC_1_lane>
-        LINUX /boot/eg/Image
+        LINUX /boot/Image
         FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
         INITRD /boot/initrd
         APPEND ${cbootargs} root=PARTUUID=fb79911a-6ada-43b3-b983-0ec29fc92323 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 firmware_class.path=/etc/firmware fbcon=map:0 nospectre_bhb video=efifb:off console=tty0 nv-auto-config
@@ -205,6 +208,7 @@ Description :
    - using the /boot/eg/Image is not mandatory for video streaming to be functional for 36.x L4T version
    - customer can add their own patches in the dedicated kernel source folder
    - consult the support team for more information
+Note : for the *forecr* specicific board, L4T versions 36.x, the /boot/eg/Image is not used, because some modules need the original kernel. So an EG kernel patch about I2C timeout is missing. This impacts EngineCore cameras (MicroCube, SmartIR640, Crius1280) control protocole (doesn't manage correctly an error timeout) but doesn't impact video streaming.
 - FDT line : native devicetree file
 - OVERLAYS : list of overlay files to apply
 

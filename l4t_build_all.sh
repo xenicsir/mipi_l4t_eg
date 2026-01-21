@@ -16,7 +16,7 @@ echo PACKAGE_VERSION ${PACKAGE_VERSION}
 DELIVERY_FOLDER=delivery/mipi_jetson-l4t-${PACKAGE_VERSION}
 
 mkdir -p $DELIVERY_FOLDER
-for version in 32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 36.4 36.4.3 36.4.4
+for version in 32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2
 do
   if [[ ! -d $version/Linux_for_Tegra ]]
   then
@@ -28,3 +28,17 @@ do
   cp $version/*.deb $DELIVERY_FOLDER
 done
 
+for version in 36.4 36.4.3 36.4.4
+do
+  if [[ ! -d $version/Linux_for_Tegra ]]
+  then
+	for board in generic forecr
+	do
+		 ./l4t_prepare.sh $version $board
+		 ./l4t_copy_sources.sh $version $board
+		 ./l4t_build.sh $version $board
+		 ./l4t_gen_delivery_package.sh $version $board $PACKAGE_VERSION
+	done
+  fi
+  cp $version/*.deb $DELIVERY_FOLDER
+done
