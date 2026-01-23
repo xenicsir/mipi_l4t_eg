@@ -1,0 +1,31 @@
+diff --git a/source/public/kernel/kernel-4.9/arch/arm64/configs/tegra_defconfig b/source/public/kernel/kernel-4.9/arch/arm64/configs/tegra_defconfig
+index 3d34446..ff1c8b0 100644
+--- a/source/public/kernel/kernel-4.9/arch/arm64/configs/tegra_defconfig
++++ b/source/public/kernel/kernel-4.9/arch/arm64/configs/tegra_defconfig
+@@ -777,6 +777,8 @@ CONFIG_VIDEO_VIVID=m
+ CONFIG_VIDEO_CAMERA=y
+ CONFIG_VIDEO_TEGRA_VIVID=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_DIONE_IR=m
++CONFIG_VIDEO_EG_EC_MIPI=m
+ CONFIG_VIDEO_IMX185=m
+ CONFIG_VIDEO_IMX219=y
+ CONFIG_VIDEO_IMX477=y
+diff --git a/source/public/kernel/kernel-4.9/scripts/Kbuild.include b/source/public/kernel/kernel-4.9/scripts/Kbuild.include
+index 84faec0..a6da9b3 100644
+--- a/source/public/kernel/kernel-4.9/scripts/Kbuild.include
++++ b/source/public/kernel/kernel-4.9/scripts/Kbuild.include
+@@ -461,8 +461,11 @@ endef
+ # It's a common trick to declare makefile variable that contains space
+ # we'll need it to convert the path string to list (string delimited by spaces)
+ # and vice versa
+-the-space :=
+-the-space += 
++#the-space :=
++#the-space += 
++# This manner is better for make versions >= 4.3
++E =
++the-space = $E $E
+ # TEGRA_ROOT_PATH is the relative path to the directory one level upper than $srctree
+ _TEGRA_ROOT_PATH = $(subst ^$(realpath $(srctree)/..)/,,^$(realpath $(kbuild-dir)))
+ # _TEGRA_REL_PATH is path like "../../../" that points to directory one level

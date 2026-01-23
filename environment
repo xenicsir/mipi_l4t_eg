@@ -10,10 +10,12 @@ L4T_VERSION=$1
 if [[ x$2 = x || $2 = "generic" ]]
 then
    module=generic
+   CARRIER_BOARD=""
    LINUX_FOR_TEGRA_DIR=Linux_for_Tegra
    L4T_VERSION_EXTENDED=${L4T_VERSION}
 else
    module=$2
+   CARRIER_BOARD=$2
    LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${2}
    L4T_VERSION_EXTENDED=${L4T_VERSION}_${2}
 fi

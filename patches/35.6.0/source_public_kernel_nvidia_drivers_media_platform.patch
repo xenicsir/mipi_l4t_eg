@@ -1,0 +1,140 @@
+diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c
+old mode 100644
+new mode 100755
+index 126527c..c72e524
+--- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c
++++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c
+@@ -152,6 +152,11 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
+ 		V4L2_COLORSPACE_SRGB,
+ 		V4L2_PIX_FMT_VYUY,
+ 	},
++	{
++		MEDIA_BUS_FMT_FIXED,
++		V4L2_COLORSPACE_RAW,
++		V4L2_PIX_FMT_Y16,
++	},
+ 	/*
+ 	 * The below two formats are not supported by VI4,
+ 	 * keep them at the last to ensure they get discarded
+diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/nvcsi/csi5_fops.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/nvcsi/csi5_fops.c
+old mode 100644
+new mode 100755
+index fab8be2..8f3d9a0
+--- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/nvcsi/csi5_fops.c
++++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/nvcsi/csi5_fops.c
+@@ -1,7 +1,7 @@
+ /*
+  * Tegra CSI5 device common APIs
+  *
+- * Copyright (c) 2016-2024, NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
+  *
+  * Author: Frank Chen <frankc@nvidia.com>
+  *
+@@ -219,7 +219,7 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
+ 	struct CAPTURE_CONTROL_MSG msg;
+ 	struct nvcsi_brick_config brick_config;
+ 	struct nvcsi_cil_config cil_config;
+-	struct nvcsi_error_config err_config;
++	struct nvcsi_error_config error_config;
+ 	u32 phy_mode = read_phy_mode_from_dt(chan);
+ 	bool is_cphy = (phy_mode == CSI_PHY_MODE_CPHY);
+ 	dev_dbg(csi->dev, "%s: stream_id=%u, csi_port=%u\n",
+@@ -291,7 +291,12 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
+ 	else
+ 		cil_config.mipi_clock_rate = csi->clk_freq / 1000;
+ 
+-	memset(&err_config, 0, sizeof(err_config));
++       /* error config */
++       memset(&error_config, 0, sizeof(error_config));
++       error_config.stream_intr_mask_lic = 0xFF;
++       error_config.stream_intr_mask_hsm = 0xFF;
++       error_config.status2vi_notify_mask = 0xFFFF;
++
+ 	/* Set NVCSI stream config */
+ 	memset(&msg, 0, sizeof(msg));
+ 	msg.header.msg_id = CAPTURE_CSI_STREAM_SET_CONFIG_REQ;
+@@ -300,9 +305,8 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
+ 	msg.csi_stream_set_config_req.csi_port = csi_port;
+ 	msg.csi_stream_set_config_req.brick_config = brick_config;
+ 	msg.csi_stream_set_config_req.cil_config = cil_config;
+-	msg.csi_stream_set_config_req.error_config = err_config;
+-	msg.csi_stream_set_config_req.config_flags = NVCSI_CONFIG_FLAG_BRICK |
+-						NVCSI_CONFIG_FLAG_CIL | NVCSI_CONFIG_FLAG_ERROR;
++        msg.csi_stream_set_config_req.error_config = error_config;
++        msg.csi_stream_set_config_req.config_flags = NVCSI_CONFIG_FLAG_BRICK | NVCSI_CONFIG_FLAG_CIL | NVCSI_CONFIG_FLAG_ERROR;
+ 
+ 	if (tegra_chan->valid_ports > 1)
+ 		vi_port = (stream_id > 0) ? 1 : 0;
+diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c
+old mode 100644
+new mode 100755
+index 038c312..f7935d5
+--- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c
++++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c
+@@ -282,8 +282,10 @@ static int extract_pixel_format(
+ 		*format = V4L2_PIX_FMT_UYVY;
+ 	else if (strncmp(pixel_t, "yuv_vyuy16", size) == 0)
+ 		*format = V4L2_PIX_FMT_VYUY;
++	else if (strncmp(pixel_t, "raw_grey16", size) == 0)
++		*format = V4L2_PIX_FMT_Y16;
+ 	else {
+-		pr_err("%s: Need to extend format%s\n", __func__, pixel_t);
++		pr_err("%s: Need to extend format %s\n", __func__, pixel_t);
+ 		return -EINVAL;
+ 	}
+ 
+diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c
+old mode 100644
+new mode 100755
+index 04aaa6a..b43c214
+--- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c
++++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c
+@@ -113,12 +113,15 @@ int tegracam_device_register(struct tegracam_device *tc_dev)
+ 		sizeof(struct camera_common_power_rail), GFP_KERNEL);
+ 	s_data->power = pw_rail;
+ 
+-	s_data->regmap = devm_regmap_init_i2c(tc_dev->client,
++	if (tc_dev->dev_regmap_config)
++	{
++		s_data->regmap = devm_regmap_init_i2c(tc_dev->client,
+ 					tc_dev->dev_regmap_config);
+-	if (IS_ERR(s_data->regmap)) {
+-		dev_err(dev,
+-			"regmap init failed: %ld\n", PTR_ERR(s_data->regmap));
+-		return -ENODEV;
++		if (IS_ERR(s_data->regmap)) {
++			dev_err(dev,
++				"regmap init failed: %ld\n", PTR_ERR(s_data->regmap));
++			return -ENODEV;
++		}
+ 	}
+ 
+ 	if (!tc_dev->sensor_ops) {
+diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h
+old mode 100644
+new mode 100755
+index a2fefe0..486ec2c
+--- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h
++++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h
+@@ -127,9 +127,19 @@ static const struct tegra_video_format vi5_video_formats[] = {
+ 	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
+ 				RAW12, SBGGR12, "BGBG.. GRGR.."),
+ 
++	/* RAW 16 */
++        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
++                                RAW16, Y16, "RAW16"),
++
+ 	/* RGB888 */
++// Exosens comment :
++// Nvidia changed the RGB888 TEGRA_VIDEO_FORMAT video format for L4T 35.4.1 version
++// RGBA32 instead of ABGR32
++// For compatibility with Exosens cameras, keep ABGR32 format
++// 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
++//				RGB888, RGBA32, "RGBA-8-8-8-8"),
+ 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
+-				RGB888, RGBA32, "RGBA-8-8-8-8"),
++				RGB888, ABGR32, "BGRA-8-8-8-8"),
+ 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X32_PADHI, 4, 1, T_A8B8G8R8,
+ 				RGB888, RGB32, "RGB-8-8-8-8"),
+ 

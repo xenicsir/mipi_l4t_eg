@@ -1,4 +1,133 @@
 #!/usr/bin/python3
+"""
+dioneCtrl.py - Xenics Dione Camera Control Module
+==================================================
+
+Overview
+--------
+Python module for controlling Xenics Dione thermal cameras via I2C (Linux)
+or USB/Serial (Windows). Supports both direct register access and the
+GenCP (Generic Camera Protocol) standard.
+
+Requirements
+------------
+- Python 3
+- Dependencies: pyserial, numpy
+
+    pip install pyserial numpy
+
+Installation
+------------
+Ensure dioneCtrl.py is in your Python path or the same directory as your script.
+
+Quick Start
+-----------
+    import dioneCtrl
+
+    # Windows (USB/Serial with GenCP)
+    cam = dioneCtrl.dioneCtrl(com_device="COM20", device_type="USB", gencp_enable=True)
+
+    # Linux (I2C without GenCP)
+    cam = dioneCtrl.dioneCtrl(dev_addr=0x5b, bus=9, device_type="I2C", gencp_enable=False)
+
+Constructor Parameters
+----------------------
+    bus          : int   (default: 6)      - I2C bus number (Linux only)
+    dev_addr     : int   (default: 0x5a)   - I2C device address (depends on camera model)
+    com_device   : str   (default: "COM0") - Serial port (Windows only, e.g., "COM20")
+    device_type  : str   (default: "I2C")  - Communication type: "I2C" or "USB"
+    gencp_enable : bool  (default: False)  - Enable GenCP protocol
+
+Note: On Windows, device_type is automatically set to "USB".
+
+Register Access Methods
+-----------------------
+
+Reading Registers:
+
+    read_reg32(reg_addr)        Read a 32-bit integer
+    read_reg32f(reg_addr)       Read a 32-bit float
+    read_buf(reg_addr, length)  Read a byte buffer
+
+Writing Registers:
+
+    write_reg32(reg_addr, val)  Write a 32-bit integer
+    write_reg32f(reg_addr, val) Write a 32-bit float
+    write_buf(reg_addr, buf)    Write a byte buffer
+
+Examples
+--------
+    # Read image width
+    width = cam.read_reg32(0x20001004)
+
+    # Read temperature
+    temp = cam.read_reg32f(0x2f030)
+
+    # Read 64-byte serial number
+    data = cam.read_buf(0x00000144, 64)
+    serial = data[2:].decode('utf-8').rstrip('\\x00')  # Skip 2-byte header
+
+    # Set integration time to 33333 us
+    cam.write_reg32(0x00080118, 33333)
+
+    # Set GSK (Gain Signal Knee) to 1.8
+    cam.write_reg32f(0x0002F004, 1.8)
+
+    # Write a byte buffer
+    cam.write_buf(0x10011000, bytearray([0x01, 0x02, 0x03, 0x04]))
+
+Some Register Addresses
+-----------------------
+    Address      Type    Description
+    0x00000144   buffer  Serial number (64 bytes)
+    0x20001004   int     Image width
+    0x00080118   int     Integration time (us)
+    0x0002F004   float   GSK (Gain Signal Knee)
+    0x0002F030   float   Temperature
+
+GenCP Status Codes
+------------------
+When using GenCP protocol, operations return a status string:
+
+    GENCP_SUCCESS           Operation successful
+    GENCP_NOT_IMPLEMENTED   Feature not implemented
+    GENCP_INVALID_PARAMETER Invalid parameter
+    GENCP_INVALID_ADDRESS   Invalid register address
+    GENCP_WRITE_PROTECT     Write-protected register
+    GENCP_BAD_ALIGNEMENT    Bad alignment
+    GENCP_ACCESS_DENIED     Access denied
+    GENCP_BUSY              Device busy
+    GENCP_MSG TIMEOUT       Communication timeout
+    GENCP_ERROR             Generic error
+
+Complete Example
+----------------
+    import dioneCtrl
+
+    # Initialize camera (Linux I2C example)
+    cam = dioneCtrl.dioneCtrl(dev_addr=0x5b, bus=9, device_type="I2C", gencp_enable=False)
+
+    # Read camera information
+    serial = cam.read_buf(0x00000144, 64)[2:].decode('utf-8').rstrip('\\x00')
+    width = cam.read_reg32(0x20001004)
+    temp = cam.read_reg32f(0x2f030)
+
+    print(f"Camera Serial: {serial}")
+    print(f"Image Width: {width}")
+    print(f"Temperature: {temp:.2f} C")
+
+    # Configure camera
+    cam.write_reg32(0x00080118, 33333)    # Set integration time
+    cam.write_reg32f(0x0002F004, 1.8)     # Set GSK
+
+Platform Notes
+--------------
+- Linux: Requires access to /dev/i2c-* devices. Run with appropriate
+  permissions or add user to i2c group.
+- Windows: Requires COM port access. Install appropriate USB-Serial drivers.
+- I2C Address: Typical values are 0x5a or 0x5b depending on camera model.
+- I2C Bus: Depends on the camera port on Jetson/RPi (check with i2cdetect).
+"""
 
 import platform
 import io, os

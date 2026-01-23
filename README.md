@@ -6,11 +6,15 @@
    * [Building and installing MIPI drivers on supported L4T versions / SoM / carrier boards](#building-and-installing-mipi-drivers-on-supported-l4t-versions-som-carrier-boards)
       + [Supported L4T versions, SOM and carrier boards](#supported-l4t-versions-som-and-carrier-boards)
       + [Building the L4T environment](#building-the-l4t-environment)
+         - [Source code organization](#source-code-organization)
+         - [Developer workflow (with full sources)](#developer-workflow-with-full-sources)
+         - [Client workflow (with patches only)](#client-workflow-with-patches-only)
       + [Building MIPI drivers for specific carrier boards](#building-mipi-drivers-for-specific-carrier-boards)
       + [Installing and configuring the MIPI drivers on the board](#installing-and-configuring-the-mipi-drivers-on-the-board)
          - [Package installation](#package-installation)
          - [Configuring a camera port on non specific (Nvidia generic) carrier boards](#configuring-a-camera-port-on-non-specific-nvidia-generic-carrier-boards)
          - [Configuring a camera port on Forecr Orin NX/Nano DSBOARD-ORNXS carrier board](#configuring-a-camera-port-on-forecr-orin-nxnano-dsboard-ornxs-carrier-board)
+      + [Quick start - Testing the camera](#quick-start---testing-the-camera)
    * [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
       + [Linux boot](#linux-boot)
       + [Orin NX/Nano devkit devicetree issue](#orin-nxnano-devkit-devicetree-issue)
@@ -52,12 +56,31 @@ L4T_VERSION=35.5.0
 ### Building the L4T environment
 This section is for developers needing to rebuild the drivers.
 
-- Prepare the environment, build the kernel, modules, device trees :
+<!-- TOC --><a name="source-code-organization"></a>
+#### Source code organization
+The Exosens camera driver modifications are available in two formats :
+* **sources/** : Complete source files. Use this if you need to modify the code (developer workflow).
+* **patches/** : Patch files only. Use this for a lighter distribution without full source files (client workflow).
+
+<!-- TOC --><a name="developer-workflow-with-full-sources"></a>
+#### Developer workflow (with full sources)
+If you are a developer modifying the camera driver code, use the full sources :
 <pre>
 ./l4t_prepare.sh $L4T_VERSION
 ./l4t_copy_sources.sh $L4T_VERSION
 ./l4t_build.sh $L4T_VERSION
 </pre>
+The *l4t_copy_sources.sh* script copies the complete source files from **sources/** to the L4T build environment and generates patch files in **patches/** for distribution.
+
+<!-- TOC --><a name="client-workflow-with-patches-only"></a>
+#### Client workflow (with patches only)
+If you are a client who only needs to rebuild without modifying the code, you can use the lighter patch-based workflow :
+<pre>
+./l4t_prepare.sh $L4T_VERSION
+./l4t_patch_sources.sh $L4T_VERSION
+./l4t_build.sh $L4T_VERSION
+</pre>
+The *l4t_patch_sources.sh* script applies the patches from **patches/** to the original Nvidia BSP. This is faster and requires less disk space than the full sources.
 
 - Generate the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
 <pre>
@@ -93,9 +116,8 @@ Note : if a 1.x.x $L4T_VERSION is already installed on the target, uninstall it.
 
 Install the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered (refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet) or locally built previously :
 <pre>
-sudo dpkg --force-overwrite -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
 </pre>
-Note : the /opt/nvidia/jetson-io scripts have been patched, that's why we use the --force-overwrite is used
 
 <!-- TOC --><a name="configuring-a-camera-port-on-non-specific-nvidia-generic-carrier-boards"></a>
 #### Configuring a camera port on non specific (Nvidia generic) carrier boards
@@ -180,6 +202,38 @@ For example, MicroCube640 on CAM0 port and Crius1280 on CAM1 :
 [...]
 </pre>
 
+<!-- TOC --><a name="quick-start---testing-the-camera"></a>
+### Quick start - Testing the camera
+
+After installing the package and rebooting, verify that the camera is detected :
+<pre>
+ls /dev/video*
+</pre>
+
+A /dev/videoX device should appear for each connected camera.
+
+#### Check camera information
+<pre>
+v4l2-ctl -d /dev/video0 --all
+</pre>
+
+#### Capture a single frame to a file
+* MicroCube/SmartIR640 cameras (YCbCr format, 640x480) :
+<pre>
+v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="YUYV" --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=frame.raw
+</pre>
+
+* Crius1280 cameras (YCbCr format, 1280x1024) :
+<pre>
+v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=frame.raw
+</pre>
+
+* Dione cameras (ARGB format, 640x480) :
+<pre>
+v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24" --stream-count=1 --stream-to=frame.raw
+</pre>
+
+For more streaming examples , see /opt/eg/doc/streaming_examples.txt on the target after package installation.
 
 <!-- TOC --><a name="notes-about-linux-boot-and-device-trees"></a>
 ## Notes about Linux boot and device trees

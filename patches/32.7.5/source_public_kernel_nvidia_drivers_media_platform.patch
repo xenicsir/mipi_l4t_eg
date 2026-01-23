@@ -1,0 +1,27 @@
+diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c
+old mode 100644
+new mode 100755
+index 04aaa6a..b43c214
+--- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c
++++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/tegracam_core.c
+@@ -113,12 +113,15 @@ int tegracam_device_register(struct tegracam_device *tc_dev)
+ 		sizeof(struct camera_common_power_rail), GFP_KERNEL);
+ 	s_data->power = pw_rail;
+ 
+-	s_data->regmap = devm_regmap_init_i2c(tc_dev->client,
++	if (tc_dev->dev_regmap_config)
++	{
++		s_data->regmap = devm_regmap_init_i2c(tc_dev->client,
+ 					tc_dev->dev_regmap_config);
+-	if (IS_ERR(s_data->regmap)) {
+-		dev_err(dev,
+-			"regmap init failed: %ld\n", PTR_ERR(s_data->regmap));
+-		return -ENODEV;
++		if (IS_ERR(s_data->regmap)) {
++			dev_err(dev,
++				"regmap init failed: %ld\n", PTR_ERR(s_data->regmap));
++			return -ENODEV;
++		}
+ 	}
+ 
+ 	if (!tc_dev->sensor_ops) {

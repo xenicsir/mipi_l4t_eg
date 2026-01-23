@@ -1,0 +1,1 @@
+/opt/nvidia/jetson-io/Linux/dt.py
