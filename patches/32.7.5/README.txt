@@ -18,6 +18,6 @@ Patch files:
 
 Usage:
   To apply these patches instead of using l4t_copy_sources.sh, run:
-  ./l4t_patch_sources.sh 32.7.5 generic
+  ./l4t_patch_sources.sh 32.7.5
 
   The patches are applied to the L4T environment prepared by l4t_prepare.sh.
