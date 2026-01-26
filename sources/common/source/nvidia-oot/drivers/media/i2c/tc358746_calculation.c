@@ -418,6 +418,9 @@ static int tc358746_setup_pll(const struct tc358746_input *input,
 {
 	unsigned int pllinclk;
 	unsigned char pll_prediv;
+	unsigned int target_vco, best_prd, trial_prd;
+	unsigned int best_error, best_pllinclk;
+	unsigned int trial_pllinclk, trial_fbd, trial_vco, error;
 
 	if (input->refclk < 6000000 || input->refclk > 40000000) {
 		log_error("refclk must between 6MHz and 40MHz\n");
@@ -426,22 +429,59 @@ static int tc358746_setup_pll(const struct tc358746_input *input,
 
 	/*
 	 * The PLL input clock is obtained by dividing refclk by pll_prd.
-	 * It must be between 4 MHz and 40 MHz, lower frequency is better.
+	 * It must be between 4 MHz and 40 MHz.
+	 *
+	 * Strategy: Find the PRD that gives the most accurate frequency match
+	 * (minimal error), and among equal errors, prefer higher PLLinclk for
+	 * better phase noise and faster lock time.
+	 *
+	 * VCO_target = 2 × link_frequency (MIPI DDR)
+	 * VCO_actual = PLLinclk × FBD
+	 * FBD must be integer, so we search for PRD that minimizes error.
 	 */
-	pll_prediv = DIV_ROUND_CLOSEST(input->refclk, 4000000);
-	if (pll_prediv < 1 || pll_prediv > 16) {
-		log_error("invalid pll pre-divider value: %d\n", pll_prediv);
-		return -EINVAL;
+	target_vco = 2 * input->link_frequency;
+	best_prd = 1;
+	best_error = U32_MAX;
+	best_pllinclk = 0;
+
+	for (trial_prd = 1; trial_prd <= 16; trial_prd++) {
+		trial_pllinclk = input->refclk / trial_prd;
+
+		/* PLLinclk must be in range 4-40 MHz */
+		if (trial_pllinclk < 4000000 || trial_pllinclk > 40000000)
+			continue;
+
+		/* Calculate FBD and actual VCO */
+		trial_fbd = DIV_ROUND_CLOSEST(target_vco, trial_pllinclk);
+		trial_vco = trial_pllinclk * trial_fbd;
+
+		/* Calculate frequency error */
+		if (trial_vco > target_vco)
+			error = trial_vco - target_vco;
+		else
+			error = target_vco - trial_vco;
+
+		/* Keep this PRD if error is smaller, or same error but higher PLLinclk */
+		if (error < best_error ||
+		    (error == best_error && trial_pllinclk > best_pllinclk)) {
+			best_error = error;
+			best_prd = trial_prd;
+			best_pllinclk = trial_pllinclk;
+
+			/* Perfect match found, no need to continue */
+			if (error == 0)
+				break;
+		}
 	}
+
+	pll_prediv = best_prd;
 	pll->pll_prd = pll_prediv;
 
-	pllinclk = DIV_ROUND_CLOSEST(input->refclk, pll_prediv);
-	if (pllinclk < 4000000 || pllinclk > 40000000) {
-		log_error("invalid pll input clock: %d Hz\n", pllinclk);
-		return -EINVAL;
-	}
-
+	pllinclk = input->refclk / pll_prediv;
 	pll->pllinclk_hz = pllinclk;
+
+	log_info("PLL optimal: PRD=%u PLLinclk=%u Hz (target VCO=%u Hz, error=%u Hz)\n",
+		 pll_prediv, pllinclk, target_vco, best_error);
 
 	return 0;
 }
@@ -455,14 +495,18 @@ static void tc358746_setup_pll_post(struct tc358746_pll *pll,
 	 * Calculation:
 	 * speed_per_lane = (pllinclk_hz * (fbd + 1)) / 2^frs
 	 *
-	 * Calculation used by REF_02:
-	 * speed_per_lane = (pllinclk_hz * fbd) / 2^frs
+	 * Therefore, the multiplier M is:
+	 * M = (speed_per_lane * 2^frs) / pllinclk_hz
+	 *
+	 * Note: pll_fbd is the multiplier value (M). The macro
+	 * PLLCTL0_PLL_FBD_SET() will subtract 1 to get the register value,
+	 * since hardware uses: VCO = PLLinclk × (FBD_register + 1)
 	 */
 #if 1
 	pll->pll_fbd =
 	    DIV_ROUND_CLOSEST(csi->speed_per_lane, pll->pllinclk_hz);
 	pll->pll_fbd <<= pll_frs;
-	pll->pll_fbd -= csi->speed_range;
+	/* pll_fbd is now the multiplier M, macro will convert to register value */
 #else
 	pll->pll_fbd = csi->speed_per_lane / pll->pllinclk_hz;
 	pll->pll_fbd <<= pll_frs;

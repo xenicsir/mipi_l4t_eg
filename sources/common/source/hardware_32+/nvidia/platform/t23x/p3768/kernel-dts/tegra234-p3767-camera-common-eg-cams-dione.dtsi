@@ -463,7 +463,7 @@
 #endif
 								  bus-width = <2>;
 								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
-								  link-frequencies = /bits/ 64 <120000000 497000000>;
+								  link-frequencies = /bits/ 64 <120000000 498000000>;
 							   };
 							};
 						 };
@@ -1029,7 +1029,7 @@
 								  port-index = <2>;
 								  bus-width = <2>;
 								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
-								  link-frequencies = /bits/ 64 <120000000 497000000>;
+								  link-frequencies = /bits/ 64 <120000000 498000000>;
 							   };
 							};
 						 };
