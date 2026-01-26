@@ -1,0 +1,74 @@
+diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
+old mode 100644
+new mode 100755
+index 9b4b263..68b26b0
+--- a/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
++++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
+@@ -896,6 +896,8 @@ CONFIG_NV_VIDEO_OV5693=m
+ CONFIG_NV_VIDEO_OV9281=m
+ CONFIG_NV_VIDEO_OV10823=m
+ CONFIG_NV_VIDEO_OV23850=m
++CONFIG_VIDEO_DIONE_IR=m
++CONFIG_VIDEO_EG_EC_MIPI=m
+ CONFIG_I2C_IOEXPANDER_PCA9570=m
+ CONFIG_VIDEO_TC358840=m
+ CONFIG_VIDEO_LT6911UXC=m
+diff --git a/source/public/kernel/kernel-5.10/drivers/i2c/busses/i2c-tegra.c b/source/public/kernel/kernel-5.10/drivers/i2c/busses/i2c-tegra.c
+index 22672c5..3cf6caf 100644
+--- a/source/public/kernel/kernel-5.10/drivers/i2c/busses/i2c-tegra.c
++++ b/source/public/kernel/kernel-5.10/drivers/i2c/busses/i2c-tegra.c
+@@ -167,6 +167,8 @@
+ /* packet header size in bytes */
+ #define I2C_PACKET_HEADER_SIZE			12
+ 
++#define I2C_ADAPTER_TIMEOUT_INIT (6 * HZ) // DAL custom code
++
+ /*
+  * I2C Controller will use PIO mode for transfers up to 32 bytes in order to
+  * avoid DMA overhead, otherwise external APB DMA controller will be used.
+@@ -1563,6 +1565,21 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
+ 	 * Transfer time in mSec = Total bits / transfer rate
+ 	 * Total bits = 9 bits per byte (including ACK bit) + Start & stop bits
+ 	 */
++	
++	 // DAL custom code start
++	if (i2c_dev->adapter.timeout != I2C_ADAPTER_TIMEOUT_INIT) // If value changed from init value, modify the the transfer timeout
++	{
++		if (i2c_dev->adapter.timeout < 0)
++		{
++			xfer_time = UINT_MAX;
++		}
++		else if (i2c_dev->adapter.timeout > 0)
++		{
++			xfer_time = i2c_dev->adapter.timeout;
++		}
++		// Value 0 = keep defaut transfer timeout
++	}
++	 // DAL custom code end
+ 	xfer_time += DIV_ROUND_CLOSEST(((xfer_size * 9) + 2) * MSEC_PER_SEC,
+ 				       i2c_dev->bus_clk_rate);
+ 
+@@ -2305,7 +2322,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+ 	i2c_dev->adapter.dev.of_node = i2c_dev->dev->of_node;
+ 	i2c_dev->adapter.dev.parent = i2c_dev->dev;
+ 	i2c_dev->adapter.retries = 1;
+-	i2c_dev->adapter.timeout = 6 * HZ;
++	i2c_dev->adapter.timeout = I2C_ADAPTER_TIMEOUT_INIT; // DAL custom code
+ 	i2c_dev->adapter.quirks = i2c_dev->hw->quirks;
+ 	i2c_dev->adapter.owner = THIS_MODULE;
+ 	i2c_dev->adapter.class = I2C_CLASS_DEPRECATED;
+diff --git a/source/public/kernel/kernel-5.10/drivers/i2c/i2c-mux.c b/source/public/kernel/kernel-5.10/drivers/i2c/i2c-mux.c
+index 774507b..25f44ca 100644
+--- a/source/public/kernel/kernel-5.10/drivers/i2c/i2c-mux.c
++++ b/source/public/kernel/kernel-5.10/drivers/i2c/i2c-mux.c
+@@ -48,7 +48,10 @@ static int __i2c_mux_master_xfer(struct i2c_adapter *adap,
+ 
+ 	ret = muxc->select(muxc, priv->chan_id);
+ 	if (ret >= 0)
++	{
++		parent->timeout = adap->timeout; // DAL custom code
+ 		ret = __i2c_transfer(parent, msgs, num);
++	}
+ 	if (muxc->deselect)
+ 		muxc->deselect(muxc, priv->chan_id);
+ 

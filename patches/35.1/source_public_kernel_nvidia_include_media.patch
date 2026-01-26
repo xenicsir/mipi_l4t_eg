@@ -1,0 +1,36 @@
+diff --git a/source/public/kernel/nvidia/include/media/camera_common.h b/source/public/kernel/nvidia/include/media/camera_common.h
+old mode 100644
+new mode 100755
+index 0a3296d..95a151a
+--- a/source/public/kernel/nvidia/include/media/camera_common.h
++++ b/source/public/kernel/nvidia/include/media/camera_common.h
+@@ -240,6 +240,7 @@ struct camera_common_data {
+ 	/* TODO: cleanup neeeded once all the sensors adapt new framework */
+ 	struct tegracam_ctrl_handler		*tegracam_ctrl_hdl;
+ 	struct regmap				*regmap;
++	struct i2c_client *i2c_client;
+ 	struct camera_common_pdata		*pdata;
+ 	/* TODO: cleanup needed for priv once all the sensors adapt new framework */
+ 	void	*priv;
+diff --git a/source/public/kernel/nvidia/include/media/tegra_camera_core.h b/source/public/kernel/nvidia/include/media/tegra_camera_core.h
+old mode 100644
+new mode 100755
+index 788cf77..c35bdc4
+--- a/source/public/kernel/nvidia/include/media/tegra_camera_core.h
++++ b/source/public/kernel/nvidia/include/media/tegra_camera_core.h
+@@ -56,6 +56,7 @@ enum tegra_image_dt {
+ 	TEGRA_IMAGE_DT_RAW10,
+ 	TEGRA_IMAGE_DT_RAW12,
+ 	TEGRA_IMAGE_DT_RAW14,
++	TEGRA_IMAGE_DT_RAW16,
+ };
+ 
+ /* Supported CSI to VI Data Formats */
+@@ -66,6 +67,7 @@ enum tegra_vf_code {
+ 	TEGRA_VF_RAW10,
+ 	TEGRA_VF_RAW12,
+ 	TEGRA_VF_RAW14,
++	TEGRA_VF_RAW16,
+ 	TEGRA_VF_EMBEDDED8,
+ 	TEGRA_VF_RGB565,
+ 	TEGRA_VF_RGB555,

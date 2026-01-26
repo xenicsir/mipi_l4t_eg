@@ -1,0 +1,24 @@
+diff --git a/source/Makefile b/source/Makefile
+index ad7dc07..2be449d 100644
+--- a/source/Makefile
++++ b/source/Makefile
+@@ -123,14 +123,14 @@ endef
+ 
+ nvidia-headers: nvidia-oot
+ 	mkdir -p $(NVIDIA_HEADERS)
+-	cp -LR $(KERNEL_HEADERS)/* $(NVIDIA_HEADERS)
++	rsync -ak $(KERNEL_HEADERS)/* $(NVIDIA_HEADERS)
+ 	if [ "$(KERNEL_HEADERS)" != "$(KERNEL_OUTPUT)" ] ; then \
+-		cp -LR $(KERNEL_OUTPUT)/include/* $(NVIDIA_HEADERS)/include/ ; \
+-		cp -LR $(KERNEL_OUTPUT)/arch/arm64/include/* $(NVIDIA_HEADERS)/arch/arm64/include/ ; \
+-		cp -LR $(KERNEL_OUTPUT)/scripts/* $(NVIDIA_HEADERS)/scripts/ ; \
++		rsync -ak $(KERNEL_OUTPUT)/include/* $(NVIDIA_HEADERS)/include/ ; \
++		rsync -ak $(KERNEL_OUTPUT)/arch/arm64/include/* $(NVIDIA_HEADERS)/arch/arm64/include/ ; \
++		rsync -ak $(KERNEL_OUTPUT)/scripts/* $(NVIDIA_HEADERS)/scripts/ ; \
+ 		cp $(KERNEL_OUTPUT)/System.map $(NVIDIA_HEADERS)/ || true ; \
+ 	fi
+-	cp -LR $(MAKEFILE_DIR)/nvidia-oot/include/* $(NVIDIA_HEADERS)/include/
++	rsync -ak $(MAKEFILE_DIR)/nvidia-oot/include/* $(NVIDIA_HEADERS)/include/
+ 	cat $(KERNEL_OUTPUT)/Module.symvers $(MAKEFILE_DIR)/nvidia-oot/Module.symvers > \
+ 		$(NVIDIA_HEADERS)/Module.symvers
+ 

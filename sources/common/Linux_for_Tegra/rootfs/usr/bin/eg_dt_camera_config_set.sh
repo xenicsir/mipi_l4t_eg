@@ -43,7 +43,7 @@ for (( i=0; i<${#dtboarg[@]}; i++ )); do
 	echo overlay ${dtboarg[$i]}
 done
 
-cmd="python /opt/nvidia/jetson-io/config-by-hardware.py -n"
+cmd="python /opt/eg/jetson-io/config-by-hardware.py -n"
 
 if [[ ${#dtboarg[@]} == 0 ]]
 then
