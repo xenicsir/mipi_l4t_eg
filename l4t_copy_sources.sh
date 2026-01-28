@@ -294,6 +294,90 @@ echo ""
 echo "  Copy complete"
 
 #******************************************************************************
+# Step 4b: Merge Exosens defconfig into Forecr defconfigs (L4T 35.x only)
+#
+# For Forecr carrier boards on L4T 35.x, we need to merge any Exosens-specific
+# CONFIG options from the generic defconfig into all Forecr *_defconfig files.
+# This ensures that if the generic defconfig is modified with new camera configs,
+# those changes are automatically propagated to Forecr builds.
+#******************************************************************************
+
+if [[ "$CARRIER_BOARD" == "forecr" && $L4T_VERSION_MAJOR -lt 36 ]]; then
+   echo ""
+   echo "============================================"
+   echo "Merging Exosens defconfig into Forecr defconfigs"
+   echo "============================================"
+
+   # Paths for L4T 35.x
+   KERNEL_SUBDIR="kernel-5.10"
+   NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+   FORECR_DEFCONFIG="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+   DEST_CONFIGS_DIR="$L4T_DIR/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
+
+   if [[ -f "$NVIDIA_DEFCONFIG" && -f "$FORECR_DEFCONFIG" && -d "$DEST_CONFIGS_DIR" ]]; then
+      echo "  Generic defconfig: $NVIDIA_DEFCONFIG"
+      echo "  Forecr vendor defconfig: $FORECR_DEFCONFIG"
+      echo ""
+
+      # Extract CONFIG options that are in generic Nvidia but not in Forecr vendor
+      # These are Exosens-specific additions
+      EXOSENS_CONFIGS=()
+      while IFS= read -r line; do
+         [[ -z "$line" ]] && continue
+         [[ "$line" =~ ^# ]] && continue
+         if [[ "$line" =~ ^CONFIG_ ]]; then
+            config_name=$(echo "$line" | cut -d'=' -f1)
+            if ! grep -q "^${config_name}=" "$FORECR_DEFCONFIG" 2>/dev/null; then
+               EXOSENS_CONFIGS+=("$line")
+            fi
+         fi
+      done < "$NVIDIA_DEFCONFIG"
+
+      if [[ ${#EXOSENS_CONFIGS[@]} -gt 0 ]]; then
+         echo "  Exosens CONFIG options to merge:"
+         for config in "${EXOSENS_CONFIGS[@]}"; do
+            echo "    $config"
+         done
+         echo ""
+
+         # Apply to all *_defconfig files
+         merged_count=0
+         for defconfig_file in "$DEST_CONFIGS_DIR"/*_defconfig; do
+            [[ ! -f "$defconfig_file" ]] && continue
+
+            filename=$(basename "$defconfig_file")
+            configs_added=0
+
+            for config in "${EXOSENS_CONFIGS[@]}"; do
+               config_name=$(echo "$config" | cut -d'=' -f1)
+               if ! grep -q "^${config_name}=" "$defconfig_file" 2>/dev/null; then
+                  sudo bash -c "echo '$config' >> '$defconfig_file'"
+                  configs_added=$((configs_added + 1))
+               fi
+            done
+
+            if [[ $configs_added -gt 0 ]]; then
+               echo "  MERGED: $filename (+$configs_added configs)"
+               merged_count=$((merged_count + 1))
+            else
+               echo "  SKIPPED: $filename (configs already present)"
+            fi
+         done
+
+         echo ""
+         echo -e "${GREEN}  Defconfig merge complete: $merged_count files updated${NC}"
+      else
+         echo "  No Exosens CONFIG options to merge."
+      fi
+   else
+      echo -e "${YELLOW}  WARNING: Cannot merge defconfigs - required files not found${NC}"
+      [[ ! -f "$NVIDIA_DEFCONFIG" ]] && echo "    Missing: $NVIDIA_DEFCONFIG"
+      [[ ! -f "$FORECR_DEFCONFIG" ]] && echo "    Missing: $FORECR_DEFCONFIG"
+      [[ ! -d "$DEST_CONFIGS_DIR" ]] && echo "    Missing: $DEST_CONFIGS_DIR"
+   fi
+fi
+
+#******************************************************************************
 # Step 5: Generate patches dynamically based on modified directories
 #******************************************************************************
 

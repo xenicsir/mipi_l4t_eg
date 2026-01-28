@@ -161,8 +161,8 @@ fi
 # Camera I2C drivers
 copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
 copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
-copy_module "$I2C_DRIVER_DIR" "nv_imx219.ko"
-copy_module "$I2C_DRIVER_DIR" "nv_imx477.ko"
+#copy_module "$I2C_DRIVER_DIR" "nv_imx219.ko"
+#copy_module "$I2C_DRIVER_DIR" "nv_imx477.ko"
 
 # Platform drivers (L4T 36.x)
 copy_module "updates/drivers/video/tegra/camera" "tegra_camera_platform.ko"
