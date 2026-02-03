@@ -232,7 +232,41 @@ copy_modified_files() {
         rel_path=$(echo "$src_file" | sed "s|$FORECR_SRC/||")
         dest_file="$DEST/$rel_path"
 
+        # Determine path to Exosens generic file
+        if [[ $L4T_MAJOR -ge 36 ]]; then
+            exosens_file="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/$rel_path"
+        else
+            exosens_file="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/$rel_path"
+        fi
+
+        # Use Nvidia Forecr BSP file as base (since file is modified in Forecr)
+        nvidia_bsp_file="$NVIDIA_SRC/$rel_path"
+
         mkdir -p "$(dirname "$dest_file")"
+
+        # Check if this file also has Exosens modifications
+        if [[ -f "$exosens_file" ]] && [[ -f "$nvidia_bsp_file" ]]; then
+            # Check if Exosens file differs from Nvidia Forecr BSP (has Exosens modifications)
+            if ! diff -q "$exosens_file" "$nvidia_bsp_file" &>/dev/null; then
+                # 3-way merge needed: Base=Nvidia Forecr BSP, Ours=Exosens, Theirs=Forecr kernel
+                echo "    MERGED: $rel_path (Exosens + Forecr)"
+
+                # Use git merge-file for 3-way merge
+                cp "$exosens_file" "$dest_file"
+                if git merge-file -q "$dest_file" "$nvidia_bsp_file" "$src_file" 2>/dev/null; then
+                    # Merge succeeded without conflicts
+                    :
+                else
+                    # Merge had conflicts - keep merged file with conflict markers
+                    echo "      WARNING: Merge conflicts detected, review $dest_file"
+                fi
+                count=$((count + 1))
+                TOTAL_MODIFIED=$((TOTAL_MODIFIED + 1))
+                continue
+            fi
+        fi
+
+        # No merge needed, just copy Forecr file
         cp "$src_file" "$dest_file"
         echo "    MODIFIED: $rel_path"
         count=$((count + 1))
@@ -265,37 +299,28 @@ merge_exosens_defconfig() {
     if [[ $L4T_MAJOR -ge 36 ]]; then
         KERNEL_SUBDIR="kernel-jammy-src"
         # For 36.x, paths are different
-        FORECR_DEFCONFIG="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+        FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
     else
         KERNEL_SUBDIR="kernel-5.10"
         # For 35.x, paths use source/public/
-        FORECR_DEFCONFIG="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+        FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
     fi
 
-    # Check if both defconfig files exist
-    if [[ ! -f "$FORECR_DEFCONFIG" ]]; then
-        echo -e "${YELLOW}WARNING: Forecr vendor defconfig not found: $FORECR_DEFCONFIG${NC}"
+    # Check if Nvidia BSP defconfig exists
+    if [[ ! -f "$NVIDIA_DEFCONFIG" ]]; then
+        echo -e "${YELLOW}WARNING: Nvidia BSP defconfig not found: $NVIDIA_DEFCONFIG${NC}"
         echo "Skipping defconfig merge."
         return 0
     fi
 
-    if [[ ! -f "$NVIDIA_DEFCONFIG" ]]; then
-        echo -e "${YELLOW}WARNING: Nvidia BSP defconfig not found: $NVIDIA_DEFCONFIG${NC}"
-        echo "Attempting to use alternative path or extract added CONFIG options directly..."
+    echo "Nvidia BSP defconfig: $NVIDIA_DEFCONFIG"
 
-        # Fallback: Extract CONFIG options that are specific to Exosens cameras
-        # These are the known Exosens-specific options
-        EXOSENS_CONFIGS=(
-            "CONFIG_VIDEO_DIONE_IR=m"
-            "CONFIG_VIDEO_EG_EC_MIPI=m"
-        )
-    else
-        echo "Forecr vendor defconfig: $FORECR_DEFCONFIG"
-        echo "Nvidia BSP defconfig:    $NVIDIA_DEFCONFIG"
+    if [[ -f "$FORECR_VENDOR_DEFCONFIG" ]]; then
+        echo "Forecr vendor defconfig: $FORECR_VENDOR_DEFCONFIG"
         echo ""
 
         # Extract CONFIG options that are in Nvidia BSP (with Exosens additions)
@@ -310,23 +335,43 @@ merge_exosens_defconfig() {
             if [[ "$line" =~ ^CONFIG_ ]]; then
                 config_name=$(echo "$line" | cut -d'=' -f1)
                 # Check if this config exists in Forecr vendor defconfig
-                if ! grep -q "^${config_name}=" "$FORECR_DEFCONFIG" 2>/dev/null; then
+                if ! grep -q "^${config_name}=" "$FORECR_VENDOR_DEFCONFIG" 2>/dev/null; then
                     EXOSENS_CONFIGS+=("$line")
                 fi
             fi
         done < "$NVIDIA_DEFCONFIG"
-    fi
 
-    if [[ ${#EXOSENS_CONFIGS[@]} -eq 0 ]]; then
-        echo -e "${YELLOW}No additional Exosens CONFIG options found to merge.${NC}"
-        return 0
-    fi
+        if [[ ${#EXOSENS_CONFIGS[@]} -eq 0 ]]; then
+            echo -e "${YELLOW}No additional Exosens CONFIG options found to merge.${NC}"
+            return 0
+        fi
 
-    echo "Exosens CONFIG options to merge:"
-    for config in "${EXOSENS_CONFIGS[@]}"; do
-        echo "  $config"
-    done
-    echo ""
+        echo "Exosens CONFIG options to merge:"
+        for config in "${EXOSENS_CONFIGS[@]}"; do
+            echo "  $config"
+        done
+        echo ""
+    else
+        echo "Forecr vendor defconfig: Not found (using all configs from Nvidia BSP)"
+        echo ""
+
+        # No Forecr vendor defconfig - fallback to known Exosens configs
+        echo -e "${YELLOW}WARNING: Cannot determine Exosens-specific configs automatically${NC}"
+        echo "Using known Exosens camera driver configs as fallback"
+        echo ""
+
+        EXOSENS_CONFIGS=(
+            "CONFIG_VIDEO_DIONE_IR=m"
+            "CONFIG_VIDEO_EG_EC_MIPI=m"
+            "CONFIG_VIDEO_EG_MICROLYNX=m"
+        )
+
+        echo "Fallback CONFIG options to merge:"
+        for config in "${EXOSENS_CONFIGS[@]}"; do
+            echo "  $config"
+        done
+        echo ""
+    fi
 
     # Check if destination configs directory exists
     if [[ ! -d "$DEST_CONFIGS_DIR" ]]; then
@@ -365,6 +410,14 @@ merge_exosens_defconfig() {
     echo ""
     echo -e "${GREEN}Defconfig merge complete: $merged_count files updated${NC}"
     echo ""
+
+    # Save vendor defconfig as reference for future merges
+    if [[ -f "$FORECR_VENDOR_DEFCONFIG" ]]; then
+        VENDOR_REF="$DEST_CONFIGS_DIR/defconfig.vendor_reference"
+        cp "$FORECR_VENDOR_DEFCONFIG" "$VENDOR_REF"
+        echo "  Saved vendor defconfig reference: $VENDOR_REF"
+        echo ""
+    fi
 }
 
 #******************************************************************************

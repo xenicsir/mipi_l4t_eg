@@ -1,3 +1,6 @@
+To check which cameras are associated to /dev/videoX devices :
+v4l2-ctl --list-devices
+
 ===========================
 Jetson boards except Nano : 
 ===========================

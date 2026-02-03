@@ -8,8 +8,8 @@ to add support for Exosens cameras.
 Total patches: 8
 
 Patch files:
-  - rootfs_opt_eg.patch (19 files, 878 lines)
-  - rootfs_usr_bin.patch (11 files, 1298 lines)
+  - rootfs_opt_eg.patch (20 files, 1444 lines)
+  - rootfs_usr_bin.patch (12 files, 1676 lines)
   - source_hardware.patch (27 files, 6711 lines)
   - source_kernel.patch (2 files, 59 lines)
   - source_nvidia-oot_drivers_media_i2c.patch (9 files, 4750 lines)

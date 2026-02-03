@@ -215,6 +215,15 @@ echo "Package version: ${PACKAGE_VERSION}"
 echo ""
 echo "Building Debian package..."
 
+# Remove existing .deb package if it exists
+# Note: fpm converts underscores to hyphens in package names (Debian convention)
+DEB_PACKAGE_NAME="${PACKAGE_NAME//_/-}"
+DEB_PACKAGE="${DEB_PACKAGE_NAME}_${PACKAGE_VERSION}_arm64.deb"
+if [[ -f "$DEB_PACKAGE" ]]; then
+   echo "Removing existing package: $DEB_PACKAGE"
+   rm -f "$DEB_PACKAGE"
+fi
+
 # Check if fpm is installed
 if ! command -v fpm &> /dev/null; then
    echo "Error: fpm is not installed"

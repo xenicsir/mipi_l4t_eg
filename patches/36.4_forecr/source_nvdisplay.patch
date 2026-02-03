@@ -1,0 +1,33 @@
+diff --git a/source/nvdisplay/src/nvidia/generated/g_rpc-message-header.h b/source/nvdisplay/src/nvidia/generated/g_rpc-message-header.h
+index f4ada16..4146226 100644
+--- a/source/nvdisplay/src/nvidia/generated/g_rpc-message-header.h
++++ b/source/nvdisplay/src/nvidia/generated/g_rpc-message-header.h
+@@ -1,5 +1,5 @@
+ /*
+- * SPDX-FileCopyrightText: Copyright (c) 2008-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2008-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: MIT
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+diff --git a/source/nvdisplay/src/nvidia/generated/g_rpc-structures.h b/source/nvdisplay/src/nvidia/generated/g_rpc-structures.h
+index c23deff..f43dca8 100644
+--- a/source/nvdisplay/src/nvidia/generated/g_rpc-structures.h
++++ b/source/nvdisplay/src/nvidia/generated/g_rpc-structures.h
+@@ -1,5 +1,5 @@
+ /*
+- * SPDX-FileCopyrightText: Copyright (c) 2008-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2008-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: MIT
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a
+diff --git a/source/nvdisplay/src/nvidia/generated/g_sdk-structures.h b/source/nvdisplay/src/nvidia/generated/g_sdk-structures.h
+index 6efdf16..7177987 100644
+--- a/source/nvdisplay/src/nvidia/generated/g_sdk-structures.h
++++ b/source/nvdisplay/src/nvidia/generated/g_sdk-structures.h
+@@ -1,5 +1,5 @@
+ /*
+- * SPDX-FileCopyrightText: Copyright (c) 2008-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * SPDX-FileCopyrightText: Copyright (c) 2008-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * SPDX-License-Identifier: MIT
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a

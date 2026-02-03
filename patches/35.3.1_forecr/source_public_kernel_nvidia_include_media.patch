@@ -1,0 +1,91 @@
+diff --git a/source/public/kernel/nvidia/include/media/camera_common.h b/source/public/kernel/nvidia/include/media/camera_common.h
+index 0a3296d..95a151a 100644
+--- a/source/public/kernel/nvidia/include/media/camera_common.h
++++ b/source/public/kernel/nvidia/include/media/camera_common.h
+@@ -240,6 +240,7 @@ struct camera_common_data {
+ 	/* TODO: cleanup neeeded once all the sensors adapt new framework */
+ 	struct tegracam_ctrl_handler		*tegracam_ctrl_hdl;
+ 	struct regmap				*regmap;
++	struct i2c_client *i2c_client;
+ 	struct camera_common_pdata		*pdata;
+ 	/* TODO: cleanup needed for priv once all the sensors adapt new framework */
+ 	void	*priv;
+diff --git a/source/public/kernel/nvidia/include/media/imx708.h b/source/public/kernel/nvidia/include/media/imx708.h
+new file mode 100644
+index 0000000..fb888d6
+--- /dev/null
++++ b/source/public/kernel/nvidia/include/media/imx708.h
+@@ -0,0 +1,53 @@
++/*
++ * imx708.h - imx708 sensor header
++ *
++ * Copyright (c) 2023, RidgeRun <support@ridgerun.com>. All rights reserved.
++ *
++ * Contact us: support@ridgerun.com
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __IMX708_H__
++#define __IMX708_H__
++
++/* imx708 - sensor parameters */
++#define IMX708_MIN_GAIN		                (0)
++#define IMX708_MAX_GAIN		                (978)
++#define IMX708_ANALOG_GAIN_C0		        (516)
++#define IMX708_SHIFT_8_BITS			(8)
++#define IMX708_MIN_FRAME_LENGTH		        (256)
++#define IMX708_MAX_FRAME_LENGTH		        (65535)
++#define IMX708_MIN_COARSE_EXPOSURE	        (1)
++#define IMX708_MAX_COARSE_DIFF		        (10)
++#define IMX708_MASK_LSB_2_BITS			0x0003
++#define IMX708_MASK_LSB_8_BITS			0x00ff
++
++/* imx708 sensor register address */
++#define IMX708_MODEL_ID_ADDR_MSB		0x0000
++#define IMX708_MODEL_ID_ADDR_LSB		0x0001
++#define IMX708_MODEL_ID_VALUE_MSB		0x0003
++#define IMX708_MODEL_ID_VALUE_LSB		0x0001
++#define IMX708_ANALOG_GAIN_ADDR_MSB		0x0204
++#define IMX708_ANALOG_GAIN_ADDR_LSB		0x0205
++#define IMX708_DIGITAL_GAIN_ADDR_MSB		0x020e
++#define IMX708_DIGITAL_GAIN_ADDR_LSB		0x020f
++#define IMX708_FRAME_LENGTH_ADDR_MSB		0x0340
++#define IMX708_FRAME_LENGTH_ADDR_LSB		0x0341
++#define IMX708_COARSE_INTEG_TIME_ADDR_MSB	0x0202
++#define IMX708_COARSE_INTEG_TIME_ADDR_LSB	0x0203
++#define IMX708_FINE_INTEG_TIME_ADDR_MSB		0x0200
++#define IMX708_FINE_INTEG_TIME_ADDR_LSB		0x0201
++#define IMX708_GROUP_HOLD_ADDR		        0x0104
++
++#endif /* __IMX708_H__ */
+diff --git a/source/public/kernel/nvidia/include/media/tegra_camera_core.h b/source/public/kernel/nvidia/include/media/tegra_camera_core.h
+index 788cf77..c35bdc4 100644
+--- a/source/public/kernel/nvidia/include/media/tegra_camera_core.h
++++ b/source/public/kernel/nvidia/include/media/tegra_camera_core.h
+@@ -56,6 +56,7 @@ enum tegra_image_dt {
+ 	TEGRA_IMAGE_DT_RAW10,
+ 	TEGRA_IMAGE_DT_RAW12,
+ 	TEGRA_IMAGE_DT_RAW14,
++	TEGRA_IMAGE_DT_RAW16,
+ };
+ 
+ /* Supported CSI to VI Data Formats */
+@@ -66,6 +67,7 @@ enum tegra_vf_code {
+ 	TEGRA_VF_RAW10,
+ 	TEGRA_VF_RAW12,
+ 	TEGRA_VF_RAW14,
++	TEGRA_VF_RAW16,
+ 	TEGRA_VF_EMBEDDED8,
+ 	TEGRA_VF_RGB565,
+ 	TEGRA_VF_RGB555,

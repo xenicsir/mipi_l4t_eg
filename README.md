@@ -152,9 +152,8 @@ After installing the forecr MIPI driver package for the first time, both ports a
 
 To change the configuration, use this command, <ins>then reboot</ins> : 
 <pre>
-sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n $COMMAND
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n $COMMAND
 </pre>
-Note : the jetson-io scripts have been patched
 
 Here are the different values for $COMMAND, depending on camera types and ports, and the corresponding OVERLAYS entry in the /boot/extlinux/extlinux.conf file : 
 
@@ -173,11 +172,11 @@ Here are the different values for $COMMAND, depending on camera types and ports,
 
 For example, configure Dione on CAM0 port and MicroCube640 on CAM1 : 
 <pre>
-sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_1_lane" 
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_1_lane" 
 </pre>
 For example, configure MicroCube640 on CAM0 port and Crius1280 on CAM1 :
 <pre>
-sudo python /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_2_lanes"
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_2_lanes"
 </pre>
 
 To check the ports configuration, open the /boot/extlinux/extlinux.conf file, JetsonIO label part, OVERLAYS entry.

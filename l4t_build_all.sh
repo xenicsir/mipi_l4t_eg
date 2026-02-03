@@ -176,25 +176,12 @@ build_version_board() {
 #******************************************************************************
 # Main build loop
 #******************************************************************************
-if [[ "$PATCHES_ONLY" == false ]]; then
-   DELIVERY_FOLDER="delivery/mipi_jetson-l4t-${PACKAGE_VERSION}"
-   mkdir -p "$DELIVERY_FOLDER"
-   echo "Delivery folder: $DELIVERY_FOLDER"
-fi
-
 for version in $SORTED_VERSIONS; do
    boards="${VERSION_BOARDS[$version]}"
 
    for board in $boards; do
       build_version_board "$version" "$board"
    done
-
-   # Copy packages to delivery folder (unless patches-only mode)
-   if [[ "$PATCHES_ONLY" == false && -d "$version" ]]; then
-      if ls "$version"/*.deb 1>/dev/null 2>&1; then
-         cp "$version"/*.deb "$DELIVERY_FOLDER/"
-      fi
-   fi
 done
 
 echo ""
@@ -203,6 +190,5 @@ if [[ "$PATCHES_ONLY" == true ]]; then
    echo "Patch generation completed for all versions"
 else
    echo "Build completed for all versions"
-   echo "Packages available in: $DELIVERY_FOLDER"
 fi
 echo "============================================"

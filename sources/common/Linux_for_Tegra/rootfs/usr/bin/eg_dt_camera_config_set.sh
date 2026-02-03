@@ -6,6 +6,27 @@ then
    exit
 fi
 
+BOARD=$(./detect_jetson_board.sh --short)
+
+case "$BOARD" in
+  dsboard-*|milboard-*|raiboard-*)
+	  echo "Forecr board detected: $BOARD"
+	  ;;
+  nvidia-*)
+	  echo "Nvidia official board"
+	  ;;
+  connecttech-*|auvidea-*)
+	  echo "Third-party board: $BOARD"
+	  ;;
+esac
+
+if [[ x$BOARD == xdsboard-ornxs ]]
+then
+   base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
+else
+   base_devicetree="Exosens Cameras"
+fi
+
 arguments=( "$@" )
 dtboarg=()
 
@@ -45,34 +66,15 @@ done
 
 cmd="python /opt/eg/jetson-io/config-by-hardware.py -n"
 
-if [[ ${#dtboarg[@]} == 0 ]]
-then
-   sudo $cmd "2=Exosens Cameras"
-elif [[ ${#dtboarg[@]} == 1 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}"
-elif [[ ${#dtboarg[@]} == 2 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}"
-elif [[ ${#dtboarg[@]} == 3 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}"
-elif [[ ${#dtboarg[@]} == 4 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}"
-elif [[ ${#dtboarg[@]} == 5 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}"
-elif [[ ${#dtboarg[@]} == 6 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}" "${dtboarg[5]}"
-elif [[ ${#dtboarg[@]} == 7 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}" "${dtboarg[5]}" "${dtboarg[6]}"
-elif [[ ${#dtboarg[@]} == 8 ]]
-then
-   sudo $cmd "2=Exosens Cameras" "${dtboarg[0]}" "${dtboarg[1]}" "${dtboarg[2]}" "${dtboarg[3]}" "${dtboarg[4]}" "${dtboarg[5]}" "${dtboarg[6]}" "${dtboarg[6]}"
-else
-   echo "Too many camera configurations"
-fi
+# Build command arguments dynamically
+cmd_args=("2=$base_devicetree" "${dtboarg[@]}")
+
+# Debug: Show all command arguments
+#echo "Number of arguments: ${#cmd_args[@]}"
+#for (( i=0; i<${#cmd_args[@]}; i++ )); do
+#	echo "  cmd_args[$i] : ${cmd_args[$i]}"
+#done
+
+# Execute the command with all arguments
+sudo $cmd "${cmd_args[@]}"
 
