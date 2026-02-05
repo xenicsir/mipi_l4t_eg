@@ -16,17 +16,16 @@
 #   3. Verifying the result matches the original source copy
 #
 # Usage:
-#   ./l4t_copy_sources.sh $L4T_VERSION [carrier_board]
+#   ./l4t_copy_sources.sh -v <version> [-V <vendor>] [-c <carrier-board>]
 #
 # Examples:
-#   ./l4t_copy_sources.sh 36.4.3
-#   ./l4t_copy_sources.sh 36.4.3 forecr
+#   ./l4t_copy_sources.sh -v 36.4.3
+#   ./l4t_copy_sources.sh -v 36.4.3 -V forecr
 #******************************************************************************
 
-. environment $@
+. environment "$@"
 
-if [[ ! -d $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} ]]
-then
+if [[ ! -d $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} ]]; then
    echo "Error : $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} folder doesn't exist"
    exit 1
 fi
@@ -43,6 +42,8 @@ L4T_DIR="$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}"
 # Temporary file to collect all destination paths
 DEST_PATHS_FILE=$(mktemp)
 trap "rm -f $DEST_PATHS_FILE" EXIT
+
+# Note: VENDOR_SOURCE_DIR is set by environment (e.g., Linux_for_Tegra_forecr)
 
 #******************************************************************************
 # Function: Copy files with rsync and track destination paths
@@ -86,6 +87,8 @@ rsync_copy() {
 
 echo "============================================"
 echo "Analyzing Exosens sources for L4T ${L4T_VERSION_EXTENDED}"
+echo "  Vendor: $VENDOR"
+echo "  Carrier board: $CARRIER_BOARD"
 echo "============================================"
 
 # Function to analyze what files will be copied (list source files)
@@ -121,9 +124,9 @@ else
    analyze_copy "$ROOT_DIR/sources/common/source/nvidia-oot/drivers" "source/public/kernel/nvidia/drivers"
 fi
 
-if [[ -n "$CARRIER_BOARD" ]]; then
-   CARRIER_DIR="Linux_for_Tegra_${CARRIER_BOARD}"
-   analyze_copy "$ROOT_DIR/sources/${L4T_VERSION}/$CARRIER_DIR" ""
+# Vendor-specific sources
+if [[ -n "$VENDOR_SOURCE_DIR" ]]; then
+   analyze_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" ""
 fi
 
 FILE_COUNT=$(wc -l < "$DEST_PATHS_FILE" 2>/dev/null || echo 0)
@@ -206,10 +209,9 @@ copy_exosens_sources() {
       rsync_copy "$ROOT_DIR/sources/common/source/nvidia-oot/drivers" "$L4T_DIR/source/public/kernel/nvidia/drivers" "source/public/kernel/nvidia/drivers" "$verbose"
    fi
 
-   # Copy carrier board specific files
-   if [[ -n "$CARRIER_BOARD" ]]; then
-      CARRIER_DIR="Linux_for_Tegra_${CARRIER_BOARD}"
-      rsync_copy "$ROOT_DIR/sources/${L4T_VERSION}/$CARRIER_DIR" "$L4T_DIR" "" "$verbose"
+   # Copy vendor-specific files
+   if [[ -n "$VENDOR_SOURCE_DIR" ]]; then
+      rsync_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
    fi
 }
 
@@ -280,28 +282,28 @@ else
 fi
 
 #******************************************************************************
-# Step 3b: Merge Exosens defconfig into Forecr sources (BEFORE copying)
+# Step 3b: Merge Exosens defconfig into vendor sources (BEFORE copying)
 #
-# For Forecr carrier boards on L4T 35.x, we need to merge any Exosens-specific
-# CONFIG options from the generic defconfig into all Forecr *_defconfig files
+# For vendor carrier boards on L4T 35.x, we need to merge any Exosens-specific
+# CONFIG options from the generic defconfig into all vendor *_defconfig files
 # in the sources/ directory BEFORE copying to the working directory.
 #******************************************************************************
 
-if [[ "$CARRIER_BOARD" == "forecr" && $L4T_VERSION_MAJOR -lt 36 ]]; then
+if [[ "$VENDOR" == "forecr" && $L4T_VERSION_MAJOR -lt 36 ]]; then
    echo ""
    echo "============================================"
-   echo "Merging Exosens defconfig into Forecr sources"
+   echo "Merging Exosens defconfig into ${VENDOR} sources"
    echo "============================================"
 
    # Paths for L4T 35.x
    KERNEL_SUBDIR="kernel-5.10"
    NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
-   SOURCE_CONFIGS_DIR="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
+   SOURCE_CONFIGS_DIR="$ROOT_DIR/sources/$L4T_VERSION/$VENDOR_SOURCE_DIR/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
    VENDOR_REF="$SOURCE_CONFIGS_DIR/defconfig.vendor_reference"
 
    if [[ -f "$NVIDIA_DEFCONFIG" && -d "$SOURCE_CONFIGS_DIR" ]]; then
       echo "  Generic defconfig: $NVIDIA_DEFCONFIG"
-      echo "  Forecr sources dir: $SOURCE_CONFIGS_DIR"
+      echo "  Vendor sources dir: $SOURCE_CONFIGS_DIR"
 
       # Check if vendor reference exists
       if [[ -f "$VENDOR_REF" ]]; then
@@ -359,7 +361,7 @@ if [[ "$CARRIER_BOARD" == "forecr" && $L4T_VERSION_MAJOR -lt 36 ]]; then
             if [[ $merged_count -gt 0 ]]; then
                echo -e "${GREEN}  Defconfig merge complete: $merged_count files updated ($total_configs_added configs added)${NC}"
             else
-               echo -e "${GREEN}  All Forecr defconfigs are already up to date${NC}"
+               echo -e "${GREEN}  All vendor defconfigs are already up to date${NC}"
             fi
          else
             echo "  No new Exosens CONFIG options to merge."
@@ -501,6 +503,9 @@ These patches were automatically generated by l4t_copy_sources.sh.
 They represent all modifications made to the original Nvidia L4T $L4T_VERSION BSP
 to add support for Exosens cameras.
 
+Vendor: $VENDOR
+Carrier board: $CARRIER_BOARD
+
 Total patches: $TOTAL_PATCHES
 
 Patch files:
@@ -519,7 +524,7 @@ cat >> $PATCH_DIR/README.txt << EOF
 
 Usage:
   To apply these patches instead of using l4t_copy_sources.sh, run:
-  ./l4t_patch_sources.sh $L4T_VERSION${CARRIER_BOARD:+ $CARRIER_BOARD}
+  ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}
 
   The patches are applied to the L4T environment prepared by l4t_prepare.sh.
 EOF
@@ -555,7 +560,12 @@ echo ""
 echo "Applying patches with l4t_patch_sources.sh..."
 cd "$ROOT_DIR"
 
-if ! "$ROOT_DIR/l4t_patch_sources.sh" "$L4T_VERSION" $CARRIER_BOARD; then
+# Build the argument list for l4t_patch_sources.sh (same as original call)
+PATCH_ARGS="-v $L4T_VERSION"
+[[ "$VENDOR" != "generic" ]] && PATCH_ARGS="$PATCH_ARGS -V $VENDOR"
+[[ "$CARRIER_BOARD" != "generic" ]] && PATCH_ARGS="$PATCH_ARGS -c $CARRIER_BOARD"
+
+if ! "$ROOT_DIR/l4t_patch_sources.sh" $PATCH_ARGS; then
    echo ""
    echo -e "${RED}ERROR: l4t_patch_sources.sh failed!${NC}"
    echo "Patches were generated but could not be applied."
@@ -630,8 +640,8 @@ fi
 echo ""
 echo "Next steps:"
 echo "  1. Build the kernel and drivers:"
-echo "     ./l4t_build.sh $L4T_VERSION${CARRIER_BOARD:+ $CARRIER_BOARD}"
+echo "     ./l4t_build.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}"
 echo ""
 echo "  2. Generate the delivery package:"
-echo "     ./l4t_gen_delivery_package.sh $L4T_VERSION${CARRIER_BOARD:+ $CARRIER_BOARD}"
+echo "     ./l4t_gen_delivery_package.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} -p <version>"
 echo "============================================"

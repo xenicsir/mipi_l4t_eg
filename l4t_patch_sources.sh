@@ -7,17 +7,16 @@
 # without regenerating them.
 #
 # Usage:
-#   ./l4t_patch_sources.sh $L4T_VERSION [carrier_board]
+#   ./l4t_patch_sources.sh -v <version> [-V <vendor>] [-c <carrier-board>]
 #
 # Examples:
-#   ./l4t_patch_sources.sh 36.4.3
-#   ./l4t_patch_sources.sh 36.4.3 forecr
+#   ./l4t_patch_sources.sh -v 36.4.3
+#   ./l4t_patch_sources.sh -v 36.4.3 -V forecr
 #******************************************************************************
 
-. environment $@
+. environment "$@"
 
-if [[ ! -d $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} ]]
-then
+if [[ ! -d $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} ]]; then
    echo "Error : $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} folder doesn't exist"
    echo "Run l4t_prepare.sh first."
    exit 1
@@ -40,6 +39,8 @@ fi
 
 echo "============================================"
 echo "Applying Exosens camera patches for L4T ${L4T_VERSION_EXTENDED}"
+echo "  Vendor: $VENDOR"
+echo "  Carrier board: $CARRIER_BOARD"
 echo "Patch directory: $PATCH_DIR"
 echo "============================================"
 
@@ -98,16 +99,16 @@ else
    echo ""
    echo "To fix, try:"
    echo "  1. Remove the L4T build directory: rm -rf $L4T_VERSION/"
-   echo "  2. Re-run l4t_prepare.sh: ./l4t_prepare.sh $L4T_VERSION"
-   echo "  3. Re-run this script: ./l4t_patch_sources.sh $L4T_VERSION${CARRIER_BOARD:+ $CARRIER_BOARD}"
+   echo "  2. Re-run l4t_prepare.sh: ./l4t_prepare.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}"
+   echo "  3. Re-run this script: ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}"
    exit 1
 fi
 
 echo ""
 echo "Next steps:"
 echo "  1. Build the kernel and drivers:"
-echo "     ./l4t_build.sh $L4T_VERSION${CARRIER_BOARD:+ $CARRIER_BOARD}"
+echo "     ./l4t_build.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}"
 echo ""
 echo "  2. Generate the delivery package:"
-echo "     ./l4t_gen_delivery_package.sh $L4T_VERSION${CARRIER_BOARD:+ $CARRIER_BOARD}"
+echo "     ./l4t_gen_delivery_package.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} -p <version>"
 echo "============================================"

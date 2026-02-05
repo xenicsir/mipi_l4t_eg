@@ -12,8 +12,7 @@
       + [Building MIPI drivers for specific carrier boards](#building-mipi-drivers-for-specific-carrier-boards)
       + [Installing and configuring the MIPI drivers on the board](#installing-and-configuring-the-mipi-drivers-on-the-board)
          - [Package installation](#package-installation)
-         - [Configuring a camera port on non specific (Nvidia generic) carrier boards](#configuring-a-camera-port-on-non-specific-nvidia-generic-carrier-boards)
-         - [Configuring a camera port on Forecr Orin NX/Nano DSBOARD-ORNXS carrier board](#configuring-a-camera-port-on-forecr-orin-nxnano-dsboard-ornxs-carrier-board)
+         - [Configuring a camera port on non specific (Nvidia generic) carrier boards](#configuring-camera-ports)
       + [Quick start - Testing the camera](#quick-start---testing-the-camera)
    * [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
       + [Linux boot](#linux-boot)
@@ -42,6 +41,11 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
 ### Host PC
 
 * Recommended OS is Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. 22.04 LTS is the one currently used.
+
+* For standalone builds, initramfs generation requires ARM64 emulation on the host:
+<pre>
+sudo apt install qemu-user-static binfmt-support
+</pre>
 
 <!-- TOC --><a name="building-and-installing-mipi-drivers-on-supported-l4t-versions-som-carrier-boards"></a>
 ## Building and installing MIPI drivers on supported L4T versions / SoM / carrier boards
@@ -119,12 +123,12 @@ Install the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package on the Jetso
 sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
 </pre>
 
-<!-- TOC --><a name="configuring-a-camera-port-on-non-specific-nvidia-generic-carrier-boards"></a>
-#### Configuring a camera port on non specific (Nvidia generic) carrier boards
+<!-- TOC --><a name="configuring-camera-ports"></a>
+#### Configuring camera ports
 Note on port numbers :
 - it depends on the carrier board, but there are generally 2 camera ports on Jetson boards : "cam0" and "cam1"
 - for the AGX Orin Auvidea X230D board, port 0 is printed "CD" on the PCB, and port 1 is "AB".
-- in Linux, when a video device is registered (camera detected), a /dev/videoX device appears. The X number is not the camera port number, but the number of the camera device, in the order it has been registered.
+- in Linux, when a video device is registered (camera detected), a /dev/videoX device appears. The X number is not the camera port number, but the number of the camera device, in the order it has been registered. Use eg_dt_camera_config_get.sh to get the attributed video device for each camera.
 
 After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
 
@@ -143,63 +147,6 @@ eg_dt_camera_config_get.sh
 </pre>
 
 Note : for some boards wiht multiple camera ports, it is possible to mix Exosens cameras and some sensors originally supported by the Jetson boards (IMX219 and/or IMX477). Consult the support team if this is needed.
-
-<!-- TOC --><a name="configuring-a-camera-port-on-forecr-orin-nxnano-dsboard-ornxs-carrier-board"></a>
-#### Configuring a camera port on Forecr Orin NX/Nano DSBOARD-ORNXS carrier board
-There are 2 camera ports on the DSBOARD-ORNXS carrier board. They are not marked, but let's use the same names as for the Jetson Orin NX/Nano devkit, "CAM0" and "CAM1".
-
-After installing the forecr MIPI driver package for the first time, both ports are configured by default for Dione cameras.
-
-To change the configuration, use this command, <ins>then reboot</ins> : 
-<pre>
-sudo python /opt/eg/jetson-io/config-by-hardware.py -n $COMMAND
-</pre>
-
-Here are the different values for $COMMAND, depending on camera types and ports, and the corresponding OVERLAYS entry in the /boot/extlinux/extlinux.conf file : 
-
-| Dione     |          | MicroCube640 |          | Crius1280/SmartIR640 |          |                                                                                                |                                                                                                                                                                          |
-|-----------|----------|--------------|----------|----------------------|----------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **CAM0**  | **CAM1** | **CAM0**     | **CAM1** | **CAM0**             | **CAM1** | **config-by-hardware.py -n $COMMAND**                                                          | **OVERLAYS in /boot/extlinux/extlinux.conf**                                                                                                                             |
-| x         | x        |              |          |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS"                                                                            | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo                                                                                                                     |
-| x         |          |              | x        |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_1_lane"                                        | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo                                                            |
-| x         |          |              |          |                      | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_2_lanes"                                       | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lane2.dtbo                                                           |
-|           | x        | x            |          |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"                                        | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo                                                            |
-|           | x        |              |          | x                    |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_2_lanes"                                       | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo                                                           |
-|           |          | x            | x        |                      |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_1_lane"   | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo   |
-|           |          | x            |          |                      | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_2_lanes"  | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo  |
-|           |          |              | x        | x                    |          | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_2_lanes" 2="Exosens Cameras. CAM1:EC_1_lane"   | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo  |
-|           |          |              | x        |                      | x        | 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_2_lanes" 2="Exosens Cameras. CAM1:EC_2_lanes"  | /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo |
-
-For example, configure Dione on CAM0 port and MicroCube640 on CAM1 : 
-<pre>
-sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_1_lane" 
-</pre>
-For example, configure MicroCube640 on CAM0 port and Crius1280 on CAM1 :
-<pre>
-sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM0:EC_1_lane"  2="Exosens Cameras. CAM1:EC_2_lanes"
-</pre>
-
-To check the ports configuration, open the /boot/extlinux/extlinux.conf file, JetsonIO label part, OVERLAYS entry.
-
-For example, Dione on CAM0 port and MicroCube640 on CAM1 : 
-<pre>
-[...]
-LABEL JetsonIO
-        MENU LABEL Custom Header Config: <CSI Exosens Cameras for DSBOARD-ORNXS> <CSI Exosens Cameras. CAM1:EC_1_lane>
-        LINUX /boot/Image
-        FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
-        INITRD /boot/initrd
-        APPEND ${cbootargs} root=PARTUUID=fb79911a-6ada-43b3-b983-0ec29fc92323 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 firmware_class.path=/etc/firmware fbcon=map:0 nospectre_bhb video=efifb:off console=tty0 nv-auto-config
-        <b>OVERLAYS /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo</b>
-[...]
-</pre>
-
-For example, MicroCube640 on CAM0 port and Crius1280 on CAM1 :
-<pre>
-[...]
-    OVERLAYS /boot/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
-[...]
-</pre>
 
 <!-- TOC --><a name="quick-start---testing-the-camera"></a>
 ### Quick start - Testing the camera

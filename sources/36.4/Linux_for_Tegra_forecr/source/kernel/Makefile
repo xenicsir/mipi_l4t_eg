@@ -15,11 +15,12 @@ else
 kernel_image := $(kernel_source_dir)/arch/arm64/boot/Image
 endif
 
-NPROC ?= $(($(shell nproc)-1))
+NPROC ?= $(shell expr $(shell nproc) - 1)
 
-# LOCALVERSION : -tegra or -rt-tegra
+# LOCALVERSION : -tegra or -rt-tegra, with optional suffix (e.g., -eg for Exosens)
+LOCALVERSION_SUFFIX ?=
 version = $(shell grep -q "CONFIG_PREEMPT_RT=y" \
-    ${kernel_source_dir}/arch/arm64/configs/${KERNEL_DEF_CONFIG} && echo "-rt-tegra" || echo "-tegra")
+    ${kernel_source_dir}/arch/arm64/configs/${KERNEL_DEF_CONFIG} && echo "-rt-tegra$(LOCALVERSION_SUFFIX)" || echo "-tegra$(LOCALVERSION_SUFFIX)")
 
 .PHONY : kernel install clean help
 

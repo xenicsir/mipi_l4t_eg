@@ -79,7 +79,7 @@ done
 detect_connected_cameras() {
     # Use global arrays (already declared in main)
     # Initialize - camera_port_map maps port_letter to camera info
-    # Format: camera_port_map[port_letter]="category:display_name"
+    # Format: camera_port_map[port_letter]="category:display_name:i2c_bus:i2c_addr:driver_name"
     declare -gA camera_port_map
 
     # Build list of unique I2C addresses to scan
@@ -104,6 +104,18 @@ detect_connected_cameras() {
                 continue
             fi
 
+            # Extract I2C bus number from device path (e.g., "9-000e" -> "9")
+            local dev_name=$(basename "$dev_path")
+            local i2c_bus="${dev_name%%-*}"
+
+            # Get driver name
+            local driver_name=""
+            if [[ -L "$dev_path/driver" ]]; then
+                driver_name=$(basename "$(readlink "$dev_path/driver")")
+            fi
+
+            [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Found device: $dev_name (bus=$i2c_bus, driver=$driver_name)" >&2
+
             # Get the device tree node via of_node symlink
             if [[ -L "$dev_path/of_node" ]]; then
                 local of_node=$(readlink -f "$dev_path/of_node" 2>/dev/null)
@@ -121,8 +133,8 @@ detect_connected_cameras() {
                     # Try to extract port letter from device tree path
                     if [[ "$of_node" =~ $dt_pattern ]]; then
                         local port_letter="${BASH_REMATCH[1]}"
-                        camera_port_map["$port_letter"]="$category:$display_name"
-                        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]   -> Port letter: $port_letter ($display_name)" >&2
+                        camera_port_map["$port_letter"]="$category:$display_name:$i2c_bus:$i2c_addr:$driver_name"
+                        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]   -> Port letter: $port_letter ($display_name, bus=$i2c_bus, driver=$driver_name)" >&2
                         break  # Found match, no need to try other patterns
                     fi
                 done
@@ -132,8 +144,58 @@ detect_connected_cameras() {
 }
 
 #******************************************************************************
+# Function: Find video device for a given I2C bus and address
+# Returns: /dev/videoN path or empty string
+#******************************************************************************
+find_video_device() {
+    local i2c_bus="$1"
+    local i2c_addr="$2"
+    local search_pattern="${i2c_bus}-00${i2c_addr}"
+
+    for video_sys in /sys/class/video4linux/video*; do
+        if [[ -f "$video_sys/name" ]]; then
+            local video_name=$(cat "$video_sys/name" 2>/dev/null)
+            if [[ "$video_name" == *"$search_pattern"* ]]; then
+                echo "/dev/$(basename "$video_sys")"
+                return 0
+            fi
+        fi
+    done
+    echo ""
+    return 1
+}
+
+#******************************************************************************
+# Function: Find custom I2C device for a camera
+# Searches /dev for driver-specific character devices (e.g., /dev/eg-ec-mipi-*)
+# Returns: device path or empty string
+#******************************************************************************
+find_i2c_chardev() {
+    local i2c_bus="$1"
+    local i2c_addr="$2"
+    local driver_name="$3"
+
+    # Search for devices matching the pattern /dev/<driver>*<bus>*<addr>*
+    # Examples: /dev/eg-ec-mipi-10-0016, /dev/dioneir-i2c-9-000e-5b
+    for dev in /dev/${driver_name}*; do
+        if [[ -c "$dev" ]]; then
+            local dev_name=$(basename "$dev")
+            # Check if device name contains the bus and address
+            if [[ "$dev_name" == *"-${i2c_bus}-"*"${i2c_addr}"* ]] || \
+               [[ "$dev_name" == *"-${i2c_bus}-00${i2c_addr}"* ]]; then
+                echo "$dev"
+                return 0
+            fi
+        fi
+    done
+    echo ""
+    return 1
+}
+
+#******************************************************************************
 # Function: Check if a specific camera port is connected
 # Sets camera_connected[$port] directly by checking physical port mapping
+# Also populates camera_video_dev and camera_i2c_chardev arrays
 #******************************************************************************
 check_camera_connected() {
     local port_num="$1"
@@ -142,8 +204,14 @@ check_camera_connected() {
 
     # Check if this port letter has a connected camera
     if [[ -n "${camera_port_map[$port_letter]}" ]]; then
-        # Parse the camera info: "category:display_name"
-        IFS=':' read -r connected_category connected_display_name <<< "${camera_port_map[$port_letter]}"
+        # Parse the camera info: "category:display_name:i2c_bus:i2c_addr:driver_name"
+        IFS=':' read -r connected_category connected_display_name conn_i2c_bus conn_i2c_addr conn_driver <<< "${camera_port_map[$port_letter]}"
+
+        # Find video device and I2C chardev for this camera
+        camera_video_dev[$port_num]=$(find_video_device "$conn_i2c_bus" "$conn_i2c_addr")
+        camera_i2c_chardev[$port_num]=$(find_i2c_chardev "$conn_i2c_bus" "$conn_i2c_addr" "$conn_driver")
+
+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]}" >&2
 
         # Match the configured camera type with the connected camera
         # Check if the display name matches OR if they're in the same category
@@ -177,6 +245,8 @@ check_camera_connected() {
     fi
 
     camera_connected[$port_num]="not connected"
+    camera_video_dev[$port_num]=""
+    camera_i2c_chardev[$port_num]=""
     [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num (letter: $port_letter): not connected" >&2
     return 1
 }
@@ -404,6 +474,8 @@ detect_connected_cameras
 
 # Determine connection status for each port
 declare -A camera_connected
+declare -A camera_video_dev
+declare -A camera_i2c_chardev
 for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
     cam_type="${camera_configs[$port]}"
     port_letter="${camera_letters[$port]}"
@@ -428,10 +500,18 @@ if [[ $JSON_OUTPUT -eq 1 ]]; then
 
         cam_type="${camera_configs[$port]}"
         conn_status="${camera_connected[$port]}"
+        video_dev="${camera_video_dev[$port]}"
+        i2c_dev="${camera_i2c_chardev[$port]}"
 
         echo -n "    \"port_$port\": {"
         echo -n "\"type\": \"$cam_type\", "
         echo -n "\"status\": \"$conn_status\""
+        if [[ -n "$video_dev" ]]; then
+            echo -n ", \"video_device\": \"$video_dev\""
+        fi
+        if [[ -n "$i2c_dev" ]]; then
+            echo -n ", \"i2c_device\": \"$i2c_dev\""
+        fi
         echo -n "}"
     done
 
@@ -453,7 +533,14 @@ else
         for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
             cam_type="${camera_configs[$port]}"
             conn_status="${camera_connected[$port]}"
+            video_dev="${camera_video_dev[$port]}"
+            i2c_dev="${camera_i2c_chardev[$port]}"
+
             echo "  Port $port: $cam_type ($conn_status)"
+            if [[ "$conn_status" == "connected" ]]; then
+                [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
+                [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
+            fi
         done
         echo ""
         echo "Total configured: ${#camera_configs[@]} camera(s)"

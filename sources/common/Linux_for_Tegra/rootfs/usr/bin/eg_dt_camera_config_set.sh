@@ -6,7 +6,7 @@ then
    exit
 fi
 
-BOARD=$(./detect_jetson_board.sh --short)
+BOARD=$(detect_jetson_board.sh --short)
 
 case "$BOARD" in
   dsboard-*|milboard-*|raiboard-*)

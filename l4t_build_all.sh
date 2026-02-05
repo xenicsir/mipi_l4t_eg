@@ -2,22 +2,23 @@
 #******************************************************************************
 # l4t_build_all.sh - Build all L4T versions and generate delivery packages
 #
-# This script extracts supported versions and boards from the environment file
+# This script extracts supported versions and vendors from the environment file
 # and builds all combinations.
 #
 # Usage:
-#   ./l4t_build_all.sh [options] [PACKAGE_VERSION]
+#   ./l4t_build_all.sh [options]
 #
 # Options:
-#   --from-scratch    Force deletion of build directories before building
-#   --patches-only    Only generate patches (no build, no package generation)
-#   --help            Show this help message
+#   -p, --package-version VERSION  Package version for all builds
+#   --from-scratch                 Force deletion of build directories before building
+#   --patches-only                 Only generate patches (no build, no package generation)
+#   -h, --help                     Show this help message
 #
 # Examples:
-#   ./l4t_build_all.sh                    # Build all with auto version from git tag
-#   ./l4t_build_all.sh 2.0.0              # Build all with specified version
-#   ./l4t_build_all.sh --from-scratch     # Clean build from scratch
-#   ./l4t_build_all.sh --patches-only     # Only generate patches
+#   ./l4t_build_all.sh                           # Build all with auto version from git tag
+#   ./l4t_build_all.sh -p 2.0.0                  # Build all with specified version
+#   ./l4t_build_all.sh --from-scratch            # Clean build from scratch
+#   ./l4t_build_all.sh --patches-only            # Only generate patches
 #******************************************************************************
 
 set -e
@@ -30,23 +31,28 @@ PATCHES_ONLY=false
 PACKAGE_VERSION=""
 
 show_help() {
-   echo "Usage: $0 [options] [PACKAGE_VERSION]"
+   echo "Usage: $0 [options]"
    echo ""
    echo "Options:"
-   echo "  --from-scratch    Force deletion of build directories before building"
-   echo "  --patches-only    Only generate patches (no build, no package generation)"
-   echo "  --help            Show this help message"
+   echo "  -p, --package-version VERSION  Package version for all builds"
+   echo "  --from-scratch                 Force deletion of build directories before building"
+   echo "  --patches-only                 Only generate patches (no build, no package generation)"
+   echo "  -h, --help                     Show this help message"
    echo ""
    echo "Examples:"
-   echo "  $0                    # Build all with auto version from git tag"
-   echo "  $0 2.0.0              # Build all with specified version"
-   echo "  $0 --from-scratch     # Clean build from scratch"
-   echo "  $0 --patches-only     # Only generate patches"
+   echo "  $0                           # Build all with auto version from git tag"
+   echo "  $0 -p 2.0.0                  # Build all with specified version"
+   echo "  $0 --from-scratch            # Clean build from scratch"
+   echo "  $0 --patches-only            # Only generate patches"
    exit 0
 }
 
 while [[ $# -gt 0 ]]; do
    case "$1" in
+      -p|--package-version)
+         PACKAGE_VERSION="$2"
+         shift 2
+         ;;
       --from-scratch)
          FROM_SCRATCH=true
          shift
@@ -55,16 +61,12 @@ while [[ $# -gt 0 ]]; do
          PATCHES_ONLY=true
          shift
          ;;
-      --help|-h)
-         show_help
-         ;;
-      -*)
-         echo "Unknown option: $1"
+      -h|--help)
          show_help
          ;;
       *)
-         PACKAGE_VERSION="$1"
-         shift
+         echo "Unknown option: $1"
+         show_help
          ;;
    esac
 done
@@ -81,74 +83,67 @@ fi
 echo "PACKAGE_VERSION: ${PACKAGE_VERSION}"
 
 #******************************************************************************
-# Extract supported versions and boards from environment file
+# Define supported versions and vendors
 #******************************************************************************
-extract_versions_and_boards() {
-   local env_file="environment"
-   local current_version=""
-   local in_case=false
-
-   # Arrays to store results
-   declare -gA VERSION_BOARDS
-
-   while IFS= read -r line; do
-      # Detect version line (e.g., "32.7.1)" or "36.4.3)")
-      if [[ "$line" =~ ^([0-9]+\.[0-9]+(\.[0-9]+)?)\)$ ]]; then
-         current_version="${BASH_REMATCH[1]}"
-         in_case=true
-      # Detect board line (e.g., "generic)" or "generic|forecr)")
-      elif [[ $in_case == true && "$line" =~ ^[[:space:]]*(generic(\|[a-z]+)*)\)$ ]]; then
-         boards="${BASH_REMATCH[1]}"
-         # Convert "generic|forecr" to "generic forecr"
-         boards=$(echo "$boards" | tr '|' ' ')
-         VERSION_BOARDS["$current_version"]="$boards"
-         in_case=false
-      # Reset on next case or esac
-      elif [[ "$line" =~ ^\*\)$ || "$line" =~ ^esac$ ]]; then
-         in_case=false
-      fi
-   done < "$env_file"
-}
-
-# Extract versions and boards
-declare -A VERSION_BOARDS
-extract_versions_and_boards
-
-# Sort versions numerically
-SORTED_VERSIONS=$(echo "${!VERSION_BOARDS[@]}" | tr ' ' '\n' | sort -V)
+# Format: "VERSION:VENDORS" where VENDORS is space-separated
+declare -a CONFIGURATIONS=(
+   "32.7.1:generic"
+   "32.7.4:generic"
+   "32.7.5:generic"
+   "32.7.6:generic"
+   "35.1:generic"
+   "35.3.1:generic forecr"
+   "35.4.1:generic forecr"
+   "35.5.0:generic forecr"
+   "35.6.0:generic forecr"
+   "35.6.1:generic forecr"
+   "35.6.2:generic forecr"
+   "36.4:generic forecr"
+   "36.4.3:generic forecr"
+   "36.4.4:generic forecr"
+)
 
 echo ""
 echo "============================================"
-echo "Detected configurations from environment:"
+echo "Supported configurations:"
 echo "============================================"
-for version in $SORTED_VERSIONS; do
-   echo "  $version: ${VERSION_BOARDS[$version]}"
+for config in "${CONFIGURATIONS[@]}"; do
+   version="${config%%:*}"
+   vendors="${config#*:}"
+   echo "  $version: $vendors"
 done
 echo ""
 
 #******************************************************************************
-# Build function for a single version/board combination
+# Build function for a single version/vendor combination
 #******************************************************************************
-build_version_board() {
+build_version_vendor() {
    local version=$1
-   local board=$2
+   local vendor=$2
 
-   if [[ "$board" == "generic" ]]; then
-      local dir_suffix=""
+   # Determine directory name based on vendor
+   if [[ "$vendor" == "generic" ]]; then
       local linux_for_tegra_dir="Linux_for_Tegra"
    else
-      local dir_suffix="_${board}"
-      local linux_for_tegra_dir="Linux_for_Tegra_${board}"
+      # Default carrier-board for vendor (forecr -> dsboard_ornx)
+      local carrier_board="dsboard_ornx"
+      local linux_for_tegra_dir="Linux_for_Tegra_${vendor}_${carrier_board}"
    fi
 
    echo ""
    echo "============================================"
    if [[ "$PATCHES_ONLY" == true ]]; then
-      echo "Generating patches for $version $board"
+      echo "Generating patches for $version ($vendor)"
    else
-      echo "Building $version $board"
+      echo "Building $version ($vendor)"
    fi
    echo "============================================"
+
+   # Build argument list
+   local args="-v $version"
+   if [[ "$vendor" != "generic" ]]; then
+      args="$args -V $vendor"
+   fi
 
    # From scratch: delete directory
    if [[ "$FROM_SCRATCH" == true ]]; then
@@ -160,27 +155,34 @@ build_version_board() {
 
    # Prepare environment if not already done
    if [[ ! -d "$version/$linux_for_tegra_dir" ]]; then
-      ./l4t_prepare.sh "$version" "$board"
+      ./l4t_prepare.sh $args
    fi
 
    # Copy sources (generates patches)
-   ./l4t_copy_sources.sh "$version" "$board"
+   ./l4t_copy_sources.sh $args
 
    # Build and generate package (unless patches-only mode)
    if [[ "$PATCHES_ONLY" == false ]]; then
-      ./l4t_build.sh "$version" "$board"
-      ./l4t_gen_delivery_package.sh "$version" "$board" "$PACKAGE_VERSION"
+      ./l4t_build.sh $args
+
+      # Add package version argument if specified
+      local pkg_args="$args"
+      if [[ -n "$PACKAGE_VERSION" ]]; then
+         pkg_args="$pkg_args -p $PACKAGE_VERSION"
+      fi
+      ./l4t_gen_delivery_package.sh $pkg_args
    fi
 }
 
 #******************************************************************************
 # Main build loop
 #******************************************************************************
-for version in $SORTED_VERSIONS; do
-   boards="${VERSION_BOARDS[$version]}"
+for config in "${CONFIGURATIONS[@]}"; do
+   version="${config%%:*}"
+   vendors="${config#*:}"
 
-   for board in $boards; do
-      build_version_board "$version" "$board"
+   for vendor in $vendors; do
+      build_version_vendor "$version" "$vendor"
    done
 done
 

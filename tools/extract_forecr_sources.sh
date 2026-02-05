@@ -19,15 +19,14 @@
 #   ./tools/extract_forecr_sources.sh 36.4.4 ~/jetson/forecr_xavier_kernel-6.2.1
 #
 # Prerequisites:
-#   1. Original Nvidia BSP must be extracted in:
-#      - L4T 35.x: $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/public/
-#      - L4T 36.x: $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/
+#   1. Original Nvidia BSP must be extracted in one of:
+#      - $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr_*/source/
+#      - $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/
 #   2. Forecr vendor kernel must contain relevant source directories
 #
 # Output:
 #   Files are copied to:
-#   - L4T 35.x: $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source/public/
-#   - L4T 36.x: $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source/
+#   - $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source/[public/]
 #
 #******************************************************************************
 
@@ -75,12 +74,52 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 L4T_MAJOR=$(echo "$L4T_VERSION" | cut -d'.' -f1)
 
 #******************************************************************************
+# Find Nvidia BSP directory (supports both naming conventions)
+#******************************************************************************
+find_nvidia_bsp_dir() {
+    local version_dir="$ROOT_DIR/$L4T_VERSION"
+
+    # First try: Linux_for_Tegra_forecr_* (new naming with carrier board)
+    for dir in "$version_dir"/Linux_for_Tegra_forecr_*/; do
+        if [[ -d "$dir" ]]; then
+            echo "$dir"
+            return 0
+        fi
+    done
+
+    # Fallback: Linux_for_Tegra_forecr (old naming)
+    if [[ -d "$version_dir/Linux_for_Tegra_forecr" ]]; then
+        echo "$version_dir/Linux_for_Tegra_forecr"
+        return 0
+    fi
+
+    return 1
+}
+
+#******************************************************************************
 # Determine paths based on L4T version
 #******************************************************************************
 
+# Find Nvidia BSP directory
+NVIDIA_BSP_DIR=$(find_nvidia_bsp_dir)
+if [[ -z "$NVIDIA_BSP_DIR" ]]; then
+    echo -e "${RED}ERROR: Nvidia BSP not found${NC}"
+    echo ""
+    echo "Expected one of:"
+    echo "  - $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr_*/"
+    echo "  - $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/"
+    echo ""
+    echo "Please ensure the original Nvidia BSP is extracted."
+    echo "Run: ./l4t_prepare.sh -v $L4T_VERSION -V forecr"
+    exit 1
+fi
+
+# Remove trailing slash if present
+NVIDIA_BSP_DIR="${NVIDIA_BSP_DIR%/}"
+
 if [[ $L4T_MAJOR -ge 36 ]]; then
     # L4T 36.x structure: source/ (no public subdirectory)
-    NVIDIA_SRC="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source"
+    NVIDIA_SRC="$NVIDIA_BSP_DIR/source"
     DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source"
 
     # Directories to process for L4T 36.x
@@ -96,7 +135,7 @@ if [[ $L4T_MAJOR -ge 36 ]]; then
     )
 else
     # L4T 35.x and earlier structure: source/public/
-    NVIDIA_SRC="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/source/public"
+    NVIDIA_SRC="$NVIDIA_BSP_DIR/source/public"
     DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source/public"
 
     # Directories to process for L4T 35.x
@@ -139,10 +178,10 @@ fi
 
 # Check Nvidia BSP exists
 if [[ ! -d "$NVIDIA_SRC" ]]; then
-    echo -e "${RED}ERROR: Nvidia BSP not found at: $NVIDIA_SRC${NC}"
+    echo -e "${RED}ERROR: Nvidia BSP source not found at: $NVIDIA_SRC${NC}"
     echo ""
     echo "Please ensure the original Nvidia BSP is extracted."
-    echo "Run: ./l4t_prepare.sh $L4T_VERSION forecr"
+    echo "Run: ./l4t_prepare.sh -v $L4T_VERSION -V forecr"
     exit 1
 fi
 
@@ -278,15 +317,6 @@ copy_modified_files() {
 
 #******************************************************************************
 # Function: Merge Exosens defconfig changes into Forecr defconfig files
-#
-# This function compares the Forecr vendor defconfig with the Nvidia BSP
-# defconfig and applies any additional CONFIG options to all *_defconfig
-# files in the extracted Forecr sources.
-#
-# For L4T 35.x:
-#   - Compare: $ROOT_DIR/$L4T_VERSION/Linux_for_Tegra_forecr/.../defconfig (Forecr vendor)
-#   - With:    $ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/.../defconfig (Nvidia BSP generic)
-#   - Apply to: $DEST/kernel/kernel-*/arch/arm64/configs/*_defconfig
 #******************************************************************************
 
 merge_exosens_defconfig() {
@@ -298,13 +328,11 @@ merge_exosens_defconfig() {
     # Determine kernel version directory pattern
     if [[ $L4T_MAJOR -ge 36 ]]; then
         KERNEL_SUBDIR="kernel-jammy-src"
-        # For 36.x, paths are different
         FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
     else
         KERNEL_SUBDIR="kernel-5.10"
-        # For 35.x, paths use source/public/
         FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
@@ -323,18 +351,12 @@ merge_exosens_defconfig() {
         echo "Forecr vendor defconfig: $FORECR_VENDOR_DEFCONFIG"
         echo ""
 
-        # Extract CONFIG options that are in Nvidia BSP (with Exosens additions)
-        # but not in Forecr vendor defconfig
-        # These are the Exosens-specific additions we need to merge
         EXOSENS_CONFIGS=()
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
-            # Skip comment lines
             [[ "$line" =~ ^# ]] && continue
-            # Only process CONFIG_ lines
             if [[ "$line" =~ ^CONFIG_ ]]; then
                 config_name=$(echo "$line" | cut -d'=' -f1)
-                # Check if this config exists in Forecr vendor defconfig
                 if ! grep -q "^${config_name}=" "$FORECR_VENDOR_DEFCONFIG" 2>/dev/null; then
                     EXOSENS_CONFIGS+=("$line")
                 fi
@@ -355,7 +377,6 @@ merge_exosens_defconfig() {
         echo "Forecr vendor defconfig: Not found (using all configs from Nvidia BSP)"
         echo ""
 
-        # No Forecr vendor defconfig - fallback to known Exosens configs
         echo -e "${YELLOW}WARNING: Cannot determine Exosens-specific configs automatically${NC}"
         echo "Using known Exosens camera driver configs as fallback"
         echo ""
@@ -380,7 +401,7 @@ merge_exosens_defconfig() {
         return 0
     fi
 
-    # Find all *_defconfig files (Forecr specific defconfigs)
+    # Find all *_defconfig files
     local merged_count=0
     for defconfig_file in "$DEST_CONFIGS_DIR"/*_defconfig; do
         [[ ! -f "$defconfig_file" ]] && continue
@@ -391,9 +412,7 @@ merge_exosens_defconfig() {
         for config in "${EXOSENS_CONFIGS[@]}"; do
             config_name=$(echo "$config" | cut -d'=' -f1)
 
-            # Check if config already exists in the file
             if ! grep -q "^${config_name}=" "$defconfig_file" 2>/dev/null; then
-                # Append config to the end of the file
                 echo "$config" >> "$defconfig_file"
                 configs_added=$((configs_added + 1))
             fi
@@ -447,6 +466,69 @@ done
 merge_exosens_defconfig
 
 #******************************************************************************
+# Fix Makefile NPROC syntax
+#******************************************************************************
+
+fix_makefile_nproc() {
+    echo -e "${BLUE}=============================================="
+    echo "Fixing Makefile NPROC syntax"
+    echo -e "==============================================${NC}"
+    echo ""
+
+    local makefile="$DEST/kernel/Makefile"
+
+    if [[ ! -f "$makefile" ]]; then
+        echo -e "${YELLOW}No kernel/Makefile found, skipping NPROC fix${NC}"
+        echo ""
+        return 0
+    fi
+
+    if grep -q 'NPROC ?= \$(($(shell nproc)-1))' "$makefile" 2>/dev/null; then
+        echo "  Found invalid NPROC syntax in: $makefile"
+        sed -i 's/NPROC ?= \$(($(shell nproc)-1))/NPROC ?= $(shell expr $(shell nproc) - 1)/' "$makefile"
+        echo -e "  ${GREEN}FIXED: NPROC syntax corrected${NC}"
+    else
+        echo "  NPROC syntax already correct or not present"
+    fi
+    echo ""
+}
+
+fix_makefile_nproc
+
+#******************************************************************************
+# Fix LOCALVERSION in kernel Makefile
+#******************************************************************************
+
+fix_makefile_localversion() {
+    echo -e "${BLUE}=============================================="
+    echo "Adding LOCALVERSION_SUFFIX support to Makefile"
+    echo -e "==============================================${NC}"
+    echo ""
+
+    local makefile="$DEST/kernel/Makefile"
+
+    if [[ ! -f "$makefile" ]]; then
+        echo -e "${YELLOW}No kernel/Makefile found, skipping LOCALVERSION fix${NC}"
+        echo ""
+        return 0
+    fi
+
+    if grep -q 'LOCALVERSION_SUFFIX' "$makefile" 2>/dev/null; then
+        echo "  LOCALVERSION_SUFFIX already present"
+    elif grep -q '# LOCALVERSION : -tegra or -rt-tegra' "$makefile" 2>/dev/null; then
+        echo "  Adding LOCALVERSION_SUFFIX support..."
+        sed -i 's/# LOCALVERSION : -tegra or -rt-tegra/# LOCALVERSION : -tegra or -rt-tegra, with optional suffix (e.g., -eg for Exosens)\nLOCALVERSION_SUFFIX ?=/' "$makefile"
+        sed -i 's/echo "-rt-tegra" || echo "-tegra")/echo "-rt-tegra$(LOCALVERSION_SUFFIX)" || echo "-tegra$(LOCALVERSION_SUFFIX)")/' "$makefile"
+        echo -e "  ${GREEN}FIXED: LOCALVERSION_SUFFIX support added${NC}"
+    else
+        echo -e "${YELLOW}  LOCALVERSION definition not found in expected format${NC}"
+    fi
+    echo ""
+}
+
+fix_makefile_localversion
+
+#******************************************************************************
 # Generate summary
 #******************************************************************************
 
@@ -462,7 +544,6 @@ echo "  - New files:      $TOTAL_NEW"
 echo "  - Modified files: $TOTAL_MODIFIED"
 echo ""
 
-# Show breakdown by directory
 echo "Breakdown by directory:"
 for subdir in "${SUBDIRS[@]}"; do
     if [[ -d "$DEST/$subdir" ]]; then
@@ -487,5 +568,5 @@ echo -e "${GREEN}SUCCESS: Forecr sources extracted for L4T $L4T_VERSION${NC}"
 echo ""
 echo "Next steps:"
 echo "  1. Review extracted files"
-echo "  2. Test with: ./l4t_copy_sources.sh $L4T_VERSION forecr"
-echo "  3. Build with: ./l4t_build.sh $L4T_VERSION forecr"
+echo "  2. Test with: ./l4t_copy_sources.sh -v $L4T_VERSION -V forecr"
+echo "  3. Build with: ./l4t_build.sh -v $L4T_VERSION -V forecr"

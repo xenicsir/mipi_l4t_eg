@@ -43,9 +43,13 @@ def add_entry(extlinux, label, mlabel, dtb, overlays, default, eg):
     current_label = None
     if (eg == 1):
         default_entry_linux = 'LINUX /boot/eg/Image'
+        if os.path.exists('/boot/eg/initrd-eg'):
+            default_entry_initrd = 'INITRD /boot/eg/initrd-eg'
+        else:
+            default_entry_initrd = 'INITRD /boot/initrd'
     else:
         default_entry_linux = 'LINUX /boot/Image'
-    default_entry_initrd = 'INITRD /boot/initrd'
+        default_entry_initrd = 'INITRD /boot/initrd'
     default_entry_append = 'APPEND ${cbootargs}'
     out = []
 
@@ -67,7 +71,8 @@ def add_entry(extlinux, label, mlabel, dtb, overlays, default, eg):
                     if (eg == 0):
                         default_entry_linux = line.strip()
                 elif words[0] == 'INITRD':
-                    default_entry_initrd = line.strip()
+                    if (eg == 0) or not os.path.exists('/boot/eg/initrd-eg'):
+                        default_entry_initrd = line.strip()
                 elif words[0] == 'APPEND':
                     default_entry_append = line.strip()
                 elif words[0] == 'LABEL':

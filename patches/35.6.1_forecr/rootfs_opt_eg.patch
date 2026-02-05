@@ -2796,10 +2796,10 @@ index 0000000..a1a32ea
 \ No newline at end of file
 diff --git a/rootfs/opt/eg/jetson-io/Linux/extlinux.py b/rootfs/opt/eg/jetson-io/Linux/extlinux.py
 new file mode 100644
-index 0000000..15109aa
+index 0000000..d494c68
 --- /dev/null
 +++ b/rootfs/opt/eg/jetson-io/Linux/extlinux.py
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,111 @@
 +# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 +#
 +# Permission is hereby granted, free of charge, to any person obtaining a
@@ -2844,9 +2844,13 @@ index 0000000..15109aa
 +    current_label = None
 +    if (eg == 1):
 +        default_entry_linux = 'LINUX /boot/eg/Image'
++        if os.path.exists('/boot/eg/initrd-eg'):
++            default_entry_initrd = 'INITRD /boot/eg/initrd-eg'
++        else:
++            default_entry_initrd = 'INITRD /boot/initrd'
 +    else:
 +        default_entry_linux = 'LINUX /boot/Image'
-+    default_entry_initrd = 'INITRD /boot/initrd'
++        default_entry_initrd = 'INITRD /boot/initrd'
 +    default_entry_append = 'APPEND ${cbootargs}'
 +    out = []
 +
@@ -2868,7 +2872,8 @@ index 0000000..15109aa
 +                    if (eg == 0):
 +                        default_entry_linux = line.strip()
 +                elif words[0] == 'INITRD':
-+                    default_entry_initrd = line.strip()
++                    if (eg == 0) or not os.path.exists('/boot/eg/initrd-eg'):
++                        default_entry_initrd = line.strip()
 +                elif words[0] == 'APPEND':
 +                    default_entry_append = line.strip()
 +                elif words[0] == 'LABEL':

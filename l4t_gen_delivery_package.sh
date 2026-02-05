@@ -3,15 +3,19 @@
 # l4t_gen_delivery_package.sh - Generate Debian package for Exosens cameras
 #
 # Usage:
-#   ./l4t_gen_delivery_package.sh $L4T_VERSION [carrier_board] [package_version]
+#   ./l4t_gen_delivery_package.sh -v <version> [-V <vendor>] [-c <carrier-board>] [-p <package-version>]
+#
+# The script automatically detects if the kernel was built in standalone mode
+# (with --standalone option) by checking for the presence of kernel modules
+# with the -eg suffix.
 #
 # Examples:
-#   ./l4t_gen_delivery_package.sh 36.4.3
-#   ./l4t_gen_delivery_package.sh 36.4.3 forecr
-#   ./l4t_gen_delivery_package.sh 36.4.3 generic 2.0.0
+#   ./l4t_gen_delivery_package.sh -v 36.4.3                    # Auto-detect mode
+#   ./l4t_gen_delivery_package.sh -v 36.4.3 -V forecr          # Forecr build
+#   ./l4t_gen_delivery_package.sh -v 36.4.3 -V forecr -p 2.0.0 # Forecr with version
 #******************************************************************************
 
-. environment $@
+. environment "$@"
 
 if [[ ! -d $JETSON_DIR ]]; then
    echo "Error : $JETSON_DIR folder doesn't exist"
@@ -23,8 +27,26 @@ cd $JETSON_DIR
 #******************************************************************************
 # Configuration
 #******************************************************************************
-KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/)
-PACKAGE_NAME=jetson-l4t-${L4T_VERSION_EXTENDED}-eg-cams
+# Auto-detect standalone build by checking for kernel modules with -eg suffix
+# Standalone builds create modules in a directory like 5.15.148-tegra-eg
+STANDALONE_BUILD=0
+EG_KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/ 2>/dev/null | grep -- '-eg$')
+if [[ -n "$EG_KERNEL_VERSION" ]]; then
+   STANDALONE_BUILD=1
+   KERNEL_VERSION="$EG_KERNEL_VERSION"
+else
+   KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/ | grep -v -- '-eg$' | head -1)
+fi
+
+# Package naming: jetson-l4t-36.4.3-forecr-dsboard-ornx-eg-cams
+if [[ "$VENDOR" == "generic" ]]; then
+   PACKAGE_NAME=jetson-l4t-${L4T_VERSION}-eg-cams
+else
+   # Replace underscores with hyphens for Debian package naming convention
+   CARRIER_BOARD_DEB=$(echo "$CARRIER_BOARD" | tr '_' '-')
+   PACKAGE_NAME=jetson-l4t-${L4T_VERSION}-${VENDOR}-${CARRIER_BOARD_DEB}-eg-cams
+fi
+
 ROOTFS_DIR=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs
 
 # Clean previous package
@@ -32,12 +54,19 @@ sudo rm -rf ${PACKAGE_NAME}
 
 echo "============================================"
 echo "Generating package: ${PACKAGE_NAME}"
+echo "  Vendor: $VENDOR"
+echo "  Carrier board: $CARRIER_BOARD"
 echo "  Kernel version: ${KERNEL_VERSION}"
+if [[ $STANDALONE_BUILD -eq 1 ]]; then
+   echo "  Mode: standalone (all modules + initramfs)"
+else
+   echo "  Mode: standard (camera modules only)"
+fi
 echo "============================================"
 
 #******************************************************************************
 # Function: Copy from sources directory to package
-# Automatically handles common/, $VERSION/, and $VERSION/$CARRIER_DIR/
+# Automatically handles common/, $VERSION/, and $VERSION/$VENDOR/
 #******************************************************************************
 copy_from_sources() {
    local src_subpath="$1"    # e.g., "rootfs/usr" or "rootfs/opt/eg"
@@ -60,11 +89,11 @@ copy_from_sources() {
       sudo rsync -a --links "$src/" "$dest_dir/"
    fi
 
-   # Copy from $VERSION/$CARRIER_DIR/ (overrides version-specific)
-   if [[ -n "$CARRIER_BOARD" ]]; then
-      src="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_${CARRIER_BOARD}/${src_subpath}"
+   # Copy from $VERSION/$VENDOR/ (overrides version-specific)
+   if [[ -n "$VENDOR_SOURCE_DIR" ]]; then
+      src="$ROOT_DIR/sources/$L4T_VERSION/${VENDOR_SOURCE_DIR}/${src_subpath}"
       if [[ -d "$src" ]]; then
-         echo "  Copying ${src_subpath} from $L4T_VERSION/$CARRIER_BOARD/"
+         echo "  Copying ${src_subpath} from $L4T_VERSION/$VENDOR/"
          sudo rsync -a --links "$src/" "$dest_dir/"
       fi
    fi
@@ -151,23 +180,37 @@ done
 echo ""
 echo "Copying kernel modules..."
 
-# Determine driver directory based on L4T version
-if [[ $L4T_VERSION_MAJOR -lt 36 ]]; then
-   I2C_DRIVER_DIR="kernel/drivers/media/i2c"
-else
+if [[ $STANDALONE_BUILD -eq 1 ]]; then
+   # Standalone build: Copy ALL kernel modules to ensure kernel/modules compatibility
+   # Modules are installed in a separate directory (e.g., 5.15.148-tegra-eg) to preserve
+   # the original kernel as a backup option.
+   MODULES_SRC="$ROOTFS_DIR/lib/modules/${KERNEL_VERSION}"
+   MODULES_DEST="${PACKAGE_NAME}/lib/modules/${KERNEL_VERSION}"
+
+   if [[ -d "$MODULES_SRC" ]]; then
+      mkdir -p "$MODULES_DEST"
+      sudo rsync -a "$MODULES_SRC/" "$MODULES_DEST/"
+      MODULE_COUNT=$(find "$MODULES_DEST" -name "*.ko" | wc -l)
+      echo "  Copied $MODULE_COUNT kernel modules to ${KERNEL_VERSION}/"
+   else
+      echo "  Warning: No modules found in $MODULES_SRC"
+   fi
+elif [[ $L4T_VERSION_MAJOR -ge 36 ]]; then
+   # L4T 36.x+ standard build: Copy only Exosens camera modules (OOT)
    I2C_DRIVER_DIR="updates/drivers/media/i2c"
+
+   copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
+   copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
+   copy_module "updates/drivers/video/tegra/camera" "tegra_camera_platform.ko"
+   copy_module "updates/drivers/media/platform/tegra/camera" "tegra-camera.ko"
+   copy_module "updates/drivers/video/tegra/host/nvcsi" "nvhost-nvcsi-t194.ko"
+else
+   # L4T 35.x and earlier standard build: Copy only Exosens camera modules (in-tree)
+   I2C_DRIVER_DIR="kernel/drivers/media/i2c"
+
+   copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
+   copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
 fi
-
-# Camera I2C drivers
-copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
-copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
-#copy_module "$I2C_DRIVER_DIR" "nv_imx219.ko"
-#copy_module "$I2C_DRIVER_DIR" "nv_imx477.ko"
-
-# Platform drivers (L4T 36.x)
-copy_module "updates/drivers/video/tegra/camera" "tegra_camera_platform.ko"
-copy_module "updates/drivers/media/platform/tegra/camera" "tegra-camera.ko"
-copy_module "updates/drivers/video/tegra/host/nvcsi" "nvhost-nvcsi-t194.ko"
 
 #******************************************************************************
 # Step 5: Create post-install script
@@ -175,12 +218,14 @@ copy_module "updates/drivers/video/tegra/host/nvcsi" "nvhost-nvcsi-t194.ko"
 cat > /tmp/postinst << 'EOT'
 #!/bin/bash
 depmod
+EOT
+
+# Add Exosens camera overlay configuration
+cat >> /tmp/postinst << 'EOT'
 
 # Configure Exosens camera overlay if not already done
 if ! grep -q "JetsonIO" /boot/extlinux/extlinux.conf 2>/dev/null; then
-   if [[ -x /opt/eg/jetson-io/config-by-hardware.py ]]; then
-      python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras"
-   fi
+   eg_dt_camera_config_set.sh 0 Dione 1 Dione
 fi
 EOT
 
@@ -195,14 +240,13 @@ EOT
 #******************************************************************************
 # Step 7: Determine package version
 #******************************************************************************
-if [[ -n "$3" ]]; then
-   PACKAGE_VERSION="$3"
-else
+if [[ -z "$PACKAGE_VERSION" ]]; then
    PACKAGE_VERSION="$GIT_TAG"
 fi
 
 if [[ -z "$PACKAGE_VERSION" ]]; then
    echo "Error: No package version specified and no git tag found"
+   echo "Use -p <version> to specify a package version"
    exit 1
 fi
 
