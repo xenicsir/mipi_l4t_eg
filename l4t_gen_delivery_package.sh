@@ -15,7 +15,8 @@
 #   ./l4t_gen_delivery_package.sh -v 36.4.3 -V forecr -p 2.0.0 # Forecr with version
 #******************************************************************************
 
-. environment "$@"
+. l4t_environment.sh
+l4t_init "$@"
 
 if [[ ! -d $JETSON_DIR ]]; then
    echo "Error : $JETSON_DIR folder doesn't exist"
@@ -226,6 +227,30 @@ cat >> /tmp/postinst << 'EOT'
 # Configure Exosens camera overlay if not already done
 if ! grep -q "JetsonIO" /boot/extlinux/extlinux.conf 2>/dev/null; then
    eg_dt_camera_config_set.sh 0 Dione 1 Dione
+else
+   # Check if /boot/eg/Image is a standalone kernel (version ends with -eg)
+   if [[ -f /boot/eg/Image ]]; then
+      KERNEL_VERSION=$(strings /boot/eg/Image | grep "Linux version" | head -1 | awk '{print $3}')
+
+      if [[ "$KERNEL_VERSION" == *-eg ]]; then
+         # Standalone kernel: requires initrd-eg
+         if [[ ! -f /boot/eg/initrd-eg ]]; then
+            echo "ERROR: Standalone kernel detected ($KERNEL_VERSION) but /boot/eg/initrd-eg is missing!"
+            exit 1
+         fi
+         INITRD_PATH="/boot/eg/initrd-eg"
+      else
+         # Standard kernel: use standard initrd
+         INITRD_PATH="/boot/initrd"
+      fi
+
+      # Update INITRD in JetsonIO section if different
+      CURRENT_INITRD=$(sed -n '/LABEL JetsonIO/,/^LABEL /{s/.*INITRD \(.*\)/\1/p}' /boot/extlinux/extlinux.conf | head -1)
+      if [[ "$CURRENT_INITRD" != "$INITRD_PATH" ]]; then
+         echo "Updating JetsonIO INITRD to $INITRD_PATH..."
+         sed -i "/LABEL JetsonIO/,/^LABEL /{s|INITRD .*|INITRD $INITRD_PATH|}" /boot/extlinux/extlinux.conf
+      fi
+   fi
 fi
 EOT
 
@@ -296,4 +321,25 @@ else
    echo ""
    echo "Error: Package generation failed"
    exit 1
+fi
+
+#******************************************************************************
+# Step 9: Verify generated package
+#******************************************************************************
+echo ""
+echo "Verifying package..."
+
+VERIFY_ARGS="-v $L4T_VERSION"
+[[ "$VENDOR" != "generic" ]] && VERIFY_ARGS="$VERIFY_ARGS -V $VENDOR -c $CARRIER_BOARD"
+
+cd $ROOT_DIR
+if ./l4t_verify_packages.sh $VERIFY_ARGS; then
+   echo ""
+   echo "============================================"
+   echo "Package verified successfully"
+   echo "============================================"
+else
+   echo ""
+   echo "Warning: Package verification found issues"
+   echo "Review the errors above before distributing the package"
 fi

@@ -10,7 +10,7 @@
 #   -V, --vendor VENDOR            Vendor: generic (default), forecr
 #   -c, --carrier-board BOARD      Carrier board (default depends on vendor)
 #   -s, --standalone               Build standalone kernel with -eg suffix
-#                                  (automatically enabled for forecr)
+#                                  (auto-enabled per l4t_versions.json config)
 #
 # The --standalone option creates a separate kernel version (e.g., 5.15.148-tegra-eg)
 # that won't conflict with the original kernel. This is required for Forecr boards
@@ -19,11 +19,13 @@
 # Examples:
 #   ./l4t_build.sh -v 36.4.3                    # Standard build (modules only)
 #   ./l4t_build.sh -v 36.4.3 --standalone       # Standalone build with -eg suffix
-#   ./l4t_build.sh -v 36.4.3 -V forecr          # Forecr build (standalone implied)
+#   ./l4t_build.sh -v 36.4.3 -V forecr          # Forecr build (standalone per config)
+#   ./l4t_build.sh -v 35.6.1 -V forecr -s       # Forecr build with manual standalone
 #******************************************************************************
 
 # Source environment (parses all arguments including --standalone)
-. environment "$@"
+. l4t_environment.sh
+l4t_init "$@"
 
 if [[ ! -d $L4T_SRC ]]; then
    echo "Error : $L4T_SRC folder doesn't exist"

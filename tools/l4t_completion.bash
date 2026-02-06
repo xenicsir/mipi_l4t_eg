@@ -3,14 +3,8 @@
 # l4t_completion.bash - Bash completion for L4T build scripts
 #
 # Installation:
-#   Option 1: Source in your .bashrc
-#     echo 'source /path/to/l4t_completion.bash' >> ~/.bashrc
-#
-#   Option 2: Install system-wide
-#     sudo cp l4t_completion.bash /etc/bash_completion.d/l4t
-#
-#   Option 3: Temporary (current shell only)
-#     source /path/to/l4t_completion.bash
+#   Source in your .bashrc with the path to the configuration file:
+#     . /path/to/l4t_completion.bash /path/to/l4t_versions.json
 #
 # Supported commands:
 #   l4t_prepare.sh
@@ -18,32 +12,42 @@
 #   l4t_patch_sources.sh
 #   l4t_build.sh
 #   l4t_gen_delivery_package.sh
+#   l4t_verify_packages.sh
 #   l4t_build_all.sh
+#   l4t_make.sh
 #******************************************************************************
 
-# L4T versions supported
-_l4t_versions="32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 36.4 36.4.3 36.4.4"
+# Get configuration file from argument
+_L4T_CONFIG_FILE="${1:-}"
 
-# Vendors and their supported carrier boards
-_l4t_vendors="generic forecr"
-_l4t_carrier_boards_generic="generic"
-_l4t_carrier_boards_forecr="dsboard_ornx"
+# Extract configuration from JSON file using jq
+_l4t_extract_from_json() {
+    local config_file="$1"
+    local jq_query="$2"
 
-# Get carrier boards for a vendor
-_l4t_get_carrier_boards() {
-    local vendor="$1"
-    case "$vendor" in
-        generic)
-            echo "$_l4t_carrier_boards_generic"
-            ;;
-        forecr)
-            echo "$_l4t_carrier_boards_forecr"
-            ;;
-        *)
-            echo "generic"
-            ;;
-    esac
+    [[ ! -f "$config_file" ]] && return
+    command -v jq >/dev/null 2>&1 || return
+
+    jq -r "$jq_query" "$config_file" 2>/dev/null | tr '\n' ' '
 }
+
+# Initialize completion variables from configuration file
+_l4t_init_completion() {
+    if [[ -n "$_L4T_CONFIG_FILE" ]] && [[ -f "$_L4T_CONFIG_FILE" ]] && command -v jq >/dev/null 2>&1; then
+        # Read from JSON configuration
+        _l4t_versions=$(_l4t_extract_from_json "$_L4T_CONFIG_FILE" '.versions | keys[]' | xargs -n1 | sort -V | tr '\n' ' ')
+        _l4t_vendors=$(_l4t_extract_from_json "$_L4T_CONFIG_FILE" '.vendors | keys[]')
+        _l4t_carrier_boards=$(_l4t_extract_from_json "$_L4T_CONFIG_FILE" '.carriers | keys[]')
+    else
+        # Fallback defaults if no configuration file or jq not available
+        _l4t_versions="32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 36.4 36.4.3 36.4.4"
+        _l4t_vendors="generic forecr"
+        _l4t_carrier_boards="generic dsboard_ornx"
+    fi
+}
+
+# Initialize on load
+_l4t_init_completion
 
 # Common completion function for l4t scripts
 _l4t_common_completion() {
@@ -66,9 +70,17 @@ _l4t_common_completion() {
         l4t_gen_delivery_package.sh)
             extra_opts="-p --package-version"
             ;;
+        l4t_verify_packages.sh)
+            # l4t_verify_packages.sh - version/vendor/carrier are optional filters
+            extra_opts="--verbose --list"
+            ;;
         l4t_build_all.sh)
             # l4t_build_all.sh has different options
             common_opts="-p --package-version --from-scratch --patches-only -h --help"
+            ;;
+        l4t_make.sh)
+            # l4t_make.sh master orchestration script
+            extra_opts="-p --package-version -s --standalone --prepare --copy-sources --patch-sources --build --gen-package --all --from-scratch --abort-on-error --continue-on-error --dry-run --list"
             ;;
     esac
 
@@ -85,19 +97,7 @@ _l4t_common_completion() {
             return 0
             ;;
         -c|--carrier-board)
-            # Find the vendor in the command line to provide appropriate carrier boards
-            local vendor="generic"
-            local i
-            for ((i=1; i<COMP_CWORD; i++)); do
-                case "${COMP_WORDS[i]}" in
-                    -V|--vendor)
-                        vendor="${COMP_WORDS[i+1]}"
-                        break
-                        ;;
-                esac
-            done
-            local carrier_boards=$(_l4t_get_carrier_boards "$vendor")
-            COMPREPLY=( $(compgen -W "$carrier_boards" -- "$cur") )
+            COMPREPLY=( $(compgen -W "$_l4t_carrier_boards" -- "$cur") )
             return 0
             ;;
         -p|--package-version)
@@ -123,7 +123,9 @@ complete -F _l4t_common_completion l4t_copy_sources.sh
 complete -F _l4t_common_completion l4t_patch_sources.sh
 complete -F _l4t_common_completion l4t_build.sh
 complete -F _l4t_common_completion l4t_gen_delivery_package.sh
+complete -F _l4t_common_completion l4t_verify_packages.sh
 complete -F _l4t_common_completion l4t_build_all.sh
+complete -F _l4t_common_completion l4t_make.sh
 
 # Also support calling scripts with ./
 complete -F _l4t_common_completion ./l4t_prepare.sh
@@ -131,4 +133,6 @@ complete -F _l4t_common_completion ./l4t_copy_sources.sh
 complete -F _l4t_common_completion ./l4t_patch_sources.sh
 complete -F _l4t_common_completion ./l4t_build.sh
 complete -F _l4t_common_completion ./l4t_gen_delivery_package.sh
+complete -F _l4t_common_completion ./l4t_verify_packages.sh
 complete -F _l4t_common_completion ./l4t_build_all.sh
+complete -F _l4t_common_completion ./l4t_make.sh

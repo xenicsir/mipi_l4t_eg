@@ -1,20 +1,24 @@
 diff --git a/source/kernel/Makefile b/source/kernel/Makefile
-index d625108..770d311 100644
+index 7874f69..770d311 100644
 --- a/source/kernel/Makefile
 +++ b/source/kernel/Makefile
-@@ -15,9 +15,9 @@ else
+@@ -15,11 +15,12 @@ else
  kernel_image := $(kernel_source_dir)/arch/arm64/boot/Image
  endif
  
 -NPROC ?= $(shell nproc)
 +NPROC ?= $(shell expr $(shell nproc) - 1)
  
--# LOCALVERSION : -tegra or -rt-tegra, with optional suffix (e.g., -eg)
+-# LOCALVERSION : -tegra or -rt-tegra
 +# LOCALVERSION : -tegra or -rt-tegra, with optional suffix (e.g., -eg for Exosens)
- LOCALVERSION_SUFFIX ?=
++LOCALVERSION_SUFFIX ?=
  version = $(shell grep -q "CONFIG_PREEMPT_RT=y" \
-     ${kernel_source_dir}/arch/arm64/configs/${KERNEL_DEF_CONFIG} && echo "-rt-tegra$(LOCALVERSION_SUFFIX)" || echo "-tegra$(LOCALVERSION_SUFFIX)")
-@@ -63,6 +63,27 @@ kernel:
+-    ${kernel_source_dir}/arch/arm64/configs/${KERNEL_DEF_CONFIG} && echo "-rt-tegra" || echo "-tegra")
++    ${kernel_source_dir}/arch/arm64/configs/${KERNEL_DEF_CONFIG} && echo "-rt-tegra$(LOCALVERSION_SUFFIX)" || echo "-tegra$(LOCALVERSION_SUFFIX)")
+ 
+ .PHONY : kernel install clean help
+ 
+@@ -62,6 +63,27 @@ kernel:
  	@echo   "================================================================================"
  
  
@@ -42,7 +46,7 @@ index d625108..770d311 100644
  install:
  	@echo   "================================================================================"
  	@echo   "Installing $(KERNEL_SRC_DIR) sources"
-@@ -96,6 +117,7 @@ help:
+@@ -95,6 +117,7 @@ help:
  	@echo   "================================================================================"
  	@echo   "Usage:"
  	@echo   "   make or make kernel   # to build kernel"

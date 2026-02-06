@@ -2,8 +2,9 @@
 #******************************************************************************
 # compare_sources.sh - Compare source directories between two repos
 #
-# This script compares Linux_for_Tegra directories between two repositories,
-# handling different naming conventions:
+# This script compares Linux_for_Tegra source directories between two repositories,
+# excluding build artifacts (.o, .ko, .cmd, .dtb, etc.) and handling different
+# naming conventions:
 #   - Linux_for_Tegra (generic)
 #   - Linux_for_Tegra_forecr (old vendor naming)
 #   - Linux_for_Tegra_forecr_dsboard_ornx (new vendor_carrier naming)
@@ -20,12 +21,14 @@
 # Options:
 #   -a, --repo-a DIR    First repository (default: ../mipi_l4t_eg-a)
 #   -b, --repo-b DIR    Second repository (default: ../mipi_l4t_eg-b)
+#   -v, --verbose       Show all differences (default: truncate to 20)
 #   -h, --help          Show this help message
 #
 # Examples:
 #   ./tools/compare_sources.sh                              # Compare all versions
-#   ./tools/compare_sources.sh 32.7.1                       # Compare specific version
-#   ./tools/compare_sources.sh -a ../repo1 -b ../repo2 35   # Custom repos, 35.x only
+#   ./tools/compare_sources.sh 32.7.1                       # Compare specific version (exact match)
+#   ./tools/compare_sources.sh "36.4*"                      # Compare 36.4, 36.4.3, 36.4.4 (glob pattern)
+#   ./tools/compare_sources.sh -a ../repo1 -b ../repo2 35   # Custom repos, version 35 only
 #******************************************************************************
 
 # Get script directory to compute default paths
@@ -37,6 +40,7 @@ PARENT_DIR="$(dirname "$BASE_DIR")"
 REPO_A="$PARENT_DIR/mipi_l4t_eg-a"
 REPO_B="$PARENT_DIR/mipi_l4t_eg-b"
 VERSION_FILTER=""
+VERBOSE=0
 
 # Parse options
 while [[ $# -gt 0 ]]; do
@@ -48,6 +52,10 @@ while [[ $# -gt 0 ]]; do
         -b|--repo-b)
             REPO_B="$2"
             shift 2
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            shift
             ;;
         -h|--help)
             head -28 "$0" | tail -n +2 | sed 's/^#//' | sed 's/^\*//g'
@@ -69,6 +77,29 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+#******************************************************************************
+# Function: Check if version matches filter (exact match or glob pattern)
+# Usage: version_matches "36.4.3" "36.4*" -> returns 0 (match)
+#        version_matches "36.4.3" "36.4"  -> returns 1 (no match)
+#******************************************************************************
+version_matches() {
+    local version="$1"
+    local filter="$2"
+
+    # Empty filter matches everything
+    [[ -z "$filter" ]] && return 0
+
+    # If filter contains glob characters, use pattern matching
+    if [[ "$filter" == *'*'* ]] || [[ "$filter" == *'?'* ]]; then
+        [[ "$version" == $filter ]] && return 0
+    else
+        # Exact match only
+        [[ "$version" == "$filter" ]] && return 0
+    fi
+
+    return 1
+}
 
 echo "============================================"
 echo "Comparing source directories"
@@ -137,8 +168,8 @@ versions=()
 for dir in "$REPO_A"/32.* "$REPO_A"/35.* "$REPO_A"/36.*; do
     if [[ -d "$dir" ]]; then
         version=$(basename "$dir")
-        # Apply version filter if specified (exact match or prefix match)
-        if [[ -z "$VERSION_FILTER" ]] || [[ "$version" == "$VERSION_FILTER" ]] || [[ "$version" == $VERSION_FILTER* ]]; then
+        # Apply version filter if specified (exact match or glob pattern)
+        if version_matches "$version" "$VERSION_FILTER"; then
             versions+=("$version")
         fi
     fi
@@ -216,17 +247,131 @@ for version in "${sorted_versions[@]}"; do
             echo -e "      ${YELLOW}[MISSING] Only in Repo A${NC}"
             version_has_diff=1
         else
-            # Compare directories (excluding .git files)
-            diff_output=$(diff -rq "$source_a" "$source_b" 2>&1 | grep -v "\.git" | grep -v "\.gitignore")
+            # Compare directories (excluding .git and build artifacts)
+            diff_output=$(diff -rq \
+                --exclude='.git' \
+                --exclude='.gitignore' \
+                --exclude='*.o' \
+                --exclude='*.o.d' \
+                --exclude='*.ko' \
+                --exclude='*.a' \
+                --exclude='*.cmd' \
+                --exclude='*.mod' \
+                --exclude='*.mod.c' \
+                --exclude='*.order' \
+                --exclude='*.symvers' \
+                --exclude='.tmp_*' \
+                --exclude='*.tmp' \
+                --exclude='modules.order' \
+                --exclude='Module.symvers' \
+                --exclude='.config' \
+                --exclude='*.dtb' \
+                --exclude='*.dtb.d.*' \
+                --exclude='*.dtbo' \
+                --exclude='Image' \
+                --exclude='Image.gz' \
+                --exclude='vmlinux' \
+                --exclude='vmlinux.o' \
+                --exclude='vmlinux.lds' \
+                --exclude='System.map' \
+                --exclude='.cache.mk' \
+                --exclude='*.builtin' \
+                --exclude='.*.d' \
+                --exclude='generated' \
+                --exclude='*.so' \
+                --exclude='*.so.dbg' \
+                --exclude='*.lds' \
+                --exclude='*.pem' \
+                --exclude='*.x509' \
+                --exclude='*.asn1.c' \
+                --exclude='*.asn1.h' \
+                --exclude='asm-offsets.s' \
+                --exclude='gen-*' \
+                --exclude='signing_key*' \
+                --exclude='x509.genkey' \
+                --exclude='x509_certificate_list' \
+                --exclude='*-core.S' \
+                --exclude='hyp-reloc.S' \
+                --exclude='vdso.lds' \
+                --exclude='config' \
+                --exclude='*.dtb.S' \
+                --exclude='bounds.s' \
+                --exclude='config_data' \
+                --exclude='config_data.gz' \
+                --exclude='conmakehash' \
+                --exclude='consolemap_deftbl.c' \
+                --exclude='defkeymap.c' \
+                --exclude='scsi_devinfo_tbl.c' \
+                --exclude='crc32table.h' \
+                --exclude='gen_crc32table' \
+                --exclude='oid_registry_data.c' \
+                --exclude='int*.c' \
+                --exclude='neon*.c' \
+                --exclude='tables.c' \
+                --exclude='mktables' \
+                --exclude='timeconst.h' \
+                --exclude='offsets.h' \
+                --exclude='cpustr.h' \
+                --exclude='machtypes.h' \
+                --exclude='selinux_av_perms.h' \
+                --exclude='flask.h' \
+                --exclude='av_permissions.h' \
+                --exclude='*.lex.c' \
+                --exclude='*.tab.c' \
+                --exclude='*.tab.h' \
+                --exclude='parse-events-bison.output' \
+                --exclude='pmu-events.c' \
+                --exclude='fixdep' \
+                --exclude='sorttable' \
+                --exclude='objtool' \
+                --exclude='modules.builtin.modinfo' \
+                --exclude='shipped-certs.c' \
+                --exclude='asn1_compiler' \
+                --exclude='dtc' \
+                --exclude='fdtoverlay' \
+                --exclude='fdtget' \
+                --exclude='fdtput' \
+                --exclude='extract-cert' \
+                --exclude='genksyms' \
+                --exclude='kallsyms' \
+                --exclude='conf' \
+                --exclude='mconf' \
+                --exclude='nconf' \
+                --exclude='modpost' \
+                --exclude='genheaders' \
+                --exclude='mdp' \
+                --exclude='sign-file' \
+                --exclude='gen_init_cpio' \
+                --exclude='initramfs_data.cpio' \
+                --exclude='initramfs_inc_data' \
+                --exclude='devicetable-offsets.*' \
+                --exclude='elfconfig.h' \
+                --exclude='mk_elfconfig' \
+                --exclude='recordmcount' \
+                --exclude='basic' \
+                --exclude='bin2c' \
+                --exclude='unifdef' \
+                --exclude='.version' \
+                --exclude='dtbs' \
+                --exclude='conftest' \
+                --exclude='nv_compiler.h' \
+                --exclude='*_binary' \
+                --exclude='_out' \
+                --exclude='out' \
+                "$source_a" "$source_b" 2>&1)
 
             if [[ -z "$diff_output" ]]; then
-                echo -e "      ${GREEN}[OK] Identical (excluding .git)${NC}"
+                echo -e "      ${GREEN}[OK] Identical (excluding .git and build artifacts)${NC}"
             else
                 echo -e "      ${RED}[DIFF] Differences found:${NC}"
-                echo "$diff_output" | sed 's/^/      /' | head -20
                 diff_count=$(echo "$diff_output" | wc -l)
-                if [[ $diff_count -gt 20 ]]; then
-                    echo "      ... and $((diff_count - 20)) more differences"
+                if [[ $VERBOSE -eq 1 ]]; then
+                    echo "$diff_output" | sed 's/^/      /'
+                else
+                    echo "$diff_output" | sed 's/^/      /' | head -20
+                    if [[ $diff_count -gt 20 ]]; then
+                        echo "      ... and $((diff_count - 20)) more differences"
+                    fi
                 fi
                 version_has_diff=1
             fi

@@ -23,7 +23,8 @@
 #   ./l4t_copy_sources.sh -v 36.4.3 -V forecr
 #******************************************************************************
 
-. environment "$@"
+. l4t_environment.sh
+l4t_init "$@"
 
 if [[ ! -d $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} ]]; then
    echo "Error : $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} folder doesn't exist"

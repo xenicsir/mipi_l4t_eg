@@ -14,7 +14,8 @@
 #   ./l4t_prepare.sh --l4t-version 36.4.3 --vendor forecr --carrier-board dsboard_ornx
 #******************************************************************************
 
-. environment "$@"
+. l4t_environment.sh
+l4t_init "$@"
 
 mkdir -p $JETSON_DIR
 
@@ -69,8 +70,9 @@ tar xvf $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}
 rsync -iahHAXxvz --progress Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
 
 cd $ROOT_DIR
-# Re-source environment to update L4T_SRC path after extraction
-. environment "$@"
+# Re-initialize to update L4T_SRC path after extraction
+. l4t_environment.sh
+l4t_init "$@"
 cd $L4T_SRC
 mkdir -p build
 mkdir -p modules

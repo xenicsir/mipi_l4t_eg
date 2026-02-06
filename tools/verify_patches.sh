@@ -33,8 +33,9 @@
 #
 # Examples:
 #   ./tools/verify_patches.sh                    # Verify all versions
-#   ./tools/verify_patches.sh 35.6.2             # Verify specific version
-#   ./tools/verify_patches.sh -v 36.4            # Verbose output for 36.x
+#   ./tools/verify_patches.sh 35.6.2             # Verify specific version (exact match)
+#   ./tools/verify_patches.sh "36.4*"            # Verify 36.4, 36.4.3, 36.4.4 (glob pattern)
+#   ./tools/verify_patches.sh -v 36.4            # Verbose output for 36.4 only
 #******************************************************************************
 
 # Get script directory
@@ -84,6 +85,29 @@ echo "Verifying Exosens patches"
 echo "  Repository: $REPO_DIR"
 echo "============================================"
 echo ""
+
+#******************************************************************************
+# Function: Check if version matches filter (exact match or glob pattern)
+# Usage: version_matches "36.4.3" "36.4*" -> returns 0 (match)
+#        version_matches "36.4.3" "36.4"  -> returns 1 (no match)
+#******************************************************************************
+version_matches() {
+    local version="$1"
+    local filter="$2"
+
+    # Empty filter matches everything
+    [[ -z "$filter" ]] && return 0
+
+    # If filter contains glob characters, use pattern matching
+    if [[ "$filter" == *'*'* ]] || [[ "$filter" == *'?'* ]]; then
+        [[ "$version" == $filter ]] && return 0
+    else
+        # Exact match only
+        [[ "$version" == "$filter" ]] && return 0
+    fi
+
+    return 1
+}
 
 #******************************************************************************
 # Function: Get L4T major version from version string
@@ -474,7 +498,7 @@ versions=()
 for dir in "$REPO_DIR"/32.* "$REPO_DIR"/35.* "$REPO_DIR"/36.*; do
     if [[ -d "$dir" ]]; then
         version=$(basename "$dir")
-        if [[ -z "$VERSION_FILTER" ]] || [[ "$version" == "$VERSION_FILTER" ]] || [[ "$version" == $VERSION_FILTER* ]]; then
+        if version_matches "$version" "$VERSION_FILTER"; then
             versions+=("$version")
         fi
     fi
@@ -574,7 +598,7 @@ for patch_dir in "$REPO_DIR"/patches/32.* "$REPO_DIR"/patches/35.* "$REPO_DIR"/p
     fi
 
     # Apply version filter
-    if [[ -n "$VERSION_FILTER" ]] && [[ "$version" != "$VERSION_FILTER" ]] && [[ "$version" != $VERSION_FILTER* ]]; then
+    if ! version_matches "$version" "$VERSION_FILTER"; then
         continue
     fi
 
