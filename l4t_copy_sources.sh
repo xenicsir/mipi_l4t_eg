@@ -86,6 +86,7 @@ rsync_copy() {
 # Step 1: Analyze source files to copy (dry-run to get file list)
 #******************************************************************************
 
+update_status "Analyzing sources..."
 echo "============================================"
 echo "Analyzing Exosens sources for L4T ${L4T_VERSION_EXTENDED}"
 echo "  Vendor: $VENDOR"
@@ -137,6 +138,7 @@ echo "  Found $FILE_COUNT files to copy"
 # Step 2: Generate dynamic .gitignore based on files to copy
 #******************************************************************************
 
+update_status "Generating .gitignore..."
 echo ""
 echo -e "${BLUE}Generating dynamic .gitignore...${NC}"
 
@@ -223,6 +225,7 @@ echo "  Generated .gitignore with $TRACKED_COUNT tracked paths"
 # Step 3: Initialize or update git repository (BEFORE copying sources)
 #******************************************************************************
 
+update_status "Preparing git repository..."
 echo ""
 echo -e "${BLUE}Preparing git repository...${NC}"
 
@@ -291,6 +294,7 @@ fi
 #******************************************************************************
 
 if [[ "$VENDOR" == "forecr" && $L4T_VERSION_MAJOR -lt 36 ]]; then
+   update_status "Merging defconfigs..."
    echo ""
    echo "============================================"
    echo "Merging Exosens defconfig into ${VENDOR} sources"
@@ -378,6 +382,7 @@ fi
 # Step 4: Copy Exosens sources (after git init with original state)
 #******************************************************************************
 
+update_status "Copying Exosens sources..."
 echo ""
 echo "============================================"
 echo "Copying Exosens sources for L4T ${L4T_VERSION_EXTENDED}"
@@ -398,6 +403,7 @@ mkdir -p $PATCH_DIR
 # Clean old patches
 rm -f $PATCH_DIR/*.patch
 
+update_status "Generating patches..."
 echo ""
 echo "============================================"
 echo "Generating patches in $PATCH_DIR"
@@ -540,6 +546,7 @@ ls -la $PATCH_DIR/
 # Step 6: Verify patches by applying them to a clean state
 #******************************************************************************
 
+update_status "Verifying patches..."
 echo ""
 echo "============================================"
 echo "Verifying patches..."
@@ -638,6 +645,7 @@ if [[ $FILE_COUNT -gt 20 ]]; then
    echo "... and $((FILE_COUNT - 20)) more files"
 fi
 
+update_status "Done"
 echo ""
 echo "Next steps:"
 echo "  1. Build the kernel and drivers:"

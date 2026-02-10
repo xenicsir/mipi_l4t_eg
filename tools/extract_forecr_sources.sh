@@ -206,6 +206,42 @@ TOTAL_NEW=0
 TOTAL_MODIFIED=0
 
 #******************************************************************************
+# Function: Check if a path contains a symlink component in reference directory
+#
+# This prevents copying files that are accessible via symlinks (duplicates).
+# For example, if scripts/dtc/include-prefixes/arm64 is a symlink to
+# arch/arm64/boot/dts, we should only copy from arch/arm64/boot/dts, not
+# from the symlink path.
+#
+# Args: $1 = relative path, $2 = reference directory (Nvidia BSP)
+# Returns: 0 if path contains symlink, 1 if path is clean
+#******************************************************************************
+path_contains_symlink() {
+    local rel_path="$1"
+    local ref_dir="$2"
+
+    # Check each component of the path
+    local current_path=""
+    IFS='/' read -ra path_parts <<< "$rel_path"
+
+    for part in "${path_parts[@]}"; do
+        [[ -z "$part" ]] && continue
+        if [[ -z "$current_path" ]]; then
+            current_path="$part"
+        else
+            current_path="$current_path/$part"
+        fi
+
+        # Check if this path component is a symlink in the reference directory
+        if [[ -L "$ref_dir/$current_path" ]]; then
+            return 0  # Path contains symlink
+        fi
+    done
+
+    return 1  # Path is clean
+}
+
+#******************************************************************************
 # Function: Copy new files (only in Forecr, not in Nvidia)
 #******************************************************************************
 
@@ -242,6 +278,14 @@ copy_new_files() {
             continue
         fi
 
+        # Skip if path goes through a symlink in Nvidia BSP (avoid duplicates)
+        local rel_path_for_check="$dir/$filename"
+        rel_path_for_check="${rel_path_for_check#$subdir/}"  # Remove subdir prefix if present
+        if path_contains_symlink "$subdir/$rel_path_for_check" "$NVIDIA_SRC"; then
+            echo "    SKIP (symlink path): $dir/$filename"
+            continue
+        fi
+
         mkdir -p "$(dirname "$dest_file")"
         cp "$src_file" "$dest_file"
         echo "    NEW: $dir/$filename"
@@ -270,6 +314,12 @@ copy_modified_files() {
         src_file=$(echo "$line" | sed 's|Files ||; s| and .*||')
         rel_path=$(echo "$src_file" | sed "s|$FORECR_SRC/||")
         dest_file="$DEST/$rel_path"
+
+        # Skip if path goes through a symlink in Nvidia BSP (avoid duplicates)
+        if path_contains_symlink "$rel_path" "$NVIDIA_SRC"; then
+            echo "    SKIP (symlink path): $rel_path"
+            continue
+        fi
 
         # Determine path to Exosens generic file
         if [[ $L4T_MAJOR -ge 36 ]]; then

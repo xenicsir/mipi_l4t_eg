@@ -58,20 +58,26 @@ if [[ $L4T_VERSION_MAJOR -lt 36 ]]; then
 	fi
 
 	pushd $L4T_SRC
+	update_status "Configuring kernel..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
+	update_status "Building kernel Image..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
+	update_status "Building device trees..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
+	update_status "Building kernel modules..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
+	update_status "Installing modules..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT modules_install INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
 	popd
 
 	# Copy device tree to destination dir
+	update_status "Copying build artifacts..."
 	cp -fv $L4T_SRC/build/arch/arm64/boot/dts/* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/kernel/dtb/
 	cp -fv $L4T_SRC/build/arch/arm64/boot/dts/nvidia/* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/kernel/dtb/
 	sudo cp -fv $L4T_SRC/build/arch/arm64/boot/dts/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
 	sudo cp -fv $L4T_SRC/build/arch/arm64/boot/dts/nvidia/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot
 	# Copy modules to destination dir
-	sudo rsync --exclude nvgpu.ko -iahHAXxvz --progress $L4T_SRC/modules/lib/modules/ $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules
+	sudo rsync --exclude nvgpu.ko -aHAX $L4T_SRC/modules/lib/modules/ $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules
 
 else
 
@@ -102,29 +108,38 @@ else
 		fi
 	fi
 
+	update_status "Building kernel..."
 	make -C kernel
+	update_status "Installing kernel..."
 	sudo -E make install -C kernel
 	##export IGNORE_PREEMPT_RT_PRESENCE=1
+	update_status "Building kernel modules..."
 	make modules
+	update_status "Installing modules..."
 	sudo -E make modules_install
+	update_status "Building device trees..."
 	make dtbs
 	popd
 
 	# Copy device tree to destination dir
+	update_status "Copying build artifacts..."
 	sudo cp -fv $L4T_SRC/kernel-devicetree/generic-dts/dtbs/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
 
 fi
 
 # Copy kernel Image to destination dir
+update_status "Copying kernel Image..."
 cp -rfv $TEGRA_KERNEL_OUT/arch/arm64/boot/Image $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/kernel/
 sudo cp -rfv $TEGRA_KERNEL_OUT/arch/arm64/boot/Image $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg
 
 # Generate version file
+update_status "Generating version file..."
 echo jetson-l4t-${L4T_VERSION_EXTENDED}_eg-${GIT_TAG}-${GIT_COMMIT} > version_eg_cams
 sudo mv version_eg_cams $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/etc/
 
 pushd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/
 if [[ -f ./tools/l4t_update_initrd.sh ]]; then
+   update_status "Updating initrd..."
    sudo ./tools/l4t_update_initrd.sh
 fi
 popd
@@ -151,7 +166,7 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
       # Generate initramfs using chroot with QEMU (arm64 emulation)
       # This requires binfmt_misc and qemu-user-static to be installed
       if [[ -f "$ROOTFS_DIR/usr/sbin/update-initramfs" ]]; then
-         echo "Generating initramfs in chroot..."
+         update_status "Generating initramfs in chroot..."
 
          # Ensure QEMU is available in rootfs
          if [[ -f /usr/bin/qemu-aarch64-static ]]; then
@@ -159,18 +174,22 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
          fi
 
          # Mount required filesystems for chroot
+         update_status "Mounting chroot filesystems..."
          sudo mount --bind /proc "$ROOTFS_DIR/proc" 2>/dev/null || true
          sudo mount --bind /sys "$ROOTFS_DIR/sys" 2>/dev/null || true
          sudo mount --bind /dev "$ROOTFS_DIR/dev" 2>/dev/null || true
          sudo mount --bind /dev/pts "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
 
          # Generate initramfs in chroot
+         update_status "Running update-initramfs..."
          sudo chroot "$ROOTFS_DIR" /usr/sbin/update-initramfs -c -k "$EG_KERNEL_VERSION" 2>/dev/null || {
             echo "Warning: update-initramfs failed, trying mkinitramfs..."
+            update_status "Running mkinitramfs..."
             sudo chroot "$ROOTFS_DIR" /usr/sbin/mkinitramfs -o "/boot/initrd.img-$EG_KERNEL_VERSION" "$EG_KERNEL_VERSION" 2>/dev/null || true
          }
 
          # Unmount filesystems
+         update_status "Unmounting chroot filesystems..."
          sudo umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
          sudo umount "$ROOTFS_DIR/dev" 2>/dev/null || true
          sudo umount "$ROOTFS_DIR/sys" 2>/dev/null || true
@@ -191,6 +210,7 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
    fi
 fi
 
+update_status "Done"
 echo ""
 echo "============================================"
 echo "Build completed for L4T ${L4T_VERSION_EXTENDED}"

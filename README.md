@@ -1,295 +1,687 @@
-<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
-
-- [Exosens cameras MIPI CSI-2 driver for NVIDIA Jetson boards](#exosens-cameras-mipi-csi-2-driver-for-nvidia-jetson-boards)
-   * [Prerequisites for cross-compiling <a name="Prerequisites"></a>](#prerequisites-for-cross-compiling)
-      + [Host PC](#host-pc)
-   * [Building and installing MIPI drivers on supported L4T versions / SoM / carrier boards](#building-and-installing-mipi-drivers-on-supported-l4t-versions-som-carrier-boards)
-      + [Supported L4T versions, SOM and carrier boards](#supported-l4t-versions-som-and-carrier-boards)
-      + [Building the L4T environment](#building-the-l4t-environment)
-         - [Source code organization](#source-code-organization)
-         - [Developer workflow (with full sources)](#developer-workflow-with-full-sources)
-         - [Client workflow (with patches only)](#client-workflow-with-patches-only)
-      + [Building MIPI drivers for specific carrier boards](#building-mipi-drivers-for-specific-carrier-boards)
-      + [Installing and configuring the MIPI drivers on the board](#installing-and-configuring-the-mipi-drivers-on-the-board)
-         - [Package installation](#package-installation)
-         - [Configuring a camera port on non specific (Nvidia generic) carrier boards](#configuring-camera-ports)
-      + [Quick start - Testing the camera](#quick-start---testing-the-camera)
-   * [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
-      + [Linux boot](#linux-boot)
-      + [Orin NX/Nano devkit devicetree issue](#orin-nxnano-devkit-devicetree-issue)
-   * [Hints to help integrating the drivers on other L4T versions and other SoM/carrier boards](#hints-to-help-integrating-the-drivers-on-other-l4t-versions-and-other-somcarrier-boards)
-      + [Getting the L4T archives files](#getting-the-l4t-archives-files)
-      + [Porting kernel patches to a new L4T version](#porting-kernel-patches-to-a-new-l4t-version)
-      + [Creating camera device trees for a new SoM / carrier board](#creating-camera-device-trees-for-a-new-som-carrier-board)
-      + [Integrating specific vendor files/patches](#integrating-specific-vendor-filespatches)
-
-<!-- TOC end -->
-
-<!-- TOC --><a name="exosens-cameras-mipi-csi-2-driver-for-nvidia-jetson-boards"></a>
 # Exosens cameras MIPI CSI-2 driver for NVIDIA Jetson boards
 
 This document describes how to build and install the MIPI drivers for different Jetson SoM (System On Module) and carrier boards, based on Nvidia BSP (L4T, Linux For Tegra).
 
-It also gives some hints to help integrating the drivers on other L4T versions and other carrier boards.
+It also provides guidance for integrating the drivers on other L4T versions and carrier boards.
 
 The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
 
-<!-- TOC --><a name="prerequisites-for-cross-compiling"></a>
-## Prerequisites for cross-compiling <a name="Prerequisites"></a>
+---
 
-<!-- TOC --><a name="host-pc"></a>
-### Host PC
+## Table of Contents
 
-* Recommended OS is Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. 22.04 LTS is the one currently used.
+- [Prerequisites for cross-compiling](#prerequisites-for-cross-compiling)
+  - [Host PC requirements](#host-pc-requirements)
+- [Building and installing MIPI drivers](#building-and-installing-mipi-drivers)
+  - [Supported L4T versions, SOM and carrier boards](#supported-l4t-versions-som-and-carrier-boards)
+  - [Building the L4T environment](#building-the-l4t-environment)
+    - [Source code organization](#source-code-organization)
+    - [Building workflow](#building-workflow)
+    - [Client workflow (patches only)](#client-workflow-patches-only)
+  - [Building MIPI drivers for specific carrier boards](#building-mipi-drivers-for-specific-carrier-boards)
+  - [Installing and configuring the MIPI drivers on the board](#installing-and-configuring-the-mipi-drivers-on-the-board)
+    - [Package installation](#package-installation)
+    - [Configuring camera ports](#configuring-camera-ports)
+  - [Quick start - Testing the camera](#quick-start---testing-the-camera)
+- [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
+  - [Linux boot configuration](#linux-boot-configuration)
+  - [Orin NX/Nano devkit devicetree issue](#orin-nxnano-devkit-devicetree-issue)
+- [Shell completion](#shell-completion)
+- [Hints to help integrating the drivers on other L4T versions and carrier boards](#hints-to-help-integrating-the-drivers-on-other-l4t-versions-and-carrier-boards)
+  - [Adding a new L4T version, vendor, or carrier board](#adding-a-new-l4t-version-vendor-or-carrier-board)
+  - [Creating device trees for a new SoM / carrier board](#creating-device-trees-for-a-new-som-carrier-board)
+  - [Understanding the source copy and patch generation workflow](#understanding-the-source-copy-and-patch-generation-workflow)
 
-* For standalone builds, initramfs generation requires ARM64 emulation on the host:
-<pre>
+---
+
+## Prerequisites for cross-compiling
+
+### Host PC requirements
+
+**Recommended OS:** Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. Ubuntu 22.04 LTS is currently used.
+
+**Required packages:**
+
+```bash
+# For standalone builds (L4T 36.x): ARM64 emulation for initramfs generation
 sudo apt install qemu-user-static binfmt-support
-</pre>
 
-<!-- TOC --><a name="building-and-installing-mipi-drivers-on-supported-l4t-versions-som-carrier-boards"></a>
-## Building and installing MIPI drivers on supported L4T versions / SoM / carrier boards
+# For faster archive extraction (highly recommended)
+sudo apt install lbzip2 pigz pbzip2
 
-<!-- TOC --><a name="supported-l4t-versions-som-and-carrier-boards"></a>
+# For building Debian packages
+sudo apt install ruby ruby-dev
+sudo gem install fpm
+
+# For JSON configuration processing
+sudo apt install jq
+```
+
+---
+
+## Building and installing MIPI drivers
+
 ### Supported L4T versions, SOM and carrier boards
-Refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet.
-For the rest of the document, $L4T_VERSION refers to the L4T version to build. For example :
-L4T_VERSION=35.5.0
 
-<!-- TOC --><a name="building-the-l4t-environment"></a>
+Refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet for the complete list of supported configurations.
+
+For the rest of this document:
+- `$L4T_VERSION` refers to the L4T version (e.g., `35.5.0`, `36.4.4`)
+- `$VENDOR` refers to the carrier board vendor (`generic` for Nvidia boards, or vendor-specific like `forecr`)
+- `$CARRIER_BOARD` refers to the specific carrier board (`generic` for standard Nvidia boards, or board-specific like `dsboard_ornx`)
+
 ### Building the L4T environment
-This section is for developers needing to rebuild the drivers.
 
-<!-- TOC --><a name="source-code-organization"></a>
+This section describes the build process using the unified `l4t_make.sh` orchestration script.
+
 #### Source code organization
-The Exosens camera driver modifications are available in two formats :
-* **sources/** : Complete source files. Use this if you need to modify the code (developer workflow).
-* **patches/** : Patch files only. Use this for a lighter distribution without full source files (client workflow).
 
-<!-- TOC --><a name="developer-workflow-with-full-sources"></a>
-#### Developer workflow (with full sources)
-If you are a developer modifying the camera driver code, use the full sources :
-<pre>
-./l4t_prepare.sh $L4T_VERSION
-./l4t_copy_sources.sh $L4T_VERSION
-./l4t_build.sh $L4T_VERSION
-</pre>
-The *l4t_copy_sources.sh* script copies the complete source files from **sources/** to the L4T build environment and generates patch files in **patches/** for distribution.
+The Exosens camera driver modifications are available in two formats:
+- **sources/**: Complete source files organized by L4T version and vendor
+- **patches/**: Automatically generated patch files for distribution
 
-<!-- TOC --><a name="client-workflow-with-patches-only"></a>
-#### Client workflow (with patches only)
-If you are a client who only needs to rebuild without modifying the code, you can use the lighter patch-based workflow :
-<pre>
-./l4t_prepare.sh $L4T_VERSION
-./l4t_patch_sources.sh $L4T_VERSION
-./l4t_build.sh $L4T_VERSION
-</pre>
-The *l4t_patch_sources.sh* script applies the patches from **patches/** to the original Nvidia BSP. This is faster and requires less disk space than the full sources.
+#### Building workflow
 
-- Generate the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package including the MIPI drivers :
-<pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION generic
-</pre>
-X.Y.Z is the driver version taken automatically from the git tag. So to use this script, a git checkout must be made on the correct tag.
-It it possible to force the version number with the following command : 
-<pre>
-./l4t_gen_delivery_package.sh $L4T_VERSION generic X.Y.Z
-</pre>
-The package is generated in the $L4T_VERSION folder.
+The `l4t_make.sh` script orchestrates the entire build process. Use `./l4t_make.sh --help` for complete documentation.
 
-<!-- TOC --><a name="building-mipi-drivers-for-specific-carrier-boards"></a>
+**Step 1: Prepare the L4T environment**
+
+Download and extract the BSP, toolchain, and sources for a specific L4T version:
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --prepare
+```
+
+To start from scratch (delete existing build directory):
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --prepare --from-scratch
+```
+
+This step:
+- Downloads BSP archives (jetson_linux, sample rootfs, toolchain, public sources)
+- Extracts archives using parallel decompression when available
+- Prepares the Linux_for_Tegra directory structure
+
+**Step 2: Copy sources and generate patches**
+
+Copy Exosens sources to the build environment and generate distribution patches:
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --copy-sources
+```
+
+This step:
+- Copies source files from `sources/` to the build environment
+- Creates a git repository to track modifications
+- Generates patch files in `patches/$L4T_VERSION/` for distribution
+
+**Step 3: Build kernel and drivers**
+
+Compile the kernel, device trees, and kernel modules:
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --build
+```
+
+This step:
+- Configures and builds the kernel Image
+- Builds device tree blobs (.dtb) and overlays (.dtbo)
+- Compiles and installs kernel modules
+- For L4T 36.x standalone builds, generates initramfs with the `-eg` suffix
+
+**Step 4: Generate the Debian package**
+
+Create the deliverable `.deb` package:
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --gen-package [-p X.Y.Z]
+```
+
+The package version can be:
+- Automatically detected from git tag (if checked out on a tagged commit)
+- Manually specified with `-p X.Y.Z`. Prior to tag version if specified.
+
+The generated package: `jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb`
+
+**Running all steps at once:**
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --all -p X.Y.Z
+```
+
+This runs all four steps (prepare, copy-sources, build, gen-package) sequentially.
+
+**Parallel execution:**
+
+To build multiple L4T versions simultaneously:
+
+```bash
+# Auto-detect number of CPU cores (default)
+./l4t_make.sh --all -p X.Y.Z
+
+# Specify number of parallel jobs
+./l4t_make.sh --all -p X.Y.Z -j 4
+
+# Build specific versions in parallel
+./l4t_make.sh -v "36.*" --all -p X.Y.Z -j 8
+```
+
+The parallel mode displays live status for each configuration showing version, vendor, carrier board, and current build step.
+
+**Note about L4T 36.x standalone builds:**
+
+Because for Nvidia SDK version from L4T 36.x some kernel modules are built "out of tree", Linux is built in **standalone mode** with the `-eg` suffix. This means:
+- The kernel version becomes `X.Y.Z-tegra-eg` instead of `X.Y.Z-tegra`
+- ALL kernel modules are included in the package (not just camera modules)
+- A dedicated initramfs (`/boot/eg/initrd-eg`) is generated
+- The Debian package is larger (~150MB) due to all modules being included
+
+#### Client workflow (patches only)
+
+If you are a client who only needs to rebuild without modifying the code, you can use the patch-based workflow.
+
+The patches are available in the `patches/` directory and can be applied to a clean L4T environment using the `l4t_patch_sources.sh` script as a reference:
+
+```bash
+./l4t_make.sh -v $L4T_VERSION --prepare
+# Apply patches manually (refer to l4t_patch_sources.sh for the method)
+./l4t_make.sh -v $L4T_VERSION --build --gen-package -p X.Y.Z
+```
+
+The `l4t_patch_sources.sh` script demonstrates how to apply patches to your own Linux_for_Tegra environment. Clients can adapt this script to their specific needs.
+
 ### Building MIPI drivers for specific carrier boards
-Some carrier boards need specific device trees and/or kernel patches. So a specific build has to be done, adding a parameter to the building scripts. The boards needing a specific build are tagged "Specific build" in the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet.
-Specific carried boards parameter values are :
-SPECIFIC_CARRIER_BOARD=forecr
 
-Then, the scripts execution is : 
-./l4t_prepare.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
-./l4t_copy_sources.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
-./l4t_build.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
-./l4t_gen_delivery_package.sh $L4T_VERSION $SPECIFIC_CARRIER_BOARD
+Some carrier boards require specific device trees and/or kernel configurations. The boards needing specific builds are tagged "Specific build" in the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet.
 
-Note : for the *forecr* specicific board, L4T versions 36.x, the kernel Image is built but not used, because some modules need the original kernel. So an EG kernel patch about I2C timeout is missing. This impacts EngineCore cameras (MicroCube, SmartIR640, Crius1280) control protocole (doesn't manage correctly an error timeout) but doesn't impact video streaming.
+**Example: Building for Forecr carrier board with dsboard_ornx:**
 
-<!-- TOC --><a name="installing-and-configuring-the-mipi-drivers-on-the-board"></a>
+```bash
+# Build all steps for forecr/dsboard_ornx
+./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --all -p X.Y.Z
+
+# Or step by step:
+./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --prepare
+./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --copy-sources
+./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --build
+./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --gen-package -p X.Y.Z
+```
+
+This generates: `jetson-l4t-$L4T_VERSION-forecr-dsboard-ornx-eg-cams_X.Y.Z_arm64.deb`
+
 ### Installing and configuring the MIPI drivers on the board
-<!-- TOC --><a name="package-installation"></a>
+
 #### Package installation
 
-Note : if a 1.x.x $L4T_VERSION is already installed on the target, uninstall it. The packages names have changed with version 2.x.x, so there would be some warnings due to common files conflicts without previous uninstallation.
+**Important:** If you have driver version 2.x.x or lower already installed, you must **uninstall** it first (not just update) :
 
-Install the jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb package on the Jetson board. It was delivered (refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet) or locally built previously :
-<pre>
+```bash
+# Uninstall old version if present
+sudo dpkg -r jetson-l4t-mipi-eg-cam  # or similar package name
+
+# Install new version
 sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
-</pre>
+```
 
-<!-- TOC --><a name="configuring-camera-ports"></a>
+The package was either delivered (see [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx)) or built locally following the previous steps.
+
 #### Configuring camera ports
-Note on port numbers :
-- it depends on the carrier board, but there are generally 2 camera ports on Jetson boards : "cam0" and "cam1"
-- for the AGX Orin Auvidea X230D board, port 0 is printed "CD" on the PCB, and port 1 is "AB".
-- in Linux, when a video device is registered (camera detected), a /dev/videoX device appears. The X number is not the camera port number, but the number of the camera device, in the order it has been registered. Use eg_dt_camera_config_get.sh to get the attributed video device for each camera.
 
-After installing the MIPI driver package for the first time, both ports are configured by default for Dione cameras.
+**Note on port numbers:**
+- Jetson boards typically have 2 camera ports: "cam0" and "cam1"
+- For the AGX Orin Auvidea X230D board, port 0 is "CD" and port 1 is "AB" on the PCB
+- The `/dev/videoX` device number is NOT the camera port number, but the registration order
 
-To change the configuration, use this command, <ins>then reboot</ins> : 
-<pre>
-eg_dt_camera_config_set.sh $CAMPORT_NUMBER_0 $CAM_TYPE $CAMPORT_NUMBER_1 $CAM_TYPE
-</pre>
-With CAMPORT_NUMBER_0 = 0 or CAMPORT_NUMBER_0 = 1
-With CAM_TYPE = Dione, MicroCube640, SmartIR640 or Crius1280
-Note : if a port is not set in the command line, the port is configured for Dione
+**Default configuration:**
 
+After first installation, both ports are configured for Dione cameras.
 
-To get the ports configuration (after a "set" command <ins>and</ins> a reboot), use this command : 
-<pre>
+**Changing the configuration:**
+
+```bash
+eg_dt_camera_config_set.sh $PORT0 $CAM_TYPE0 $PORT1 $CAM_TYPE1
+```
+
+Where:
+- `$PORT0`, `$PORT1` = `0` or `1` (camera port number)
+- `$CAM_TYPE` = `Dione`, `MicroCube640`, `SmartIR640`, or `Crius1280`
+
+**Note:** Ports not specified in the command are configured for Dione by default.
+
+**After changing configuration, reboot is required:**
+
+```bash
+sudo reboot
+```
+
+**Getting the current configuration:**
+
+After a configuration change and reboot, check the current status:
+
+```bash
 eg_dt_camera_config_get.sh
-</pre>
+```
 
-Note : for some boards wiht multiple camera ports, it is possible to mix Exosens cameras and some sensors originally supported by the Jetson boards (IMX219 and/or IMX477). Consult the support team if this is needed.
+This displays:
+- **Board:** The detected board, SoM and SoC
+- **Camera ports:** For each port, the configured camera type, connection status, video device and I2C device
+- **Total configured:** Number of configured cameras
 
-<!-- TOC --><a name="quick-start---testing-the-camera"></a>
+**Example output:**
+```
+=== Exosens Camera Configuration ===
+
+Board: nvidia-devkit (orin-nx, t234)
+
+Camera ports:
+  Port 0: SmartIR640 or Crius1280 (connected)
+    Video device: /dev/video0
+    I2C device:   /dev/eg-ec-mipi-10-0016
+  Port 1: Dione (connected)
+    Video device: /dev/video1
+    I2C device:   /dev/dioneir-i2c-9-000e-5a
+
+Total configured: 2 camera(s)
+```
+
+**Note:** For some boards with multiple camera ports, it is possible to mix Exosens cameras with sensors originally supported by Jetson boards (IMX219, IMX477). Consult the support team if needed.
+
 ### Quick start - Testing the camera
 
-After installing the package and rebooting, verify that the camera is detected :
-<pre>
+After installing the package and rebooting, verify camera detection:
+
+```bash
 ls /dev/video*
-</pre>
+```
 
-A /dev/videoX device should appear for each connected camera.
+A `/dev/videoX` device should appear for each connected camera.
 
-#### Check camera information
-<pre>
+**Check camera information:**
+
+```bash
 v4l2-ctl -d /dev/video0 --all
-</pre>
+```
 
-#### Capture a single frame to a file
-* MicroCube/SmartIR640 cameras (YCbCr format, 640x480) :
-<pre>
-v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="YUYV" --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=frame.raw
-</pre>
+**Capture a single frame:**
 
-* Crius1280 cameras (YCbCr format, 1280x1024) :
-<pre>
-v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=frame.raw
-</pre>
+- **MicroCube/SmartIR640** (YCbCr format, 640x480):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=640,height=480,pixelformat="YUYV" \
+  --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=frame.raw
+```
 
-* Dione cameras (ARGB format, 640x480) :
-<pre>
-v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24" --stream-count=1 --stream-to=frame.raw
-</pre>
+- **Crius1280** (YCbCr format, 1280x1024):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" \
+  --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=frame.raw
+```
 
-For more streaming examples , see /opt/eg/doc/streaming_examples.txt on the target after package installation.
+- **Dione** (ARGB format, 640x480):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=640,height=480,pixelformat="AR24" \
+  --stream-count=1 --stream-to=frame.raw
+```
 
-<!-- TOC --><a name="notes-about-linux-boot-and-device-trees"></a>
+For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.
+
+---
+
 ## Notes about Linux boot and device trees
 
-<!-- TOC --><a name="linux-boot"></a>
-### Linux boot
-The /boot/extlinux/extlinux.conf contains the data for the Linux boot. 
-A "JetsonIO" entry is added at first package installation, and is set as default one.
+### Linux boot configuration
 
-Here is an example from the Orin NX : 
-<pre>
+The `/boot/extlinux/extlinux.conf` file contains Linux boot configuration. A "JetsonIO" entry is added at first package installation and set as default.
+
+**Example from Orin NX:**
+
+```
 DEFAULT JetsonIO
 [...]
 LABEL JetsonIO
-        MENU LABEL Custom Header Config: <CSI Exosens Cameras. CAM0:EC_1_lane> <CSI Exosens Cameras. CAM1:EC_1_lane>
-        LINUX /boot/eg/Image
-        FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
-        INITRD /boot/initrd
-        APPEND [...]
-        OVERLAYS /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
-		[...]
-</pre>
+    MENU LABEL Custom Header Config: <CSI Exosens Cameras. CAM0:EC_1_lane> <CSI Exosens Cameras. CAM1:EC_1_lane>
+    LINUX /boot/eg/Image
+    FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
+    INITRD /boot/initrd
+    APPEND [...]
+    OVERLAYS /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
+    [...]
+```
 
-Description :
-- LINUX line :
-   - using the /boot/eg/Image is not mandatory for video streaming to be functional for 36.x L4T version
-   - customer can add their own patches in the dedicated kernel source folder
-   - consult the support team for more information
-Note : for the *forecr* specicific board, L4T versions 36.x, the /boot/eg/Image is not used, because some modules need the original kernel. So an EG kernel patch about I2C timeout is missing. This impacts EngineCore cameras (MicroCube, SmartIR640, Crius1280) control protocole (doesn't manage correctly an error timeout) but doesn't impact video streaming.
-- FDT line : native devicetree file
-- OVERLAYS : list of overlay files to apply
+**Description:**
+- **LINUX:** Path to the kernel Image
+  - `/boot/eg/Image` - The Exosens kernel
+- **FDT:** Base device tree file
+- **INITRD:** Initial ramdisk
+  - `/boot/initrd` for L4T 32.x/35.x
+  - **`/boot/eg/initrd-eg` for L4T 36.x standalone builds**
+- **OVERLAYS:** Comma-separated list of device tree overlay files to apply
 
-<!-- TOC --><a name="orin-nxnano-devkit-devicetree-issue"></a>
+**Important note for L4T 36.x:**
+
+For standalone builds (L4T 36.x), the INITRD line must use the standalone initramfs:
+
+```
+INITRD /boot/eg/initrd-eg
+```
+
+The package post-install script automatically updates this when installing on a system with JetsonIO configuration.
+
+**Custom kernel patches:**
+
+Customers can add their own kernel patches in:
+- `sources/$L4T_VERSION/Linux_for_Tegra/` (full sources)
+- `patches/$L4T_VERSION/` (patch files)
+
+Consult the support team for assistance with custom modifications.
+
 ### Orin NX/Nano devkit devicetree issue
-There is a CSI diff pair swap on Jetson Orin Nano devkit :
+
+There is a CSI differential pair swap on Jetson Orin Nano devkit:
 https://nvidia-jetson.piveral.com/jetson-orin-nano/csi-diff-pair-polarity-swap-on-nvidia-jetson-orin-nano-dev-board/
-<pre>
-lane_polarity = "6"; 
-</pre>
-has been added in this devicetree overlay as a workaround for that issue : tegra234-p3767-camera-common-eg-cams-dione.dtsi
 
-To port the devicetree on a custom carrier board embedding the Orin NX/Nano, this lane polarity parameter may have to be removed.
+The following workaround is applied in `tegra234-p3767-camera-common-eg-cams-dione.dtsi`:
 
+```c
+lane_polarity = "6";
+```
 
-<!-- TOC --><a name="hints-to-help-integrating-the-drivers-on-other-l4t-versions-and-other-somcarrier-boards"></a>
-## Hints to help integrating the drivers on other L4T versions and other SoM/carrier boards
+**Important:** When porting device trees to a custom carrier board embedding Orin NX/Nano, this lane polarity parameter may need to be removed if the custom board doesn't have the same swap issue.
 
-Here are some informations about how to create MIPI drivers for a new L4T version and new SoM/carrier boards.
-Basically, take example on the existing environment.
+---
 
-<!-- TOC --><a name="getting-the-l4t-archives-files"></a>
-### Getting the L4T archives files
+## Shell completion
 
-* First check the compatibility of the L4T_VERSION with the SoM target : https://developer.nvidia.com/embedded/jetson-linux-archive
+The build system includes bash completion for `l4t_make.sh` commands and arguments.
 
-* modify the *environment* file and add a new entry. For example the L4T version 36.4.4, generic (for all boards) and forecr (specific carrier board) : 
-<pre>
-36.4.4)
-   case "$module" in
-   generic|forecr)
-      JETSON_PUBLIC_SOURCES=public_sources.tbz2
-      JETSON_PUBLIC_SOURCES_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/sources/${JETSON_PUBLIC_SOURCES}
-      JETSON_TOOCHAIN_ARCHIVE=aarch64--glibc--stable-2022.08-1.tar.bz2
-      JETSON_TOOCHAIN_ARCHIVE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/$JETSON_TOOCHAIN_ARCHIVE
-      TOOLCHAIN_DIR=aarch64--glibc--stable-2022.08-1
-      TOOLCHAIN_PREFIX=$JETSON_DIR/$TOOLCHAIN_DIR/$TOOLCHAIN_DIR/bin/aarch64-buildroot-linux-gnu-
-      L4T_RELEASE_PACKAGE=jetson_linux_r36.4.4_aarch64.tbz2
-      L4T_RELEASE_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/release/${L4T_RELEASE_PACKAGE}
-      SAMPLE_FS_PACKAGE=tegra_linux_sample-root-filesystem_r36.4.4_aarch64.tbz2
-      SAMPLE_FS_PACKAGE_URL=https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/release/${SAMPLE_FS_PACKAGE}
-      ;;
-   *)
-      echo "Incorrect $module module"
-      exit
-      ;;
-   esac
-   ;;
-</pre>
+**To enable completion on your host PC:**
 
-<!-- TOC --><a name="porting-kernel-patches-to-a-new-l4t-version"></a>
-### Porting kernel patches to a new L4T version
-The *source/$L4T_VERSION/Linux_for_Tegra* folder contains the customized files specific to a L4T version needed to build the MIPI drivers.
+```bash
+# Add to your ~/.bashrc
+source /path/to/mipi_l4t_eg-forecr-5.x/tools/l4t_completion.bash
 
-If the need is only to implement a new $L4T_VERSION_NEW version :
-* create the *source/$L4T_VERSION_NEW/Linux_for_Tegra* folder, port and adapt the content from another *source/$L4T_VERSION/Linux_for_Tegra* folder
-* create the *source/$L4T_VERSION_NEW_common/Linux_for_Tegra* folder with the correcponding links to hadware and nvidia-oot paths (in sources/common/source)
+# Or install system-wide
+sudo cp tools/l4t_completion.bash /etc/bash_completion.d/l4t_make
+```
 
-Note : the *l4t_copy_sources.sh* script is in charge of copying customized files to the original L4T build environment.
+This provides tab-completion for:
+- Command options (`--prepare`, `--build`, `--all`, etc.)
+- L4T versions (`-v 36.4.4`)
+- Vendors (`-V forecr`)
+- Carrier boards (`-c dsboard_ornx`)
 
-<!-- TOC --><a name="creating-camera-device-trees-for-a-new-som-carrier-board"></a>
-### Creating camera device trees for a new SoM / carrier board
+---
 
-Device tree source files are in the *sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay* folder.
-Let's say the SoM ID is tegra234-pXXXX :
-* create the tegra234-pXXXX-camera-common-eg-cams-dione.dtsi, based on the native tegra234-pXXXX-camera dts files provided by Nvidia and tegra234-p3767-camera-common-eg-cams-dione.dtsi as an example
-* based on tegra234-p3767-camera-p3768-eg-cam*.dts files, create all needed overlay files : tegra234-pXXX-camera-eg-cams-dione, tegra234-pXXX-camera-eg-cam0-ec-1-lane, tegra234-pXXX-camera-eg-cam0-ec-2-lanes, , tegra234-pXXX-camera-eg-cam1-ec-1-lane, tegra234-pXXX-camera-eg-cam1-ec-2-lanes, etc..
-* add the tegra234-pXXX-camera-eg-cams-*.dtbo files in the corresponding Makefile : sources/36.x.x/Linux_for_Tegra/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-* if the carrier board has specificities over native Nvidia carrier boards (for example a different cam_i2c_mux gpio), one specific tegra234-pXXX-camera-$SPECIFIC_BOARD-eg-cams-dione devicetree has to be created. For example : sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
+## Hints to help integrating the drivers on other L4T versions and carrier boards
 
-<!-- TOC --><a name="integrating-specific-vendor-filespatches"></a>
-### Integrating specific vendor files/patches
-Some carrier board vendors provide specific patches. They need to be imported from the *sources/$L4T_VERSION/Linux_for_Tegra_$SPECIFIC* folder.
+This section provides guidance for creating MIPI drivers for new L4T versions, vendors, and carrier boards.
 
-For example, the "*./l4t_copy_sources.sh 36.4.3 forecr*" command uses *sources/36.4.3/Linux_for_Tegra* and *sources/36.4.3/Linux_for_Tegra_forecr*, which contains files collected from Forecr (https://github.com/forecr/forecr_xavier_kernel/tree/JetPack-6.2.1).
+### Adding a new L4T version, vendor, or carrier board
 
-Note : the *l4t_copy_sources.sh* script only copies files. If the developer wants to apply patch files, the script needs to be modified.
+The build system uses `l4t_versions.json` to define supported configurations.
 
+**Step 1: Update l4t_versions.json**
 
+Add configuration for the new L4T version:
 
+```json
+{
+  "versions": {
+    "36.5.0": {
+      "vendors": ["generic", "forecr"],
+      "sources": {
+        "public": {
+          "filename": "public_sources.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/sources/public_sources.tbz2"
+        },
+        "release": {
+          "filename": "jetson_linux_r36.5.0_aarch64.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/jetson_linux_r36.5.0_aarch64.tbz2"
+        },
+        "sample_fs": {
+          "filename": "tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2"
+        }
+      },
+      "toolchain": {
+        "archive": "aarch64--glibc--stable-2022.08-1.tar.bz2",
+        "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2",
+        "dir": "aarch64--glibc--stable-2022.08-1",
+        "prefix": "aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-"
+      },
+      "standalone": {
+        "forecr": {
+          "dsboard_ornx": true
+        }
+      }
+    }
+  },
+  "vendors": {
+    "generic": {
+      "carriers": ["generic"],
+      "default_carrier": "generic"
+    },
+    "forecr": {
+      "carriers": ["dsboard_ornx"],
+      "default_carrier": "dsboard_ornx"
+    }
+  },
+  "carriers": {
+    "generic": {},
+    "dsboard_ornx": {
+      "defconfig": "forecr_defconfig",
+      "dir_suffix": "dsboard_ornx"
+    }
+  }
+}
+```
 
+**Step 2: Create source directory structure**
 
+Create the source directory for the new L4T version:
 
+```bash
+# For generic (Nvidia) boards
+mkdir -p sources/$L4T_VERSION_NEW/Linux_for_Tegra/
 
+# For vendor-specific boards (if applicable)
+mkdir -p sources/$L4T_VERSION_NEW/Linux_for_Tegra_${VENDOR_NEW}/
+```
+
+**Step 3: Port source files**
+
+Copy and adapt source files from a similar L4T version:
+
+```bash
+# Start with the closest L4T version as a template
+cp -r sources/$L4T_VERSION_SIMILAR/Linux_for_Tegra/* \
+      sources/$L4T_VERSION_NEW/Linux_for_Tegra/
+
+# Review and adapt:
+# - Kernel defconfig files
+# - Device tree overlays
+# - Scripts in rootfs/opt/eg/ and rootfs/usr/bin/
+# - Any version-specific patches
+```
+
+**Step 4: Create device trees**
+
+See next section for detailed device tree creation.
+
+**Step 5: Test the build**
+
+```bash
+./l4t_make.sh -v $L4T_VERSION_NEW --all -p 0.0.1-test
+```
+
+### Creating device trees for a new SoM / carrier board
+
+Device tree source files location depends on L4T version:
+- **L4T 36.x:** `sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay/`
+- **L4T 32.x/35.x:** `sources/common/source/hardware_32+/nvidia/soc/t19x/kernel-dts/`
+
+**Steps for creating device trees (example for Orin with tegra234-pXXXX SoM ID):**
+
+1. **Create common base device tree:**
+
+```bash
+cd sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay/
+
+# Create the common camera definitions
+# Based on Nvidia's native tegra234-pXXXX-camera files and existing examples
+cp tegra234-p3767-camera-common-eg-cams-dione.dtsi \
+   tegra234-pXXXX-camera-common-eg-cams-dione.dtsi
+
+# Edit to match your hardware:
+# - CSI port mappings
+# - I2C bus numbers
+# - GPIO assignments
+# - Clock configurations
+```
+
+2. **Create overlay files for each camera configuration:**
+
+```bash
+# Dione camera overlay (base)
+cp tegra234-p3767-camera-p3768-eg-cams-dione.dts \
+   tegra234-pXXXX-camera-pYYYY-eg-cams-dione.dts
+
+# Port 0 overlays (1-lane and 2-lanes EngineCore)
+cp tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts \
+   tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-1-lane.dts
+
+cp tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts \
+   tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-2-lanes.dts
+
+# Port 1 overlays
+cp tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts \
+   tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-1-lane.dts
+
+cp tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts \
+   tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dts
+```
+
+3. **Update the Makefile to build the new overlays:**
+
+```makefile
+# In sources/$L4T_VERSION/Linux_for_Tegra/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
+# (for L4T 36.x)
+
+dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cams-dione.dtbo
+dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-1-lane.dtbo
+dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-2-lanes.dtbo
+dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-1-lane.dtbo
+dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dtbo
+```
+
+4. **For vendor-specific carrier boards with special requirements:**
+
+If the carrier board has hardware differences (e.g., different GPIO for cam_i2c_mux), create a vendor-specific variant:
+
+```bash
+# Example for a Forecr board with special configuration
+cp tegra234-p3767-camera-common-eg-cams-dione.dtsi \
+   tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
+
+# Modify for the specific board's hardware
+```
+
+### Understanding the source copy and patch generation workflow
+
+The build system uses a two-phase approach for managing source modifications:
+
+**Phase 1: Source Organization**
+
+Source files are organized in `sources/` directory:
+
+```
+sources/
+├── common/                         # Files common to all L4T versions
+│   ├── Linux_for_Tegra/           # Scripts, tools, documentation
+│   │   ├── rootfs/opt/eg/         # Exosens tools and scripts
+│   │   └── rootfs/usr/bin/        # System utilities
+│   └── source/                    # Common source code
+│       ├── hardware_36+/          # Hardware definitions for L4T 36.x+
+│       ├── hardware_32+/          # Hardware definitions for L4T 32.x-35.x
+│       └── nvidia-oot/            # Out-of-tree driver modules
+│
+├── 35.6.2/                        # L4T version-specific files
+│   └── Linux_for_Tegra/
+│       ├── rootfs/                # Version-specific scripts
+│       └── source/                # Version-specific kernel patches
+│
+└── 36.4.4/                        # Another L4T version
+    ├── Linux_for_Tegra/           # Generic (Nvidia) boards
+    └── Linux_for_Tegra_forecr/    # Vendor-specific (Forecr) additions
+```
+
+**Phase 2: Copy and Patch Generation**
+
+When running `./l4t_make.sh --copy-sources`:
+
+1. **Initialize git repository** in the build directory
+   - Creates `.gitignore` to track only modified files
+   - Commits the original Nvidia BSP state
+
+2. **Copy sources with priority:**
+   - First: `sources/common/` (common files)
+   - Second: `sources/$L4T_VERSION/` (version-specific files, overrides common)
+   - Third: `sources/$L4T_VERSION/Linux_for_Tegra_$VENDOR/` (vendor-specific, overrides all)
+
+3. **Track modifications:**
+   - Git detects all changes vs original Nvidia BSP
+   - Modifications include: new files, modified files, deleted files
+
+4. **Generate patches automatically:**
+   - Creates patch files in `patches/$L4T_VERSION/`
+   - Patches are organized by directory (e.g., `source_kernel.patch`, `rootfs_opt_eg.patch`)
+   - Each patch contains all changes for that component
+   - Generates `README.txt` with patch summary
+
+5. **Verify patches:**
+   - Applies generated patches to clean state
+   - Confirms patches recreate the exact source tree
+   - Reports any discrepancies
+
+**Benefits of this approach:**
+
+- **Developer workflow:** Work with full sources, easy to modify and test
+- **Client workflow:** Lightweight distribution with patches only
+- **Version control:** Git-based tracking of all modifications
+- **Traceability:** Clear patches show exactly what changed vs Nvidia BSP
+- **Flexibility:** Easy to port changes to new L4T versions by applying patches
+
+**Example: Integrating vendor-specific files**
+
+Some vendors (like Forecr) provide their own kernel patches and device trees. To integrate:
+
+1. Download vendor sources (e.g., from Forecr GitHub)
+2. Create vendor directory: `sources/$L4T_VERSION/Linux_for_Tegra_$VENDOR/`
+3. Extract relevant files (defconfig, device trees, patches)
+4. Run `--copy-sources` to merge vendor files with Exosens modifications
+5. Generated patches combine both vendor and Exosens changes
+
+**Example: Forecr integration**
+
+```bash
+# Forecr provides kernel patches and device trees
+# Their sources are imported to:
+sources/36.4.3/Linux_for_Tegra_forecr/
+
+# When building:
+./l4t_make.sh -v 36.4.3 -V forecr --copy-sources
+
+# This copies in order:
+# 1. sources/common/                          (Exosens common)
+# 2. sources/36.4.3/Linux_for_Tegra/          (Exosens for 36.4.3)
+# 3. sources/36.4.3/Linux_for_Tegra_forecr/   (Forecr + Exosens for 36.4.3)
+
+# Result: Combined Nvidia + Forecr + Exosens sources
+```
+
+---
+
+**For additional support or questions, contact the Exosens support team.**

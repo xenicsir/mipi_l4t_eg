@@ -25533,13 +25533,14 @@ index 0000000..8882bbb
 +	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
-index 60243ed..a1b0214 100644
+index 60243ed..f576b16 100644
 --- a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
-@@ -47,6 +47,144 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-imx477-dual-4lane.dtbo
+@@ -47,6 +47,146 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-imx477-dual-4lane.dtbo
  dtbo-$(BUILD_ENABLE) += tegra234-p3767-overlay.dtbo
  dtbo-$(BUILD_ENABLE) += tegra234-p3768-overlay.dtbo
  
++<<<<<<< /home/da38/work/external_drive/jetson/mipi_l4t_eg-forecr-5.x/sources/35.6.2/Linux_for_Tegra_forecr/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cams-dione.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
@@ -25551,7 +25552,7 @@ index 60243ed..a1b0214 100644
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
-+
++=======
 +dtb-$(BUILD_ENABLE) += tegra234-p3767-0000-p3509-a02-dsboard-nx2.dtb
 +dtb-$(BUILD_ENABLE) += tegra234-p3767-0000-p3768-0000-a0-dsboard-ornx.dtb
 +dtb-$(BUILD_ENABLE) += tegra234-p3767-0000-p3768-0000-a0-dsboard-ornx-basler.dtb
@@ -25677,6 +25678,7 @@ index 60243ed..a1b0214 100644
 +dtb-$(BUILD_ENABLE) += tegra234-p3767-0004-super-p3768-0000-a0-milboard-ornx-base.dtb
 +dtb-$(BUILD_ENABLE) += tegra234-p3767-0004-super-p3768-0000-a0-raiboard-ornx.dtb
 +dtb-$(BUILD_ENABLE) += tegra234-p3767-0004-super-p3768-0000-a0-raiboard-ornx-base.dtb
++>>>>>>> /home/da38/work/external_drive/jetson/forecr/forecr_xavier_kernel_5.1.5/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
 +
  ifneq ($(dtb-y),)
  dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))

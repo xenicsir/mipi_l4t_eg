@@ -140,8 +140,7 @@ copy_module() {
 #******************************************************************************
 # Step 1: Copy files from sources/
 #******************************************************************************
-echo ""
-echo "Copying Exosens sources..."
+update_status "Copying Exosens sources..."
 
 copy_from_sources "rootfs/usr" "usr"
 copy_from_sources "rootfs/opt/eg" "opt/eg"
@@ -149,15 +148,13 @@ copy_from_sources "rootfs/opt/eg" "opt/eg"
 #******************************************************************************
 # Step 2: Copy version info from build
 #******************************************************************************
-echo ""
-echo "Copying version info..."
+update_status "Copying version info..."
 copy_from_rootfs "etc/version_eg_cams" "etc/"
 
 #******************************************************************************
 # Step 3: Copy boot files (kernel, dtb, dtbo)
 #******************************************************************************
-echo ""
-echo "Copying boot files..."
+update_status "Copying boot files..."
 
 # EG kernel and dtbo
 if [[ -d "$ROOTFS_DIR/boot/eg" ]]; then
@@ -178,8 +175,7 @@ done
 #******************************************************************************
 # Step 4: Copy kernel modules
 #******************************************************************************
-echo ""
-echo "Copying kernel modules..."
+update_status "Copying kernel modules..."
 
 if [[ $STANDALONE_BUILD -eq 1 ]]; then
    # Standalone build: Copy ALL kernel modules to ensure kernel/modules compatibility
@@ -216,6 +212,7 @@ fi
 #******************************************************************************
 # Step 5: Create post-install script
 #******************************************************************************
+update_status "Creating install scripts..."
 cat > /tmp/postinst << 'EOT'
 #!/bin/bash
 depmod
@@ -281,8 +278,7 @@ echo "Package version: ${PACKAGE_VERSION}"
 #******************************************************************************
 # Step 8: Build Debian package with fpm
 #******************************************************************************
-echo ""
-echo "Building Debian package..."
+update_status "Building Debian package..."
 
 # Remove existing .deb package if it exists
 # Note: fpm converts underscores to hyphens in package names (Debian convention)
@@ -315,8 +311,17 @@ fpm -v ${PACKAGE_VERSION} \
 if [[ $? -eq 0 ]]; then
    echo ""
    echo "============================================"
-   echo "Package generated: ${PACKAGE_NAME}_${PACKAGE_VERSION}_arm64.deb"
+   echo "Package generated: ${DEB_PACKAGE}"
    echo "============================================"
+
+   # Copy to delivery directory if it exists
+   DELIVERY_DIR="$ROOT_DIR/delivery"
+   if [[ -d "$DELIVERY_DIR" ]]; then
+      DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${PACKAGE_VERSION}"
+      mkdir -p "$DELIVERY_SUBDIR"
+      cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
+      echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"
+   fi
 else
    echo ""
    echo "Error: Package generation failed"
@@ -326,19 +331,20 @@ fi
 #******************************************************************************
 # Step 9: Verify generated package
 #******************************************************************************
-echo ""
-echo "Verifying package..."
+update_status "Verifying package..."
 
 VERIFY_ARGS="-v $L4T_VERSION"
 [[ "$VENDOR" != "generic" ]] && VERIFY_ARGS="$VERIFY_ARGS -V $VENDOR -c $CARRIER_BOARD"
 
 cd $ROOT_DIR
 if ./l4t_verify_packages.sh $VERIFY_ARGS; then
+   update_status "Done"
    echo ""
    echo "============================================"
    echo "Package verified successfully"
    echo "============================================"
 else
+   update_status "Done (with warnings)"
    echo ""
    echo "Warning: Package verification found issues"
    echo "Review the errors above before distributing the package"

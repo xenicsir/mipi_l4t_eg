@@ -247,8 +247,23 @@ for version in "${sorted_versions[@]}"; do
             echo -e "      ${YELLOW}[MISSING] Only in Repo A${NC}"
             version_has_diff=1
         else
+            # Build version-specific exclude options and output filters
+            # Note: diff --exclude only matches names, not paths, so we filter output for paths
+            version_major=$(echo "$version" | cut -d. -f1)
+            EXTRA_EXCLUDES=""
+            OUTPUT_FILTER=""
+            if [[ "$version_major" == "32" ]] || [[ "$version_major" == "35" ]]; then
+                # Exclude build and modules directories (build artifacts under source/public/)
+                EXTRA_EXCLUDES="--exclude=build --exclude=modules"
+                # Filter out source/hardware (empty artifact from kernel build path bug)
+                OUTPUT_FILTER="grep -v '/source/hardware' | grep -v '/source: hardware'"
+            elif [[ "$version_major" == "36" ]]; then
+                # Filter out kernel/Makefile (patched for LOCALVERSION_SUFFIX during build)
+                OUTPUT_FILTER="grep -v '/source/kernel/Makefile'"
+            fi
+
             # Compare directories (excluding .git and build artifacts)
-            diff_output=$(diff -rq \
+            diff_output=$(diff -rq $EXTRA_EXCLUDES \
                 --exclude='.git' \
                 --exclude='.gitignore' \
                 --exclude='*.o' \
@@ -359,6 +374,11 @@ for version in "${sorted_versions[@]}"; do
                 --exclude='_out' \
                 --exclude='out' \
                 "$source_a" "$source_b" 2>&1)
+
+            # Apply version-specific output filter
+            if [[ -n "$OUTPUT_FILTER" && -n "$diff_output" ]]; then
+                diff_output=$(echo "$diff_output" | eval "$OUTPUT_FILTER")
+            fi
 
             if [[ -z "$diff_output" ]]; then
                 echo -e "      ${GREEN}[OK] Identical (excluding .git and build artifacts)${NC}"

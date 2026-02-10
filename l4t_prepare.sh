@@ -12,11 +12,60 @@
 #   ./l4t_prepare.sh -v 36.4.3
 #   ./l4t_prepare.sh -v 36.4.3 -V forecr
 #   ./l4t_prepare.sh --l4t-version 36.4.3 --vendor forecr --carrier-board dsboard_ornx
+#
+# Performance:
+#   Install parallel decompression tools for faster extraction:
+#     sudo apt install lbzip2 pigz
 #******************************************************************************
 
 . l4t_environment.sh
 l4t_init "$@"
 
+#******************************************************************************
+# Optimized tar extraction using parallel decompression when available
+# Usage: fast_tar_extract <archive_file>
+#******************************************************************************
+fast_tar_extract() {
+    local archive="$1"
+    local ext="${archive##*.}"
+
+    case "$ext" in
+        tbz2|bz2)
+            # Use parallel bzip2 if available (lbzip2 is fastest)
+            if command -v lbzip2 &>/dev/null; then
+                tar -I lbzip2 -xf "$archive"
+            elif command -v pbzip2 &>/dev/null; then
+                tar -I pbzip2 -xf "$archive"
+            else
+                tar -xjf "$archive"
+            fi
+            ;;
+        tgz|gz)
+            # Use parallel gzip if available
+            if command -v pigz &>/dev/null; then
+                tar -I pigz -xf "$archive"
+            else
+                tar -xzf "$archive"
+            fi
+            ;;
+        xz)
+            # Use parallel xz if available
+            if command -v pixz &>/dev/null; then
+                tar -I pixz -xf "$archive"
+            else
+                tar -xJf "$archive"
+            fi
+            ;;
+        *)
+            tar -xf "$archive"
+            ;;
+    esac
+}
+
+# Show which decompression tools are available
+echo "Decompression tools: $(command -v lbzip2 >/dev/null && echo 'lbzip2' || echo 'bzip2') | $(command -v pigz >/dev/null && echo 'pigz' || echo 'gzip')"
+
+update_status "Initializing..."
 mkdir -p $JETSON_DIR
 
 if [[ ! -d $ARCHIVE_DIR/$L4T_VERSION ]]; then
@@ -29,36 +78,45 @@ fi
 cd ${JETSON_DIR}
 
 if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE} ]]; then
-   wget $L4T_RELEASE_PACKAGE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE}
+   update_status "Downloading BSP..."
+   wget -q $L4T_RELEASE_PACKAGE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE}
 fi
 if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE} ]]; then
-   wget $SAMPLE_FS_PACKAGE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}
+   update_status "Downloading rootfs..."
+   wget -q $SAMPLE_FS_PACKAGE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}
 fi
 if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES} ]]; then
-   wget $JETSON_PUBLIC_SOURCES_URL -O $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}
+   update_status "Downloading sources..."
+   wget -q $JETSON_PUBLIC_SOURCES_URL -O $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}
 fi
 
 if [[ ! -d $LINUX_FOR_TEGRA_DIR ]]; then
    sudo rm -rf tmp_$LINUX_FOR_TEGRA_DIR
    mkdir tmp_$LINUX_FOR_TEGRA_DIR
    cd tmp_$LINUX_FOR_TEGRA_DIR
-   tar xvf $ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE}
+   update_status "Extracting BSP..."
+   fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE}"
    sudo mv Linux_for_Tegra ../$LINUX_FOR_TEGRA_DIR
    cd ${JETSON_DIR}/${LINUX_FOR_TEGRA_DIR}/rootfs/
-   sudo tar xpvf $ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}
+   update_status "Extracting rootfs..."
+   sudo tar -I lbzip2 -xpf "$ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}" 2>/dev/null \
+      || sudo tar -xpjf "$ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}"
    cd ..
-   sudo ./apply_binaries.sh
+   update_status "Applying binaries..."
+   sudo ./apply_binaries.sh > /dev/null 2>&1
 fi
 
 # Get toolchain
 cd $JETSON_DIR
 if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${JETSON_TOOCHAIN_ARCHIVE} ]]; then
-   wget $JETSON_TOOCHAIN_ARCHIVE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${JETSON_TOOCHAIN_ARCHIVE}
+   update_status "Downloading toolchain..."
+   wget -q $JETSON_TOOCHAIN_ARCHIVE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${JETSON_TOOCHAIN_ARCHIVE}
 fi
 if [[ ! -d $JETSON_DIR/$TOOLCHAIN_DIR ]]; then
    mkdir $JETSON_DIR/$TOOLCHAIN_DIR
    cd $JETSON_DIR/$TOOLCHAIN_DIR
-   tar xvf $ARCHIVE_DIR/$L4T_VERSION/$JETSON_TOOCHAIN_ARCHIVE
+   update_status "Extracting toolchain..."
+   fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/$JETSON_TOOCHAIN_ARCHIVE"
 fi
 
 # Decompress Linux sources
@@ -66,8 +124,11 @@ cd $JETSON_DIR
 sudo rm -rf tmp_$LINUX_FOR_TEGRA_DIR
 mkdir tmp_$LINUX_FOR_TEGRA_DIR
 cd tmp_$LINUX_FOR_TEGRA_DIR
-tar xvf $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}
-rsync -iahHAXxvz --progress Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
+update_status "Extracting public sources..."
+fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}"
+update_status "Copying sources..."
+rsync -aHAX Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
+
 
 cd $ROOT_DIR
 # Re-initialize to update L4T_SRC path after extraction
@@ -77,16 +138,22 @@ cd $L4T_SRC
 mkdir -p build
 mkdir -p modules
 
-tar -xvf kernel_src.tbz2
+update_status "Extracting kernel sources..."
+fast_tar_extract kernel_src.tbz2
+
 if [[ -f kernel_oot_modules_src.tbz2 ]]; then
-   tar -xvf kernel_oot_modules_src.tbz2
+   update_status "Extracting OOT modules..."
+   fast_tar_extract kernel_oot_modules_src.tbz2
 fi
 if [[ -f nvidia_kernel_display_driver_source.tbz2 ]]; then
-   tar -xvf nvidia_kernel_display_driver_source.tbz2
+   update_status "Extracting display driver..."
+   fast_tar_extract nvidia_kernel_display_driver_source.tbz2
 fi
 
+update_status "Cleaning up..."
 sudo rm -rf $JETSON_DIR/tmp_$LINUX_FOR_TEGRA_DIR
 
+update_status "Done"
 echo ""
 echo "============================================"
 echo "L4T ${L4T_VERSION_EXTENDED} environment prepared successfully"

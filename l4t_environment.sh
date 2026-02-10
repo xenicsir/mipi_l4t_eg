@@ -586,6 +586,20 @@ compute_derived_vars() {
 #   . l4t_environment.sh "$@"
 # They should be updated to explicitly call parse_l4t_args after sourcing.
 
+#******************************************************************************
+# Status reporting for parallel execution monitoring
+# If L4T_STATUS_FILE is set (by l4t_make.sh), writes status to that file
+# for live monitoring. Always prints to stdout as well.
+# Usage: update_status "message"
+#******************************************************************************
+update_status() {
+    local msg="$1"
+    echo "$msg"
+    if [[ -n "$L4T_STATUS_FILE" ]]; then
+        echo "$msg" > "$L4T_STATUS_FILE"
+    fi
+}
+
 # Export the initialization function for scripts that need full setup
 l4t_init() {
     parse_l4t_args "$@"
