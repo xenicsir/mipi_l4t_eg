@@ -66,6 +66,25 @@ fi
 echo "============================================"
 
 #******************************************************************************
+# Sanitize a version string for Debian compatibility
+# - Replaces invalid characters (/, _) with hyphens
+# - Prepends 0~ if the version doesn't start with a digit (Debian requirement)
+#******************************************************************************
+sanitize_debian_version() {
+   local ver="$1"
+   # Replace / and _ with hyphens
+   ver="${ver//\//-}"
+   ver="${ver//_/-}"
+   # Remove any remaining invalid characters (keep alphanumeric, ., +, ~, -)
+   ver=$(echo "$ver" | sed 's/[^a-zA-Z0-9.+~-]/-/g; s/-\+/-/g; s/-$//')
+   # Debian: version must start with a digit
+   if [[ ! "$ver" =~ ^[0-9] ]]; then
+      ver="0~${ver}"
+   fi
+   echo "$ver"
+}
+
+#******************************************************************************
 # Function: Copy from sources directory to package
 # Automatically handles common/, $VERSION/, and $VERSION/$VENDOR/
 #******************************************************************************
@@ -146,13 +165,37 @@ copy_from_sources "rootfs/usr" "usr"
 copy_from_sources "rootfs/opt/eg" "opt/eg"
 
 #******************************************************************************
-# Step 2: Copy version info from build
+# Step 2: Determine package version
 #******************************************************************************
-update_status "Copying version info..."
-copy_from_rootfs "etc/version_eg_cams" "etc/"
+update_status "Determining package version..."
+
+if [[ -n "$PACKAGE_VERSION" ]]; then
+   # -p specified: use it + git commit for traceability
+   DEB_VERSION="$(sanitize_debian_version "$PACKAGE_VERSION")+g${GIT_COMMIT}"
+elif [[ -n "$GIT_EXACT_TAG" ]]; then
+   # On an exact tag: clean release version
+   DEB_VERSION="$(sanitize_debian_version "$GIT_EXACT_TAG")"
+else
+   # No -p, no tag: use branch name + git commit
+   DEB_VERSION="$(sanitize_debian_version "$GIT_BRANCH")+g${GIT_COMMIT}"
+fi
+
+# Final safety: Debian version must start with a digit
+if [[ ! "$DEB_VERSION" =~ ^[0-9] ]]; then
+   DEB_VERSION="0~${DEB_VERSION}"
+fi
+
+echo "  Debian version: ${DEB_VERSION}"
 
 #******************************************************************************
-# Step 3: Copy boot files (kernel, dtb, dtbo)
+# Step 3: Generate version info
+#******************************************************************************
+update_status "Generating version info..."
+mkdir -p "${PACKAGE_NAME}/etc"
+echo "jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT_COMMIT})" > "${PACKAGE_NAME}/etc/version_eg_cams"
+
+#******************************************************************************
+# Step 4: Copy boot files (kernel, dtb, dtbo)
 #******************************************************************************
 update_status "Copying boot files..."
 
@@ -173,7 +216,7 @@ for dtb in $ROOTFS_DIR/boot/*-eg-*.dtb*; do
 done
 
 #******************************************************************************
-# Step 4: Copy kernel modules
+# Step 5: Copy kernel modules
 #******************************************************************************
 update_status "Copying kernel modules..."
 
@@ -186,7 +229,7 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
 
    if [[ -d "$MODULES_SRC" ]]; then
       mkdir -p "$MODULES_DEST"
-      sudo rsync -a "$MODULES_SRC/" "$MODULES_DEST/"
+      sudo rsync -a --exclude='build' --exclude='source' "$MODULES_SRC/" "$MODULES_DEST/"
       MODULE_COUNT=$(find "$MODULES_DEST" -name "*.ko" | wc -l)
       echo "  Copied $MODULE_COUNT kernel modules to ${KERNEL_VERSION}/"
    else
@@ -210,7 +253,7 @@ else
 fi
 
 #******************************************************************************
-# Step 5: Create post-install script
+# Step 6: Create post-install script
 #******************************************************************************
 update_status "Creating install scripts..."
 cat > /tmp/postinst << 'EOT'
@@ -252,28 +295,12 @@ fi
 EOT
 
 #******************************************************************************
-# Step 6: Create post-remove script
+# Step 7: Create post-remove script
 #******************************************************************************
 cat > /tmp/postrm << 'EOT'
 #!/bin/bash
 depmod
 EOT
-
-#******************************************************************************
-# Step 7: Determine package version
-#******************************************************************************
-if [[ -z "$PACKAGE_VERSION" ]]; then
-   PACKAGE_VERSION="$GIT_TAG"
-fi
-
-if [[ -z "$PACKAGE_VERSION" ]]; then
-   echo "Error: No package version specified and no git tag found"
-   echo "Use -p <version> to specify a package version"
-   exit 1
-fi
-
-echo ""
-echo "Package version: ${PACKAGE_VERSION}"
 
 #******************************************************************************
 # Step 8: Build Debian package with fpm
@@ -283,7 +310,7 @@ update_status "Building Debian package..."
 # Remove existing .deb package if it exists
 # Note: fpm converts underscores to hyphens in package names (Debian convention)
 DEB_PACKAGE_NAME="${PACKAGE_NAME//_/-}"
-DEB_PACKAGE="${DEB_PACKAGE_NAME}_${PACKAGE_VERSION}_arm64.deb"
+DEB_PACKAGE="${DEB_PACKAGE_NAME}_${DEB_VERSION}_arm64.deb"
 if [[ -f "$DEB_PACKAGE" ]]; then
    echo "Removing existing package: $DEB_PACKAGE"
    rm -f "$DEB_PACKAGE"
@@ -297,7 +324,7 @@ if ! command -v fpm &> /dev/null; then
    exit 1
 fi
 
-fpm -v ${PACKAGE_VERSION} \
+fpm -v ${DEB_VERSION} \
    -C ${PACKAGE_NAME} \
    -a arm64 \
    -s dir \
@@ -317,7 +344,7 @@ if [[ $? -eq 0 ]]; then
    # Copy to delivery directory if it exists
    DELIVERY_DIR="$ROOT_DIR/delivery"
    if [[ -d "$DELIVERY_DIR" ]]; then
-      DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${PACKAGE_VERSION}"
+      DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${DEB_VERSION}"
       mkdir -p "$DELIVERY_SUBDIR"
       cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
       echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"

@@ -66,9 +66,8 @@ sudo apt install jq
 Refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet for the complete list of supported configurations.
 
 For the rest of this document:
-- `$L4T_VERSION` refers to the L4T version (e.g., `35.5.0`, `36.4.4`)
-- `$VENDOR` refers to the carrier board vendor (`generic` for Nvidia boards, or vendor-specific like `forecr`)
-- `$CARRIER_BOARD` refers to the specific carrier board (`generic` for standard Nvidia boards, or board-specific like `dsboard_ornx`)
+- `<l4t_version>` refers to the L4T version (e.g., `35.5.0`, `36.4.4`)
+- `<vendor>` refers to the carrier board vendor (`generic` for Nvidia boards, or vendor-specific like `forecr`)
 
 ### Building the L4T environment
 
@@ -89,13 +88,13 @@ The `l4t_make.sh` script orchestrates the entire build process. Use `./l4t_make.
 Download and extract the BSP, toolchain, and sources for a specific L4T version:
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --prepare
+./l4t_make.sh -v <l4t_version> --prepare
 ```
 
 To start from scratch (delete existing build directory):
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --prepare --from-scratch
+./l4t_make.sh -v <l4t_version> --prepare --from-scratch
 ```
 
 This step:
@@ -108,20 +107,20 @@ This step:
 Copy Exosens sources to the build environment and generate distribution patches:
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --copy-sources
+./l4t_make.sh -v <l4t_version> --copy-sources
 ```
 
 This step:
 - Copies source files from `sources/` to the build environment
 - Creates a git repository to track modifications
-- Generates patch files in `patches/$L4T_VERSION/` for distribution
+- Generates patch files in `patches/<l4t_version>/` for distribution
 
 **Step 3: Build kernel and drivers**
 
 Compile the kernel, device trees, and kernel modules:
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --build
+./l4t_make.sh -v <l4t_version> --build
 ```
 
 This step:
@@ -135,19 +134,28 @@ This step:
 Create the deliverable `.deb` package:
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --gen-package [-p X.Y.Z]
+./l4t_make.sh -v <l4t_version> --gen-package [-p <debian_version>]
 ```
 
-The package version can be:
-- Automatically detected from git tag (if checked out on a tagged commit)
-- Manually specified with `-p X.Y.Z`. Prior to tag version if specified.
+The `-p` option is optional. The package version is determined as follows:
 
-The generated package: `jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb`
+| Scenario | Command | Debian version |
+|---|---|---|
+| Release (on git tag `3.1.0`) | `--gen-package` | `3.1.0` |
+| Development build | `--gen-package -p 3.2.0` | `3.2.0+g84920ea` |
+| Branch build | `--gen-package -p feature/foo` | `0~feature-foo+g84920ea` |
+| No `-p`, no tag | `--gen-package` | `0~branch-name+g84920ea` |
+
+Where `g84920ea` is the short git commit hash for traceability.
+
+Version strings are sanitized for Debian compatibility (invalid characters replaced, `0~` prefix added when the version doesn't start with a digit). The `0~` prefix ensures development builds sort before any release version.
+
+The generated package: `jetson-l4t-<l4t_version>-eg-cams_<debian_version>_arm64.deb`
 
 **Running all steps at once:**
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --all -p X.Y.Z
+./l4t_make.sh -v <l4t_version> --all
 ```
 
 This runs all four steps (prepare, copy-sources, build, gen-package) sequentially.
@@ -158,13 +166,13 @@ To build multiple L4T versions simultaneously:
 
 ```bash
 # Auto-detect number of CPU cores (default)
-./l4t_make.sh --all -p X.Y.Z
+./l4t_make.sh --all
 
 # Specify number of parallel jobs
-./l4t_make.sh --all -p X.Y.Z -j 4
+./l4t_make.sh --all -j 4
 
 # Build specific versions in parallel
-./l4t_make.sh -v "36.*" --all -p X.Y.Z -j 8
+./l4t_make.sh -v "36.*" --all -j 8
 ```
 
 The parallel mode displays live status for each configuration showing version, vendor, carrier board, and current build step.
@@ -184,9 +192,9 @@ If you are a client who only needs to rebuild without modifying the code, you ca
 The patches are available in the `patches/` directory and can be applied to a clean L4T environment using the `l4t_patch_sources.sh` script as a reference:
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION --prepare
+./l4t_make.sh -v <l4t_version> --prepare
 # Apply patches manually (refer to l4t_patch_sources.sh for the method)
-./l4t_make.sh -v $L4T_VERSION --build --gen-package -p X.Y.Z
+./l4t_make.sh -v <l4t_version> --build --gen-package
 ```
 
 The `l4t_patch_sources.sh` script demonstrates how to apply patches to your own Linux_for_Tegra environment. Clients can adapt this script to their specific needs.
@@ -199,16 +207,16 @@ Some carrier boards require specific device trees and/or kernel configurations. 
 
 ```bash
 # Build all steps for forecr/dsboard_ornx
-./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --all -p X.Y.Z
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --all
 
 # Or step by step:
-./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --prepare
-./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --copy-sources
-./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --build
-./l4t_make.sh -v $L4T_VERSION -V forecr -c dsboard_ornx --gen-package -p X.Y.Z
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --prepare
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --copy-sources
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --build
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --gen-package
 ```
 
-This generates: `jetson-l4t-$L4T_VERSION-forecr-dsboard-ornx-eg-cams_X.Y.Z_arm64.deb`
+This generates: `jetson-l4t-<l4t_version>-forecr-dsboard-ornx-eg-cams_<debian_version>_arm64.deb`
 
 ### Installing and configuring the MIPI drivers on the board
 
@@ -221,7 +229,7 @@ This generates: `jetson-l4t-$L4T_VERSION-forecr-dsboard-ornx-eg-cams_X.Y.Z_arm64
 sudo dpkg -r jetson-l4t-mipi-eg-cam  # or similar package name
 
 # Install new version
-sudo dpkg -i jetson-l4t-$L4T_VERSION-eg-cams_X.Y.Z_arm64.deb
+sudo dpkg -i jetson-l4t-<l4t_version>-eg-cams_<debian_version>_arm64.deb
 ```
 
 The package was either delivered (see [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx)) or built locally following the previous steps.
@@ -240,14 +248,22 @@ After first installation, both ports are configured for Dione cameras.
 **Changing the configuration:**
 
 ```bash
-eg_dt_camera_config_set.sh $PORT0 $CAM_TYPE0 $PORT1 $CAM_TYPE1
+eg_dt_camera_config_set.sh <port> <cam_type> <port> <cam_type>
 ```
 
 Where:
-- `$PORT0`, `$PORT1` = `0` or `1` (camera port number)
-- `$CAM_TYPE` = `Dione`, `MicroCube640`, `SmartIR640`, or `Crius1280`
+- `<port>` = `0` or `1` (camera port number)
+- `<cam_type>` = `Dione`, `MicroCube640`, `SmartIR640`, or `Crius1280`
 
-**Note:** Ports not specified in the command are configured for Dione by default.
+Example : 
+```bash
+eg_dt_camera_config_set.sh 1 SmartIR640 0 Dione
+```
+
+**Note:** Ports not specified in the command are configured for Dione by default. So the above command is equivalent to this one :
+```bash
+eg_dt_camera_config_set.sh 1 SmartIR640
+```
 
 **After changing configuration, reboot is required:**
 
@@ -373,8 +389,8 @@ The package post-install script automatically updates this when installing on a 
 **Custom kernel patches:**
 
 Customers can add their own kernel patches in:
-- `sources/$L4T_VERSION/Linux_for_Tegra/` (full sources)
-- `patches/$L4T_VERSION/` (patch files)
+- `sources/<l4t_version>/Linux_for_Tegra/` (full sources)
+- `patches/<l4t_version>/` (patch files)
 
 Consult the support team for assistance with custom modifications.
 
@@ -485,10 +501,10 @@ Create the source directory for the new L4T version:
 
 ```bash
 # For generic (Nvidia) boards
-mkdir -p sources/$L4T_VERSION_NEW/Linux_for_Tegra/
+mkdir -p sources/<l4t_version>_NEW/Linux_for_Tegra/
 
 # For vendor-specific boards (if applicable)
-mkdir -p sources/$L4T_VERSION_NEW/Linux_for_Tegra_${VENDOR_NEW}/
+mkdir -p sources/<l4t_version>_NEW/Linux_for_Tegra_<vendor_new>/
 ```
 
 **Step 3: Port source files**
@@ -497,8 +513,8 @@ Copy and adapt source files from a similar L4T version:
 
 ```bash
 # Start with the closest L4T version as a template
-cp -r sources/$L4T_VERSION_SIMILAR/Linux_for_Tegra/* \
-      sources/$L4T_VERSION_NEW/Linux_for_Tegra/
+cp -r sources/<l4t_version>_SIMILAR/Linux_for_Tegra/* \
+      sources/<l4t_version>_NEW/Linux_for_Tegra/
 
 # Review and adapt:
 # - Kernel defconfig files
@@ -514,7 +530,7 @@ See next section for detailed device tree creation.
 **Step 5: Test the build**
 
 ```bash
-./l4t_make.sh -v $L4T_VERSION_NEW --all -p 0.0.1-test
+./l4t_make.sh -v <l4t_version>_NEW --all
 ```
 
 ### Creating device trees for a new SoM / carrier board
@@ -567,7 +583,7 @@ cp tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts \
 3. **Update the Makefile to build the new overlays:**
 
 ```makefile
-# In sources/$L4T_VERSION/Linux_for_Tegra/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
+# In sources/<l4t_version>/Linux_for_Tegra/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 # (for L4T 36.x)
 
 dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cams-dione.dtbo
@@ -628,15 +644,15 @@ When running `./l4t_make.sh --copy-sources`:
 
 2. **Copy sources with priority:**
    - First: `sources/common/` (common files)
-   - Second: `sources/$L4T_VERSION/` (version-specific files, overrides common)
-   - Third: `sources/$L4T_VERSION/Linux_for_Tegra_$VENDOR/` (vendor-specific, overrides all)
+   - Second: `sources/<l4t_version>/` (version-specific files, overrides common)
+   - Third: `sources/<l4t_version>/Linux_for_Tegra_<vendor>/` (vendor-specific, overrides all)
 
 3. **Track modifications:**
    - Git detects all changes vs original Nvidia BSP
    - Modifications include: new files, modified files, deleted files
 
 4. **Generate patches automatically:**
-   - Creates patch files in `patches/$L4T_VERSION/`
+   - Creates patch files in `patches/<l4t_version>/`
    - Patches are organized by directory (e.g., `source_kernel.patch`, `rootfs_opt_eg.patch`)
    - Each patch contains all changes for that component
    - Generates `README.txt` with patch summary
@@ -659,7 +675,7 @@ When running `./l4t_make.sh --copy-sources`:
 Some vendors (like Forecr) provide their own kernel patches and device trees. To integrate:
 
 1. Download vendor sources (e.g., from Forecr GitHub)
-2. Create vendor directory: `sources/$L4T_VERSION/Linux_for_Tegra_$VENDOR/`
+2. Create vendor directory: `sources/<l4t_version>/Linux_for_Tegra_<vendor>/`
 3. Extract relevant files (defconfig, device trees, patches)
 4. Run `--copy-sources` to merge vendor files with Exosens modifications
 5. Generated patches combine both vendor and Exosens changes

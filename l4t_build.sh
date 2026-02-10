@@ -132,11 +132,6 @@ update_status "Copying kernel Image..."
 cp -rfv $TEGRA_KERNEL_OUT/arch/arm64/boot/Image $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/kernel/
 sudo cp -rfv $TEGRA_KERNEL_OUT/arch/arm64/boot/Image $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/eg
 
-# Generate version file
-update_status "Generating version file..."
-echo jetson-l4t-${L4T_VERSION_EXTENDED}_eg-${GIT_TAG}-${GIT_COMMIT} > version_eg_cams
-sudo mv version_eg_cams $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/etc/
-
 pushd $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/
 if [[ -f ./tools/l4t_update_initrd.sh ]]; then
    update_status "Updating initrd..."

@@ -51,14 +51,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source unified environment (provides enumeration functions)
 . "$SCRIPT_DIR/l4t_environment.sh"
 
-# Detect git tag early (for package version fallback)
-if [[ -f /usr/lib/git-core/git-sh-prompt ]]; then
-    . /usr/lib/git-core/git-sh-prompt
-    GIT_TAG=$(echo $(__git_ps1) | sed 's/[()]//g')
-else
-    GIT_TAG=""
-fi
-
 #******************************************************************************
 # Default values
 #******************************************************************************
@@ -234,16 +226,8 @@ if [[ $LIST_ONLY -eq 0 ]]; then
     fi
 fi
 
-# Check package version for gen-package (use GIT_TAG as fallback)
-if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
-    if [[ -z "$PACKAGE_VERSION" && -n "$GIT_TAG" ]]; then
-        PACKAGE_VERSION="$GIT_TAG"
-        echo -e "${CYAN}Using git tag as package version: $PACKAGE_VERSION${NC}"
-    elif [[ -z "$PACKAGE_VERSION" ]]; then
-        echo "Error: --package-version is required when using --gen-package (no git tag detected)"
-        exit 1
-    fi
-fi
+# Note: package version is now fully handled by l4t_gen_delivery_package.sh
+# (auto-detects from git tag or branch if -p is not specified)
 
 # Handle parallel jobs (0 = auto = nproc)
 if [[ "$PARALLEL_JOBS" == "0" || "$PARALLEL_JOBS" == "auto" ]]; then
@@ -391,7 +375,8 @@ run_config() {
 
     if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
         [[ -n "$status_file" ]] && echo "Generating package..." > "$status_file"
-        local pkg_args="$base_args -p $PACKAGE_VERSION"
+        local pkg_args="$base_args"
+        [[ -n "$PACKAGE_VERSION" ]] && pkg_args="$pkg_args -p $PACKAGE_VERSION"
         echo "[gen-package] l4t_gen_delivery_package.sh $pkg_args"
         if ! "$SCRIPT_DIR/l4t_gen_delivery_package.sh" $pkg_args; then
             [[ -n "$status_file" ]] && echo "FAILED" > "$status_file"
@@ -482,7 +467,11 @@ if [[ $PARALLEL_JOBS -eq 1 ]]; then
             [[ $DO_COPY_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[copy-sources]${NC} l4t_copy_sources.sh $base_args"
             [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"
             [[ $DO_BUILD -eq 1 ]] && echo -e "    ${BLUE}[build]${NC} l4t_build.sh $base_args"
-            [[ $DO_GEN_PACKAGE -eq 1 ]] && echo -e "    ${BLUE}[gen-package]${NC} l4t_gen_delivery_package.sh $base_args -p $PACKAGE_VERSION"
+            if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
+                local dry_pkg_args="$base_args"
+                [[ -n "$PACKAGE_VERSION" ]] && dry_pkg_args="$dry_pkg_args -p $PACKAGE_VERSION"
+                echo -e "    ${BLUE}[gen-package]${NC} l4t_gen_delivery_package.sh $dry_pkg_args"
+            fi
             echo -e "    ${GREEN}[SUCCESS]${NC}"
             total_success=$((total_success + 1))
         else

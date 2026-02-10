@@ -529,12 +529,8 @@ compute_derived_vars() {
     ARCHIVE_DIR=$ROOT_DIR/archives
 
     # Git information
-    if [[ -f /usr/lib/git-core/git-sh-prompt ]]; then
-        . /usr/lib/git-core/git-sh-prompt
-        GIT_TAG=$(echo $(__git_ps1) | sed 's/[()]//g')
-    else
-        GIT_TAG=""
-    fi
+    GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    GIT_EXACT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
     GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
     # Directory naming based on vendor/carrier-board
