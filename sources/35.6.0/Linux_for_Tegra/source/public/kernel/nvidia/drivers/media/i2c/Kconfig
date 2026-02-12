@@ -211,6 +211,15 @@ config VIDEO_DIONE_IR
 		To compile this driver as a module, choose M here: the
 		module will be called dione_ir.
 
+config VIDEO_ILUMOS
+	tristate "iLumos MIPI camera support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+		This driver supports iLumos camera from Exosens.
+		To compile this driver as a module, choose M here: the
+		module will be called dione_ir.
+
 config NV_VIDEO_HAWK_OWL
 	tristate "Hawk & Owl camera sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API

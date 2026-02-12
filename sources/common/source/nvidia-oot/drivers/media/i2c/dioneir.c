@@ -44,13 +44,14 @@
 #define DIONE_IR_REG_HEIGHT_MAX		0x0002f02c
 #define DIONE_IR_REG_MODEL_NAME		0x00000044
 #define DIONE_IR_REG_FIRMWARE_VERSION	0x2000e000
+#define DIONE_IR_REG_SERIAL_NUMBER	    0x00000144
 #define DIONE_IR_REG_ACQUISITION_STOP	0x00080104
 #define DIONE_IR_REG_ACQUISITION_SRC	0x00080108
 #define DIONE_IR_REG_ACQUISITION_STAT	0x0008010c
 
-/* #define DIONE_IR_I2C_TMO_MS		5 */
-/* #define DIONE_IR_STARTUP_TMO_MS		1500 */
-/* #define DIONE_IR_HAS_SYSFS		1 */
+// #define DIONE_IR_I2C_TMO_MS		5
+// #define DIONE_IR_STARTUP_TMO_MS		1500
+// #define DIONE_IR_HAS_SYSFS_RESTART_MIPI
 
 #define CSI_HSTXVREGCNT			5
 
@@ -191,6 +192,11 @@ struct dione_ir {
 
 	u64				*link_frequencies;
 	unsigned int			link_frequencies_num;
+
+	char				model[64];
+	char				serial_number[64];
+	u32				native_width;
+	u32				native_height;
 };
 
 static int dione_ir_i2c_read(struct i2c_client *client, u32 addr, u8 *buf, u16 len);
@@ -1583,6 +1589,9 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 		goto error;
 	}
 
+	priv->native_width = width;
+	priv->native_height = height;
+
    dev_info(dev, "%s fpga_found\n", __func__);
 	priv->fpga_found = true;
 
@@ -1593,6 +1602,30 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 
 	for (i = sizeof(buf) - 1; i >= 0 && buf[i] == 0xff; i--)
 		buf[i] = '\0';
+
+	/* Read model name */
+	ret = dione_ir_i2c_read(priv->fpga_client, DIONE_IR_REG_MODEL_NAME,
+				(u8 *)priv->model, sizeof(priv->model));
+	if (ret < 0) {
+		priv->model[0] = '\0';
+		dev_warn(dev, "failed to read model name\n");
+	} else {
+		for (i = sizeof(priv->model) - 1; i >= 0 &&
+		     (priv->model[i] == (char)0xff || priv->model[i] == '\0'); i--)
+			priv->model[i] = '\0';
+	}
+
+	/* Read serial number */
+	ret = dione_ir_i2c_read(priv->fpga_client, DIONE_IR_REG_SERIAL_NUMBER,
+				(u8 *)priv->serial_number, sizeof(priv->serial_number));
+	if (ret < 0) {
+		priv->serial_number[0] = '\0';
+		dev_warn(dev, "failed to read serial number\n");
+	} else {
+		for (i = sizeof(priv->serial_number) - 1; i >= 0 &&
+		     (priv->serial_number[i] == (char)0xff || priv->serial_number[i] == '\0'); i--)
+			priv->serial_number[i] = '\0';
+	}
 
    if (priv->fpga_found)
    {
@@ -1615,8 +1648,10 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
          }
       }
    }
-	dev_info(dev, "dione-ir %ux%u at address %#02x, firmware: %s\n",
-		 width, height, fpga_addr, buf);
+	dev_info(dev, "dione-ir %ux%u at address %#02x, firmware: %s, model: %s, serial: %s\n",
+		 width, height, fpga_addr, buf,
+		 priv->model[0] ? priv->model : "N/A",
+		 priv->serial_number[0] ? priv->serial_number : "N/A");
 
 	return mode;
 
@@ -1782,69 +1817,63 @@ static struct tegracam_device *dione_ir_probe_sensor(struct dione_ir *priv)
 	return tc_dev;
 }
 
-#ifdef DIONE_IR_HAS_SYSFS
-/**
- * sysfs interface function handling ".../restart_mipi"
- */
-
-static struct dione_ir *dione_ir_priv = NULL;
-
-static ssize_t dione_ir_sysfs_restart_mipi(struct kobject *kobj,
-					   struct kobj_attribute *attr,
-					   const char *buf, size_t count)
+static ssize_t model_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
 {
-	struct camera_common_data *s_data;
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->model);
+}
+static DEVICE_ATTR_RO(model);
+
+static ssize_t serial_number_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->serial_number);
+}
+static DEVICE_ATTR_RO(serial_number);
+
+static ssize_t resolution_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%ux%u\n",
+			 priv->native_width, priv->native_height);
+}
+static DEVICE_ATTR_RO(resolution);
+
+static ssize_t pixel_format_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "'AR24' (32-bit BGRA 8-8-8-8)\n");
+}
+static DEVICE_ATTR_RO(pixel_format);
+
+#ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
+static ssize_t restart_mipi_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
 	int cmd;
 
-	if ((dione_ir_priv != NULL) && (sscanf(buf, "%x", &cmd) == 1) && (cmd == 1)) {
-		s_data = dione_ir_priv->s_data;
-		dione_ir_stop_streaming(dione_ir_priv->tc_dev);
+	if ((sscanf(buf, "%x", &cmd) == 1) && (cmd == 1)) {
+		dione_ir_stop_streaming(priv->tc_dev);
 		msleep(1000);
-		dione_ir_set_mode(dione_ir_priv->tc_dev);
-		dione_ir_start_streaming(dione_ir_priv->tc_dev);
+		dione_ir_set_mode(priv->tc_dev);
+		dione_ir_start_streaming(priv->tc_dev);
 	}
 
 	return count;
 }
-
-static struct kobj_attribute dione_ir_sysfs_attr_restart_mipi = {
-	.attr = { .name = "restart_mipi", .mode = VERIFY_OCTAL_PERMISSIONS(0220) },
-	.show = NULL,
-	.store = dione_ir_sysfs_restart_mipi,
-};
-
-static void dione_ir_sysfs_create(struct i2c_client *client,
-				  struct dione_ir *priv)
-{
-	struct device *dev = &client->dev;
-	const char *path = kobject_get_path(&dev->kobj, GFP_KERNEL);
-	int err = -EINVAL;
-
-	dione_ir_priv = priv;
-
-	if (path != NULL)
-		err = sysfs_create_file(&dev->kobj,
-					&dione_ir_sysfs_attr_restart_mipi.attr);
-
-	if (!err)
-		dev_info(dev, "sysfs path: /sys%s/%s\n", path,
-			 dione_ir_sysfs_attr_restart_mipi.attr.name);
-}
-
-static void dione_ir_sysfs_remove(struct i2c_client *client)
-{
-	sysfs_remove_file(&client->dev.kobj,
-			  &dione_ir_sysfs_attr_restart_mipi.attr);
-}
-#else
-static inline void dione_ir_sysfs_create(struct i2c_client *client,
-					 struct dione_ir *priv)
-{
-}
-
-static inline void dione_ir_sysfs_remove(struct i2c_client *client)
-{
-}
+static DEVICE_ATTR_WO(restart_mipi);
 #endif
 
 static int dione_ir_parse_fpga_address(struct i2c_client *client,
@@ -1961,7 +1990,13 @@ static int dione_ir_probe(struct i2c_client *client,
 		 test_mode ? " test" : "",
 		 quick_mode ? " quick" : "");
 
-	dione_ir_sysfs_create(client, priv);
+	device_create_file(dev, &dev_attr_model);
+	device_create_file(dev, &dev_attr_serial_number);
+	device_create_file(dev, &dev_attr_resolution);
+	device_create_file(dev, &dev_attr_pixel_format);
+#ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
+	device_create_file(dev, &dev_attr_restart_mipi);
+#endif
 
 	return 0;
 }
@@ -1997,7 +2032,13 @@ static void dione_ir_remove(struct i2c_client *client)
       }
    }
 
-	dione_ir_sysfs_remove(client);
+#ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
+	device_remove_file(dev, &dev_attr_restart_mipi);
+#endif
+	device_remove_file(dev, &dev_attr_pixel_format);
+	device_remove_file(dev, &dev_attr_resolution);
+	device_remove_file(dev, &dev_attr_serial_number);
+	device_remove_file(dev, &dev_attr_model);
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(6,1,1)
    return 0;

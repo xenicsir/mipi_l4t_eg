@@ -645,10 +645,10 @@ index 0000000..373756e
 +Part of Forecr/Exosens Jetson BSP distribution.
 diff --git a/rootfs/opt/eg/doc/eg_dt_camera_config_get.md b/rootfs/opt/eg/doc/eg_dt_camera_config_get.md
 new file mode 100644
-index 0000000..548a36c
+index 0000000..dac4a29
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/eg_dt_camera_config_get.md
-@@ -0,0 +1,745 @@
+@@ -0,0 +1,811 @@
 +# eg_dt_camera_config_get.sh - Documentation
 +
 +Automatic Exosens camera configuration detection from device tree.
@@ -714,28 +714,53 @@ index 0000000..548a36c
 +
 +### 1. Default Mode (Human-Readable)
 +
-+Simple, clear output showing configured cameras and their connection status:
++Simple, clear output showing configured cameras and their connection status.
++When a camera is connected, additional details are displayed: video device, I2C device,
++model name, serial number, native resolution, and pixel format.
++
++The connection status is color-coded in terminal: **green** for connected, **red** for not connected.
++
++When the camera driver exposes a `model` sysfs attribute, the model name replaces the
++device tree type name in the output (e.g., "MicroCube" instead of "SmartIR640 or Crius1280").
 +
 +```bash
 +$ eg_dt_camera_config_get.sh
 +=== Exosens Camera Configuration ===
 +
-+Board: dsboard-ornxs (orin-nano, t234)
++Board: nvidia-p3509 (xavier-nx, t194)
 +
 +Camera ports:
-+  Port 0: Dione (connected)
-+  Port 1: Dione (not connected)
++  Port 0: MicroCube (connected)        # model from sysfs
++    Video device: /dev/video0
++    I2C device:   /dev/eg-ec-mipi-9-0016
++    Serial:       21971
++    Resolution:   640x480
++    Pixel format: 'Y16 ' (16-bit Greyscale)
++  Port 1: Dione 1280 (connected)       # model from sysfs
++    Video device: /dev/video1
++    I2C device:   /dev/dioneir-i2c-10-000e-5b
++    Serial:       20823
++    Resolution:   1280x1024
++    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
 +
 +Total configured: 2 camera(s)
 +```
 +
 +**Connection Status Indicators**:
-+- `(connected)` - Camera is physically present and detected by V4L2
-+- `(not connected)` - Camera is configured in device tree but not physically connected
++- `(connected)` (green) - Camera is physically present and detected
++- `(not connected)` (red) - Camera is configured in device tree but not physically connected
++
++**Camera Details** (shown only for connected cameras):
++- **Video device**: `/dev/videoN` V4L2 device path
++- **I2C device**: `/dev/<driver>-<bus>-<addr>` character device for direct I2C communication
++- **Model**: Camera model name read from driver sysfs (if available)
++- **Serial**: Camera serial number read from driver sysfs (if available)
++- **Resolution**: Native camera resolution from driver sysfs (preferred), fallback to V4L2 current format
++- **Pixel format**: Native pixel format from driver sysfs (preferred), fallback to V4L2 current format
 +
 +### 2. Verbose Mode
 +
-+Includes debug information about device tree paths and V4L2 detection:
++Includes debug information about device tree paths, sysfs and V4L2 detection:
 +
 +```bash
 +$ eg_dt_camera_config_get.sh -v
@@ -743,30 +768,43 @@ index 0000000..548a36c
 +SoM Type: orin-nano
 +Tegra SoC: t234
 +
-+[DEBUG] Port 0 (letter: b): Dione
-+[DEBUG]   Dione: /proc/device-tree/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e
-+[DEBUG]   EC: /proc/device-tree/cam_i2cmux/i2c@0/eg_ec_b@16
-+[DEBUG]   I2C path: /proc/device-tree/cam_i2cmux/i2c@0
-+[DEBUG] Port 1 (letter: c): Dione
-+[DEBUG]   Dione: /proc/device-tree/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e
-+[DEBUG]   EC: /proc/device-tree/cam_i2cmux/i2c@1/eg_ec_c@16
-+[DEBUG]   I2C path: /proc/device-tree/cam_i2cmux/i2c@1
-+[DEBUG] Detected Dione camera: 9-000e
++[DEBUG] Scanning I2C address 0x0e...
++[DEBUG] Found device: 9-000e (bus=9, driver=dioneir)
++[DEBUG] Camera found at: /proc/device-tree/.../xenics_dione_ir_b@0e
++[DEBUG]   -> Port letter: b (Dione, bus=9, driver=dioneir)
++[DEBUG] Scanning I2C address 0x16...
++[DEBUG] Found device: 10-0016 (bus=10, driver=eg_ec_mipi)
++[DEBUG] Camera found at: /proc/device-tree/.../eg_ec_c@16
++[DEBUG]   -> Port letter: c (MicroCube640, bus=10, driver=eg_ec_mipi)
++[DEBUG] Port 0: video=/dev/video0 i2c_chardev=/dev/dioneir-i2c-9-000e-5b model=Dione 640 serial=20823 res=640x480 fmt='AR24' (32-bit BGRA 8-8-8-8)
++[DEBUG] Port 0 (letter: b): Dione connected (exact match)
++[DEBUG] Port 1: video=/dev/video1 i2c_chardev=/dev/eg-ec-mipi-10-0016 model=MicroCube serial=21971 res=640x480 fmt='Y16 ' (16-bit Greyscale)
++[DEBUG] Port 1 (letter: c): MicroCube640 connected (compatible with MicroCube640)
 +
 +=== Exosens Camera Configuration ===
 +
 +Board: dsboard-ornxs (orin-nano, t234)
 +
 +Camera ports:
-+  Port 0: Dione (connected)
-+  Port 1: Dione (not connected)
++  Port 0: Dione 640 (connected)
++    Video device: /dev/video0
++    I2C device:   /dev/dioneir-i2c-9-000e-5b
++    Serial:       20823
++    Resolution:   640x480
++    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
++  Port 1: MicroCube (connected)
++    Video device: /dev/video1
++    I2C device:   /dev/eg-ec-mipi-10-0016
++    Serial:       21971
++    Resolution:   640x480
++    Pixel format: 'Y16 ' (16-bit Greyscale)
 +
 +Total configured: 2 camera(s)
 +```
 +
 +### 3. JSON Mode
 +
-+Machine-readable structured output with connection status:
++Machine-readable structured output with connection status and camera details:
 +
 +```bash
 +$ eg_dt_camera_config_get.sh --json
@@ -777,12 +815,14 @@ index 0000000..548a36c
 +    "tegra": "t234"
 +  },
 +  "cameras": {
-+    "port_0": {"type": "Dione", "status": "connected"},
-+    "port_1": {"type": "Dione", "status": "not connected"}
++    "port_0": {"type": "Dione", "status": "connected", "video_device": "/dev/video0", "i2c_device": "/dev/dioneir-i2c-9-000e-5b", "model": "Dione 640", "serial_number": "20823", "width/height": "640x480", "pixel_format": "'AR24' (32-bit BGRA 8-8-8-8)"},
++    "port_1": {"type": "MicroCube640", "status": "not connected"}
 +  },
 +  "camera_count": 2
 +}
 +```
++
++Connected cameras include additional fields: `video_device`, `i2c_device`, `model`, `serial_number`, `width/height`, and `pixel_format` (when available from driver sysfs or V4L2).
 +
 +---
 +
@@ -790,11 +830,13 @@ index 0000000..548a36c
 +
 +### Camera Types Detected
 +
-+| Camera Type | MIPI Lanes | Detection Method |
-+|-------------|-----------|-----------------|
-+| **Dione** | N/A | Presence of `xenics_dione_ir_*@0e` device with status "okay" |
-+| **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` |
-+| **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` |
++| DT Type (configured) | MIPI Lanes | Detection Method | Sysfs Models |
++|----------------------|-----------|-----------------|--------------|
++| **Dione** | N/A | Presence of `xenics_dione_ir_*@0e` device with status "okay" | Dione 640, Dione 1280 |
++| **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` | MicroCube |
++| **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` | SmartIR640, Crius640, Crius1280, Aion640 |
++
++**Note:** The "DT Type" column shows the name from the device tree configuration. When a camera is connected, the driver reads the actual model from the camera hardware via sysfs, and the output displays the real model name instead (e.g., "MicroCube" instead of "MicroCube640").
 +
 +### Device Tree Node Patterns
 +
@@ -816,29 +858,35 @@ index 0000000..548a36c
 +   ├─ Get board type, SoM type, Tegra SoC
 +   └─ Verify board is supported
 +
-+2. Auto-discover configured cameras in device tree
++2. Detect physically connected cameras via sysfs
++   ├─ Scan /sys/bus/i2c/devices/ for known I2C addresses (0x0e, 0x16)
++   ├─ Check driver is bound (driver/ symlink exists)
++   ├─ Follow of_node symlink to get device tree path
++   └─ Extract port letter from device tree node name
++
++3. Auto-discover configured cameras in device tree
 +   ├─ Search known I2C bus locations (cam_i2cmux, direct i2c@*)
 +   ├─ Find all xenics_dione_ir_*@0e devices
 +   ├─ Find all eg_ec_*@16 devices
 +   └─ Extract port letters (a, b, c, etc.)
 +
-+3. For each camera port:
++4. For each camera port:
 +   ├─ Check Dione device status (okay/disabled)
 +   ├─ If no Dione or disabled, check EC device
 +   ├─ Determine camera type from num_lanes
 +   └─ Map port letter to port number (0-7)
 +
-+4. Detect physically connected cameras
-+   ├─ Run v4l2-ctl --list-devices
-+   ├─ Parse vi-output entries (dioneir X-000e, eg_ec X-0016)
-+   ├─ Count /dev/video* devices
-+   └─ Match connected cameras to configured ports
++5. For each connected camera, read details:
++   ├─ Find /dev/videoN via /sys/class/video4linux/
++   ├─ Find I2C character device in /dev/
++   ├─ Read model, serial_number, resolution, pixel_format from driver sysfs
++   └─ Fallback to v4l2-ctl for resolution/pixel_format if sysfs unavailable
 +
-+5. Combine configuration + connection status
-+   ├─ Port X: CameraType (connected)
++6. Combine configuration + connection status
++   ├─ Port X: ModelName (connected) + details
 +   └─ Port Y: CameraType (not connected)
 +
-+6. Output results in requested format
++7. Output results in requested format
 +```
 +
 +### Device Tree Structure
@@ -892,29 +940,33 @@ index 0000000..548a36c
 +
 +### Connection Detection
 +
-+The script detects physically connected cameras using the V4L2 subsystem:
++The script detects physically connected cameras using the **sysfs I2C subsystem**:
 +
-+**V4L2 Detection**:
++**Sysfs Detection**:
 +```bash
-+$ v4l2-ctl --list-devices
-+NVIDIA Tegra Video Input Device (platform:tegra-camrtc-ca):
-+	/dev/media0
++# The script scans /sys/bus/i2c/devices/ for known camera I2C addresses
++$ ls /sys/bus/i2c/devices/9-000e/
++driver/  model  serial_number  resolution  pixel_format  of_node  ...
 +
-+vi-output, dioneir 9-000e (platform:tegra-capture-vi:0):
-+	/dev/video0
++$ cat /sys/bus/i2c/devices/9-000e/model
++Dione 640
 +```
 +
 +**Detection Logic**:
-+1. Parse `v4l2-ctl --list-devices` output
-+2. Look for camera entries: `vi-output, dioneir <bus>-<address>` or `vi-output, eg_ec <bus>-<address>`
-+3. Count number of `/dev/video*` devices created
-+4. Match video device count to configured ports
-+5. First N configured ports are marked as "connected"
++1. Scan `/sys/bus/i2c/devices/` for devices at known I2C addresses (0x0e for Dione, 0x16 for EngineCore)
++2. Check if a driver is bound (`driver/` symlink exists)
++3. Follow `of_node` symlink to match the device tree node and extract port letter
++4. Read camera details from driver sysfs attributes:
++   - `model` - Camera model name (e.g., "MicroCube", "Dione 1280")
++   - `serial_number` - Camera serial number
++   - `resolution` - Native resolution (e.g., "640x480", "1280x1024")
++   - `pixel_format` - Native pixel format (e.g., "'AR24' (32-bit BGRA 8-8-8-8)")
++5. Find corresponding `/dev/videoN` and `/dev/<driver>-*` devices
++6. Fallback to `v4l2-ctl` for resolution/pixel format if sysfs attributes are not available
 +
-+**Example**:
-+- 2 ports configured (Port 0: Dione, Port 1: Dione)
-+- 1 video device found (`/dev/video0`)
-+- Result: Port 0 = connected, Port 1 = not connected
++**Why sysfs over v4l2-ctl**:
++- **Sysfs resolution** shows the **native camera resolution** (read from hardware registers)
++- **v4l2-ctl resolution** shows the **currently selected V4L2 mode** (which may differ, e.g., sensor_mode=0 = 640x480 even on a 1280x1024 camera)
 +
 +**Why This Matters**:
 +- **Configured but not connected**: Camera overlay is in device tree, but camera is not physically present or not detected
@@ -938,8 +990,13 @@ index 0000000..548a36c
 +Board: dsboard-ornxs (orin-nano, t234)
 +
 +Camera ports:
-+  Port 0: Dione (connected)
-+  Port 1: MicroCube640 (not connected)
++  Port 0: Dione 640 (connected)          # model from sysfs
++    Video device: /dev/video0
++    I2C device:   /dev/dioneir-i2c-9-000e-5b
++    Serial:       20823
++    Resolution:   640x480
++    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
++  Port 1: MicroCube640 (not connected)    # DT type (no camera connected)
 +
 +Total configured: 2 camera(s)
 +```
@@ -952,7 +1009,7 @@ index 0000000..548a36c
 +# verify the configuration was applied correctly and cameras are connected
 +
 +echo "Configuring cameras..."
-+eg_dt_camera_config_set.sh 0 Dione 1 MicroCube640
++eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
 +
 +echo ""
 +echo "Verifying configuration..."
@@ -960,8 +1017,12 @@ index 0000000..548a36c
 +
 +# Expected output:
 +#   Camera ports:
-+#     Port 0: Dione (connected)
-+#     Port 1: MicroCube640 (connected/not connected)
++#     Port 0: Dione 640 (connected)
++#       Video device: /dev/video0
++#       ...
++#     Port 1: MicroCube (connected)
++#       Video device: /dev/video1
++#       ...
 +```
 +
 +### Conditional Logic Based on Camera Count
@@ -1006,13 +1067,13 @@ index 0000000..548a36c
 +echo "Board: $BOARD ($SOM)"
 +echo "Cameras: $CAM_COUNT"
 +
-+# List all cameras with connection status
-+echo "$CAM_JSON" | jq -r '.cameras | to_entries[] | "\(.key): \(.value.type) (\(.value.status))"'
++# List all cameras with connection status and model
++echo "$CAM_JSON" | jq -r '.cameras | to_entries[] | "\(.key): \(.value.type) (\(.value.status))\(if .value.model then " [" + .value.model + "]" else "" end)"'
 +
 +# Example output:
 +# Board: dsboard-ornxs (orin-nano)
 +# Cameras: 2
-+# port_0: Dione (connected)
++# port_0: Dione (connected) [Dione 640]
 +# port_1: SmartIR640 or Crius1280 (not connected)
 +```
 +
@@ -1134,9 +1195,11 @@ index 0000000..548a36c
 +    print(f"Board: {config['board']['type']}")
 +    print(f"Camera count: {config['camera_count']}")
 +
-+    for port, cam_type in config['cameras'].items():
++    for port, cam_info in config['cameras'].items():
 +        port_num = port.split('_')[1]
-+        print(f"  Camera {port_num}: {cam_type}")
++        model = cam_info.get('model', cam_info['type'])
++        status = cam_info['status']
++        print(f"  Camera {port_num}: {model} ({status})")
 +```
 +
 +### C++ Integration
@@ -1173,8 +1236,10 @@ index 0000000..548a36c
 +        std::cout << "Board: " << config["board"]["type"] << std::endl;
 +        std::cout << "Cameras: " << config["camera_count"] << std::endl;
 +
-+        for (auto& [port, type] : config["cameras"].items()) {
-+            std::cout << "  " << port << ": " << type << std::endl;
++        for (auto& [port, info] : config["cameras"].items()) {
++            std::string model = info.value("model", info["type"].get<std::string>());
++            std::string status = info["status"];
++            std::cout << "  " << port << ": " << model << " (" << status << ")" << std::endl;
 +        }
 +    } catch (const std::exception& e) {
 +        std::cerr << "Error: " << e.what() << std::endl;
@@ -1368,6 +1433,7 @@ index 0000000..548a36c
 +
 +| Version | Date | Changes |
 +|---------|------|---------|
++| 2.2 | 2026-02-12 | Read camera details from driver sysfs (model, serial, resolution, pixel format), color-coded connection status, display actual model name from sysfs instead of DT type name, sysfs-first resolution/pixel format with v4l2-ctl fallback, JSON output includes camera details |
 +| 2.1 | 2026-02-03 | Added connection detection: distinguishes configured vs physically connected cameras using V4L2 |
 +| 2.0 | 2026-02-03 | Complete rewrite: auto-discovery, generic board support, JSON output, uses detect_jetson_board.sh |
 +| 1.0 | 2025-02-02 | Initial version with hardcoded board types |
@@ -1663,10 +1729,10 @@ index 0000000..1c2d645
 +**Script Version**: 2.0 (Data-driven architecture)
 diff --git a/rootfs/opt/eg/doc/eg_dt_camera_config_set.md b/rootfs/opt/eg/doc/eg_dt_camera_config_set.md
 new file mode 100644
-index 0000000..fcb865f
+index 0000000..e9a6a5a
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/eg_dt_camera_config_set.md
-@@ -0,0 +1,551 @@
+@@ -0,0 +1,632 @@
 +# eg_dt_camera_config_set.sh - Documentation
 +
 +Configure Exosens camera device tree overlays on Jetson boards.
@@ -1689,11 +1755,12 @@ index 0000000..fcb865f
 +`eg_dt_camera_config_set.sh` configures the Jetson device tree to enable specific Exosens cameras on designated ports. The script automatically detects the board type and applies the appropriate device tree overlays.
 +
 +**Key Features**:
-+- ✅ **Simple Interface**: Specify port numbers and camera types as arguments
++- ✅ **Simple Interface**: Specify port/camera pairs as arguments (`0/Dione 1/SmartIR640`)
 +- ✅ **Automatic Board Detection**: Uses `detect_jetson_board.sh` for reliable identification
-+- ✅ **Multi-Camera Support**: Configure up to 8 cameras in a single command
++- ✅ **Automatic Port Count**: Detects number of camera ports from device tree (2, 4, 6...)
++- ✅ **Default Configuration**: Without arguments, configures all detected ports with Dione
 +- ✅ **Board-Specific Overlays**: Automatically selects correct overlays for your board
-+- ✅ **Validation**: Checks port numbers and camera types before applying
++- ✅ **Validation**: Checks port numbers against actual board capabilities and camera types before applying
 +
 +**Important**: Changes require a **reboot** to take effect!
 +
@@ -1704,15 +1771,26 @@ index 0000000..fcb865f
 +### Basic Syntax
 +
 +```bash
-+eg_dt_camera_config_set.sh <port0> <camera_type0> [<port1> <camera_type1>] ...
++eg_dt_camera_config_set.sh [<port/camera_type>] ...
 +```
 +
 +### Arguments
 +
-+Arguments are provided as **pairs** of port number and camera type:
++Each argument is a **port/camera pair** separated by a `/`:
 +
-+- **port_number**: Integer from 0 to 7 (depending on board)
++- **port_number**: Integer from 0 to N-1, where N is the number of camera ports detected on the board (e.g., 0-1 on DSBOARD-ORNXS, 0-3 on DSBOARD-ORNX, 0-5 on DSBOARD-XV2)
 +- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`
++
++Example: `0/Dione`, `1/MicroCube640`, `2/SmartIR640`
++
++**Without arguments**, all detected ports are configured with Dione (default camera).
++
++### Options
++
++| Option | Description |
++|--------|-------------|
++| (no args) | Configure all detected ports with Dione |
++| `-h`, `--help` | Show usage help |
 +
 +### Exit Codes
 +
@@ -1771,15 +1849,17 @@ index 0000000..fcb865f
 +### Configuration Process
 +
 +```
-+1. Parse port/camera pairs from command line arguments
-+   └─ Validate: even number of arguments, valid ports (0-7), valid camera types
-+
-+2. Detect board type
-+   ├─ Run detect_jetson_board.sh --short
++1. Detect board and camera ports
++   ├─ Run detect_jetson_board.sh --short (board type)
++   ├─ Run detect_jetson_board.sh --camera-ports (number of ports from device tree)
 +   └─ Determine base device tree overlay name
 +
-+3. Build overlay arguments
-+   ├─ For Dione: No additional overlay needed
++2. Parse port/camera pairs from command line arguments
++   ├─ If no arguments: generate default pairs (all ports with Dione)
++   └─ Validate: format port/camera, port within 0..N-1, valid camera type
++
++3. Build overlay arguments (from CAMERA_LANES database)
++   ├─ For Dione: No additional overlay needed (empty lane config)
 +   ├─ For MicroCube640: Add "CAM<port>:EC_1_lane" overlay
 +   └─ For SmartIR640/Crius1280: Add "CAM<port>:EC_2_lanes" overlay
 +
@@ -1788,6 +1868,18 @@ index 0000000..fcb865f
 +   ├─ Update /boot/extlinux/extlinux.conf with FDT overlays
 +   └─ Report success (reboot required)
 +```
++
++### Camera Port Detection
++
++The number of camera ports is detected automatically from the device tree by `detect_jetson_board.sh --camera-ports`. The detection reads the `num-channels` property from the NVCSI controller node in `/proc/device-tree/`.
++
++| Board | Camera Ports | Valid port range |
++|-------|-------------|-----------------|
++| DSBOARD-ORNXS | 2 | 0-1 |
++| DSBOARD-ORNX | 4 | 0-3 |
++| DSBOARD-XV2 | 6 | 0-5 |
++| Orin Nano/NX DevKit | 2 | 0-1 |
++| AGX Orin DevKit | 4 | 0-3 |
 +
 +### Device Tree Overlays
 +
@@ -1807,7 +1899,7 @@ index 0000000..fcb865f
 +Overlays:
 +  - CAM0:EC_1_lane, CAM0:EC_2_lanes
 +  - CAM1:EC_1_lane, CAM1:EC_2_lanes
-+  - ... up to CAM7
++  - ... up to CAM<N-1> (depending on detected port count)
 +```
 +
 +### Configuration Storage
@@ -1830,12 +1922,47 @@ index 0000000..fcb865f
 +
 +## Examples
 +
++### Default Configuration (no arguments)
++
++Configure all detected ports with Dione (default camera). The number of ports is
++automatically detected from the device tree:
++
++```bash
++# On a DSBOARD-ORNXS (2 ports)
++$ sudo eg_dt_camera_config_set.sh
++Forecr board detected: dsboard-ornxs
++Port number : 0
++Camera type : Dione
++Port number : 1
++Camera type : Dione
++
++Configuration applied successfully.
++Please reboot to activate changes.
++```
++
++```bash
++# On a DSBOARD-ORNX (4 ports)
++$ sudo eg_dt_camera_config_set.sh
++Forecr board detected: dsboard-ornx
++Port number : 0
++Camera type : Dione
++Port number : 1
++Camera type : Dione
++Port number : 2
++Camera type : Dione
++Port number : 3
++Camera type : Dione
++
++Configuration applied successfully.
++Please reboot to activate changes.
++```
++
 +### Single Camera Configuration
 +
 +Configure a Dione camera on port 0:
 +
 +```bash
-+$ sudo eg_dt_camera_config_set.sh 0 Dione
++$ sudo eg_dt_camera_config_set.sh 0/Dione
 +Forecr board detected: dsboard-ornxs
 +Port number : 0
 +Camera type : Dione
@@ -1850,7 +1977,7 @@ index 0000000..fcb865f
 +Configure MicroCube640 on port 0 and SmartIR640 on port 1:
 +
 +```bash
-+$ sudo eg_dt_camera_config_set.sh 0 MicroCube640 1 SmartIR640
++$ sudo eg_dt_camera_config_set.sh 0/MicroCube640 1/SmartIR640
 +Forecr board detected: dsboard-ornxs
 +Port number : 0
 +Camera type : MicroCube640
@@ -1866,7 +1993,7 @@ index 0000000..fcb865f
 +### Four Cameras (AGX Orin)
 +
 +```bash
-+$ sudo eg_dt_camera_config_set.sh 0 Dione 1 MicroCube640 2 SmartIR640 3 Crius1280
++$ sudo eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640 2/SmartIR640 3/Crius1280
 +Nvidia official board
 +Port number : 0
 +Camera type : Dione
@@ -1890,12 +2017,8 @@ index 0000000..fcb865f
 +#!/bin/bash
 +# configure_cameras.sh - Automated camera configuration
 +
-+# Define camera setup
-+PORT0_CAM="Dione"
-+PORT1_CAM="MicroCube640"
-+
 +echo "Configuring cameras..."
-+eg_dt_camera_config_set.sh 0 "$PORT0_CAM" 1 "$PORT1_CAM"
++eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
 +
 +if [[ $? -eq 0 ]]; then
 +    echo ""
@@ -1919,7 +2042,7 @@ index 0000000..fcb865f
 +
 +# Apply configuration
 +echo "Applying camera configuration..."
-+eg_dt_camera_config_set.sh 0 Dione 1 SmartIR640
++eg_dt_camera_config_set.sh 0/Dione 1/SmartIR640
 +
 +if [[ $? -ne 0 ]]; then
 +    echo "ERROR: Configuration failed"
@@ -1942,16 +2065,23 @@ index 0000000..fcb865f
 +### Complete Configuration Workflow
 +
 +```bash
-+# 1. Check current board
++# 1. Check current board and camera ports
 +$ detect_jetson_board.sh -v
 +=== Jetson Board Detection ===
 +Board Type: dsboard-ornxs
 +System on Module (SoM):
 +  Type: orin-nano
 +  Part: P3767-0003 (8GB)
++  SoC:  t234
++Carrier Board:
++  Vendor: forecr
++  Type:   dsboard-ornxs
++  Desc:   DSBOARD-ORNXS (Orin Nano/NX compact)
++Camera:
++  Ports: 2
 +
 +# 2. Apply camera configuration
-+$ sudo eg_dt_camera_config_set.sh 0 Dione 1 MicroCube640
++$ sudo eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
 +Forecr board detected: dsboard-ornxs
 +Port number : 0
 +Camera type : Dione
@@ -1968,11 +2098,21 @@ index 0000000..fcb865f
 +
 +Board: dsboard-ornxs (orin-nano, t234)
 +
-+Detected cameras:
-+  Port 0: Dione
-+  Port 1: MicroCube640
++Camera ports:
++  Port 0: Dione 640 (connected)
++    Video device: /dev/video0
++    I2C device:   /dev/dioneir-i2c-9-000e-5b
++    Serial:       20823
++    Resolution:   640x480
++    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
++  Port 1: MicroCube (connected)
++    Video device: /dev/video1
++    I2C device:   /dev/eg-ec-mipi-10-0016
++    Serial:       21971
++    Resolution:   640x480
++    Pixel format: 'Y16 ' (16-bit Greyscale)
 +
-+Total: 2 camera(s)
++Total configured: 2 camera(s)
 +
 +# 5. Start using cameras
 +$ v4l2-ctl --list-devices
@@ -1986,14 +2126,16 @@ index 0000000..fcb865f
 +# Old configuration: 0=Dione, 1=MicroCube640
 +$ eg_dt_camera_config_get.sh --json
 +{
++  "board": {"type": "dsboard-ornxs", "som": "orin-nano", "tegra": "t234"},
 +  "cameras": {
-+    "port_0": "Dione",
-+    "port_1": "MicroCube640"
-+  }
++    "port_0": {"type": "Dione", "status": "connected", "model": "Dione 640", ...},
++    "port_1": {"type": "MicroCube640", "status": "connected", "model": "MicroCube", ...}
++  },
++  "camera_count": 2
 +}
 +
 +# Apply new configuration
-+$ sudo eg_dt_camera_config_set.sh 0 SmartIR640 1 Crius1280
++$ sudo eg_dt_camera_config_set.sh 0/SmartIR640 1/Crius1280
 +...
 +
 +# Reboot
@@ -2002,10 +2144,12 @@ index 0000000..fcb865f
 +# Verify new configuration
 +$ eg_dt_camera_config_get.sh --json
 +{
++  "board": {"type": "dsboard-ornxs", "som": "orin-nano", "tegra": "t234"},
 +  "cameras": {
-+    "port_0": "SmartIR640 or Crius1280",
-+    "port_1": "SmartIR640 or Crius1280"
-+  }
++    "port_0": {"type": "SmartIR640 or Crius1280", "status": "connected", "model": "SmartIR640", ...},
++    "port_1": {"type": "SmartIR640 or Crius1280", "status": "connected", "model": "Crius1280", ...}
++  },
++  "camera_count": 2
 +}
 +```
 +
@@ -2013,43 +2157,47 @@ index 0000000..fcb865f
 +
 +## Troubleshooting
 +
-+### "Error. Arguments number must be a multiple of 2"
++### "Error: invalid argument ... Expected format: port_number/camera_type"
 +
-+You must provide pairs of port number and camera type:
-+
-+```bash
-+# ✗ Wrong: odd number of arguments
-+$ eg_dt_camera_config_set.sh 0 Dione 1
-+Error. Arguments number must be a multiple of 2 : pairs port_number camera_type
-+
-+# ✓ Correct: pairs of port and camera
-+$ eg_dt_camera_config_set.sh 0 Dione 1 MicroCube640
-+```
-+
-+### "Error : invalid port number"
-+
-+Port numbers must be 0-7:
++Each argument must be a port/camera pair separated by `/`:
 +
 +```bash
-+# ✗ Wrong: port 9 doesn't exist
-+$ eg_dt_camera_config_set.sh 9 Dione
-+Error : invalid port number 9
-+
-+# ✓ Correct: valid port numbers
++# ✗ Wrong: missing slash separator
 +$ eg_dt_camera_config_set.sh 0 Dione
++Error: invalid argument '0'. Expected format: port_number/camera_type
++
++# ✓ Correct: port/camera pairs
++$ eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
 +```
 +
-+### "Unknown camera type"
++### "Error: invalid port number"
++
++Port numbers must be within the range detected for your board:
++
++```bash
++# ✗ Wrong: port 2 doesn't exist on a 2-port board (DSBOARD-ORNXS)
++$ eg_dt_camera_config_set.sh 2/Dione
++Error: invalid port number '2' (from argument '2/Dione'). Must be 0-1.
++
++# ✓ Correct: valid port numbers for this board
++$ eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
++```
++
++The valid port range is automatically detected from the device tree. Use
++`detect_jetson_board.sh --camera-ports` to check how many ports your board has.
++
++### "Error: unknown camera type"
 +
 +Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`
 +
 +```bash
 +# ✗ Wrong: typo in camera name
-+$ eg_dt_camera_config_set.sh 0 microcube640
-+Unknown camera type microcube640. Dione, MicroCube640, SmartIR640 or Crius1280 are supported
++$ eg_dt_camera_config_set.sh 0/microcube640
++Error: unknown camera type 'microcube640' (from argument '0/microcube640').
++Supported cameras: Dione, MicroCube640, SmartIR640, Crius1280
 +
 +# ✓ Correct: exact camera name
-+$ eg_dt_camera_config_set.sh 0 MicroCube640
++$ eg_dt_camera_config_set.sh 0/MicroCube640
 +```
 +
 +### "detect_jetson_board.sh: command not found"
@@ -2087,7 +2235,7 @@ index 0000000..fcb865f
 +
 +4. **Re-apply configuration**:
 +   ```bash
-+   sudo eg_dt_camera_config_set.sh 0 Dione 1 MicroCube640
++   sudo eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
 +   sudo reboot
 +   ```
 +
@@ -2121,11 +2269,11 @@ index 0000000..fcb865f
 +
 +```bash
 +# ✗ Wrong: no sudo
-+$ eg_dt_camera_config_set.sh 0 Dione
++$ eg_dt_camera_config_set.sh 0/Dione
 +[sudo] password for user:
 +
 +# ✓ Correct: run with sudo
-+$ sudo eg_dt_camera_config_set.sh 0 Dione
++$ sudo eg_dt_camera_config_set.sh 0/Dione
 +```
 +
 +---
@@ -2139,9 +2287,9 @@ index 0000000..fcb865f
 +# deploy_camera_config.sh - Deploy camera configuration to multiple Jetson boards
 +
 +BOARDS=(
-+    "192.168.1.101:0,Dione,1,MicroCube640"
-+    "192.168.1.102:0,SmartIR640,1,Crius1280"
-+    "192.168.1.103:0,Dione"
++    "192.168.1.101:0/Dione 1/MicroCube640"
++    "192.168.1.102:0/SmartIR640 1/Crius1280"
++    "192.168.1.103:0/Dione"
 +)
 +
 +for board_config in "${BOARDS[@]}"; do
@@ -2149,11 +2297,8 @@ index 0000000..fcb865f
 +
 +    echo "Configuring board at $ip..."
 +
-+    # Convert comma-separated camera list to space-separated arguments
-+    camera_args="${cameras//,/ }"
-+
 +    # Apply configuration remotely
-+    ssh jetson@$ip "sudo eg_dt_camera_config_set.sh $camera_args && sudo reboot"
++    ssh jetson@$ip "sudo eg_dt_camera_config_set.sh $cameras && sudo reboot"
 +
 +    echo "Board $ip configured and rebooting..."
 +done
@@ -2168,11 +2313,11 @@ index 0000000..fcb865f
 +# test_configurations.sh - Test different camera configurations
 +
 +CONFIGS=(
-+    "0 Dione"
-+    "0 MicroCube640"
-+    "0 SmartIR640"
-+    "0 Dione 1 MicroCube640"
-+    "0 MicroCube640 1 SmartIR640"
++    "0/Dione"
++    "0/MicroCube640"
++    "0/SmartIR640"
++    "0/Dione 1/MicroCube640"
++    "0/MicroCube640 1/SmartIR640"
 +)
 +
 +for config in "${CONFIGS[@]}"; do
@@ -2192,6 +2337,8 @@ index 0000000..fcb865f
 +
 +| Version | Date | Changes |
 +|---------|------|---------|
++| 1.3 | 2026-02-11 | Automatic camera port count detection from device tree, dynamic port validation, default configuration (no args = all ports with Dione), factorized camera database (CAMERA_LANES) |
++| 1.2 | 2026-02-11 | New argument format: `port/camera_type` pairs, usage help, improved error messages |
 +| 1.1 | 2026-02-03 | Improved command argument handling (dynamic array expansion), added board detection with detect_jetson_board.sh |
 +| 1.0 | 2025-02-02 | Initial version |
 +
@@ -2207,7 +2354,7 @@ index 0000000..fcb865f
 +
 +## See Also
 +
-+- `detect_jetson_board.sh` - Board detection utility
++- `detect_jetson_board.sh` - Board detection utility (use `--camera-ports` for port count, `-v` for details)
 +- `eg_dt_camera_config_get.sh` - Get current camera configuration
 +- `/opt/eg/jetson-io/` - Jetson device tree configuration tools
 +- `/boot/extlinux/extlinux.conf` - Boot configuration file

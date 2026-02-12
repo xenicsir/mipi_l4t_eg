@@ -261,13 +261,76 @@ cat > /tmp/postinst << 'EOT'
 depmod
 EOT
 
-# Add Exosens camera overlay configuration
+# Inject L4T version into postinst (unquoted EOT for variable expansion)
+cat >> /tmp/postinst << EOT
+
+L4T_VERSION_MAJOR=$L4T_VERSION_MAJOR
+EOT
+
+# Add Exosens camera overlay configuration (quoted EOT, no expansion)
 cat >> /tmp/postinst << 'EOT'
 
 # Configure Exosens camera overlay if not already done
 if ! grep -q "JetsonIO" /boot/extlinux/extlinux.conf 2>/dev/null; then
-   eg_dt_camera_config_set.sh 0 Dione 1 Dione
+   # Fresh install: configure all ports with default camera (Dione)
+   eg_dt_camera_config_set.sh
 else
+   # Upgrade: JetsonIO already configured
+
+   # For L4T < 36: re-apply camera configuration after package upgrade
+   # This ensures device tree overlays stay in sync with the installed drivers
+   if [[ $L4T_VERSION_MAJOR -lt 36 ]]; then
+      echo "L4T < 36: reading current camera configuration..."
+      CONFIG_OUTPUT=$(eg_dt_camera_config_get.sh 2>/dev/null)
+
+      if [[ -n "$CONFIG_OUTPUT" ]]; then
+         CAMERA_ARGS=""
+         while IFS= read -r line; do
+            port=""
+            cam_type=""
+
+            # Old format: "Camera port 0 configuration : Dione"
+            #             "Camera port 1 configuration : SmartIR640 and Crius1280"
+            if [[ "$line" =~ Camera\ port\ ([0-9]+)\ configuration\ :\ (.+) ]]; then
+               port="${BASH_REMATCH[1]}"
+               cam_type="${BASH_REMATCH[2]}"
+
+            # New format: "  Port 0: Dione (connected)"
+            #             "  Port 1: SmartIR640 or Crius1280 (not connected)"
+            elif [[ "$line" =~ Port\ ([0-9]+):\ ([^\(]+) ]]; then
+               port="${BASH_REMATCH[1]}"
+               cam_type="${BASH_REMATCH[2]}"
+               cam_type="${cam_type% }"
+            fi
+
+            [[ -z "$port" ]] && continue
+
+            # Normalize camera type names
+            case "$cam_type" in
+               *SmartIR640*)    cam_type="SmartIR640" ;;
+               *Crius1280*)     cam_type="Crius1280" ;;
+               *MicroCube640*)  cam_type="MicroCube640" ;;
+               *MicroCube*)     cam_type="MicroCube640" ;;
+               *Dione*)         cam_type="Dione" ;;
+               *)               continue ;;
+            esac
+
+            CAMERA_ARGS="$CAMERA_ARGS $port/$cam_type"
+         done <<< "$CONFIG_OUTPUT"
+
+         if [[ -n "$CAMERA_ARGS" ]]; then
+            echo "Re-applying camera configuration:$CAMERA_ARGS"
+            eg_dt_camera_config_set.sh $CAMERA_ARGS
+         else
+            echo "No camera configuration found, applying defaults"
+            eg_dt_camera_config_set.sh
+         fi
+      else
+         echo "Could not read camera configuration, applying defaults"
+         eg_dt_camera_config_set.sh
+      fi
+   fi
+
    # Check if /boot/eg/Image is a standalone kernel (version ends with -eg)
    if [[ -f /boot/eg/Image ]]; then
       KERNEL_VERSION=$(strings /boot/eg/Image | grep "Linux version" | head -1 | awk '{print $3}')

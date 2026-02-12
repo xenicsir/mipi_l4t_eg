@@ -3942,6 +3942,2057 @@ index 0000000..dd0727b
 +MODULE_DESCRIPTION("Xenics Exosens MIPI camera I2C driver for EngineCore cameras");
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_client.c b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_client.c
+new file mode 100644
+index 0000000..db4b104
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_client.c
+@@ -0,0 +1,698 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#define PREFIX "gencp client"
++#include "liblogger.h"
++
++#include "gencp_common.h"
++#include "gencp_client.h"
++#include "nb_timer.h"
++
++#define TIMER_GENCPCLIENT_PTT 0
++#define TIMER_GENCPCLIENT_HEARTBEAT 1
++#define TIMER_GENCPCLIENT_ACK_READ 2
++
++// WV [20201027] G L O B A L   V A R I A B L E   D E C L A R A T I O N S   A N D   T Y P E   D E F S ------------------
++GENCP_MSG* pRxBuffer;
++GENCP_MSG* pTxBuffer;
++
++static const uint32_t gpBaudrate_u32[8]     = {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600};
++static const uint32_t gDefaultBaudrate_u32  = 9600;
++static bool gGencpInitWasSuccessfull        = false;
++
++static struct unio_handle *unio_handle_ptr;
++
++// --------------------------------------------------------------------------------------------------------------------
++
++// WV [20201026] S T A T I C   F U N C T I O N   D E L C L A R A T I O N S --------------------------------------------
++static uint32_t GENCPCLIENT_getNextRequestId(void);
++static void     GENCPCLIENT_sendCommand(uint32_t size_bytes);
++static uint32_t GENCPCLIENT_ComposeReadCommand(uint64_t address, uint16_t read_length_bytes);
++static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write_length_b, uint8_t* data);
++static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpired);
++static uint32_t GENCPCLIENT_GetPackageTransferTime(void);
++static uint8_t  GENCPCLIENT_isNonSwapCase(uint32_t address);
++// --------------------------------------------------------------------------------------------------------------------
++
++
++/*_____       _ _      _____ ______ _   _  _____ _____         _ _            _
++ |_   _|     (_) |    / ____|  ____| \ | |/ ____|  __ \       | (_)          | |
++   | |  _ __  _| |_  | |  __| |__  |  \| | |    | |__) |   ___| |_  ___ _ __ | |_
++   | | | '_ \| | __| | | |_ |  __| | . ` | |    |  ___/   / __| | |/ _ \ '_ \| __|
++  _| |_| | | | | |_  | |__| | |____| |\  | |____| |      | (__| | |  __/ | | | |_
++ |_____|_| |_|_|\__|  \_____|______|_| \_|\_____|_|       \___|_|_|\___|_| |_|\__|
++ */
++void GENCPCLIENT_Init(struct unio_handle *h)
++{
++    uint16_t status = GENCP_STATUS_SUCCESS;
++    gGencpInitWasSuccessfull = true; // required for correct opperation of init functions, will be reset to false if needed...
++
++    if(h) // if we have a valid pointer
++    {
++        PRINT_DEBUG("\n\rGENCP CLIENT     - GENCP Client Initialization");
++        unio_handle_ptr = h; //Save unio handle ptr
++        unio_read_buffer_init(unio_handle_ptr, 8); //initialize the ringbuffer and parsed gencp
++        nb_timers_init(2); //Init timers
++
++        // Two buffers for rx and tx for i2c send and capture
++        pRxBuffer = (GENCP_MSG*)MEM_ALLOC(sizeof(GENCP_MSG));
++        pTxBuffer = (GENCP_MSG*)MEM_ALLOC(sizeof(GENCP_MSG));
++
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Address of RxBuffer:             0x%p", pRxBuffer);
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Address of TxBuffer:             0x%p", pTxBuffer);
++
++        // USE THIS REGISTER READ TO SEE IF THE COMMUNICATION WORKS, IF FAILURE DISABLE THE GENCP CIENT MODULE !!!
++        uint32_t gencpVersion = 0;
++        status = GENCP_STATUS_SUCCESS;
++        // Read twice incase it fails
++        status = GENCPCLIENT_ReadRegister(GENCP_REG_GENCP_VERSION, &gencpVersion);
++        status = GENCPCLIENT_ReadRegister(GENCP_REG_GENCP_VERSION, &gencpVersion);
++        if(status == GENCP_STATUS_SUCCESS)
++        {
++            gGencpInitWasSuccessfull = true;
++            PRINT_INFO("GenCP version = %#08x\n", gencpVersion);
++        }
++        else
++        {
++            gGencpInitWasSuccessfull = false;
++
++            PRINT_ERROR("\n\r\n\r");
++            PRINT_ERROR("\n\r\033[91m       ^        \033[0m");
++            PRINT_ERROR("\n\r\033[91m      / \\      \033[0m");
++            PRINT_ERROR("\n\r\033[91m     / _ \\     \033[0m");
++            PRINT_ERROR("\n\r\033[91m    / | | \\    \033[0m");
++            PRINT_ERROR("\n\r\033[91m   /  |_|  \\   \033[0m");
++            PRINT_ERROR("\n\r\033[91m  /   (_)   \\  \033[0m");
++            PRINT_ERROR("\n\r\033[91m /___________\\ \033[0m");
++            PRINT_ERROR("\n\r");
++            PRINT_ERROR("\n\r \033[91m***ERROR***\033[0m GENCP CLIENT     - Failed to get a reliable connection to the sensor module -> DISABLE GENCP CLIENT !!!\n\r\n\r");
++            return;
++        }
++
++        // uint32_t read_data = 0;
++        // //FPGA firmware read
++        // status = GENCPCLIENT_ReadRegister(0x50FF0000, &read_data);
++        // if(status == GENCP_STATUS_SUCCESS)
++        //     PRINT_INFO("FPGA firmware version = %#08x\n", read_data);
++        // else
++        //     PRINT_INFO("FPGA firmware read failed\n");
++        //
++        //
++        // //FPGA test read
++        // // mipi enable register to read 50ff0010
++        // status = GENCPCLIENT_ReadRegister(0x50ff0010, &read_data);
++        // if(status == GENCP_STATUS_SUCCESS)
++        //     PRINT_INFO("MIPI Enable status = %#08x\n", read_data);
++        // else
++        //     PRINT_INFO("MIPI status read failed\n");
++    }
++    else
++    {
++        PRINT_ERROR("\n\r\n\r\033[91m***ERROR***\033[0m GENCP CLIENT     - Initialization Failed. Communication interface not set!\n\r");
++    }
++}
++
++void GENCPCLIENT_Cleanup(void)
++{
++    nb_timer_delete_all();
++    MEM_FREE(pRxBuffer);
++    MEM_FREE(pTxBuffer);
++    PRINT_INFO("GENCP Client cleaned up\n");
++}
++/*_____                _                                                 _
++ |  __ \              | |                                               | |
++ | |__) |___  __ _  __| |   ___ ___  _ __ ___  _ __ ___   __ _ _ __   __| |
++ |  _  // _ \/ _` |/ _` |  / __/ _ \| '_ ` _ \| '_ ` _ \ / _` | '_ \ / _` |
++ | | \ \  __/ (_| | (_| | | (_| (_) | | | | | | | | | | | (_| | | | | (_| |
++ |_|  \_\___|\__,_|\__,_|  \___\___/|_| |_| |_|_| |_| |_|\__,_|_| |_|\__,_|
++ */
++
++uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data)
++{
++    uint16_t status = GENCP_STATUS_SUCCESS;
++
++    if(gGencpInitWasSuccessfull)
++    {
++        PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Read register 0x%08x", address);
++        uint32_t command_size_bytes = 0;
++        uint32_t AckMsgRdyStatus = ACK_NOT_READY;
++        uint8_t timerIsExpired = 0;
++        uint32_t tempdata;
++
++        // WV [20201026] C O M P O S E   T H E   R E A D   C O M M A N D
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Compose the GENCP Read command...");
++        command_size_bytes = GENCPCLIENT_ComposeReadCommand((uint64_t) address, 4);
++        PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
++
++        // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   U A R T
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by UART...");
++        GENCPCLIENT_sendCommand(command_size_bytes);
++
++        // WV [20201026] R E A D   T H E   R E S P O N S E
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Waiting for GENCP ACK...");
++        AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(1, &timerIsExpired);      // WV [20201104] Start timer
++        do
++        {
++            AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(0, &timerIsExpired);
++            PRINT_DEBUG("STATUS: %u", AckMsgRdyStatus);
++        }while( (AckMsgRdyStatus == ACK_NOT_READY) && (!timerIsExpired) );
++
++        if(timerIsExpired)
++        {
++            PRINT_ERROR("\n\r\n\r\033[91m***ERROR***\033[0m GENCP CLIENT     - Timeout occurred while reading address 0x%08x!\n\r",address);
++            status = GENCP_STATUS_MSG_TIMEOUT;
++        }
++        else
++        {
++            tempdata = *((uint32_t*) &pRxBuffer->pScd_u16[0]);
++            *data = __builtin_bswap32(tempdata);
++            status = __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
++
++            if(status == GENCP_STATUS_SUCCESS)
++                PRINT_DEBUG("\n\rGENCP CLIENT     - Register 0x%08x content: 0x%08x", address, *data);
++            else
++                PRINT_DEBUG("\n\rGENCP CLIENT     - Register read 0x%08x GENCP status: 0x%08x", address, status);
++
++        }
++    }
++    else
++    {
++        // The register read was not done, however a SUCCESS is reported as a GENERIC ERROR STATUS is interpreted as a timeout error by Xeneth at startup
++        *data = 0;
++        status = GENCP_STATUS_SUCCESS;
++    }
++
++    return status;
++}
++
++// uint16_t GENCPCLIENT_ReadRegister64bit(uint32_t address, uint64_t* data)
++// {
++//     uint16_t status = GENCP_STATUS_SUCCESS;
++//
++//     if(gGencpInitWasSuccessfull)
++//     {
++//         PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Read register 0x%08x", address);
++//
++//         uint32_t command_size_bytes = 0;
++//         uint32_t AckMsgRdyStatus = ACK_NOT_READY;
++//         uint8_t timerIsExpired = 0;
++//         uint64_t tempdata;
++//
++//         // WV [20201026] C O M P O S E   T H E   R E A D   C O M M A N D
++//         PRINT_DEBUG("\n\rGENCP CLIENT     - Compose the GENCP Read command...");
++//         command_size_bytes = GENCPCLIENT_ComposeReadCommand((uint64_t) address, 8);
++//         PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
++//
++//         // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   U A R T
++//         PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by UART...");
++//         GENCPCLIENT_sendCommand(command_size_bytes);
++//
++//         // WV [20201026] R E A D   T H E   R E S P O N S E
++//         PRINT_DEBUG("\n\rGENCP CLIENT     - Waiting for GENCP ACK...");
++//
++//         AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(1, &timerIsExpired);      // WV [20201104] Start timer
++//         do
++//         {
++//             AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(0, &timerIsExpired);
++//         }while( (AckMsgRdyStatus == ACK_NOT_READY) && (!timerIsExpired) );
++//
++//         if(timerIsExpired)
++//         {
++//             PRINT_ERROR("\n\r\n\r\033[91m***ERROR***\033[0m GENCP CLIENT     - Timeout occurred!\n\r");
++//             status = GENCP_STATUS_MSG_TIMEOUT;
++//         }
++//         else
++//         {
++//             tempdata = *((uint64_t*) &pRxBuffer->pScd_u16[0]);
++//             *data = __builtin_bswap64(tempdata);
++//             status = __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
++//
++//             if(status == GENCP_STATUS_SUCCESS)
++//                 PRINT_DEBUG("\n\rGENCP CLIENT     - Register 0x%08x content: 0x%016x", address, *data);
++//             else
++//                 PRINT_DEBUG("\n\rGENCP CLIENT     - Register read 0x%08x GENCP status: 0x%08x", address, status);
++//         }
++//     }
++//     else
++//     {
++//         // The register read was not done, however a SUCCESS is reported as a GENERIC ERROR STATUS is interpreted as a timeout error by Xeneth at startup
++//         *data = 0;
++//         status = GENCP_STATUS_SUCCESS;
++//     }
++//     return status;
++// }
++//
++static uint32_t GENCPCLIENT_ComposeReadCommand(uint64_t address, uint16_t read_length_bytes)
++{
++    uint32_t size = 0;
++    uint32_t command_size_bytes;
++    const uint16_t SCD_size = 12;
++
++    /** Note:   The byte must be transmit in Big Endian mode, thus the MSB and LSB byte must be inverted in the transmission,
++                the "__builtin_bswap16" function is used in order to swap the byte of each packet. */
++
++    // P R E F I X
++    pTxBuffer->prefix.preamble_u16      = __builtin_bswap16(GENCP_PREAMBLE);
++    pTxBuffer->prefix.ccd_crc_16        = 0;                    // WV [20201023] will be overwritten later
++    pTxBuffer->prefix.scd_crc_16        = 0;                    // WV [20201023] will be overwritten later
++    pTxBuffer->prefix.channel_id_u16    = 0;
++
++    // C O M M O N   C O M M A N D   D A T A
++    pTxBuffer->ccd.flags_status_u16     = __builtin_bswap16(GENCP_CMD_FLAG_REQUEST_ACK);
++    pTxBuffer->ccd.command_id_u16       = __builtin_bswap16(GENCP_READMEM_CMD);
++    pTxBuffer->ccd.scd_length_u16       = __builtin_bswap16(SCD_size);              // SCD section consists of 12 bytes
++    pTxBuffer->ccd.request_id_u16       = __builtin_bswap16(GENCPCLIENT_getNextRequestId());
++
++    // S P E C I F I C   C O M M A N D   D A T A
++    *((uint64_t*) &pTxBuffer->pScd_u16[0])  = __builtin_bswap64(address);               // 8 bytes
++    pTxBuffer->pScd_u16[4]              = (uint16_t) 0;         // 2 bytes
++    pTxBuffer->pScd_u16[5]              = __builtin_bswap16(read_length_bytes); // 2 bytes
++
++    // C O M P L E T E   T H E   C H E C K S U M   F O R   C H A N N E L   I D   &   C C D
++    size = 0;
++    size += sizeof(pTxBuffer->prefix.channel_id_u16);
++    size += sizeof(pTxBuffer->ccd);
++    pTxBuffer->prefix.ccd_crc_16        = __builtin_bswap16(GENCP_crc16((uint8_t*) &pTxBuffer->prefix.channel_id_u16, size));
++
++    // C O M P L E T E   T H E   C H E C K S U M   F O R   C H A N N E L   I D   &   C C D   &   S C D
++    size += SCD_size;
++    pTxBuffer->prefix.scd_crc_16        = __builtin_bswap16(GENCP_crc16((uint8_t*) &pTxBuffer->prefix.channel_id_u16, size));
++
++    command_size_bytes = sizeof(pTxBuffer->prefix) + sizeof(pTxBuffer->ccd) + SCD_size;
++
++    return command_size_bytes;
++}
++
++// /*__          __   _ _                                                       _
++//   \ \        / /  (_) |                                                     | |
++//    \ \  /\  / / __ _| |_ ___    ___ ___  _ __ ___  _ __ ___   __ _ _ __   __| |
++//     \ \/  \/ / '__| | __/ _ \  / __/ _ \| '_ ` _ \| '_ ` _ \ / _` | '_ \ / _` |
++//      \  /\  /| |  | | ||  __/ | (_| (_) | | | | | | | | | | | (_| | | | | (_| |
++//       \/  \/ |_|  |_|\__\___|  \___\___/|_| |_| |_|_| |_| |_|\__,_|_| |_|\__,_|
++// */
++
++uint16_t GENCPCLIENT_WriteRegister(uint32_t address, uint32_t data)
++{
++    if(gGencpInitWasSuccessfull)
++    {
++        uint32_t command_size_bytes = 0;
++        uint32_t AckMsgRdyStatus = ACK_NOT_READY;
++        uint8_t timerIsExpired = 0;
++
++        uint32_t dataword = data;
++
++        PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Write 0x%08x to register 0x%08x", data, address);
++
++        // WV [20201026] C O M P O S E   T H E   W R I T E   C O M M A N D
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Compose the GENCP Write command...");
++        command_size_bytes = GENCPCLIENT_ComposeWriteCommand((uint64_t) address, 4, (uint8_t*) &dataword);
++        PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
++
++        // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E   O V E R   U A R T
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Send the write command by UART...");
++        GENCPCLIENT_sendCommand(command_size_bytes);
++
++        // WV [20201026] R E A D   T H E   R E S P O N S E
++        PRINT_DEBUG("\n\rGENCP CLIENT     - Waiting for GENCP ACK...");
++
++        AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(1, &timerIsExpired);      // WV [20201104] Start timer
++        do
++        {
++            AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(0, &timerIsExpired);
++        }while( (AckMsgRdyStatus == ACK_NOT_READY) && (!timerIsExpired) );
++
++        if(timerIsExpired)
++        {
++            PRINT_ERROR("\n\r\n\r\033[91m***ERROR***\033[0m GENCP CLIENT     - Timeout occurred while writing register 0x%08x!\n\r", address);
++            return GENCP_STATUS_MSG_TIMEOUT;
++        }
++        else
++        {
++            PRINT_DEBUG("\n\rGENCP CLIENT     - Register 0x%x has been written - GENCP status: %d", address, pRxBuffer->ccd.flags_status_u16);
++            return __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
++        }
++    }
++    else
++    {
++        // The register write was not done, however a SUCCESS is reported for the time being (decided after discussion with Guy)
++        return GENCP_STATUS_SUCCESS;
++    }
++}
++
++
++
++
++
++// uint16_t GENCPCLIENT_WriteBuffer(uint32_t address, uint8_t* pBuffer, uint32_t length)
++// {
++//     if(gGencpInitWasSuccessfull)
++//     {
++//         uint32_t command_size_bytes = 0;
++//         uint32_t AckMsgRdyStatus = ACK_NOT_READY;
++//         uint8_t timerIsExpired = 0;
++//
++//         PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Write data to buffer at address 0x%x", address);
++//
++//         // WV [20201026] C O M P O S E   T H E   W R I T E   C O M M A N D
++//         PRINT_DEBUG("\n\rGENCP CLIENT     - Compose the GENCP Write command...");
++//         command_size_bytes = GENCPCLIENT_ComposeWriteCommand((uint64_t) address, length, pBuffer);
++//
++//         PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
++//
++//
++//         // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E   O V E R   U A R T
++//         PRINT_DEBUG("\n\rGENCP CLIENT     - Send the write command by UART...");
++//         GENCPCLIENT_sendCommand(command_size_bytes);
++//
++//         // WV [20201026] R E A D   T H E   R E S P O N S E
++//         PRINT_DEBUG("\n\rGENCP CLIENT     - Waiting for GENCP ACK...");
++//
++//         AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(1, &timerIsExpired);      // WV [20201104] Start timer
++//         do
++//         {
++//             AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(0, &timerIsExpired);
++//         }while( (AckMsgRdyStatus == ACK_NOT_READY) && (!timerIsExpired) );
++//
++//         if(timerIsExpired)
++//         {
++//             PRINT_ERROR("\n\r\n\r\033[91m***ERROR***\033[0m GENCP CLIENT     - Timeout occurred while writing register 0x%08x!\n\r", address);
++//             return GENCP_STATUS_MSG_TIMEOUT;
++//         }
++//         else
++//         {
++//             PRINT_DEBUG("\n\rGENCP CLIENT     - Buffer has been written - GENCP status: %d", pRxBuffer->ccd.flags_status_u16);
++//             return __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
++//         }
++//     }
++//     else
++//     {
++//         // The register write was not done, however a SUCCESS is reported for the time being (decided after discussion with Guy)
++//         return GENCP_STATUS_SUCCESS;
++//     }
++// }
++
++static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write_length_b, uint8_t* data)
++{
++    uint32_t size = 0;
++    uint32_t command_size_bytes;
++    uint16_t SCD_size = 8 + write_length_b;
++
++    /** Note:   The byte must be transmit in Big Endian mode, thus the MSB and LSB byte must be inverted in the transmission,
++                the "__builtin_bswap16" function is used in order to swap the byte of each packet. */
++
++    // WV [202010] 24 bytes used out of the 1024 byte TX buffer: 1000 bytes left for data
++    const uint32_t overhead_b = sizeof(pTxBuffer->prefix) + sizeof(pTxBuffer->ccd) + sizeof(address);
++
++    // P R E F I X
++    pTxBuffer->prefix.preamble_u16      = __builtin_bswap16(GENCP_PREAMBLE);
++    pTxBuffer->prefix.ccd_crc_16        = 0;                    // WV [20201023] will be overwritten later
++    pTxBuffer->prefix.scd_crc_16        = 0;                    // WV [20201023] will be overwritten later
++    pTxBuffer->prefix.channel_id_u16    = 0;
++
++    // C O M M O N   C O M M A N D   D A T A
++    pTxBuffer->ccd.flags_status_u16     = __builtin_bswap16(GENCP_CMD_FLAG_REQUEST_ACK);
++    pTxBuffer->ccd.command_id_u16       = __builtin_bswap16(GENCP_WRITEMEM_CMD);
++    pTxBuffer->ccd.scd_length_u16       = __builtin_bswap16(SCD_size);              // SCD section consists of 12 bytes
++    pTxBuffer->ccd.request_id_u16       = __builtin_bswap16(GENCPCLIENT_getNextRequestId());
++
++    // S P E C I F I C   C O M M A N D   D A T A
++    *((uint64_t*) &pTxBuffer->pScd_u16[0])  = __builtin_bswap64(address);               // 8 bytes
++
++    if(write_length_b <= (GENCP_TX_BUF_SIZE - overhead_b))
++    {
++        //if(GENCP_isNonSwapAddress((uint32_t) address))
++        if(GENCPCLIENT_isNonSwapCase((uint32_t) address))
++        {
++            memcpy(((uint8_t*) &pTxBuffer->pScd_u16[0]) + 8, data, write_length_b);
++            // if(address == SENSORMODULE_REMOTE_FAC_BUFFER_BASE_ADDRESS){
++                PRINT_INFO("\n\rGENCP CLIENT     - First bytes: 0x%02x | 0x%02x | 0x%02x", (((uint8_t*) &pTxBuffer->pScd_u16[0]) + 8)[0], (((uint8_t*) &pTxBuffer->pScd_u16[0]) + 8)[1], (((uint8_t*) &pTxBuffer->pScd_u16[0]) + 8)[2]);
++            // }
++        }
++        else
++        {
++            PRINT_DEBUG("\n\rGENCP CLIENT     - Compose Write: swap address range.");
++            uint32_t i,j = 0;
++            // Swapping of normal register data which are integer values
++            for(i = 0; i < write_length_b/4; i++)
++            {
++                for(j = 0; j < 4; j++)
++                {
++                    *(((uint8_t*) &pTxBuffer->pScd_u16[0]) + 8 + write_length_b - 4*i - 1 - j) = *(data + 4*i + j);
++                    PRINT_DEBUG(" 0x%02x", *(data + 4*i + j));
++                }
++            }
++        }
++    }
++
++    // C O M P L E T E   T H E   C H E C K S U M   F O R   C H A N N E L   I D   &   C C D
++    size = 0;
++    size += sizeof(pTxBuffer->prefix.channel_id_u16);
++    size += sizeof(pTxBuffer->ccd);
++    pTxBuffer->prefix.ccd_crc_16        = __builtin_bswap16( GENCP_crc16((uint8_t*) &pTxBuffer->prefix.channel_id_u16, size) );
++
++    // C O M P L E T E   T H E   C H E C K S U M   F O R   C H A N N E L   I D   &   C C D   &   S C D
++    size += SCD_size;
++    pTxBuffer->prefix.scd_crc_16        = __builtin_bswap16( GENCP_crc16((uint8_t*) &pTxBuffer->prefix.channel_id_u16, size) );
++
++    command_size_bytes = sizeof(pTxBuffer->prefix) + sizeof(pTxBuffer->ccd) + SCD_size;
++
++    return command_size_bytes;
++}
++
++/*_____                _            _____ _  __
++ |  __ \              | |     /\   / ____| |/ /
++ | |__) |___  __ _  __| |    /  \ | |    | ' /   _ __ ___   ___  ___ ___  __ _  __ _  ___
++ |  _  // _ \/ _` |/ _` |   / /\ \| |    |  <   | '_ ` _ \ / _ \/ __/ __|/ _` |/ _` |/ _ \
++ | | \ \  __/ (_| | (_| |  / ____ \ |____| . \  | | | | | |  __/\__ \__ \ (_| | (_| |  __/
++ |_|  \_\___|\__,_|\__,_| /_/    \_\_____|_|\_\ |_| |_| |_|\___||___/___/\__,_|\__, |\___|
++                                                                                __/ |
++                                                                               |___/
++ */
++static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpired)
++{
++    uint32_t Status_u32 = ACK_NOT_READY;
++    uint8_t* pAckStartPtr_u8 = (uint8_t*) pRxBuffer;
++
++    static uint8_t AckMsgState = HUNTING_PREAMBLE_0;
++    static uint32_t RxIndex = 0;
++
++    if(startTimer)
++    {
++        nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
++        AckMsgState = HUNTING_PREAMBLE_0;
++    }
++    else
++    {
++        // pr_info("Called from: %pS\n", __builtin_return_address(0));
++        if(nb_timer_is_expired(TIMER_GENCPCLIENT_PTT))
++        { // If received more data after a Packet Transfer Time (PTT) timeout
++            *timerIsExpired = 1;                // Set the Timer expired flag HIGH!
++            memset(pRxBuffer, 0, sizeof(GENCP_MSG));
++            AckMsgState = HUNTING_PREAMBLE_0;
++        }
++
++        uint8_t byteReceived_u8 = 0xab;
++        while (SUCCESS == unio_read_byte(unio_handle_ptr, &byteReceived_u8))
++        {
++            switch (AckMsgState)
++            {
++                case HUNTING_PREAMBLE_0:
++                    PRINT_DEBUG(" 0x%02x", byteReceived_u8);
++                    RxIndex = 0;
++                    if (byteReceived_u8 == GENCP_PREAMBLE_BYTE_0)
++                    {
++                        AckMsgState = HUNTING_PREAMBLE_1;
++                        PRINT_DEBUG(" PREAMBLE 0");
++                        *timerIsExpired = 0;
++                        nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
++                        RxIndex++;
++                    }
++                    break;
++
++                case HUNTING_PREAMBLE_1:
++                    PRINT_DEBUG(" 0x%02x", byteReceived_u8);
++                    if (byteReceived_u8 == GENCP_PREAMBLE_BYTE_1)
++                    {
++                        AckMsgState = WAIT_CCD;
++                        PRINT_DEBUG(" PREAMBLE 1");
++                        *timerIsExpired = 0;
++                        nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
++                        RxIndex++;
++                    } else
++                        AckMsgState = HUNTING_PREAMBLE_0;
++                    break;
++
++                case WAIT_CCD:
++                    pAckStartPtr_u8[RxIndex++] = byteReceived_u8;
++                    PRINT_DEBUG(" 0x%02x", byteReceived_u8);
++                    PRINT_DEBUG(" CCD");
++                    *timerIsExpired = 0;
++                    nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
++                    if (RxIndex == (PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES))
++                    {   // All of Prefix + CCD have been received -> check CCD checksum
++                        //uint16_t Checksum_u16 = GENCPMSG_ComputeChecksum(&gpGencpMsgCfg_X[UartId_E].pRxBuf_X->ChannelId_u16, CCD_CRC_LENGTH_W, CRC_RX_STATE);
++                        uint16_t Checksum_u16 = GENCP_crc16((uint8_t *) &pRxBuffer->prefix.channel_id_u16 , CCD_CRC_LENGTH_BYTES);
++
++                        if(Checksum_u16 == __builtin_bswap16(pRxBuffer->prefix.ccd_crc_16))
++                        {
++                            if(__builtin_bswap16(pRxBuffer->ccd.scd_length_u16) == 0)
++                            {
++                                // S T O P   H E R E   A L R E A D Y  . . .
++                                nb_timer_delete(TIMER_GENCPCLIENT_PTT);
++                                Status_u32 = ACK_READY;
++                                RxIndex = 0;
++                                AckMsgState = HUNTING_PREAMBLE_0;
++                            }
++                            else
++                                AckMsgState = WAIT_SCD;
++                        }
++                        else
++                        {
++                            AckMsgState = WAIT_FOR_PTT_TIMEOUT;
++                            PRINT_DEBUG("\n\r\n\r*** ERROR *** GENCP CLIENT     - Checksum error in ACK message [0x%08x VS 0x%08x] - wait for timeout!\n\r", Checksum_u16, pRxBuffer->prefix.ccd_crc_16);
++                        }
++
++                    } else {
++                        PRINT_DEBUG("CCD: Collecting bytes for CRC, currently at %d of %d", RxIndex, PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES);
++                    }
++                    break;
++
++                case WAIT_SCD:
++                    PRINT_DEBUG(" 0x%02x", byteReceived_u8);
++                    PRINT_DEBUG(" SCD");
++                    pAckStartPtr_u8[RxIndex++] = byteReceived_u8;
++
++                    // All of the data have been received
++                    if (RxIndex == (PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES + __builtin_bswap16(pRxBuffer->ccd.scd_length_u16)))
++                    {
++                        nb_timer_delete(TIMER_GENCPCLIENT_PTT);
++                        Status_u32 = ACK_READY;
++                        RxIndex = 0;
++                        AckMsgState = HUNTING_PREAMBLE_0;
++                    }
++                    else {
++                        *timerIsExpired = 0;
++                        nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
++                    }
++                    break;
++
++                case WAIT_FOR_PTT_TIMEOUT:  // Wait for PTT Timeout event (manage in upper if function)
++                    PRINT_DEBUG(" --- WAIT_FOR_PTT_TIMEOUT ---");
++                    // nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
++                    break;
++            }
++
++            if (RxIndex > GENCP_RX_BUF_INDEX_MAX)
++            {   // Exceed the end of GENCP RX Buf => Not receive all of the message
++                RxIndex = 0;
++                AckMsgState = HUNTING_PREAMBLE_0;
++            }
++        }
++    }
++
++    return Status_u32;
++}
++
++/*_    _      _                   ______                _   _
++ | |  | |    | |                 |  ____|              | | (_)
++ | |__| | ___| |_ __   ___ _ __  | |__ _   _ _ __   ___| |_ _  ___  _ __  ___
++ |  __  |/ _ \ | '_ \ / _ \ '__| |  __| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
++ | |  | |  __/ | |_) |  __/ |    | |  | |_| | | | | (__| |_| | (_) | | | \__ \
++ |_|  |_|\___|_| .__/ \___|_|    |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
++               | |
++               |_|
++ */
++static uint32_t GENCPCLIENT_getNextRequestId(void)
++{
++    static uint16_t requestId = 0;
++
++    requestId++;
++    if(requestId == 0)
++        requestId = 1;
++
++    return requestId;
++}
++
++static uint32_t GENCPCLIENT_GetPackageTransferTime()
++{
++    // PRINT_DEBUG("\n\rGENCP CLIENT     - Packet transfer time: %d", (uint32_t) (GENCP_RX_BUF_SIZE * 12500 / gpBaudrate_u32(gGencpClientUartId)));
++    // //return (uint32_t) (GENCP_RX_BUF_SIZE * 12500 / UART_GetBaudrate(gGencpClientUartId));
++    // // WV timeout issues for cameralink... increase margin...
++    // return (uint32_t) (2 * GENCP_RX_BUF_SIZE * 12500 / gpBaudrate_u32(gGencpClientUartId));
++    return (uint32_t) (2 * GENCP_RX_BUF_SIZE * 12500 / 9600); // FIX: change this
++}
++
++static void GENCPCLIENT_sendCommand(uint32_t size_bytes)
++{
++    // Call to write command
++    unio_write(unio_handle_ptr, (uint8_t*) &pTxBuffer->prefix.preamble_u16, size_bytes);
++
++    PRINT_DEBUG("\n\rGENCP REQUEST: ");
++    for(uint32_t i=0; i<size_bytes; i++)
++        PRINT_DEBUG("[%02xh] ", *(((uint8_t*) &pTxBuffer->prefix.preamble_u16)+i) );
++}
++
++static uint8_t GENCPCLIENT_isNonSwapCase(uint32_t address)
++{
++    uint8_t isNonSwapCase = 0;
++    // uint8_t isInRemoteFileAccessBufferRange = 0;
++
++    // FIX: Verify this
++
++    // isInRemoteFileAccessBufferRange = ((SENSORMODULE_REMOTE_FAC_BUFFER_BASE_ADDRESS <= address) && (address < (SENSORMODULE_REMOTE_FAC_BUFFER_BASE_ADDRESS + 0x1000))) ? 1:0;
++    //
++    // isNonSwapCase = (isInRemoteFileAccessBufferRange) ? 1:0;
++
++    //if(address == SENSORMODULE_REMOTE_FAC_BUFFER_BASE_ADDRESS)
++    //      PRINT_DEBUG("\n\rGENCP CLIENT     -----------------      isNonSwapCase: %d", isNonSwapCase);
++
++    return isNonSwapCase;
++}
++
++bool GENCPCLIENT_isSuccesfullyInitialized(void) {return gGencpInitWasSuccessfull;}
++
++
++// uint16_t GENCPCLIENT_ReadString(uint32_t address, uint8_t* my_string, uint32_t lenght)
++// {
++//     PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Read register 0x%08x", address);
++//     uint32_t command_size_bytes = 0;
++//     uint32_t AckMsgRdyStatus = ACK_NOT_READY;
++//     uint8_t timerIsExpired = 0;
++//     uint16_t status = GENCP_STATUS_SUCCESS;
++//     //uint32_t tempdata;
++//
++//     // WV [20201026] C O M P O S E   T H E   R E A D   C O M M A N D
++//     PRINT_DEBUG("\n\rGENCP CLIENT     - Compose the GENCP Read command...");
++//     command_size_bytes = GENCPCLIENT_ComposeReadCommand((uint64_t) address, lenght);
++//     PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
++//
++//     // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   U A R T
++//     PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by UART...");
++//     //PRINT_DEBUG("\n\rSEND");
++//     GENCPCLIENT_sendCommand(command_size_bytes);
++//
++//     // WV [20201026] R E A D   T H E   R E S P O N S E
++//     PRINT_DEBUG("\n\rGENCP CLIENT     - Waiting for GENCP ACK...");
++//     AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(1, &timerIsExpired);      // WV [20201104] Start timer
++//     do
++//     {
++//         //PRINT_DEBUG(" >");
++//         AckMsgRdyStatus = GENCPCLIENT_IsAckMsgRdy(0, &timerIsExpired);
++//     }while( (AckMsgRdyStatus == ACK_NOT_READY) && (!timerIsExpired) );
++//
++//     if(timerIsExpired)
++//     {
++//         PRINT_ERROR("\n\r\n\r\033[91m***ERROR***\033[0m GENCP CLIENT     - Timeout occurred!\n\r");
++//         status = GENCP_STATUS_MSG_TIMEOUT;
++//     }
++//     else
++//     {
++//         //tempdata = *((uint32_t*) &pRxBuffer->pScd_u16[0]);
++//         memcpy((void *) my_string, (void *) &pRxBuffer->pScd_u16[0], lenght);
++//         status = __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
++//     }
++//
++//     return status;
++// }
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_client.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_client.h
+new file mode 100644
+index 0000000..eef1264
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_client.h
+@@ -0,0 +1,27 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "libtarget.h"
++
++#include "libunio.h"
++
++#ifndef RAYTRON_MINI2
++
++#ifndef SRC_INTERFACE_GENCP_GENCP_CLIENT_H_
++#define SRC_INTERFACE_GENCP_GENCP_CLIENT_H_
++
++// #include "../../periphery/uart.h"
++
++void GENCPCLIENT_Init(struct unio_handle *h);
++void GENCPCLIENT_Cleanup(void);
++uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data);
++// uint16_t GENCPCLIENT_ReadRegister64bit(uint32_t address, uint64_t* data);
++uint16_t GENCPCLIENT_WriteRegister(uint32_t address, uint32_t data);
++// uint16_t GENCPCLIENT_WriteBuffer(uint32_t address, uint8_t* pBuffer, uint32_t length);
++bool GENCPCLIENT_isSuccesfullyInitialized(void);
++uint16_t GENCPCLIENT_ReadString(uint32_t address, uint8_t* string, uint32_t length);
++
++#endif /* SRC_INTERFACE_GENCP_GENCP_CLIENT_H_ */
++#endif
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_common.c b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_common.c
+new file mode 100644
+index 0000000..7086c9b
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_common.c
+@@ -0,0 +1,59 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "gencp_common.h"
++
++uint16_t GENCP_crc16(uint8_t *buf, uint32_t len)
++{
++    uint32_t sum = 0;
++
++    for (uint32_t i = 0; i < len; i++)
++    {
++        if (i & 1)
++            sum += (uint32_t)buf[i];
++        else
++            sum += (uint32_t)buf[i] << 8;
++    }
++
++    while (sum >> 16)
++        sum = (sum & 0xFFFF) + (sum >> 16);
++
++    if (sum == 0xFFFF)  // special case in RFC768 (as referred in GenCP spec, tested on JAI GO-2400M camera)
++        sum = 0;
++
++    // printf("CRC_CALC: : [");
++    // for (int i = 0; i < len; i++) {
++    //     printf("%#02x", buf[i]);
++    //     if (i < len-1) printf(", ");
++    // }
++    // printf("]\n");
++    // printf("CRC Result: %#04x, or len: %u", ~sum & 0xffff, len);
++
++    // printk(KERN_INFO "CRC_CALC: Array [");
++    // for (int i = 0; i < len; i++) {
++    //     printk(KERN_CONT "%#02x", buf[i]);
++    //     if (i < len-1) printk(KERN_CONT ", ");
++    // }
++    // printk(KERN_CONT "]\n");
++    //
++    // printf("CRC Result: %#04x, or len: %u", ~sum & 0xffff, len);
++    return ~sum;
++}
++
++uint8_t GENCP_isNonSwapAddress(uint32_t addr)
++{
++	uint8_t addrIsInFileAccessBufferRange = 0;
++	#ifdef FILEACCESS_IMPLEMENTED
++		addrIsInFileAccessBufferRange = ((FILEACCESS_REG_BUFFER_BASE <= addr) && (addr <= FILEACCESS_REG_BUFFER_END)) ? 1:0;
++	#endif
++	//uint8_t addrIsInCalSetSourceDescr 	  = ((CSC_STRING_SOURCEDESCRIPTION_OFFSET <= addr)  && (addr <= CSC_STRING_SOURCEDESCRIPTION_END)) ? 1:0;
++	//uint8_t addrIsInCalSetUserDefName	  = ((CSC_STRING_USERDEFINEDNAME_OFFSET <= addr)    && (addr <= CSC_STRING_USERDEFINEDNAME_END)) ? 1:0;
++	uint8_t addrIsInCalSetSourceDescr 	  = 0;
++	uint8_t addrIsInCalSetUserDefName	  = 0;
++
++	uint8_t result = (addrIsInFileAccessBufferRange || addrIsInCalSetSourceDescr || addrIsInCalSetUserDefName) ? 1:0;
++
++	return result;
++}
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_common.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_common.h
+new file mode 100644
+index 0000000..14e961e
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/gencp_common.h
+@@ -0,0 +1,215 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "libtarget.h"
++
++#define GENCP_RX_BUF_SIZE                               (1024)
++#define GENCP_TX_BUF_SIZE                               (1024)
++
++#define ACK_NOT_READY                                   (1)
++#define ACK_READY                                       (0)
++#define SUCCESS                                         (0)
++#define DEFAULT_GENCPCLIENT_HEARTBEAT_TIMEOUT_MS (3000)
++
++// GenICam Control Protocol Command Identifiers
++#define GENCP_READMEM_CMD                       (0x0800)
++#define GENCP_READMEM_ACK                       (0x0801)
++#define GENCP_WRITEMEM_CMD                      (0x0802)
++#define GENCP_WRITEMEM_ACK                      (0x0803)
++#define GENCP_PENDING_ACK                       (0x0805)
++#define GENCP_EVENT_CMD                         (0x0C00)
++#define GENCP_EVENT_ACK                         (0x0C01)
++
++// GenICam CP Status Codes
++#define GENCP_STATUS_SUCCESS            (0x0000)
++#define GENCP_STATUS_NOT_IMPLEMENTED    (0x8001)
++#define GENCP_STATUS_INVALID_PARAMETER  (0x8002)
++#define GENCP_STATUS_INVALID_ADDRESS    (0x8003)
++#define GENCP_STATUS_WRITE_PROTECT      (0x8004)
++#define GENCP_STATUS_BAD_ALIGNMENT      (0x8005)
++#define GENCP_STATUS_ACCESS_DENIED      (0x8006)
++#define GENCP_STATUS_BUSY               (0x8007)
++#define GENCP_STATUS_LOCAL_PROBLEM      (0x8008)
++#define GENCP_STATUS_MISMATCH           (0x8009)
++#define GENCP_STATUS_INVALID_PROTOCOL   (0x800A)
++#define GENCP_STATUS_MSG_TIMEOUT        (0x800B)
++#define GENCP_STATUS_INVALID_HEADER     (0x800E)
++#define GENCP_STATUS_WRONG_CONFIG       (0x800F)
++#define GENCP_STATUS_GENERIC_ERROR      (0x8FFF)
++
++//GenICam CP command protocol flags
++#define GENCP_CMD_FLAG_REQUEST_ACK      (0x4000)
++#define GENCP_CMD_FLAG_RESEND           (0x8000)
++
++//GenCP Device capability
++#define GENCP_CAP_USERS_DEFINED_NAME    (0x1 << 0)
++#define GENCP_CAP_ACCESS_PRIVILEGE      (0x1 << 1)
++#define GENCP_CAP_MESSAGE_CHANNEL       (0x1 << 2)
++#define GENCP_CAP_TIMESTAMP             (0x1 << 3)
++#define GENCP_CAP_STRING_ENCODING       (0xF << 4)
++#define GENCP_CAP_FAMILY_NAME           (0x1 << 8)
++#define GENCP_CAP_USERS_SBRM            (0x1 << 9)
++#define GENCP_CAP_ENDIANESS             (0x1 << 10)
++#define GENCP_CAP_WRITEN_LENGTH_FIELD   (0x1 << 11)
++#define GENCP_CAP_MULTI_EVENT           (0x1 << 12)
++
++// Baudrate definition
++enum {
++   BAUDRATE_9600   = 0x00000001,
++   BAUDRATE_19200  = 0x00000002,
++   BAUDRATE_38400  = 0x00000004,
++   BAUDRATE_57600  = 0x00000008,
++   BAUDRATE_115200 = 0x00000010,
++   BAUDRATE_230400 = 0x00000020,
++   BAUDRATE_460800 = 0x00000040,
++   BAUDRATE_921600 = 0x00000080,
++};
++
++// Bootstrap register map
++#define GENCP_REG_GENCP_VERSION                                 (0x00000000)
++#define GENCP_REG_MANUFACTURER_NAME                             (0x00000004)
++#define GENCP_REG_MODEL_NAME                                    (0x00000044)
++#define GENCP_REG_FAMILY_NAME                                   (0x00000084)
++#define GENCP_REG_DEVICE_VERSION                                (0x000000C4)
++#define GENCP_REG_MANUFACTURER_INFO                             (0x00000104)
++#define GENCP_REG_SERIAL_NUMBER                                 (0x00000144)
++#define GENCP_REG_USER_DEFINED_NAME                             (0x00000184)
++#define GENCP_REG_DEVICE_CAPABILITY                             (0x000001C4)
++#define GENCP_REG_MAX_DEVICE_RESPONSE_TIME                      (0x000001CC)
++#define GENCP_REG_MANIFEST_TABLE_ADDRESS                        (0x000001D0)
++#define GENCP_REG_SBRM_ADDRESS                                  (0x000001D8)
++#define GENCP_REG_DEVICE_CONFIGURATION                          (0x000001E0)
++#define GENCP_REG_HEARTBEAT_TIMEOUT                             (0x000001E8)
++#define GENCP_REG_MESSAGE_CHANNEL_ID                            (0x000001EC)
++#define GENCP_REG_TIMESTAMP                                     (0x000001F0)
++#define GENCP_REG_TIMESTAMP_LATCH                               (0x000001F8)
++#define GENCP_REG_TIMESTAMP_INCREMENT                           (0x000001FC)
++#define GENCP_REG_ACCESS_PRIVILEGE                              (0x00000204)
++#define GENCP_REG_ENDIANESS                                     (0x0000020C)
++
++//Specific bootstrap registers
++#define GENCP_REG_SUPPORTED_BAUDRATES                           (0x00000000)
++#define GENCP_REG_CURRENT_BAUDRATE                              (0x00000004)
++
++//Timing
++#define GENCP_REG_MAX_DEVICE_RESPONSE_INIT_TIME (50)
++#define GENCP_MAX_DEVICE_RESPONSE_TIME                  (300)   //GenCP section 5.4.10: should not exceed 300ms
++#define GENCP_MAX_RESPONSE_TIME_THRESHOLD               (1000)
++#define GENCP_HEARTBEAT_TIMEOUT                         (3000)
++//#define CHANGE_BAUDRATE_TIMEOUT_MS 250   //In case the device does not receive the confirming write command with the new parameters within
++                                            //  250 ms after sending the acknowledge it falls back to the original parameter set
++
++#define CHANGE_BAUDRATE_TIMEOUT_MS      (500)
++
++
++// WV [20201023] DEFS, TYPEDEFS & STRUCTS
++#define GENCP_RX_BUF_INDEX_MAX                          (GENCP_RX_BUF_SIZE - 1)
++#define PREFIXE_LENGTH_W                                (4)
++#define PREFIXE_LENGTH_BYTES                            (PREFIXE_LENGTH_W * 2)
++#define CCD_LENGTH_W                                    (4)
++#define CCD_LENGTH_BYTES                                (CCD_LENGTH_W * 2)
++#define SCD_DATA_OFFSET_BYTES                           (PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES)
++#define CCD_CRC_LENGTH_W                                (5)
++#define CCD_CRC_LENGTH_BYTES                            (CCD_CRC_LENGTH_W * 2)
++#define SCD_REG_ADDR_LENGTH_W                           (4)
++#define WRITE_MEM_ACK_MSG_SCD_LENGTH_BYTES      (4)
++
++
++#define READMEM_REQ_SCD_LENGTH_BYTES            (12)
++#define WRITEMEM_REGADDR_LENGTH_BYTES           (8)
++
++#define  GENCP_PREAMBLE                                         (0x0100)
++#define  GENCP_PREAMBLE_BYTE_0                          (0x01)
++#define  GENCP_PREAMBLE_BYTE_1                          (0x00)
++
++
++/* _____ ______ _   _  _____ _____    __  __  _____  _____       _                   _
++  / ____|  ____| \ | |/ ____|  __ \  |  \/  |/ ____|/ ____|     | |                 | |
++ | |  __| |__  |  \| | |    | |__) | | \  / | (___ | |  __   ___| |_ _ __ _   _  ___| |_ ___
++ | | |_ |  __| | . ` | |    |  ___/  | |\/| |\___ \| | |_ | / __| __| '__| | | |/ __| __/ __|
++ | |__| | |____| |\  | |____| |      | |  | |____) | |__| | \__ \ |_| |  | |_| | (__| |_\__ \
++  \_____|______|_| \_|\_____|_|      |_|  |_|_____/ \_____| |___/\__|_|   \__,_|\___|\__|___/
++ */
++typedef enum
++{
++   HUNTING_PREAMBLE_0 = 0,
++   HUNTING_PREAMBLE_1,
++   WAIT_CCD,
++   WAIT_SCD,
++   WAIT_FOR_PTT_TIMEOUT
++}FSM_STATE;
++
++typedef struct GenCPPrefixLayout {
++        // WV [20201023] P R E F I X :   4 x uint16
++    uint16_t preamble_u16;                              // preamble (= 0x0100 = SOH NULL)
++    uint16_t ccd_crc_16;                                // crc-16 build form the channel_id and CCD
++    uint16_t scd_crc_16;                                // crc-16 build form the channel_id, CCD, SCD (and Postfix, which is not present)
++    uint16_t channel_id_u16;                    // = 0 (reserved for the default comms channel)
++}GenCPPrefixLayout;
++
++typedef struct GenCPCCDLayout {
++        // WV [20201023] C O M M O N   C O M M A N D   D A T A :   4 x uint16
++    uint16_t flags_status_u16;          // flags for command - request ack bit is set 0b 0100 0000 0000 0000 | status for ACK;
++    uint16_t command_id_u16;                    // command_id = 0x0800 READMEM_CMD
++    uint16_t scd_length_u16;                    // always 12 bytes for this cmd
++    uint16_t request_id_u16;                    // reserved, set to 0
++}GenCPCCDLayout;
++
++typedef struct ReadMemCmdLayout {
++    GenCPPrefixLayout prefix;
++    GenCPCCDLayout ccd;
++
++    // Specific Command Data fields
++    uint64_t reg_addr;
++    uint16_t reserved;
++    uint16_t read_length;
++}ReadMemCmdLayout;
++
++typedef struct ReadMemAckLayout {
++    GenCPPrefixLayout prefix;
++    GenCPCCDLayout ccd;
++
++    // Specific Command Data fields
++    uint8_t  pData[GENCP_RX_BUF_SIZE - SCD_DATA_OFFSET_BYTES];
++}ReadMemAckLayout;
++
++typedef struct WriteMemCmdLayout {
++    GenCPPrefixLayout prefix;
++    GenCPCCDLayout ccd;
++
++    // Specific Command Data fields
++    uint64_t reg_addr;
++    uint8_t  pData[GENCP_RX_BUF_SIZE - SCD_DATA_OFFSET_BYTES - WRITEMEM_REGADDR_LENGTH_BYTES];
++}WriteMemCmdLayout;
++
++typedef struct WriteMemAckLayout {
++    GenCPPrefixLayout prefix;
++    GenCPCCDLayout ccd;
++
++    // Specific Command Data fields
++    uint16_t reserved;
++    uint16_t length_written;
++}WriteMemAckLayout;
++
++typedef struct
++{
++        GenCPPrefixLayout prefix;
++        GenCPCCDLayout ccd;
++
++        // WV [20201023] S P E C I F I C   C O M M A N D    D A T A
++        uint16_t pScd_u16[(GENCP_RX_BUF_SIZE/2) - PREFIXE_LENGTH_W - CCD_LENGTH_W];  //  512 - 4 - 4 = 504 x uint16
++
++}GENCP_MSG;
++
++/* _____                                        ______                _   _
++  / ____|                                      |  ____|              | | (_)
++ | |     ___  _ __ ___  _ __ ___   ___  _ __   | |__ _   _ _ __   ___| |_ _  ___  _ __  ___
++ | |    / _ \| '_ ` _ \| '_ ` _ \ / _ \| '_ \  |  __| | | | '_ \ / __| __| |/ _ \| '_ \/ __|
++ | |___| (_) | | | | | | | | | | | (_) | | | | | |  | |_| | | | | (__| |_| | (_) | | | \__ \
++  \_____\___/|_| |_| |_|_| |_| |_|\___/|_| |_| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
++ */
++// WV [20201023] F U N C T I O N   D E C L A R A T I O N S
++uint16_t GENCP_crc16(uint8_t *buf, uint32_t len);
++uint8_t GENCP_isNonSwapAddress(uint32_t addr);
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/liblogger.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/liblogger.h
+new file mode 100644
+index 0000000..3b4c324
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/liblogger.h
+@@ -0,0 +1,61 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#ifndef LIB_LOGGER_H
++#define LIB_LOGGER_H
++
++#define LOG_INFO
++// #define LOG_DEBUG
++#define LOG_ERROR
++
++#ifndef PREFIX
++    #define PREFIX "liblogger"
++#endif
++
++#ifdef __KERNEL__
++    #include <linux/kernel.h>
++#else
++    #include <stdio.h> //for printf
++#endif
++
++
++// Info log declaration
++#ifdef LOG_INFO
++    #ifdef __KERNEL__
++        #define PRINT_INFO(fmt, ...) pr_info(PREFIX ": [INFO]-> " fmt, ##__VA_ARGS__)
++    #else
++        #define PRINT_INFO(fmt, ...) printf(PREFIX ": [INFO]-> " fmt, ##__VA_ARGS__)
++    #endif
++#else
++    #define PRINT_INFO(fmt, ...) ((void)0)
++#endif
++
++// Debug log declaration
++// WARNING: #define DEBUG has to be defined for pr_debug to work in kernel.
++// It should be defined before the kernel.h is included.
++// OR in the make add the following: EXTRA_CFLAGS="-DDEBUG -g -O0"
++// TODO: Implement this using CONFIG_DYNAMIC_DEBUG instead? IDK, needs more research
++#ifdef LOG_DEBUG
++    #ifdef __KERNEL__
++        #define PRINT_DEBUG(fmt, ...) pr_debug(PREFIX ": [DEBUG]-> " fmt, ##__VA_ARGS__)
++    #else
++        #define PRINT_DEBUG(fmt, ...) printf(PREFIX ": [DEBUG]-> " fmt, ##__VA_ARGS__)
++    #endif
++#else
++    #define PRINT_DEBUG(fmt, ...) ((void)0)
++#endif
++
++// Error log declaration
++#ifdef LOG_ERROR
++    #ifdef __KERNEL__
++        #define PRINT_ERROR(fmt, ...) pr_err(PREFIX ": [ERROR]-> " fmt, ##__VA_ARGS__)
++    #else
++        #define PRINT_ERROR(fmt, ...) printf(PREFIX ": [ERROR]-> " fmt, ##__VA_ARGS__)
++    #endif
++#else
++    #define PRINT_ERROR(fmt, ...) ((void)0)
++#endif
++
++#endif /* LIB_LOGGER_H */
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libtarget.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libtarget.h
+new file mode 100644
+index 0000000..305cbb2
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libtarget.h
+@@ -0,0 +1,39 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#ifndef LIB_PLATFORM_H
++#define LIB_PLATFORM_H
++
++// Data types
++#ifdef __KERNEL__ // automatically defined when building kernel modules
++    #include <linux/types.h>
++    typedef u8  uint8_t;
++    typedef u16 uint16_t;
++    typedef u32 uint32_t;
++    typedef u64 uint64_t;
++#else
++    #include <stdint.h>
++    #include <stdbool.h>
++    #include <stddef.h>
++    #include <string.h>
++    typedef uint8_t  u8;
++    typedef uint16_t u16;
++    typedef uint32_t u32;
++    typedef uint64_t u64;
++#endif
++
++
++// Allocation of memories
++#ifdef __KERNEL__ // automatically defined when building kernel modules
++    #include <linux/slab.h>
++    #define MEM_ALLOC(size) kzalloc(size, GFP_KERNEL)
++    #define MEM_FREE(ptr) kfree(ptr)
++#else
++    #include <stdlib.h>
++    #define MEM_ALLOC(size) malloc(size)
++    #define MEM_FREE(ptr) free(ptr)
++#endif
++
++#endif /* LIB_PLATFORM_H */
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio.c b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio.c
+new file mode 100644
+index 0000000..bdb9d22
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio.c
+@@ -0,0 +1,125 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "libunio.h"
++#include "libunio_extras.h"
++
++#define PREFIX "libunio"
++#include "liblogger.h"
++
++static struct ring_buffer rb_fifo;
++
++int unio_read_buffer_init(struct unio_handle *h, size_t depth)
++{
++    rb_init(&rb_fifo);
++    h->read_buffer_enable = true;
++    return 0;
++}
++
++static enum return_status __unio_parsed_byte (struct unio_handle *h, u8 *buf)
++{
++    int ret;
++    if (rb_fifo.count == 0) {
++        PRINT_DEBUG("No data available, doing a read\n");
++        u8 temp_buff[16]; // NOTE: make it a static param?
++        size_t temp_size = sizeof(temp_buff)/sizeof(temp_buff[0]);
++
++        // Read 16 bytes from i2c
++        ret = unio_read(h, &temp_buff[0], temp_size);
++        if (ret < 0) {return ERROR;}
++
++        // Parse the 16 bytes read and save result to rb_fifo
++        ret = parse_gencp_raw(&temp_buff[0], temp_size, &rb_fifo);
++        if (ret < 0) {
++            PRINT_ERROR("Error while parsing. Data might have been lost\n");
++            return ERROR;
++        } else {
++            PRINT_DEBUG("rb count = %d\n", (int)rb_fifo.count);
++            if (rb_fifo.count == 0) {
++                PRINT_DEBUG("Parsed no valid data\n");
++                return NO_DATA;
++            } else {
++                rb_pop(&rb_fifo,buf);
++                return SUCCESS;
++            }
++        }
++    } else {
++        rb_pop(&rb_fifo,buf);
++    }
++    return 0;
++}
++
++int unio_read_byte (struct unio_handle *h, u8 *buf)
++{
++    // pr_info("Called from: %pS\n", __builtin_return_address(0));
++    if (h->read_buffer_enable) {
++        enum return_status ret;
++        ret = __unio_parsed_byte(h,buf);
++        return (int)ret;
++    } else {
++        int ret;
++        ret = unio_read(h,buf,1);
++        return ret;
++    }
++}
++
++#ifdef __KERNEL__ /* Kernelspace implementation */
++#include <linux/kernel.h>
++
++int unio_write(struct unio_handle *h, const u8 *buf, size_t len)
++{
++    PRINT_DEBUG("Writing to 0x%X, %lu bytes.\n", h->client->addr, len);
++    struct i2c_msg msg = {
++        .addr  = h->client->addr,
++        .flags = 0,               // write
++        .len   = len,
++        .buf   = (u8 *)buf,
++    };
++
++    int ret = i2c_transfer(h->client->adapter, &msg, 1);
++    PRINT_DEBUG("Write status: %d.\n", ret);
++    return (ret == 1) ? 0 : ret;
++}
++
++int unio_read(struct unio_handle *h, u8 *buf, size_t len)
++{
++    // pr_info("Called from: %pS\n", __builtin_return_address(0));
++    PRINT_DEBUG("Reading from 0x%X, %lu bytes.\n", h->client->addr, len);
++    struct i2c_msg msg = {
++        .addr  = h->client->addr,
++        .flags = I2C_M_RD,        // read
++        .len   = len,
++        .buf   = buf,
++    };
++
++    int ret = i2c_transfer(h->client->adapter, &msg, 1);
++
++    //This is required in kernel to print an array on one line.
++    PRINT_DEBUG("Read status: %d.\n Result: [", ret);
++    for (int i = 0; i < len; i++) {
++        PRINT_DEBUG("0x%X", buf[i]);
++        if (i < len-1) PRINT_DEBUG(", ");
++    }
++    PRINT_DEBUG("]\n");
++    return (ret == 1) ? 0 : ret;
++}
++
++#else   /* Userspace implementation */
++#include <errno.h>
++#include <stdio.h>
++
++int unio_write(struct unio_handle *h, const u8 *buf, size_t len)
++{
++    size_t ret = write(h->fd, buf, len);
++    return (ret == (size_t)len) ? 0 : -errno;
++}
++
++int unio_read(struct unio_handle *h, u8 *buf, size_t len)
++{
++    size_t ret = read(h->fd, buf, len);
++    return (ret == (size_t)len) ? 0 : -errno;
++}
++
++#endif
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio.h
+new file mode 100644
+index 0000000..c62cf6a
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio.h
+@@ -0,0 +1,58 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#ifndef LIB_UNIO_H
++#define LIB_UNIO_H
++
++#include "libtarget.h"
++#ifdef __KERNEL__
++    #include <linux/i2c.h>
++#else
++    #include <unistd.h> // For close(), read(), write() functions
++#endif
++
++struct unio_handle {
++#ifdef __KERNEL__
++    struct i2c_client *client;
++#else
++    int fd; // file descriptor for userspace device
++#endif
++    bool    read_buffer_enable;
++};
++
++int unio_write(struct unio_handle *h, const u8 *buf, size_t len);
++int unio_read (struct unio_handle *h,       u8 *buf, size_t len);
++int unio_read_buffer_init(struct unio_handle *h, size_t depth);
++int unio_read_byte (struct unio_handle *h, u8 *buf);
++
++#endif /* LIB_UNIO_H */
++
++
++// /* Kernel */
++// struct unio_handle h = {
++//     .client = client,   // inside i2c driver's probe()
++// };
++//
++// uint8_t cmd[] = { 0x01, 0x02, 0x03 };
++// unio_write(&h, cmd, sizeof(cmd));
++//
++// uint8_t response[4];
++// unio_read(&h, response, sizeof(response));
++
++// /* user space */
++// #include "unio.h"
++// #include <fcntl.h>
++//
++// struct unio_handle h;
++//
++// h.fd = open("/dev/i2c-1", O_RDWR);
++//
++// /* Write */
++// uint8_t data[] = { 0x10, 0x20 };
++// unio_write(&h, data, sizeof(data));
++//
++// /* Read */
++// uint8_t inbuf[4];
++// unio_read(&h, inbuf, sizeof(inbuf));
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio_extras.c b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio_extras.c
+new file mode 100644
+index 0000000..2ed493f
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio_extras.c
+@@ -0,0 +1,87 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "libunio_extras.h"
++
++#define PREFIX "libunio_extra"
++#include "liblogger.h"
++
++// Initialize the buffer
++void rb_init(struct ring_buffer *rb)
++{
++    // TODO: update to dynamic array
++    rb->head = 0;
++    rb->tail = 0;
++    rb->count = 0;
++}
++
++// Flush the buffer
++void rb_flush(struct ring_buffer *rb)
++{
++    //No need to clear the array, just the index pointers
++    rb->head = 0;
++    rb->tail = 0;
++    rb->count = 0;
++}
++
++// Check if the buffer is empty
++bool rb_is_empty(struct ring_buffer *rb)
++{
++    return rb->count == 0;
++}
++
++// Check if the buffer is full
++bool rb_is_full(struct ring_buffer *rb)
++{
++    return rb->count >= BUFFER_SIZE; // TODO: overflow check?
++}
++
++// Add an element to the buffer
++int rb_push(struct ring_buffer *rb, u8 value)
++{
++    if (rb_is_full(rb)) {
++        return -1; // buffer full
++    }
++    rb->data[rb->head] = value;
++    rb->head = (rb->head + 1) & (BUFFER_SIZE - 1); // wrap around mask
++    rb->count++;
++    return 0;
++}
++
++// Remove an element from the buffer
++int rb_pop(struct ring_buffer *rb, u8 *value)
++{
++    if (rb_is_empty(rb)) {
++        return -1; // buffer empty
++    }
++    *value = rb->data[rb->tail];
++    rb->tail = (rb->tail + 1) & (BUFFER_SIZE - 1); // wrap around mask
++    rb->count--;
++    return 0;
++}
++
++int parse_gencp_raw(u8 *buff, size_t buff_len, struct ring_buffer *rb)
++{
++    static u8 last_byte = 0xAA;
++    static int word_count = 0;
++
++    for (size_t i = 0; i < buff_len; i++){
++        if(buff[i] != last_byte) { // ignore the duplicates
++            word_count++;
++            // XOR the two byte to check if they are the inverse of eachother
++            if((buff[i] ^ last_byte) == 0xff) {
++                if (word_count > 1) {
++                    word_count = 0;
++                    int ret;
++                    ret = rb_push(rb, last_byte);
++                    PRINT_DEBUG("Parsed: 0x%x\n", last_byte);
++                    if (ret < 0) return -1;
++                }
++            }
++        }
++        last_byte = buff[i];
++    }
++    return 0;
++}
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio_extras.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio_extras.h
+new file mode 100644
+index 0000000..f83d848
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/libunio_extras.h
+@@ -0,0 +1,46 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#ifndef LIB_UNIO_EXTRA_H
++#define LIB_UNIO_EXTRA_H
++
++#include "libtarget.h"
++
++#define BUFFER_SIZE 8  // must be a power of two
++
++struct ring_buffer {
++    u8 data[BUFFER_SIZE];
++    size_t head;  // write index
++    size_t tail;  // read index
++    size_t count;
++};
++
++enum return_status {
++    ERROR = -1,
++    SUCCESS = 0,
++    NO_DATA = 1
++};
++
++// Initialize the buffer
++void rb_init(struct ring_buffer *rb);
++
++// Flush the buffer
++void rb_flush(struct ring_buffer *rb);
++
++// Check if the buffer is empty
++bool rb_is_empty(struct ring_buffer *rb);
++
++// Check if the buffer is full
++bool rb_is_full(struct ring_buffer *rb);
++
++// Add an element to the buffer
++int rb_push(struct ring_buffer *rb, u8 value);
++
++// Remove an element from the buffer
++int rb_pop(struct ring_buffer *rb, u8 *value);
++
++int parse_gencp_raw(u8 *buff, size_t buff_len, struct ring_buffer *rb);
++
++#endif /* LIB_UNIO_EXTRA_H */
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/nb_timer.c b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/nb_timer.c
+new file mode 100644
+index 0000000..1b18562
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/nb_timer.c
+@@ -0,0 +1,106 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "nb_timer.h"
++
++#define PREFIX "libunio"
++#include "liblogger.h"
++
++// Memory allocation calls
++#ifdef __KERNEL__ // automatically defined when building kernel modules
++    #include <linux/timer.h>
++#else
++    #include <string.h>
++    #define timer_setup(...) ((void)0) //ignore the timer setup function from kernel target
++    #define mod_timer (...) ((void)0) //ignore
++    #define del_timer (ptr, ...) ((void)0) //ignore
++    #define NSECS_TO_MSECS(ns) ((ns) / 1000000)
++    #define  SECS_TO_MSECS(s)  ((s) * 1000)
++#endif
++
++struct timer_def *_timer_array_ptr;
++size_t _timer_array_len;
++
++#ifdef __KERNEL__
++static void _timer_callback (struct timer_list *t){
++    struct timer_def *timer_ptr = from_timer(timer_ptr, t, timer); // similar to container_of macro
++    timer_ptr->done = 1;
++    timer_ptr->active = 0;
++    PRINT_DEBUG("Timer_triggered #%d\n", timer_ptr->id);
++
++}
++#endif
++
++int nb_timers_init(int num_timers) {
++    _timer_array_ptr = MEM_ALLOC(sizeof(struct timer_def) * num_timers);
++    _timer_array_len = (size_t)num_timers;
++
++    if (!_timer_array_ptr)
++        return -1;
++
++    for(int i=0; i<num_timers; i++){
++        _timer_array_ptr->id = i;
++        timer_setup(&_timer_array_ptr[i].timer, _timer_callback, 0);
++    }
++    return 0;
++}
++
++int nb_timer_start(int timer_id, int timer_dur_ms) {
++    struct timer_def *timer_ptr = &_timer_array_ptr[timer_id];
++    if (!timer_ptr) {
++        PRINT_ERROR("Timer id#%d doesn't exist\n", timer_id);
++        return -1;
++    } else {
++        PRINT_DEBUG("Starting timer id#%d for %dms\n", timer_id, timer_dur_ms);
++        timer_ptr->active = 1;
++        #ifdef __KERNEL__
++            timer_ptr->done = 0;
++            mod_timer(&timer_ptr->timer, jiffies + msecs_to_jiffies(timer_dur_ms));
++        #else
++            timer_ptr->duration_msec = timer_dur_ms;
++            clock_gettime(CLOCK_MONOTONIC, &timer_ptr->start_time);
++            PRINT_DEBUG("Start timer at %u msec", NSECS_TO_MSECS(timer_ptr->start_time.tv_nsec));
++        #endif
++        return 0;
++    }
++}
++
++int nb_timer_is_expired(int timer_id) {
++    struct timer_def *timer_ptr = &_timer_array_ptr[timer_id];
++    #ifdef __KERNEL__
++        return timer_ptr->done;
++    #else
++        struct timespec current_time;
++        clock_gettime(CLOCK_MONOTONIC, &current_time);
++        double elapsed =
++            SECS_TO_MSECS(current_time.tv_sec - timer_ptr->start_time.tv_sec) +
++            NSECS_TO_MSECS(current_time.tv_nsec - timer_ptr->start_time.tv_nsec);
++        PRINT_DEBUG("Time elapsed, %d msec", elapsed);
++        return (elapsed > timer_ptr->duration_msec);
++    #endif
++}
++
++int nb_timer_delete(int timer_id) {
++    struct timer_def *timer_ptr = &_timer_array_ptr[timer_id];
++    if (!timer_ptr) {
++        PRINT_ERROR("Timer id#%d doesn't exist\n", timer_id);
++        return -1;
++    } else {
++        PRINT_DEBUG("Deleting timer id#%d\n", timer_id);
++        #ifdef __KERNEL__
++        del_timer(&timer_ptr->timer);
++        #endif
++        memset(timer_ptr, 0, sizeof(struct timer_def)); // not really required
++        return 0;
++    }
++}
++
++int nb_timer_delete_all (void) {
++    for (size_t i = 0; i < _timer_array_len;i++){
++        nb_timer_delete(i);
++    }
++    MEM_FREE(_timer_array_ptr);
++    return 0;
++}
+diff --git a/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/nb_timer.h b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/nb_timer.h
+new file mode 100644
+index 0000000..be2a89e
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/nb_timer.h
+@@ -0,0 +1,34 @@
++/*
++ *
++ * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
++ *
++ */
++#include "libtarget.h"
++
++#ifdef __KERNEL__ // automatically defined when building kernel modules
++    #include <linux/timer.h>
++#else
++    #include <time.h>
++#endif
++
++struct timer_def {
++    int  id;
++    int  active;
++#ifdef __KERNEL__
++    struct timer_list timer;
++    int  done;
++#else
++    struct timespec start_time;
++    double duration_msec;
++#endif
++};
++
++int nb_timers_init(int num_timers);
++
++int nb_timer_start(int timer_id, int timer_dur_ms);
++
++int nb_timer_is_expired(int timer_id);
++
++int nb_timer_delete(int timer_id);
++
++int nb_timer_delete_all (void);
+diff --git a/source/nvidia-oot/drivers/media/i2c/ilumos.c b/source/nvidia-oot/drivers/media/i2c/ilumos.c
+new file mode 100644
+index 0000000..5858904
+--- /dev/null
++++ b/source/nvidia-oot/drivers/media/i2c/ilumos.c
+@@ -0,0 +1,418 @@
++/*
++ * A V4L2 driver for Exosens ilumos MIPI IR cameras.
++ *
++ * Based on Sony imx219 NVIDIA camera driver
++ * Copyright (C) 2026 Exosens
++ *
++ */
++
++#include <linux/i2c.h>
++#include <linux/i2c-mux.h>
++#include <linux/of_device.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/version.h>
++#include <media/tegracam_core.h>
++
++#include "gencp-over-i2c/libunio.h"
++#include "gencp-over-i2c/gencp_client.h"
++
++#include "gencp-over-i2c/liblogger.h"
++
++/* ilumos specific registers */
++#define REG_ACQ_START_W   0x500F0000
++#define REG_ACQ_STOP_W    0x500F0004
++#define REG_ACQ_STATUS_R  0x500F0008
++#define REG_IMG_HEIGHT_RW 0x500E000C
++#define REG_IMG_WIDTH_R   0x500E0008
++#define REG_MIPI_ENA_R    0x50ff0010
++#define REG_FIRW_VER_R    0x50FF0000
++
++static const struct of_device_id ilumos_of_match[] = {
++	{ .compatible = "exosens,ilumos", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, ilumos_of_match);
++
++enum {
++	ILUMOS_MODE_1024x128_RAW16,
++};
++
++static const int ilumos_60fps[] = {
++	60,
++};
++
++/*
++ * WARNING: frmfmt ordering need to match mode definition in
++ * device tree!
++ */
++static const struct camera_common_frmfmt ilumos_frmfmt[] = {
++	{{1024, 128},	ilumos_60fps, 1, 0, ILUMOS_MODE_1024x128_RAW16},
++};
++
++static const u32 ctrl_cid_list[] = {
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
++	TEGRA_CAMERA_CID_GAIN,
++	TEGRA_CAMERA_CID_EXPOSURE,
++	TEGRA_CAMERA_CID_FRAME_RATE,
++#endif
++	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
++};
++
++struct ilumos {
++	struct i2c_client		*i2c_client;
++	struct v4l2_subdev		*subdev;
++	struct camera_common_data	*s_data;
++	struct tegracam_device		*tc_dev;
++	struct unio_handle		io_handle;
++	u32				line_height;
++	u32				native_width;
++	bool				gencp_initialized;
++};
++
++static int ilumos_sensor_check(struct ilumos *priv)
++{
++	struct device *dev = &priv->i2c_client->dev;
++	int status;
++	u32 read_data = 0;
++
++	priv->io_handle.client = priv->i2c_client;
++
++	/* INIT the gencp client */
++	GENCPCLIENT_Init(&priv->io_handle);
++
++	/* FPGA test read - check if MIPI is enabled */
++	status = GENCPCLIENT_ReadRegister(REG_MIPI_ENA_R, &read_data);
++	if (status == 0) {
++		if (read_data == 0x1) {
++			PRINT_INFO("MIPI is enabled, status = %#08x\n", read_data);
++		} else {
++			PRINT_ERROR("MIPI is not enabled on this camera, license missing? Exiting...\n");
++			goto error_exit;
++		}
++	} else {
++		PRINT_INFO("MIPI status read failed\n");
++		goto error_exit;
++	}
++
++	/* FPGA firmware read */
++	status = GENCPCLIENT_ReadRegister(REG_FIRW_VER_R, &read_data);
++	if (status == 0) {
++		PRINT_INFO("FPGA firmware version = %#08x\n", read_data);
++	} else {
++		PRINT_INFO("FPGA firmware read failed\n");
++		goto error_exit;
++	}
++
++	/* Resolution - Set Height */
++	device_property_read_u32(dev, "line-height", &priv->line_height);
++	if (priv->line_height == 0)
++		priv->line_height = 128; /* Default value */
++	dev_info(dev, "line height read: %u\n", priv->line_height);
++
++	/* Height check */
++	status = GENCPCLIENT_ReadRegister(REG_IMG_HEIGHT_RW, &read_data);
++	if (status == 0) {
++		if (read_data == priv->line_height) {
++			PRINT_INFO("Camera and driver line heights match, height = %#08x\n", read_data);
++		} else {
++			PRINT_ERROR("Camera and driver line heights don't match.\n");
++			PRINT_ERROR("Camera = %u, Driver = %u\n", read_data, priv->line_height);
++		}
++	} else {
++		PRINT_INFO("Register read failed\n");
++		goto error_exit;
++	}
++
++	/* Set camera width */
++	priv->native_width = 1024;
++	status = GENCPCLIENT_ReadRegister(REG_IMG_WIDTH_R, &read_data);
++	if (status == 0) {
++		priv->native_width = read_data;
++	} else {
++		PRINT_INFO("Register read failed\n");
++		goto error_exit;
++	}
++
++	priv->gencp_initialized = true;
++	return 0;
++
++error_exit:
++	dev_err(dev, "Probing failed");
++	GENCPCLIENT_Cleanup();
++	priv->gencp_initialized = false;
++	return -EIO;
++}
++
++static int ilumos_set_group_hold(struct tegracam_device *tc_dev, bool val)
++{
++	/* group hold is not supported */
++	dev_dbg(tc_dev->dev, "%s val=%d\n", __func__, val);
++	return 0;
++}
++
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
++static int ilumos_set_gain(struct tegracam_device *tc_dev, s64 val)
++{
++	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
++	return 0;
++}
++
++static int ilumos_set_frame_rate(struct tegracam_device *tc_dev, s64 val)
++{
++	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
++	return 0;
++}
++
++static int ilumos_set_exposure(struct tegracam_device *tc_dev, s64 val)
++{
++	dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
++	return 0;
++}
++#endif
++
++static struct tegracam_ctrl_ops ilumos_ctrl_ops = {
++	.numctrls = ARRAY_SIZE(ctrl_cid_list),
++	.ctrl_cid_list = ctrl_cid_list,
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
++	.set_gain = ilumos_set_gain,
++	.set_exposure = ilumos_set_exposure,
++	.set_frame_rate = ilumos_set_frame_rate,
++#endif
++	.set_group_hold = ilumos_set_group_hold,
++};
++
++static int ilumos_power_on(struct camera_common_data *s_data)
++{
++	/* Power is not managed here */
++	struct device *dev = s_data->dev;
++	dev_dbg(dev, "%s\n", __func__);
++	return 0;
++}
++
++static int ilumos_power_off(struct camera_common_data *s_data)
++{
++	/* Power is not managed here */
++	struct device *dev = s_data->dev;
++	dev_dbg(dev, "%s\n", __func__);
++	return 0;
++}
++
++static int ilumos_power_put(struct tegracam_device *tc_dev)
++{
++	/* Power is not managed here */
++	dev_dbg(tc_dev->dev, "%s\n", __func__);
++	return 0;
++}
++
++static int ilumos_power_get(struct tegracam_device *tc_dev)
++{
++	/* Power is not managed here */
++	dev_dbg(tc_dev->dev, "%s\n", __func__);
++	return 0;
++}
++
++static struct camera_common_pdata *ilumos_parse_dt(
++	struct tegracam_device *tc_dev)
++{
++	struct device *dev = tc_dev->dev;
++	struct device_node *np = dev->of_node;
++	struct camera_common_pdata *board_priv_pdata;
++	const struct of_device_id *match;
++
++	if (!np)
++		return NULL;
++
++	match = of_match_device(ilumos_of_match, dev);
++	if (!match) {
++		dev_err(dev, "Failed to find matching dt id\n");
++		return NULL;
++	}
++
++	/* Just need to allocate data for tegra registration */
++	board_priv_pdata = devm_kzalloc(dev,
++		sizeof(*board_priv_pdata), GFP_KERNEL);
++	if (!board_priv_pdata)
++		return NULL;
++
++	return board_priv_pdata;
++}
++
++static int ilumos_set_mode(struct tegracam_device *tc_dev)
++{
++	/* Configuration is done independently by a control application */
++	dev_dbg(tc_dev->dev, "%s\n", __func__);
++	return 0;
++}
++
++static int ilumos_start_streaming(struct tegracam_device *tc_dev)
++{
++	struct ilumos *priv = tegracam_get_privdata(tc_dev);
++	int status = 0;
++	u32 read_data;
++
++	dev_dbg(tc_dev->dev, "%s\n", __func__);
++
++	if (!priv->gencp_initialized) {
++		dev_err(tc_dev->dev, "GenCP not initialized\n");
++		return -EIO;
++	}
++
++	/* Camera should always be streaming. But we can check that. */
++	status = GENCPCLIENT_ReadRegister(REG_ACQ_STATUS_R, &read_data);
++	if (status == 0) {
++		if (read_data != 0x1) {
++			PRINT_INFO("Acquisition is off, re-enabling it.\n");
++			status = GENCPCLIENT_WriteRegister(REG_ACQ_START_W, 0x1);
++		}
++	} else {
++		PRINT_INFO("Register read failed\n");
++	}
++
++	return 0;
++}
++
++static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
++{
++	struct ilumos *priv = tegracam_get_privdata(tc_dev);
++
++	dev_dbg(tc_dev->dev, "%s\n", __func__);
++
++	if (!priv->gencp_initialized) {
++		dev_err(tc_dev->dev, "GenCP not initialized\n");
++		return -EIO;
++	}
++
++	/* Note: We don't actually stop the camera, just acknowledge the call */
++	return 0;
++}
++
++static struct camera_common_sensor_ops ilumos_common_ops = {
++	.numfrmfmts = ARRAY_SIZE(ilumos_frmfmt),
++	.frmfmt_table = ilumos_frmfmt,
++	.power_on = ilumos_power_on,
++	.power_off = ilumos_power_off,
++	.parse_dt = ilumos_parse_dt,
++	.power_get = ilumos_power_get,
++	.power_put = ilumos_power_put,
++	.set_mode = ilumos_set_mode,
++	.start_streaming = ilumos_start_streaming,
++	.stop_streaming = ilumos_stop_streaming,
++};
++
++static int ilumos_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
++{
++	return 0;
++}
++
++static const struct v4l2_subdev_internal_ops ilumos_subdev_internal_ops = {
++	.open = ilumos_open,
++};
++
++static int ilumos_probe(struct i2c_client *client,
++	const struct i2c_device_id *id)
++{
++	struct device *dev = &client->dev;
++	struct tegracam_device *tc_dev;
++	struct ilumos *priv;
++	int err;
++
++	dev_info(dev, "probing v4l2 ilumos sensor at addr 0x%0x\n", client->addr);
++
++	if (!IS_ENABLED(CONFIG_OF) || !client->dev.of_node)
++		return -EINVAL;
++
++	priv = devm_kzalloc(dev, sizeof(struct ilumos), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	tc_dev = devm_kzalloc(dev, sizeof(struct tegracam_device), GFP_KERNEL);
++	if (!tc_dev)
++		return -ENOMEM;
++
++	priv->i2c_client = tc_dev->client = client;
++	tc_dev->dev = dev;
++	strncpy(tc_dev->name, "ilumos", sizeof(tc_dev->name));
++	tc_dev->dev_regmap_config = NULL;
++	tc_dev->sensor_ops = &ilumos_common_ops;
++	tc_dev->v4l2sd_internal_ops = &ilumos_subdev_internal_ops;
++	tc_dev->tcctrl_ops = &ilumos_ctrl_ops;
++
++	err = tegracam_device_register(tc_dev);
++	if (err) {
++		dev_err(dev, "tegra camera driver registration failed\n");
++		return err;
++	}
++
++	tc_dev->s_data->i2c_client = client;
++	priv->tc_dev = tc_dev;
++	priv->s_data = tc_dev->s_data;
++	priv->subdev = &tc_dev->s_data->subdev;
++	tegracam_set_privdata(tc_dev, (void *)priv);
++
++	/* Initialize sensor and check GenCP communication */
++	err = ilumos_sensor_check(priv);
++	if (err) {
++		dev_err(dev, "sensor check failed\n");
++		tegracam_device_unregister(tc_dev);
++		return err;
++	}
++
++	err = tegracam_v4l2subdev_register(tc_dev, true);
++	if (err) {
++		dev_err(dev, "tegra camera subdev registration failed\n");
++		GENCPCLIENT_Cleanup();
++		tegracam_device_unregister(tc_dev);
++		return err;
++	}
++
++	dev_info(dev, "Registered ilumos device (width=%u, height=%u)\n",
++		priv->native_width, priv->line_height);
++	return 0;
++}
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,1)
++static int ilumos_remove(struct i2c_client *client)
++#else
++static void ilumos_remove(struct i2c_client *client)
++#endif
++{
++	struct device *dev = &client->dev;
++	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
++	struct ilumos *priv = (struct ilumos *)s_data->priv;
++
++	tegracam_v4l2subdev_unregister(priv->tc_dev);
++	tegracam_device_unregister(priv->tc_dev);
++
++	if (priv->gencp_initialized)
++		GENCPCLIENT_Cleanup();
++
++	dev_info(dev, "Removed ilumos device\n");
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,1)
++	return 0;
++#endif
++}
++
++static const struct i2c_device_id ilumos_id[] = {
++	{ "ilumos", 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, ilumos_id);
++
++static struct i2c_driver ilumos_i2c_driver = {
++	.driver = {
++		.name = "ilumos",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(ilumos_of_match),
++	},
++	.probe = ilumos_probe,
++	.remove = ilumos_remove,
++	.id_table = ilumos_id,
++};
++module_i2c_driver(ilumos_i2c_driver);
++
++MODULE_AUTHOR("Exosens");
++MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for ilumos IR cameras");
++MODULE_LICENSE("GPL v2");
++MODULE_VERSION("1.0");
 diff --git a/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.c b/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.c
 new file mode 100755
 index 0000000..5f4ffef

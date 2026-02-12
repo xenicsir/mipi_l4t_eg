@@ -1,9 +1,9 @@
 diff --git a/rootfs/usr/bin/detect_jetson_board.sh b/rootfs/usr/bin/detect_jetson_board.sh
 new file mode 100755
-index 0000000..a294445
+index 0000000..2cfdaaf
 --- /dev/null
 +++ b/rootfs/usr/bin/detect_jetson_board.sh
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,471 @@
 +#!/bin/bash
 +#******************************************************************************
 +# detect_board.sh - Comprehensive Jetson board detection
@@ -37,6 +37,7 @@ index 0000000..a294445
 +VERBOSE=0
 +JSON_OUTPUT=0
 +SHORT_NAME=0
++CAMERA_PORTS_ONLY=0
 +
 +# Parse arguments
 +while [[ $# -gt 0 ]]; do
@@ -44,19 +45,22 @@ index 0000000..a294445
 +        -v|--verbose) VERBOSE=1; shift ;;
 +        --json) JSON_OUTPUT=1; shift ;;
 +        --short) SHORT_NAME=1; shift ;;
++        --camera-ports) CAMERA_PORTS_ONLY=1; shift ;;
 +        -h|--help)
 +            echo "Usage: $0 [OPTIONS]"
 +            echo ""
 +            echo "Detects Jetson board type including SoM and carrier board."
 +            echo ""
 +            echo "Options:"
-+            echo "  -v, --verbose    Print detailed information"
-+            echo "  --json          Output in JSON format"
-+            echo "  --short         Print short board name only"
-+            echo "  -h, --help      Show this help"
++            echo "  -v, --verbose       Print detailed information"
++            echo "  --json              Output in JSON format"
++            echo "  --short             Print short board name only"
++            echo "  --camera-ports      Print number of camera ports only"
++            echo "  -h, --help          Show this help"
 +            echo ""
 +            echo "Examples:"
 +            echo "  BOARD=\$(./detect_board.sh --short)"
++            echo "  PORTS=\$(./detect_board.sh --camera-ports)"
 +            echo "  ./detect_board.sh --json | jq '.module'"
 +            exit 0
 +            ;;
@@ -266,6 +270,76 @@ index 0000000..a294445
 +}
 +
 +#******************************************************************************
++# Detect number of camera ports from device tree
++#******************************************************************************
++detect_camera_ports() {
++    local dt_base="/proc/device-tree"
++    local port_count=0
++
++    # NVCSI paths vary by Tegra SoC generation
++    local nvcsi_paths=(
++        "$dt_base/host1x@13e00000/nvcsi@15a00000"          # T234 (Orin)
++        "$dt_base/bus@0/host1x@13e00000/nvcsi@15a00000"    # T234 (Orin, 36.x with bus@0)
++        "$dt_base/host1x@13e00000/nvcsi@14a00000"          # T194 (Xavier)
++        "$dt_base/host1x/nvcsi"                             # Fallback generic
++    )
++
++    local vi_paths=(
++        "$dt_base/tegra-capture-vi"
++        "$dt_base/bus@0/tegra-capture-vi"
++    )
++
++    # Method 1: Read num-channels property from nvcsi node (most reliable)
++    for nvcsi_path in "${nvcsi_paths[@]}"; do
++        if [[ -f "$nvcsi_path/num-channels" ]]; then
++            local hex_bytes
++            hex_bytes=$(xxd -p "$nvcsi_path/num-channels" 2>/dev/null)
++            if [[ -n "$hex_bytes" ]]; then
++                port_count=$((16#${hex_bytes:0:8}))
++                if [[ $port_count -gt 0 ]]; then
++                    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Camera ports from $nvcsi_path/num-channels: $port_count" >&2
++                    echo "$port_count"
++                    return 0
++                fi
++            fi
++        fi
++    done
++
++    # Method 2: Count channel@* directories in nvcsi node
++    for nvcsi_path in "${nvcsi_paths[@]}"; do
++        if [[ -d "$nvcsi_path" ]]; then
++            port_count=0
++            for ch_dir in "$nvcsi_path"/channel@*; do
++                [[ -d "$ch_dir" ]] && (( port_count++ ))
++            done
++            if [[ $port_count -gt 0 ]]; then
++                [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Camera ports from $nvcsi_path/channel@* count: $port_count" >&2
++                echo "$port_count"
++                return 0
++            fi
++        fi
++    done
++
++    # Method 3: Count port@* directories in tegra-capture-vi/ports
++    for vi_path in "${vi_paths[@]}"; do
++        if [[ -d "$vi_path/ports" ]]; then
++            port_count=0
++            for port_dir in "$vi_path/ports"/port@*; do
++                [[ -d "$port_dir" ]] && (( port_count++ ))
++            done
++            if [[ $port_count -gt 0 ]]; then
++                [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Camera ports from $vi_path/ports/port@* count: $port_count" >&2
++                echo "$port_count"
++                return 0
++            fi
++        fi
++    done
++
++    echo "0"
++    return 1
++}
++
++#******************************************************************************
 +# Main detection function
 +#******************************************************************************
 +detect_board_type() {
@@ -308,6 +382,10 @@ index 0000000..a294445
 +        board_type="unknown"
 +    fi
 +
++    # Detect camera ports
++    local camera_ports
++    camera_ports=$(detect_camera_ports)
++
 +    # Export for output
 +    export DETECTED_MODEL="$model"
 +    export DETECTED_DTB="$dtb"
@@ -319,6 +397,7 @@ index 0000000..a294445
 +    export DETECTED_CARRIER="$carrier"
 +    export DETECTED_CARRIER_PN="$carrier_pn"
 +    export DETECTED_BOARD_TYPE="$board_type"
++    export DETECTED_CAMERA_PORTS="$camera_ports"
 +
 +    [[ "$board_type" != "unknown" ]] && return 0 || return 1
 +}
@@ -327,7 +406,9 @@ index 0000000..a294445
 +# Output functions
 +#******************************************************************************
 +print_board_info() {
-+    if [[ $JSON_OUTPUT -eq 1 ]]; then
++    if [[ $CAMERA_PORTS_ONLY -eq 1 ]]; then
++        echo "$DETECTED_CAMERA_PORTS"
++    elif [[ $JSON_OUTPUT -eq 1 ]]; then
 +        cat <<EOF
 +{
 +  "board_type": "$DETECTED_BOARD_TYPE",
@@ -341,6 +422,7 @@ index 0000000..a294445
 +    "type": "$DETECTED_CARRIER",
 +    "description": "$DETECTED_CARRIER_PN"
 +  },
++  "camera_ports": $DETECTED_CAMERA_PORTS,
 +  "model": "$DETECTED_MODEL",
 +  "dtb": "$DETECTED_DTB"
 +}
@@ -361,6 +443,9 @@ index 0000000..a294445
 +        echo "  Vendor: $DETECTED_VENDOR"
 +        echo "  Type:   $DETECTED_CARRIER"
 +        echo "  Desc:   $DETECTED_CARRIER_PN"
++        echo ""
++        echo -e "${GREEN}Camera:${NC}"
++        echo "  Ports: $DETECTED_CAMERA_PORTS"
 +        echo ""
 +        echo -e "${GREEN}Device Tree:${NC}"
 +        echo "  Model: $DETECTED_MODEL"
@@ -1308,10 +1393,10 @@ index 0000000..3f65049
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..530284e
+index 0000000..7cb60a5
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
-@@ -0,0 +1,550 @@
+@@ -0,0 +1,609 @@
 +#!/bin/bash
 +#******************************************************************************
 +# eg_dt_camera_config_get.sh - Get Exosens camera configuration from device tree
@@ -1525,7 +1610,36 @@ index 0000000..530284e
 +        camera_video_dev[$port_num]=$(find_video_device "$conn_i2c_bus" "$conn_i2c_addr")
 +        camera_i2c_chardev[$port_num]=$(find_i2c_chardev "$conn_i2c_bus" "$conn_i2c_addr" "$conn_driver")
 +
-+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]}" >&2
++        # Read camera details from sysfs and V4L2
++        local sysfs_path="/sys/bus/i2c/devices/${conn_i2c_bus}-00${conn_i2c_addr}"
++        camera_model[$port_num]=$(cat "$sysfs_path/model" 2>/dev/null | tr -d '\n')
++        camera_serial[$port_num]=$(cat "$sysfs_path/serial_number" 2>/dev/null | tr -d '\n')
++
++        # Read native resolution and pixel format from sysfs (preferred)
++        camera_resolution[$port_num]=$(cat "$sysfs_path/resolution" 2>/dev/null | tr -d '\n')
++        camera_pixfmt[$port_num]=$(cat "$sysfs_path/pixel_format" 2>/dev/null | tr -d '\n')
++
++        # Fallback to V4L2 for resolution and pixel format
++        if [[ -z "${camera_resolution[$port_num]}" ]] || [[ -z "${camera_pixfmt[$port_num]}" ]]; then
++            if [[ -n "${camera_video_dev[$port_num]}" ]] && command -v v4l2-ctl &>/dev/null; then
++                local v4l2_fmt
++                v4l2_fmt=$(v4l2-ctl --device "${camera_video_dev[$port_num]}" --get-fmt-video 2>/dev/null)
++                if [[ -n "$v4l2_fmt" ]]; then
++                    if [[ -z "${camera_resolution[$port_num]}" ]]; then
++                        local wh
++                        wh=$(echo "$v4l2_fmt" | grep -oP 'Width/Height\s*:\s*\K[0-9]+/[0-9]+')
++                        if [[ -n "$wh" ]]; then
++                            camera_resolution[$port_num]="${wh}"
++                        fi
++                    fi
++                    if [[ -z "${camera_pixfmt[$port_num]}" ]]; then
++                        camera_pixfmt[$port_num]=$(echo "$v4l2_fmt" | grep -oP "Pixel Format\s*:\s*'\K[^']+")
++                    fi
++                fi
++            fi
++        fi
++
++        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]}" >&2
 +
 +        # Match the configured camera type with the connected camera
 +        # Check if the display name matches OR if they're in the same category
@@ -1561,6 +1675,10 @@ index 0000000..530284e
 +    camera_connected[$port_num]="not connected"
 +    camera_video_dev[$port_num]=""
 +    camera_i2c_chardev[$port_num]=""
++    camera_model[$port_num]=""
++    camera_serial[$port_num]=""
++    camera_resolution[$port_num]=""
++    camera_pixfmt[$port_num]=""
 +    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num (letter: $port_letter): not connected" >&2
 +    return 1
 +}
@@ -1620,24 +1738,6 @@ index 0000000..530284e
 +}
 +
 +#******************************************************************************
-+# Function: Map port letter to port number
-+#******************************************************************************
-+letter_to_port() {
-+    local letter="$1"
-+    case "$letter" in
-+        a) echo 0 ;;
-+        b) echo 0 ;;  # On Orin boards, 'b' is port 0
-+        c) echo 1 ;;
-+        d) echo 1 ;;
-+        e) echo 2 ;;
-+        f) echo 3 ;;
-+        g) echo 4 ;;
-+        h) echo 5 ;;
-+        *) echo -1 ;;
-+    esac
-+}
-+
-+#******************************************************************************
 +# Function: Discover cameras in specific device tree locations
 +#******************************************************************************
 +discover_cameras() {
@@ -1646,24 +1746,28 @@ index 0000000..530284e
 +    declare -gA camera_i2c_paths
 +    declare -gA camera_letters
 +
-+    # Search locations for camera devices (ordered by likelihood)
++    # Search locations for camera devices
++    # Format: "port_number:path"
++    # Port numbers are physical port indices for each carrier board.
++    # For cam_i2cmux boards, port number = i2c@N index.
++    # For AGX Orin direct I2C, port numbers follow the hardware mapping.
 +    local search_paths=(
-+        "$dt_base/cam_i2cmux/i2c@0"
-+        "$dt_base/cam_i2cmux/i2c@1"
-+        "$dt_base/cam_i2cmux/i2c@2"
-+        "$dt_base/cam_i2cmux/i2c@3"
-+        "$dt_base/bus@0/cam_i2cmux/i2c@0"
-+        "$dt_base/bus@0/cam_i2cmux/i2c@1"
-+        "$dt_base/bus@0/cam_i2cmux/i2c@2"
-+        "$dt_base/bus@0/cam_i2cmux/i2c@3"
-+        "$dt_base/bus@0/i2c@31e0000"
-+        "$dt_base/bus@0/i2c@c240000"
-+        "$dt_base/bus@0/i2c@c250000"
-+        "$dt_base/bus@0/i2c@3180000"
-+        "$dt_base/i2c@31e0000"
-+        "$dt_base/i2c@c240000"
-+        "$dt_base/i2c@c250000"
-+        "$dt_base/i2c@3180000"
++        "0:$dt_base/cam_i2cmux/i2c@0"
++        "1:$dt_base/cam_i2cmux/i2c@1"
++        "2:$dt_base/cam_i2cmux/i2c@2"
++        "3:$dt_base/cam_i2cmux/i2c@3"
++        "0:$dt_base/bus@0/cam_i2cmux/i2c@0"
++        "1:$dt_base/bus@0/cam_i2cmux/i2c@1"
++        "2:$dt_base/bus@0/cam_i2cmux/i2c@2"
++        "3:$dt_base/bus@0/cam_i2cmux/i2c@3"
++        "0:$dt_base/bus@0/i2c@31e0000"
++        "1:$dt_base/bus@0/i2c@c240000"
++        "2:$dt_base/bus@0/i2c@c250000"
++        "3:$dt_base/bus@0/i2c@3180000"
++        "0:$dt_base/i2c@31e0000"
++        "1:$dt_base/i2c@c240000"
++        "2:$dt_base/i2c@c250000"
++        "3:$dt_base/i2c@3180000"
 +    )
 +
 +    # Build list of unique glob patterns from camera database
@@ -1679,12 +1783,22 @@ index 0000000..530284e
 +    done
 +
 +    # Process each search path
-+    for search_path in "${search_paths[@]}"; do
++    for search_entry in "${search_paths[@]}"; do
++        # Extract port number and path from "port_num:path" format
++        local port_num="${search_entry%%:*}"
++        local search_path="${search_entry#*:}"
++
 +        if [[ ! -d "$search_path" ]]; then
 +            continue
 +        fi
 +
-+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Searching in: $search_path" >&2
++        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Searching in: $search_path (port $port_num)" >&2
++
++        # Skip if this port is already configured
++        if [[ -n "${camera_configs[$port_num]}" ]]; then
++            [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]   Port $port_num already configured, skipping" >&2
++            continue
++        fi
 +
 +        # Look for all camera device nodes using patterns from database
 +        for pattern_info in "${glob_patterns[@]}"; do
@@ -1706,7 +1820,7 @@ index 0000000..530284e
 +
 +                [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]     Found device: $dev_node" >&2
 +
-+                # Extract port letter using regex
++                # Extract port letter using regex (for connection detection)
 +                local node_name=$(basename "$dev_node")
 +                if [[ "$node_name" =~ $regex_pattern ]]; then
 +                    local port_letter="${BASH_REMATCH[1]}"
@@ -1715,29 +1829,24 @@ index 0000000..530284e
 +                        continue
 +                    fi
 +
-+                    # Map letter to port number
-+                    local port_num=$(letter_to_port "$port_letter")
-+
 +                    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]       Port letter: $port_letter -> Port num: $port_num" >&2
 +
-+                    # Only process if port hasn't been configured yet
-+                    if [[ $port_num -ge 0 ]] && [[ -z "${camera_configs[$port_num]}" ]]; then
-+                        # Get camera type from this device node
-+                        local cam_type=$(get_camera_type_from_node "$dev_node")
++                    # Get camera type from this device node
++                    local cam_type=$(get_camera_type_from_node "$dev_node")
 +
-+                        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]       Camera type: $cam_type" >&2
++                    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]       Camera type: $cam_type" >&2
 +
-+                        if [[ "$cam_type" != "None" ]]; then
-+                            camera_configs[$port_num]="$cam_type"
-+                            camera_i2c_paths[$port_num]="$search_path"
-+                            camera_letters[$port_num]="$port_letter"
++                    if [[ "$cam_type" != "None" ]]; then
++                        camera_configs[$port_num]="$cam_type"
++                        camera_i2c_paths[$port_num]="$search_path"
++                        camera_letters[$port_num]="$port_letter"
 +
-+                            if [[ $VERBOSE -eq 1 ]]; then
-+                                echo "[DEBUG] Port $port_num (letter: $port_letter): $cam_type" >&2
-+                                echo "[DEBUG]   Device: $dev_node" >&2
-+                                echo "[DEBUG]   I2C path: $search_path" >&2
-+                            fi
++                        if [[ $VERBOSE -eq 1 ]]; then
++                            echo "[DEBUG] Port $port_num (letter: $port_letter): $cam_type" >&2
++                            echo "[DEBUG]   Device: $dev_node" >&2
++                            echo "[DEBUG]   I2C path: $search_path" >&2
 +                        fi
++                        break 2  # Found camera for this port, move to next search_entry
 +                    fi
 +                fi
 +            done
@@ -1790,6 +1899,10 @@ index 0000000..530284e
 +declare -A camera_connected
 +declare -A camera_video_dev
 +declare -A camera_i2c_chardev
++declare -A camera_model
++declare -A camera_serial
++declare -A camera_resolution
++declare -A camera_pixfmt
 +for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
 +    cam_type="${camera_configs[$port]}"
 +    port_letter="${camera_letters[$port]}"
@@ -1816,6 +1929,10 @@ index 0000000..530284e
 +        conn_status="${camera_connected[$port]}"
 +        video_dev="${camera_video_dev[$port]}"
 +        i2c_dev="${camera_i2c_chardev[$port]}"
++        model="${camera_model[$port]}"
++        serial="${camera_serial[$port]}"
++        resolution="${camera_resolution[$port]}"
++        pixfmt="${camera_pixfmt[$port]}"
 +
 +        echo -n "    \"port_$port\": {"
 +        echo -n "\"type\": \"$cam_type\", "
@@ -1825,6 +1942,18 @@ index 0000000..530284e
 +        fi
 +        if [[ -n "$i2c_dev" ]]; then
 +            echo -n ", \"i2c_device\": \"$i2c_dev\""
++        fi
++        if [[ -n "$model" ]]; then
++            echo -n ", \"model\": \"$model\""
++        fi
++        if [[ -n "$serial" ]]; then
++            echo -n ", \"serial_number\": \"$serial\""
++        fi
++        if [[ -n "$resolution" ]]; then
++            echo -n ", \"width/height\": \"$resolution\""
++        fi
++        if [[ -n "$pixfmt" ]]; then
++            echo -n ", \"pixel_format\": \"$pixfmt\""
 +        fi
 +        echo -n "}"
 +    done
@@ -1849,11 +1978,26 @@ index 0000000..530284e
 +            conn_status="${camera_connected[$port]}"
 +            video_dev="${camera_video_dev[$port]}"
 +            i2c_dev="${camera_i2c_chardev[$port]}"
++            model="${camera_model[$port]}"
++            serial="${camera_serial[$port]}"
++            resolution="${camera_resolution[$port]}"
++            pixfmt="${camera_pixfmt[$port]}"
 +
-+            echo "  Port $port: $cam_type ($conn_status)"
++            display_name="$cam_type"
++            if [[ "$conn_status" == "connected" ]] && [[ -n "$model" ]]; then
++                display_name="$model"
++            fi
++            if [[ "$conn_status" == "connected" ]]; then
++                echo "  Port $port: $display_name ("$'\033[32m'"$conn_status"$'\033[0m'")"
++            else
++                echo "  Port $port: $display_name ("$'\033[31m'"$conn_status"$'\033[0m'")"
++            fi
 +            if [[ "$conn_status" == "connected" ]]; then
 +                [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
 +                [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
++                [[ -n "$serial" ]] && echo "    Serial:       $serial"
++                [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
++                [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
 +            fi
 +        done
 +        echo ""
@@ -1864,19 +2008,67 @@ index 0000000..530284e
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..4040ca8
+index 0000000..ca67a6f
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,129 @@
 +#!/bin/bash
 +
-+if (( $# % 2 ))
-+then
-+   echo "Error. Arguments number must be a multiple of 2 : pairs port_number camera_type"
-+   exit
++# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
++declare -A CAMERA_LANES=(
++	[Dione]=""
++	[MicroCube640]="EC_1_lane"
++	[MicroCube]="EC_1_lane"
++	[SmartIR640]="EC_2_lanes"
++	[Crius1280]="EC_2_lanes"
++)
++
++SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')
++
++DEFAULT_CAMERA="Dione"
++
++usage() {
++	echo "Usage: $(basename "$0") [<port/camera_type>] ..."
++	echo ""
++	echo "Configure Exosens camera device tree overlays on Jetson boards."
++	echo ""
++	echo "Arguments:"
++	echo "  port/camera_type  Pair of port number and camera type separated by '/'"
++	echo ""
++	echo "Without arguments, all detected ports are configured with $DEFAULT_CAMERA."
++	echo ""
++	echo "Supported cameras: $SUPPORTED_CAMERAS"
++	echo ""
++	echo "Examples:"
++	echo "  $(basename "$0")                                              # all ports with $DEFAULT_CAMERA"
++	echo "  $(basename "$0") 0/Dione"
++	echo "  $(basename "$0") 0/MicroCube 1/SmartIR640"
++	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/Crius1280"
++}
++
++if [[ "$1" == "-h" || "$1" == "--help" ]]; then
++	usage
++	exit 0
 +fi
 +
 +BOARD=$(detect_jetson_board.sh --short)
++
++# Detect number of camera ports from device tree
++CAMERA_PORTS=$(detect_jetson_board.sh --camera-ports 2>/dev/null)
++if [[ -z "$CAMERA_PORTS" || "$CAMERA_PORTS" -eq 0 ]] 2>/dev/null; then
++	echo "Warning: could not detect camera port count, defaulting to 8"
++	CAMERA_PORTS=8
++fi
++MAX_PORT=$(( CAMERA_PORTS - 1 ))
++
++# Default: all ports with DEFAULT_CAMERA
++if [[ $# -eq 0 ]]; then
++	args=()
++	for port in $(seq 0 $MAX_PORT); do
++		args+=("$port/$DEFAULT_CAMERA")
++	done
++	set -- "${args[@]}"
++fi
 +
 +case "$BOARD" in
 +  dsboard-*|milboard-*|raiboard-*)
@@ -1897,33 +2089,34 @@ index 0000000..4040ca8
 +   base_devicetree="Exosens Cameras"
 +fi
 +
-+arguments=( "$@" )
 +dtboarg=()
 +
-+for (( i=0; i<${#arguments[@]}; i=i+2 )); do
-+	port_number=${arguments[$i]}
-+	camera_type=${arguments[(($i+1))]}
-+	
-+	if [[ $port_number != 0 && $port_number != 1 && $port_number != 2 && $port_number != 3 && $port_number != 4 && $port_number != 5 && $port_number != 6 && $port_number != 7 ]]
-+	then
-+	   echo "Error : invalid port number $port_number"
-+	   exit
++for arg in "$@"; do
++	if [[ "$arg" != */* ]]; then
++		echo "Error: invalid argument '$arg'. Expected format: port_number/camera_type"
++		echo ""
++		usage
++		exit 1
 +	fi
-+	
-+	case $camera_type in
-+	Dione)
-+	   ;;
-+	MicroCube640)
-+	   dtboarg+=("2=Exosens Cameras. CAM$port_number:EC_1_lane")
-+	   ;;
-+	SmartIR640|Crius1280)
-+	   dtboarg+=("2=Exosens Cameras. CAM$port_number:EC_2_lanes")
-+	   ;;
-+	*)
-+	   echo "Unknown camera type $camera_type. Dione, MicroCube640, SmartIR640 or Crius1280 are supported"
-+	   exit
-+	   ;;
-+	esac
++
++	port_number="${arg%%/*}"
++	camera_type="${arg#*/}"
++
++	if [[ ! "$port_number" =~ ^[0-9]+$ ]] || [[ "$port_number" -gt "$MAX_PORT" ]]; then
++		echo "Error: invalid port number '$port_number' (from argument '$arg'). Must be 0-$MAX_PORT."
++		exit 1
++	fi
++
++	if [[ -z "${CAMERA_LANES[$camera_type]+x}" ]]; then
++		echo "Error: unknown camera type '$camera_type' (from argument '$arg')."
++		echo "Supported cameras: $SUPPORTED_CAMERAS"
++		exit 1
++	fi
++
++	lanes="${CAMERA_LANES[$camera_type]}"
++	if [[ -n "$lanes" ]]; then
++		dtboarg+=("2=Exosens Cameras. CAM$port_number:$lanes")
++	fi
 +
 +    echo "Port number : $port_number"
 +    echo "Camera type : $camera_type"

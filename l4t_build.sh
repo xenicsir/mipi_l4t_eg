@@ -58,14 +58,15 @@ if [[ $L4T_VERSION_MAJOR -lt 36 ]]; then
 	fi
 
 	pushd $L4T_SRC
-	update_status "Configuring kernel..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
-	update_status "Building kernel Image..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
-	update_status "Building device trees..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
+#	update_status "Configuring kernel..."
+#	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
+#	update_status "Building kernel Image..."
+#	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
+#	update_status "Building device trees..."
+#	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
 	update_status "Building kernel modules..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
+exit
 	update_status "Installing modules..."
 	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT modules_install INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
 	popd
@@ -213,7 +214,7 @@ echo "============================================"
 echo ""
 echo "Next steps:"
 echo "  Generate the delivery package:"
-echo "  ./l4t_gen_delivery_package.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} -p <version>"
+echo "  ./l4t_gen_delivery_package.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} [-p <version>]"
 echo "============================================"
 
 #-----------------------------#

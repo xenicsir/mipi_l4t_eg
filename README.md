@@ -82,6 +82,7 @@ The Exosens camera driver modifications are available in two formats:
 #### Building workflow
 
 The `l4t_make.sh` script orchestrates the entire build process. Use `./l4t_make.sh --help` for complete documentation.
+It uses individual scripts for build steps.
 
 **Step 1: Prepare the L4T environment**
 
@@ -90,6 +91,11 @@ Download and extract the BSP, toolchain, and sources for a specific L4T version:
 ```bash
 ./l4t_make.sh -v <l4t_version> --prepare
 ```
+or use the individual script for more logs : 
+```bash
+./l4t_prepare.sh -v <l4t_version>
+```
+
 
 To start from scratch (delete existing build directory):
 
@@ -109,6 +115,10 @@ Copy Exosens sources to the build environment and generate distribution patches:
 ```bash
 ./l4t_make.sh -v <l4t_version> --copy-sources
 ```
+or use the individual script for more logs : 
+```bash
+./l4t_copy_sources.sh -v <l4t_version>
+```
 
 This step:
 - Copies source files from `sources/` to the build environment
@@ -121,6 +131,10 @@ Compile the kernel, device trees, and kernel modules:
 
 ```bash
 ./l4t_make.sh -v <l4t_version> --build
+```
+or use the individual script for more logs : 
+```bash
+./l4t_build.sh -v <l4t_version>
 ```
 
 This step:
@@ -135,6 +149,10 @@ Create the deliverable `.deb` package:
 
 ```bash
 ./l4t_make.sh -v <l4t_version> --gen-package [-p <debian_version>]
+```
+or use the individual script for more logs : 
+```bash
+./l4t_gen_delivery_package.sh -v <l4t_version> [-p <debian_version>]
 ```
 
 The `-p` option is optional. The package version is determined as follows:
@@ -155,10 +173,16 @@ The generated package: `jetson-l4t-<l4t_version>-eg-cams_<debian_version>_arm64.
 **Running all steps at once:**
 
 ```bash
-./l4t_make.sh -v <l4t_version> --all
+./l4t_make.sh -v <l4t_version>
 ```
 
 This runs all four steps (prepare, copy-sources, build, gen-package) sequentially.
+
+```bash
+./l4t_make.sh
+```
+
+This runs all four steps (prepare, copy-sources, build, gen-package) sequentially for all L4T versions.
 
 **Parallel execution:**
 
@@ -166,13 +190,13 @@ To build multiple L4T versions simultaneously:
 
 ```bash
 # Auto-detect number of CPU cores (default)
-./l4t_make.sh --all
+./l4t_make.sh
 
 # Specify number of parallel jobs
-./l4t_make.sh --all -j 4
+./l4t_make.sh -j 4
 
 # Build specific versions in parallel
-./l4t_make.sh -v "36.*" --all -j 8
+./l4t_make.sh -v "36.*" -j 8
 ```
 
 The parallel mode displays live status for each configuration showing version, vendor, carrier board, and current build step.
@@ -183,7 +207,7 @@ Because for Nvidia SDK version from L4T 36.x some kernel modules are built "out 
 - The kernel version becomes `X.Y.Z-tegra-eg` instead of `X.Y.Z-tegra`
 - ALL kernel modules are included in the package (not just camera modules)
 - A dedicated initramfs (`/boot/eg/initrd-eg`) is generated
-- The Debian package is larger (~150MB) due to all modules being included
+- The Debian package is larger (~150MB) due to all modules and initramfs being included
 
 #### Client workflow (patches only)
 
@@ -207,13 +231,20 @@ Some carrier boards require specific device trees and/or kernel configurations. 
 
 ```bash
 # Build all steps for forecr/dsboard_ornx
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --all
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx
 
 # Or step by step:
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --prepare
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --copy-sources
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --build
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --gen-package
+
+# Or step by step with individual scripts :
+./l4t_prepare.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_copy_sources.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_build.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_gen_delivery_package.sh -v <l4t_version> -V forecr -c dsboard_ornx
+
 ```
 
 This generates: `jetson-l4t-<l4t_version>-forecr-dsboard-ornx-eg-cams_<debian_version>_arm64.deb`
@@ -237,9 +268,9 @@ The package was either delivered (see [MIPI_deployment](https://github.com/xenic
 #### Configuring camera ports
 
 **Note on port numbers:**
-- Jetson boards typically have 2 camera ports: "cam0" and "cam1"
-- For the AGX Orin Auvidea X230D board, port 0 is "CD" and port 1 is "AB" on the PCB
-- The `/dev/videoX` device number is NOT the camera port number, but the registration order
+- Jetson carrier boards typically include 2 camera ports: "CAM0" and "CAM1"
+- For the AGX Orin Auvidea X230D carrier board, port 0 is "CD" and port 1 is "AB" on the PCB
+- The `/dev/videoX` device number is NOT the camera port number, but the registration order. Carefully check with the eg_dt_camera_config_get script.
 
 **Default configuration:**
 
@@ -248,21 +279,21 @@ After first installation, both ports are configured for Dione cameras.
 **Changing the configuration:**
 
 ```bash
-eg_dt_camera_config_set.sh <port> <cam_type> <port> <cam_type>
+eg_dt_camera_config_set.sh <port>/<cam_type> [<port>/<cam_type>] ...
 ```
 
 Where:
 - `<port>` = `0` or `1` (camera port number)
-- `<cam_type>` = `Dione`, `MicroCube640`, `SmartIR640`, or `Crius1280`
+- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, or `Crius1280`
 
-Example : 
+Example :
 ```bash
-eg_dt_camera_config_set.sh 1 SmartIR640 0 Dione
+eg_dt_camera_config_set.sh 1/SmartIR640 0/Dione
 ```
 
 **Note:** Ports not specified in the command are configured for Dione by default. So the above command is equivalent to this one :
 ```bash
-eg_dt_camera_config_set.sh 1 SmartIR640
+eg_dt_camera_config_set.sh 1/SmartIR640
 ```
 
 **After changing configuration, reboot is required:**
@@ -281,7 +312,7 @@ eg_dt_camera_config_get.sh
 
 This displays:
 - **Board:** The detected board, SoM and SoC
-- **Camera ports:** For each port, the configured camera type, connection status, video device and I2C device
+- **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format
 - **Total configured:** Number of configured cameras
 
 **Example output:**
@@ -291,12 +322,18 @@ This displays:
 Board: nvidia-devkit (orin-nx, t234)
 
 Camera ports:
-  Port 0: SmartIR640 or Crius1280 (connected)
+  Port 0: SmartIR640 (connected)
     Video device: /dev/video0
     I2C device:   /dev/eg-ec-mipi-10-0016
-  Port 1: Dione (connected)
+    Serial:       21456
+    Resolution:   640x480
+    Pixel format: 'Y16 ' (16-bit Greyscale)
+  Port 1: Dione 640 (connected)
     Video device: /dev/video1
     I2C device:   /dev/dioneir-i2c-9-000e-5a
+    Serial:       20823
+    Resolution:   640x480
+    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
 
 Total configured: 2 camera(s)
 ```
@@ -424,7 +461,7 @@ sudo cp tools/l4t_completion.bash /etc/bash_completion.d/l4t_make
 ```
 
 This provides tab-completion for:
-- Command options (`--prepare`, `--build`, `--all`, etc.)
+- Command options (`--prepare`, `--build`, etc.)
 - L4T versions (`-v 36.4.4`)
 - Vendors (`-V forecr`)
 - Carrier boards (`-c dsboard_ornx`)

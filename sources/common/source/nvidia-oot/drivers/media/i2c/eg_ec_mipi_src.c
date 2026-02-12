@@ -10,12 +10,20 @@
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
 #include <linux/of_device.h>
+#include <linux/of_graph.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <media/tegracam_core.h>
 #include "ecctrl_i2c_common.h"
 
 #define MAX_I2C_CLIENTS_NUMBER 128
+
+#define ENGINECORE_REG_UPGRADE_MODE	0x0000
+#define ENGINECORE_REG_SERIAL_NUMBER	0x0040
+#define ENGINECORE_REG_PRODUCT_CODE	0x0080
+#define ENGINECORE_REG_WIDTH		0x0180
+#define ENGINECORE_REG_HEIGHT		0x0184
+#define ENGINECORE_REG_PIXEL_FORMAT	0x0260
 
 int eg_ec_chnod_open (struct inode * pInode, struct file * file);
 int eg_ec_chnod_release (struct inode * pInode, struct file * file);
@@ -75,6 +83,12 @@ struct eg_ec_mipi {
 	struct v4l2_subdev		*subdev;
 	struct camera_common_data	*s_data;
 	struct tegracam_device		*tc_dev;
+
+	char				model[64];
+	char				serial_number[32];
+	u32				native_width;
+	u32				native_height;
+	char				pixel_format[48];
 };
 
 struct eg_ec_i2c_client {
@@ -562,6 +576,85 @@ static int eg_ec_mipi_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	return 0;
 }
 
+static const char *eg_ec_model_name(u32 code)
+{
+	switch (code) {
+	case 0x0A0600: return "Aion640";
+	case 0x090601: return "Crius640";
+	case 0x070600: return "Crius640";
+	case 0x080600: return "Crius1280";
+	case 0x090600: return "MicroCube";
+	case 0x010600: return "SmartIR640";
+	case 0x050600: return "SmartIR1024";
+	default:       return NULL;
+	}
+}
+
+/*
+ * Returns the expected number of MIPI data lanes for a given model code.
+ * Returns 0 if no check is required for this model.
+ */
+static int eg_ec_expected_lanes(u32 code)
+{
+	switch (code) {
+	case 0x090600: return 1;  /* MicroCube: 1 lane */
+	case 0x010600: return 2;  /* SmartIR640: 2 lanes */
+	case 0x080600: return 2;  /* Crius1280: 2 lanes */
+	default:       return 0;  /* No check */
+	}
+}
+
+static ssize_t model_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->model);
+}
+static DEVICE_ATTR_RO(model);
+
+static ssize_t serial_number_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->serial_number);
+}
+static DEVICE_ATTR_RO(serial_number);
+
+static ssize_t resolution_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%ux%u\n",
+			 priv->native_width, priv->native_height);
+}
+static DEVICE_ATTR_RO(resolution);
+
+static ssize_t pixel_format_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->pixel_format);
+}
+static DEVICE_ATTR_RO(pixel_format);
+
+static const char *eg_ec_pixel_format_name(u32 code)
+{
+	switch (code) {
+	case 20: return "'Y16 ' (16-bit Greyscale)";
+	case 21: return "'AR24' (32-bit BGRA 8-8-8-8)";
+	case 22: return "'YUYV' (YUYV 4:2:2)";
+	default: return NULL;
+	}
+}
+
 static const struct v4l2_subdev_internal_ops eg_ec_mipi_subdev_internal_ops = {
 	.open = eg_ec_mipi_open,
 };
@@ -594,7 +687,7 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 			}
 
 			// Try to communicate with the camera
-			err = eg_ec_mipi_read_reg(i2c_clients[i].i2c_client, 0, (uint8_t*)&upgradeMode, sizeof(upgradeMode));
+			err = eg_ec_mipi_read_reg(i2c_clients[i].i2c_client, ENGINECORE_REG_UPGRADE_MODE, (uint8_t*)&upgradeMode, sizeof(upgradeMode));
 			if (err)
 			{
 				dev_err(dev, "Failed to communicate with the camera\n");
@@ -613,6 +706,98 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 			sizeof(struct eg_ec_mipi), GFP_KERNEL);
 	if (!priv)
 		goto err_camera_register;
+
+	/* Read camera identification registers */
+	{
+		uint32_t model_code = 0;
+		uint32_t pixfmt_code = 0;
+		const char *name;
+		const char *pixfmt_name;
+		int j;
+
+		err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_PRODUCT_CODE,
+					  (uint8_t *)&model_code, 4);
+		if (!err) {
+			name = eg_ec_model_name(model_code);
+			if (name)
+				strncpy(priv->model, name, sizeof(priv->model) - 1);
+			else
+				snprintf(priv->model, sizeof(priv->model),
+					 "Unknown (0x%06x)", model_code);
+		} else {
+			dev_warn(dev, "failed to read model code\n");
+		}
+
+		err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_SERIAL_NUMBER,
+					  (uint8_t *)priv->serial_number,
+					  sizeof(priv->serial_number));
+		if (!err) {
+			for (j = sizeof(priv->serial_number) - 1; j >= 0 &&
+			     (priv->serial_number[j] == (char)0xff ||
+			      priv->serial_number[j] == '\0'); j--)
+				priv->serial_number[j] = '\0';
+		} else {
+			priv->serial_number[0] = '\0';
+			dev_warn(dev, "failed to read serial number\n");
+		}
+
+		err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_WIDTH,
+					  (uint8_t *)&priv->native_width, 4);
+		if (err)
+			dev_warn(dev, "failed to read width\n");
+
+		err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_HEIGHT,
+					  (uint8_t *)&priv->native_height, 4);
+		if (err)
+			dev_warn(dev, "failed to read height\n");
+
+		err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_PIXEL_FORMAT,
+					  (uint8_t *)&pixfmt_code, 4);
+		if (!err) {
+			pixfmt_name = eg_ec_pixel_format_name(pixfmt_code);
+			if (pixfmt_name)
+				strncpy(priv->pixel_format, pixfmt_name,
+					sizeof(priv->pixel_format) - 1);
+			else
+				snprintf(priv->pixel_format,
+					 sizeof(priv->pixel_format),
+					 "0x%02x", pixfmt_code);
+		} else {
+			dev_warn(dev, "failed to read pixel format\n");
+		}
+
+		dev_info(dev, "camera: %s, serial: %s, resolution: %ux%u, format: %s\n",
+			 priv->model[0] ? priv->model : "N/A",
+			 priv->serial_number[0] ? priv->serial_number : "N/A",
+			 priv->native_width, priv->native_height,
+			 priv->pixel_format[0] ? priv->pixel_format : "N/A");
+
+		/* Check MIPI lane consistency between camera and device tree */
+		{
+			int expected_lanes = eg_ec_expected_lanes(model_code);
+
+			if (expected_lanes > 0) {
+				struct device_node *ep;
+				u32 bus_width = 0;
+
+				ep = of_graph_get_next_endpoint(
+						client->dev.of_node, NULL);
+				if (ep) {
+					of_property_read_u32(ep, "bus-width",
+							     &bus_width);
+					of_node_put(ep);
+				}
+
+				if (bus_width && bus_width != expected_lanes) {
+					dev_err(dev,
+						"%s requires %d MIPI lane(s) but device tree configures %u (bus-width). Check device tree configuration.\n",
+						priv->model, expected_lanes,
+						bus_width);
+					goto err_camera_register;
+				}
+			}
+		}
+	}
 
 	tc_dev = devm_kzalloc(dev,
 			sizeof(struct tegracam_device), GFP_KERNEL);
@@ -643,6 +828,11 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 		tegracam_device_unregister(tc_dev);
 		goto err_camera_register;
 	}
+
+	device_create_file(dev, &dev_attr_model);
+	device_create_file(dev, &dev_attr_serial_number);
+	device_create_file(dev, &dev_attr_resolution);
+	device_create_file(dev, &dev_attr_pixel_format);
 
 	dev_info(dev, "Registered %s device\n", i2c_clients[i].chnod_name);
 	return 0;
@@ -687,6 +877,11 @@ static void eg_ec_mipi_remove(struct i2c_client *client)
 			break;
 		}
 	}
+
+	device_remove_file(dev, &dev_attr_pixel_format);
+	device_remove_file(dev, &dev_attr_resolution);
+	device_remove_file(dev, &dev_attr_serial_number);
+	device_remove_file(dev, &dev_attr_model);
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(6,1,1)
    return 0;
