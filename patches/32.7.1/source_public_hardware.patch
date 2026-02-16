@@ -1,6 +1,6 @@
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..6c4b502
+index 0000000..6a7853a
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1024 @@
@@ -88,7 +88,7 @@ index 0000000..6c4b502
 +			cam_i2cmux {
 +				i2c@0 {
 +					dione_ir_cam0: xenics_dione_ir_a@0e {
-+						compatible = "xenics,dioneir";
++						compatible = "xenics,dioneir", "exosens,dioneir";
 +						/* I2C device address */
 +						reg = <0x0e>;
 +						fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -385,7 +385,7 @@ index 0000000..6c4b502
 +						};
 +					};
 +					eg_ec_cam0: eg_ec_a@16 {
-+						compatible = "xenics,eg-ec-mipi";
++						compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +						/* I2C device address */
 +						reg = <0x16>;
 +					status = "disabled";
@@ -592,7 +592,7 @@ index 0000000..6c4b502
 +
 +				i2c@1 {
 +					dione_ir_cam1: xenics_dione_ir_c@0e {
-+						compatible = "xenics,dioneir";
++						compatible = "xenics,dioneir", "exosens,dioneir";
 +						reg = <0x0e>;
 +						fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -806,7 +806,7 @@ index 0000000..6c4b502
 +						};
 +					};
 +					eg_ec_cam1: eg_ec_c@16 {
-+						compatible = "xenics,eg-ec-mipi";
++						compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +						reg = <0x16>;
 +					status = "disabled";
 +
@@ -1808,7 +1808,7 @@ index fd4bf1e..52723de 100644
  endif
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..f597113
+index 0000000..aaff67b
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,960 @@
@@ -1896,7 +1896,7 @@ index 0000000..f597113
 +			cam_i2cmux {
 +				i2c@0 {
 +					dione_ir_cam0: xenics_dione_ir_a@0e {
-+						compatible = "xenics,dioneir";
++						compatible = "xenics,dioneir", "exosens,dioneir";
 +						/* I2C device address */
 +						reg = <0x0e>;
 +						fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -2193,7 +2193,7 @@ index 0000000..f597113
 +						};
 +					};
 +					eg_ec_cam0: eg_ec_a@16 {
-+						compatible = "xenics,eg-ec-mipi";
++						compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +						/* I2C device address */
 +						reg = <0x16>;
 +					status = "disabled";
@@ -2368,7 +2368,7 @@ index 0000000..f597113
 +
 +				i2c@1 {
 +					dione_ir_cam1: xenics_dione_ir_e@0e {
-+						compatible = "xenics,dioneir";
++						compatible = "xenics,dioneir", "exosens,dioneir";
 +						reg = <0x0e>;
 +						fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -2582,7 +2582,7 @@ index 0000000..f597113
 +						};
 +					};
 +					eg_ec_cam1: eg_ec_e@16 {
-+						compatible = "xenics,eg-ec-mipi";
++						compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +						reg = <0x16>;
 +					status = "disabled";
 +
@@ -3474,7 +3474,7 @@ index 0000000..c94036c
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..b4dc5f1
+index 0000000..7e0e851
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1741 @@
@@ -3674,7 +3674,7 @@ index 0000000..b4dc5f1
 +
 +			i2c@31e0000 {											//M222 CSI 01		
 +			  dione_ir_cam0: xenics_dione_ir_a@0e {
-+				 compatible = "xenics,dioneir";
++				 compatible = "xenics,dioneir", "exosens,dioneir";
 +				 /* I2C device address */
 +				 reg = <0x0e>;
 +				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -3971,7 +3971,7 @@ index 0000000..b4dc5f1
 +				 };
 +			  };
 +			  eg_ec_cam0: eg_ec_a@16 {
-+				 compatible = "xenics,eg-ec-mipi";
++				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +				 /* I2C device address */
 +				 reg = <0x16>;
 +				 status = "disabled";
@@ -4177,7 +4177,7 @@ index 0000000..b4dc5f1
 +			};
 +			i2c@c240000 {												//M222 CSI 67			
 +			  dione_ir_cam1: xenics_dione_ir_g@0e {
-+				 compatible = "xenics,dioneir";
++				 compatible = "xenics,dioneir", "exosens,dioneir";
 +				 reg = <0x0e>;
 +				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -4391,7 +4391,7 @@ index 0000000..b4dc5f1
 +				 };
 +			  };
 +			  eg_ec_cam1: eg_ec_g@16 {
-+				 compatible = "xenics,eg-ec-mipi";
++				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +				 reg = <0x16>;
 +				 status = "disabled";
 +
@@ -4514,7 +4514,7 @@ index 0000000..b4dc5f1
 +			};
 +			i2c@c250000 {												//M222 CSI 45	
 +			  dione_ir_cam2: xenics_dione_ir_e@0e {
-+				 compatible = "xenics,dioneir";
++				 compatible = "xenics,dioneir", "exosens,dioneir";
 +				 reg = <0x0e>;
 +				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -4728,7 +4728,7 @@ index 0000000..b4dc5f1
 +				 };
 +			  };
 +			  eg_ec_cam2: eg_ec_e@16 {
-+				 compatible = "xenics,eg-ec-mipi";
++				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +				 reg = <0x16>;
 +				 status = "disabled";
 +
@@ -4851,7 +4851,7 @@ index 0000000..b4dc5f1
 +			};
 +			i2c@3180000 {											//M222 CSI 23				
 +			  dione_ir_cam3: xenics_dione_ir_c@0e {
-+				 compatible = "xenics,dioneir";
++				 compatible = "xenics,dioneir", "exosens,dioneir";
 +				 reg = <0x0e>;
 +				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -5065,7 +5065,7 @@ index 0000000..b4dc5f1
 +				 };
 +			  };
 +			  eg_ec_cam3: eg_ec_c@16 {
-+				 compatible = "xenics,eg-ec-mipi";
++				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +				 reg = <0x16>;
 +				 status = "disabled";
 +
@@ -6340,10 +6340,10 @@ index 0000000..8882bbb
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..5bcae28
+index 0000000..9cf5e47
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,1332 @@
+@@ -0,0 +1,1543 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -6512,7 +6512,7 @@ index 0000000..5bcae28
 +			cam_i2cmux {
 +				i2c@0 {
 +					  dione_ir_cam0: xenics_dione_ir_b@0e {
-+						 compatible = "xenics,dioneir";
++						 compatible = "xenics,dioneir", "exosens,dioneir";
 +						 status = "okay";
 +						 /* I2C device address */
 +						 reg = <0x0e>;
@@ -6815,7 +6815,7 @@ index 0000000..5bcae28
 +						 };
 +					  };
 +					  eg_ec_cam0: eg_ec_b@16 {
-+						 compatible = "xenics,eg-ec-mipi";
++						 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +						 /* I2C device address */
 +						 reg = <0x16>;
 +						 status = "disabled";
@@ -7166,10 +7166,118 @@ index 0000000..5bcae28
 +							};
 +						};
 +					};
++					ilumos_cam0: ilumos_b@30 {
++						 compatible = "exosens,ilumos";
++						 /* I2C device address */
++						 reg = <0x30>;
++						 status = "disabled";
++
++						 sensor_model = "ilumos";
++
++						 use_sensor_mode_id = "false";
++
++						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++							num_lanes = "4";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++							num_lanes = "4";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++							   reg = <0>;
++							   ilumos_out0: endpoint {
++#ifdef DSBOARD_ORNXS
++								  port-index = <0>;
++#else
++								  port-index = <1>;
++#endif
++								  bus-width = <4>;
++								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++							   };
++							};
++						};
++					};
 +				};
 +				i2c@1 {
 +					  dione_ir_cam1: xenics_dione_ir_c@0e {
-+						 compatible = "xenics,dioneir";
++						 compatible = "xenics,dioneir", "exosens,dioneir";
 +						 reg = <0x0e>;
 +						 status = "okay";
 +						 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -7381,7 +7489,7 @@ index 0000000..5bcae28
 +						 };
 +					  };
 +					  eg_ec_cam1: eg_ec_c@16 {
-+						 compatible = "xenics,eg-ec-mipi";
++						 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +						 reg = <0x16>;
 +						 status = "disabled";
 +
@@ -7638,6 +7746,109 @@ index 0000000..5bcae28
 +							   eg_ec_out1: endpoint {
 +								  port-index = <2>;
 +								  bus-width = <2>;
++								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++							   };
++							};
++						};
++					};
++					ilumos_cam1: ilumos_c@30 {
++						 compatible = "exosens,ilumos";
++						 reg = <0x30>;
++						 status = "disabled";
++
++						 sensor_model = "ilumos";
++
++						 use_sensor_mode_id = "false";
++
++						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++							num_lanes = "4";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++
++						 };
++						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++							num_lanes = "4";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++
++						 };
++						 ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++							   reg = <0>;
++							   ilumos_out1: endpoint {
++								  port-index = <2>;
++								  bus-width = <4>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
 +							   };
 +							};

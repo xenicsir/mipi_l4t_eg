@@ -31,4 +31,4 @@ eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 obj-$(CONFIG_VIDEO_EG_EC_MIPI)	+= eg-ec-mipi.o
 obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 dione_ir-y += dioneir.o tc358746_calculation.o
-#obj-$(CONFIG_VIDEO_ILUMOS) += ilumos.o
+obj-$(CONFIG_VIDEO_ILUMOS) += ilumos.o

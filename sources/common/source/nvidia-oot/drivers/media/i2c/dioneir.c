@@ -159,6 +159,7 @@ static const struct regmap_config tx_regmap_config = {
 
 static const struct of_device_id dione_ir_of_match[] = {
 	{ .compatible = "xenics,dioneir", },
+	{ .compatible = "exosens,dioneir", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, dione_ir_of_match);
@@ -2064,6 +2065,6 @@ static struct i2c_driver dione_ir_i2c_driver = {
 module_i2c_driver(dione_ir_i2c_driver);
 
 MODULE_DESCRIPTION("Media Controller driver for Xenics Dione IR sensors");
-MODULE_AUTHOR("Xenics Exosens");
+MODULE_AUTHOR("Exosens");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");

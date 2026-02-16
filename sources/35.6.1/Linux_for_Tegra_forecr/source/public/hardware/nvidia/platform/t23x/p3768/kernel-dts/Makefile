@@ -47,18 +47,6 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-imx477-dual-4lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3768-overlay.dtbo
 
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cams-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-imx219.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
-
 dtb-$(BUILD_ENABLE) += tegra234-p3767-0000-p3509-a02-dsboard-nx2.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3767-0000-p3768-0000-a0-dsboard-ornx.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3767-0000-p3768-0000-a0-dsboard-ornx-basler.dtb

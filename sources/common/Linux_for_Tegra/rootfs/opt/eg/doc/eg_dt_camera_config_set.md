@@ -44,7 +44,7 @@ eg_dt_camera_config_set.sh [<port/camera_type>] ...
 Each argument is a **port/camera pair** separated by a `/`:
 
 - **port_number**: Integer from 0 to N-1, where N is the number of camera ports detected on the board (e.g., 0-1 on DSBOARD-ORNXS, 0-3 on DSBOARD-ORNX, 0-5 on DSBOARD-XV2)
-- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`
+- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`
 
 Example: `0/Dione`, `1/MicroCube640`, `2/SmartIR640`
 
@@ -76,8 +76,9 @@ Example: `0/Dione`, `1/MicroCube640`, `2/SmartIR640`
 | **MicroCube640** | 1 | 0x16 | Exosens EC camera (1 lane) |
 | **SmartIR640** | 2 | 0x16 | Exosens EC camera (2 lanes) |
 | **Crius1280** | 2 | 0x16 | Exosens EC camera (2 lanes) |
+| **iLumos** | 4 | 0x30 | Exosens iLumos camera |
 
-**Note**: `SmartIR640` and `Crius1280` use the same device tree configuration (2 MIPI lanes).
+**Note**: `SmartIR640` and `Crius1280` use the same device tree configuration (2 MIPI lanes). `iLumos` is also accepted as `ilumos` (case-insensitive).
 
 ---
 
@@ -126,7 +127,8 @@ All DSBOARD, MILBOARD, and RAIBOARD series:
 3. Build overlay arguments (from CAMERA_LANES database)
    ├─ For Dione: No additional overlay needed (empty lane config)
    ├─ For MicroCube640: Add "CAM<port>:EC_1_lane" overlay
-   └─ For SmartIR640/Crius1280: Add "CAM<port>:EC_2_lanes" overlay
+   ├─ For SmartIR640/Crius1280: Add "CAM<port>:EC_2_lanes" overlay
+   └─ For iLumos: Add "CAM<port>:iLumos" overlay
 
 4. Apply configuration
    ├─ Call /opt/eg/jetson-io/config-by-hardware.py
@@ -162,8 +164,8 @@ Overlays:
 ```
 Base: "Exosens Cameras"
 Overlays:
-  - CAM0:EC_1_lane, CAM0:EC_2_lanes
-  - CAM1:EC_1_lane, CAM1:EC_2_lanes
+  - CAM0:EC_1_lane, CAM0:EC_2_lanes, CAM0:iLumos
+  - CAM1:EC_1_lane, CAM1:EC_2_lanes, CAM1:iLumos
   - ... up to CAM<N-1> (depending on detected port count)
 ```
 
@@ -453,13 +455,13 @@ The valid port range is automatically detected from the device tree. Use
 
 ### "Error: unknown camera type"
 
-Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`
+Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`
 
 ```bash
 # ✗ Wrong: typo in camera name
 $ eg_dt_camera_config_set.sh 0/microcube640
 Error: unknown camera type 'microcube640' (from argument '0/microcube640').
-Supported cameras: Dione, MicroCube640, SmartIR640, Crius1280
+Supported cameras: Crius1280, Dione, MicroCube, MicroCube640, SmartIR640, iLumos
 
 # ✓ Correct: exact camera name
 $ eg_dt_camera_config_set.sh 0/MicroCube640
@@ -519,7 +521,7 @@ $ sudo chmod +x /usr/bin/detect_jetson_board.sh
 
 3. **Check device tree nodes**:
    ```bash
-   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" 2>/dev/null
+   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" -o -name "ilumos*" 2>/dev/null
    ```
 
 4. **Check camera device nodes**:

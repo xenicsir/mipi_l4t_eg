@@ -42,10 +42,10 @@ index af6122b..3b14f31 100644
 +dione_ir-y += dioneir.o tc358746_calculation.o
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c b/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c
 new file mode 100755
-index 0000000..20bd129
+index 0000000..f953020
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c
-@@ -0,0 +1,2069 @@
+@@ -0,0 +1,2070 @@
 +/*
 + * dione_ir.c - Dione IR sensor driver
 + *
@@ -207,6 +207,7 @@ index 0000000..20bd129
 +
 +static const struct of_device_id dione_ir_of_match[] = {
 +	{ .compatible = "xenics,dioneir", },
++	{ .compatible = "exosens,dioneir", },
 +	{ },
 +};
 +MODULE_DEVICE_TABLE(of, dione_ir_of_match);
@@ -2112,7 +2113,7 @@ index 0000000..20bd129
 +module_i2c_driver(dione_ir_i2c_driver);
 +
 +MODULE_DESCRIPTION("Media Controller driver for Xenics Dione IR sensors");
-+MODULE_AUTHOR("Xenics Exosens");
++MODULE_AUTHOR("Exosens");
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ecctrl_i2c.h b/source/public/kernel/nvidia/drivers/media/i2c/ecctrl_i2c.h
@@ -3288,15 +3289,15 @@ index 0000000..32f24b6
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..2de064e
+index 0000000..cc47017
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,912 @@
+@@ -0,0 +1,913 @@
 +/*
-+ * A V4L2 driver for Xenics Exosens MIPI EngineCore cameras.
++ * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
 + * Based on Sony imx219 NVIDIA camera driver
-+ * Copyright Copyright (C) 2023 Xenics Exosens
++ * Copyright Copyright (C) 2023 Exosens
 + *
 + */
 +
@@ -3324,6 +3325,7 @@ index 0000000..2de064e
 +
 +static const struct of_device_id eg_ec_mipi_of_match[] = {
 +	{ .compatible = "xenics,eg-ec-mipi", },
++	{ .compatible = "exosens,eg-ec-mipi", },
 +	{ },
 +};
 +MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
@@ -4200,8 +4202,8 @@ index 0000000..2de064e
 +};
 +module_i2c_driver(eg_ec_mipi_i2c_driver);
 +
-+MODULE_AUTHOR("Xenics Exosens");
-+MODULE_DESCRIPTION("Xenics Exosens MIPI camera I2C driver for EngineCore cameras");
++MODULE_AUTHOR("Exosens");
++MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for EngineCore cameras");
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.c b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.c
@@ -5833,10 +5835,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..5858904
+index 0000000..a783074
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,478 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -5853,19 +5855,14 @@ index 0000000..5858904
 +#include <linux/version.h>
 +#include <media/tegracam_core.h>
 +
-+#include "gencp-over-i2c/libunio.h"
-+#include "gencp-over-i2c/gencp_client.h"
-+
-+#include "gencp-over-i2c/liblogger.h"
-+
 +/* ilumos specific registers */
-+#define REG_ACQ_START_W   0x500F0000
-+#define REG_ACQ_STOP_W    0x500F0004
-+#define REG_ACQ_STATUS_R  0x500F0008
-+#define REG_IMG_HEIGHT_RW 0x500E000C
-+#define REG_IMG_WIDTH_R   0x500E0008
-+#define REG_MIPI_ENA_R    0x50ff0010
-+#define REG_FIRW_VER_R    0x50FF0000
++#define REG_ACQ_START_W   0x50000A00
++#define REG_ACQ_STATUS_R  0x50000A20
++#define REG_IMG_HEIGHT_RW 0x50000004
++#define REG_IMG_WIDTH_RW  0x50000000
++#define REG_FIRW_VER_R    0x10000000
++#define REG_SERIAL_R      0x00144
++#define REG_MODEL_NAME_R  0x00044
 +
 +static const struct of_device_id ilumos_of_match[] = {
 +	{ .compatible = "exosens,ilumos", },
@@ -5874,7 +5871,8 @@ index 0000000..5858904
 +MODULE_DEVICE_TABLE(of, ilumos_of_match);
 +
 +enum {
-+	ILUMOS_MODE_1024x128_RAW16,
++	ILUMOS_MODE_2048x2048_RAW16,
++	ILUMOS_MODE_2048x1088_RAW16,
 +};
 +
 +static const int ilumos_60fps[] = {
@@ -5886,8 +5884,24 @@ index 0000000..5858904
 + * device tree!
 + */
 +static const struct camera_common_frmfmt ilumos_frmfmt[] = {
-+	{{1024, 128},	ilumos_60fps, 1, 0, ILUMOS_MODE_1024x128_RAW16},
++	{{2048, 2048},	ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16},
++	{{2048, 1088},	ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16},
 +};
++
++static int ilumos_find_frmfmt(u32 width, u32 height)
++{
++	u32 i;
++
++	for (i = 0; i < ARRAY_SIZE(ilumos_frmfmt); i++) {
++		const struct camera_common_frmfmt *fmt = ilumos_frmfmt + i;
++
++		if (fmt->size.width == width && fmt->size.height == height)
++			return i;
++	}
++
++	return -1;
++}
++
 +
 +static const u32 ctrl_cid_list[] = {
 +#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
@@ -5903,83 +5917,150 @@ index 0000000..5858904
 +	struct v4l2_subdev		*subdev;
 +	struct camera_common_data	*s_data;
 +	struct tegracam_device		*tc_dev;
-+	struct unio_handle		io_handle;
-+	u32				line_height;
++
++	char			model[64];
++	char			serial_number[64];
 +	u32				native_width;
-+	bool				gencp_initialized;
++	u32				native_height;
 +};
++
++static int ilumos_i2c_read(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
++{
++	struct i2c_msg msgs[2];
++	u8 tx_data[6];
++	u8 rx_data[72];
++	int ret = 0;
++
++	if (len > sizeof(rx_data) - 2)
++		ret = -EINVAL;
++
++	if (!ret) {
++		*(u32 *)tx_data = cpu_to_le32(reg);
++		*(u16 *)(tx_data + 4) = cpu_to_le16(len);
++
++		msgs[0].addr = client->addr;
++		msgs[0].flags = 0;
++		msgs[0].len = sizeof(tx_data);
++		msgs[0].buf = tx_data;
++
++		msgs[1].addr = client->addr;
++		msgs[1].flags = I2C_M_RD;
++		msgs[1].len = len + 2;
++		msgs[1].buf = rx_data;
++
++		if (i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs)) != 2)
++			ret = -EIO;
++	}
++
++	if (!ret) {
++		if (rx_data[0] != 0 || rx_data[1] != 0) {
++			ret = -EINVAL;
++		} else {
++			switch (len) {
++			case 1:
++				dst[0] = rx_data[2];
++				break;
++			case 2:
++				*(u16 *)dst = le16_to_cpu(*(u16 *)(rx_data + 2));
++				break;
++			case 4:
++				*(u32 *)dst = le32_to_cpu(*(u32 *)(rx_data + 2));
++				break;
++			default:
++				memcpy(dst, rx_data + 2, len);
++			}
++		}
++	}
++
++	return ret;
++}
++
++static int ilumos_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
++{
++	struct i2c_msg msgs;
++	u8 tx_data[10];
++
++	*(u32 *)tx_data = cpu_to_le32(reg);
++	*(u16 *)(tx_data + 4) = cpu_to_le16(4);
++	*(u32 *)(tx_data + 6) = cpu_to_le32(val);
++
++	msgs.addr = client->addr;
++	msgs.flags = 0;
++	msgs.len = sizeof(tx_data);
++	msgs.buf = tx_data;
++
++	if (i2c_transfer(client->adapter, &msgs, 1) != 1)
++		return -EIO;
++
++	return 0;
++}
++
 +
 +static int ilumos_sensor_check(struct ilumos *priv)
 +{
 +	struct device *dev = &priv->i2c_client->dev;
-+	int status;
-+	u32 read_data = 0;
-+
-+	priv->io_handle.client = priv->i2c_client;
-+
-+	/* INIT the gencp client */
-+	GENCPCLIENT_Init(&priv->io_handle);
-+
-+	/* FPGA test read - check if MIPI is enabled */
-+	status = GENCPCLIENT_ReadRegister(REG_MIPI_ENA_R, &read_data);
-+	if (status == 0) {
-+		if (read_data == 0x1) {
-+			PRINT_INFO("MIPI is enabled, status = %#08x\n", read_data);
-+		} else {
-+			PRINT_ERROR("MIPI is not enabled on this camera, license missing? Exiting...\n");
-+			goto error_exit;
-+		}
-+	} else {
-+		PRINT_INFO("MIPI status read failed\n");
-+		goto error_exit;
-+	}
++	int status, mode, i;
++	u8 buf[64];
++	u32 width, height;
 +
 +	/* FPGA firmware read */
-+	status = GENCPCLIENT_ReadRegister(REG_FIRW_VER_R, &read_data);
-+	if (status == 0) {
-+		PRINT_INFO("FPGA firmware version = %#08x\n", read_data);
-+	} else {
-+		PRINT_INFO("FPGA firmware read failed\n");
++	status = ilumos_i2c_read(priv->i2c_client, REG_FIRW_VER_R,
++				buf, sizeof(buf));
++	if (status < 0)
++	{
 +		goto error_exit;
 +	}
 +
-+	/* Resolution - Set Height */
-+	device_property_read_u32(dev, "line-height", &priv->line_height);
-+	if (priv->line_height == 0)
-+		priv->line_height = 128; /* Default value */
-+	dev_info(dev, "line height read: %u\n", priv->line_height);
-+
-+	/* Height check */
-+	status = GENCPCLIENT_ReadRegister(REG_IMG_HEIGHT_RW, &read_data);
-+	if (status == 0) {
-+		if (read_data == priv->line_height) {
-+			PRINT_INFO("Camera and driver line heights match, height = %#08x\n", read_data);
-+		} else {
-+			PRINT_ERROR("Camera and driver line heights don't match.\n");
-+			PRINT_ERROR("Camera = %u, Driver = %u\n", read_data, priv->line_height);
-+		}
-+	} else {
-+		PRINT_INFO("Register read failed\n");
++	status = ilumos_i2c_read(priv->i2c_client, REG_IMG_WIDTH_RW,
++				(u8 *)&width, sizeof(width));
++	if (status < 0)
++	{
 +		goto error_exit;
 +	}
 +
-+	/* Set camera width */
-+	priv->native_width = 1024;
-+	status = GENCPCLIENT_ReadRegister(REG_IMG_WIDTH_R, &read_data);
-+	if (status == 0) {
-+		priv->native_width = read_data;
-+	} else {
-+		PRINT_INFO("Register read failed\n");
++	status = ilumos_i2c_read(priv->i2c_client, REG_IMG_HEIGHT_RW,
++				(u8 *)&height, sizeof(height));
++	if (status < 0)
++	{
 +		goto error_exit;
 +	}
 +
-+	priv->gencp_initialized = true;
++	mode = ilumos_find_frmfmt(width, height);
++	if (mode < 0) {
++		goto error_exit;
++	}
++
++	priv->native_width = width;
++	priv->native_height = height;
++
++	/* Read model name */
++	status = ilumos_i2c_read(priv->i2c_client, REG_MODEL_NAME_R,
++				(u8 *)priv->model, sizeof(priv->model));
++	if (status < 0) {
++		priv->model[0] = '\0';
++		dev_warn(dev, "failed to read model name\n");
++	} else {
++		for (i = sizeof(priv->model) - 1; i >= 0 &&
++		     (priv->model[i] == (char)0xff || priv->model[i] == '\0'); i--)
++			priv->model[i] = '\0';
++	}
++
++	/* Read serial number */
++	status = ilumos_i2c_read(priv->i2c_client, REG_SERIAL_R,
++				(u8 *)priv->serial_number, sizeof(priv->serial_number));
++	if (status < 0) {
++		priv->serial_number[0] = '\0';
++		dev_warn(dev, "failed to read serial number\n");
++	} else {
++		for (i = sizeof(priv->serial_number) - 1; i >= 0 &&
++		     (priv->serial_number[i] == (char)0xff || priv->serial_number[i] == '\0'); i--)
++			priv->serial_number[i] = '\0';
++	}
++
 +	return 0;
 +
 +error_exit:
 +	dev_err(dev, "Probing failed");
-+	GENCPCLIENT_Cleanup();
-+	priv->gencp_initialized = false;
 +	return -EIO;
 +}
 +
@@ -6092,20 +6173,14 @@ index 0000000..5858904
 +
 +	dev_dbg(tc_dev->dev, "%s\n", __func__);
 +
-+	if (!priv->gencp_initialized) {
-+		dev_err(tc_dev->dev, "GenCP not initialized\n");
-+		return -EIO;
-+	}
-+
-+	/* Camera should always be streaming. But we can check that. */
-+	status = GENCPCLIENT_ReadRegister(REG_ACQ_STATUS_R, &read_data);
++	status = ilumos_i2c_read(priv->i2c_client, REG_ACQ_STATUS_R,
++				(u8 *)&read_data, sizeof(read_data));
 +	if (status == 0) {
 +		if (read_data != 0x1) {
-+			PRINT_INFO("Acquisition is off, re-enabling it.\n");
-+			status = GENCPCLIENT_WriteRegister(REG_ACQ_START_W, 0x1);
++			status = ilumos_i2c_write32(priv->i2c_client, REG_ACQ_START_W, 1);
 +		}
 +	} else {
-+		PRINT_INFO("Register read failed\n");
++		dev_err(tc_dev->dev, "%s : Register read failed\n", __func__);
 +	}
 +
 +	return 0;
@@ -6113,14 +6188,7 @@ index 0000000..5858904
 +
 +static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
 +{
-+	struct ilumos *priv = tegracam_get_privdata(tc_dev);
-+
 +	dev_dbg(tc_dev->dev, "%s\n", __func__);
-+
-+	if (!priv->gencp_initialized) {
-+		dev_err(tc_dev->dev, "GenCP not initialized\n");
-+		return -EIO;
-+	}
 +
 +	/* Note: We don't actually stop the camera, just acknowledge the call */
 +	return 0;
@@ -6200,13 +6268,10 @@ index 0000000..5858904
 +	err = tegracam_v4l2subdev_register(tc_dev, true);
 +	if (err) {
 +		dev_err(dev, "tegra camera subdev registration failed\n");
-+		GENCPCLIENT_Cleanup();
 +		tegracam_device_unregister(tc_dev);
 +		return err;
 +	}
 +
-+	dev_info(dev, "Registered ilumos device (width=%u, height=%u)\n",
-+		priv->native_width, priv->line_height);
 +	return 0;
 +}
 +
@@ -6222,9 +6287,6 @@ index 0000000..5858904
 +
 +	tegracam_v4l2subdev_unregister(priv->tc_dev);
 +	tegracam_device_unregister(priv->tc_dev);
-+
-+	if (priv->gencp_initialized)
-+		GENCPCLIENT_Cleanup();
 +
 +	dev_info(dev, "Removed ilumos device\n");
 +

@@ -16,7 +16,7 @@ Patch files:
   - source_hardware.patch (127 files, 18151 lines)
   - source_kernel.patch (31 files, 13677 lines)
   - source_nvdisplay.patch (3 files, 33 lines)
-  - source_nvidia-oot_drivers_media_i2c.patch (22 files, 7037 lines)
+  - source_nvidia-oot_drivers_media_i2c.patch (22 files, 7099 lines)
   - source_nvidia-oot_drivers_media_platform.patch (4 files, 105 lines)
   - source_nvidia-oot_include_media.patch (2 files, 36 lines)
   - source.patch (1 files, 24 lines)

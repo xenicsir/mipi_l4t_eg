@@ -194,7 +194,7 @@
 
 			i2c@31e0000 {											//M222 CSI 01		
 			  dione_ir_cam0: xenics_dione_ir_a@0e {
-				 compatible = "xenics,dioneir";
+				 compatible = "xenics,dioneir", "exosens,dioneir";
 				 /* I2C device address */
 				 reg = <0x0e>;
 				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -491,7 +491,7 @@
 				 };
 			  };
 			  eg_ec_cam0: eg_ec_a@16 {
-				 compatible = "xenics,eg-ec-mipi";
+				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 				 /* I2C device address */
 				 reg = <0x16>;
 				 status = "disabled";
@@ -697,7 +697,7 @@
 			};
 			i2c@c240000 {												//M222 CSI 67			
 			  dione_ir_cam1: xenics_dione_ir_g@0e {
-				 compatible = "xenics,dioneir";
+				 compatible = "xenics,dioneir", "exosens,dioneir";
 				 reg = <0x0e>;
 				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 
@@ -911,7 +911,7 @@
 				 };
 			  };
 			  eg_ec_cam1: eg_ec_g@16 {
-				 compatible = "xenics,eg-ec-mipi";
+				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 				 reg = <0x16>;
 				 status = "disabled";
 
@@ -1034,7 +1034,7 @@
 			};
 			i2c@c250000 {												//M222 CSI 45	
 			  dione_ir_cam2: xenics_dione_ir_e@0e {
-				 compatible = "xenics,dioneir";
+				 compatible = "xenics,dioneir", "exosens,dioneir";
 				 reg = <0x0e>;
 				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 
@@ -1248,7 +1248,7 @@
 				 };
 			  };
 			  eg_ec_cam2: eg_ec_e@16 {
-				 compatible = "xenics,eg-ec-mipi";
+				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 				 reg = <0x16>;
 				 status = "disabled";
 
@@ -1371,7 +1371,7 @@
 			};
 			i2c@3180000 {											//M222 CSI 23				
 			  dione_ir_cam3: xenics_dione_ir_c@0e {
-				 compatible = "xenics,dioneir";
+				 compatible = "xenics,dioneir", "exosens,dioneir";
 				 reg = <0x0e>;
 				 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 
@@ -1585,7 +1585,7 @@
 				 };
 			  };
 			  eg_ec_cam3: eg_ec_c@16 {
-				 compatible = "xenics,eg-ec-mipi";
+				 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 				 reg = <0x16>;
 				 status = "disabled";
 

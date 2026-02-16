@@ -1,8 +1,8 @@
 /*
- * A V4L2 driver for Xenics Exosens MIPI EngineCore cameras.
+ * A V4L2 driver for Exosens MIPI EngineCore cameras.
  *
  * Based on Sony imx219 NVIDIA camera driver
- * Copyright Copyright (C) 2023 Xenics Exosens
+ * Copyright Copyright (C) 2023 Exosens
  *
  */
 
@@ -30,6 +30,7 @@ int eg_ec_chnod_release (struct inode * pInode, struct file * file);
 
 static const struct of_device_id eg_ec_mipi_of_match[] = {
 	{ .compatible = "xenics,eg-ec-mipi", },
+	{ .compatible = "exosens,eg-ec-mipi", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
@@ -906,7 +907,7 @@ static struct i2c_driver eg_ec_mipi_i2c_driver = {
 };
 module_i2c_driver(eg_ec_mipi_i2c_driver);
 
-MODULE_AUTHOR("Xenics Exosens");
-MODULE_DESCRIPTION("Xenics Exosens MIPI camera I2C driver for EngineCore cameras");
+MODULE_AUTHOR("Exosens");
+MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for EngineCore cameras");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");

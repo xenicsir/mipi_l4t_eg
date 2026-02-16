@@ -30,17 +30,6 @@ dtb-$(BUILD_ENABLE) += tegra194-p3668-dsboard-nx2-0000-rev121.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-dsboard-nx2-0000-rev121-imx477.dtb
 
 
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cams-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-imx219.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-imx477.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx219.dtbo
-dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx477.dtbo
-
-
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 endif

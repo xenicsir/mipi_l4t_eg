@@ -235,21 +235,30 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
    else
       echo "  Warning: No modules found in $MODULES_SRC"
    fi
-elif [[ $L4T_VERSION_MAJOR -ge 36 ]]; then
-   # L4T 36.x+ standard build: Copy only Exosens camera modules (OOT)
-   I2C_DRIVER_DIR="updates/drivers/media/i2c"
-
-   copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
-   copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
-   copy_module "updates/drivers/video/tegra/camera" "tegra_camera_platform.ko"
-   copy_module "updates/drivers/media/platform/tegra/camera" "tegra-camera.ko"
-   copy_module "updates/drivers/video/tegra/host/nvcsi" "nvhost-nvcsi-t194.ko"
 else
-   # L4T 35.x and earlier standard build: Copy only Exosens camera modules (in-tree)
+   # L4T 35.x and earlier standard build: auto-detect Exosens camera modules
    I2C_DRIVER_DIR="kernel/drivers/media/i2c"
+   I2C_PATCH_FILE="$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}/source_public_kernel_nvidia_drivers_media_i2c.patch"
+   EG_MODULES=()
 
-   copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
-   copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
+   # Detect new modules from patch file (works with both l4t_copy_sources.sh and l4t_patch_sources.sh)
+   if [[ -f "$I2C_PATCH_FILE" ]]; then
+      while IFS= read -r mod_name; do
+         [[ -z "$mod_name" ]] && continue
+         EG_MODULES+=("${mod_name}.ko")
+      done < <(grep '^+obj-' "$I2C_PATCH_FILE" | sed 's/.*+=//' | tr -d '[:blank:]' | sed 's/\.o$//' | sort -u)
+   else
+      echo "  WARNING: Patch file not found: $I2C_PATCH_FILE"
+   fi
+
+   if [[ ${#EG_MODULES[@]} -gt 0 ]]; then
+      echo "  Auto-detected Exosens modules: ${EG_MODULES[*]}"
+      for module in "${EG_MODULES[@]}"; do
+         copy_module "$I2C_DRIVER_DIR" "$module"
+      done
+   else
+      echo "  WARNING: Could not auto-detect modules from patch file"
+   fi
 fi
 
 #******************************************************************************
@@ -311,6 +320,7 @@ else
                *Crius1280*)     cam_type="Crius1280" ;;
                *MicroCube640*)  cam_type="MicroCube640" ;;
                *MicroCube*)     cam_type="MicroCube640" ;;
+               *iLumos*|*ilumos*) cam_type="iLumos" ;;
                *Dione*)         cam_type="Dione" ;;
                *)               continue ;;
             esac

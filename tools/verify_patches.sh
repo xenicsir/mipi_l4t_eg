@@ -214,7 +214,8 @@ verify_file() {
 #******************************************************************************
 build_file_map() {
     local target_dir="$1"
-    shift
+    local merged_list_file="$2"
+    shift 2
     local source_dirs=("$@")
 
     local map_file=$(mktemp)
@@ -237,6 +238,11 @@ build_file_map() {
                 target_rel="$dest_subpath/$rel_file"
             else
                 target_rel="$rel_file"
+            fi
+
+            # Track files that exist in multiple source layers (will be merged)
+            if grep -q "^${target_rel}:" "$map_file" 2>/dev/null; then
+                echo "$target_rel" >> "$merged_list_file"
             fi
 
             sed -i "\|^${target_rel}:|d" "$map_file" 2>/dev/null || true
@@ -262,10 +268,13 @@ verify_target() {
     local ok_files=0
     local missing_files=0
     local different_files=0
+    local merged_files=0
     local missing_list=()
     local different_list=()
+    local merged_display=()
 
-    local map_file=$(build_file_map "$target_dir" "${source_dirs[@]}")
+    local merged_list_file=$(mktemp)
+    local map_file=$(build_file_map "$target_dir" "$merged_list_file" "${source_dirs[@]}")
 
     while IFS=':' read -r target_rel src_file; do
         [[ -z "$target_rel" ]] && continue
@@ -284,13 +293,19 @@ verify_target() {
                 missing_list+=("$target_rel")
                 ;;
             DIFFERENT|TYPE_MISMATCH)
-                different_files=$((different_files + 1))
-                different_list+=("$target_rel (from ${src_file#$REPO_DIR/})")
+                # Files in multiple source layers are expected to differ (3-way merge)
+                if grep -qFx "$target_rel" "$merged_list_file" 2>/dev/null; then
+                    merged_files=$((merged_files + 1))
+                    merged_display+=("$target_rel")
+                else
+                    different_files=$((different_files + 1))
+                    different_list+=("$target_rel (from ${src_file#$REPO_DIR/})")
+                fi
                 ;;
         esac
     done < "$map_file"
 
-    rm -f "$map_file"
+    rm -f "$map_file" "$merged_list_file"
 
     if [[ $total_files -eq 0 ]]; then
         echo -e "      ${YELLOW}[SKIP] No source files found${NC}"
@@ -298,7 +313,9 @@ verify_target() {
     fi
 
     if [[ $missing_files -eq 0 ]] && [[ $different_files -eq 0 ]]; then
-        echo -e "      ${GREEN}[OK] $ok_files/$total_files files verified${NC}"
+        local status_msg="[OK] $ok_files/$total_files files verified"
+        [[ $merged_files -gt 0 ]] && status_msg="$status_msg ($merged_files merged)"
+        echo -e "      ${GREEN}$status_msg${NC}"
         return 0
     else
         echo -e "      ${RED}[FAIL] $ok_files/$total_files OK, $missing_files missing, $different_files different${NC}"
@@ -319,6 +336,14 @@ verify_target() {
                 done
                 [[ ${#different_list[@]} -gt 10 ]] && echo "          ... and $((${#different_list[@]} - 10)) more"
             fi
+        fi
+
+        if [[ $VERBOSE -eq 1 ]] && [[ ${#merged_display[@]} -gt 0 ]]; then
+            echo -e "        ${BLUE}Merged files (multi-layer, OK):${NC}"
+            for f in "${merged_display[@]:0:10}"; do
+                echo "          - $f"
+            done
+            [[ ${#merged_display[@]} -gt 10 ]] && echo "          ... and $((${#merged_display[@]} - 10)) more"
         fi
 
         return 1

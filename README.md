@@ -284,7 +284,7 @@ eg_dt_camera_config_set.sh <port>/<cam_type> [<port>/<cam_type>] ...
 
 Where:
 - `<port>` = `0` or `1` (camera port number)
-- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, or `Crius1280`
+- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, `Crius1280`, or `iLumos`
 
 Example :
 ```bash
@@ -377,6 +377,13 @@ v4l2-ctl -d /dev/video0 --stream-mmap \
 v4l2-ctl -d /dev/video0 --stream-mmap \
   --set-fmt-video=width=640,height=480,pixelformat="AR24" \
   --stream-count=1 --stream-to=frame.raw
+```
+
+- **iLumos** (RAW16 format, 2048x2048):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=2048,height=2048,pixelformat="RG16" \
+  --set-ctrl=sensor_mode=0 --stream-count=1 --stream-to=frame.raw
 ```
 
 For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.

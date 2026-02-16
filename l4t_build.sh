@@ -27,6 +27,24 @@
 . l4t_environment.sh
 l4t_init "$@"
 
+#******************************************************************************
+# Helper: run a build command and abort on failure
+# Usage: run_build_step "description" command args...
+#******************************************************************************
+run_build_step() {
+   local description="$1"
+   shift
+   update_status "$description"
+   if ! "$@"; then
+      echo ""
+      echo "============================================"
+      echo "ERROR: $description FAILED"
+      echo "  Command: $*"
+      echo "============================================"
+      exit 1
+   fi
+}
+
 if [[ ! -d $L4T_SRC ]]; then
    echo "Error : $L4T_SRC folder doesn't exist"
    exit 1
@@ -58,17 +76,16 @@ if [[ $L4T_VERSION_MAJOR -lt 36 ]]; then
 	fi
 
 	pushd $L4T_SRC
-#	update_status "Configuring kernel..."
-#	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
-#	update_status "Building kernel Image..."
-#	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
-#	update_status "Building device trees..."
-#	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
-	update_status "Building kernel modules..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
-exit
-	update_status "Installing modules..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT modules_install INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
+	run_build_step "Configuring kernel..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
+	run_build_step "Building kernel Image..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
+	run_build_step "Building device trees..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
+	run_build_step "Building kernel modules..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
+	run_build_step "Installing modules..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT modules_install INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
 	popd
 
 	# Copy device tree to destination dir
@@ -109,17 +126,17 @@ else
 		fi
 	fi
 
-	update_status "Building kernel..."
-	make -C kernel
-	update_status "Installing kernel..."
-	sudo -E make install -C kernel
+	run_build_step "Building kernel..." \
+		make -C kernel
+	run_build_step "Installing kernel..." \
+		sudo -E make install -C kernel
 	##export IGNORE_PREEMPT_RT_PRESENCE=1
-	update_status "Building kernel modules..."
-	make modules
-	update_status "Installing modules..."
-	sudo -E make modules_install
-	update_status "Building device trees..."
-	make dtbs
+	run_build_step "Building kernel modules..." \
+		make modules
+	run_build_step "Installing modules..." \
+		sudo -E make modules_install
+	run_build_step "Building device trees..." \
+		make dtbs
 	popd
 
 	# Copy device tree to destination dir

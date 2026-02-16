@@ -184,6 +184,7 @@ Connected cameras include additional fields: `video_device`, `i2c_device`, `mode
 | **Dione** | N/A | Presence of `xenics_dione_ir_*@0e` device with status "okay" | Dione 640, Dione 1280 |
 | **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` | MicroCube |
 | **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` | SmartIR640, Crius640, Crius1280, Aion640 |
+| **iLumos** | 4 | Presence of `ilumos_*@30` device with status "okay" | iLumos |
 
 **Note:** The "DT Type" column shows the name from the device tree configuration. When a camera is connected, the driver reads the actual model from the camera hardware via sysfs, and the output displays the real model name instead (e.g., "MicroCube" instead of "MicroCube640").
 
@@ -193,6 +194,7 @@ The script searches for these device patterns in `/proc/device-tree/`:
 
 - **Dione cameras**: `xenics_dione_ir_[a-h]@0e`
 - **EC cameras**: `eg_ec_[a-h]@16`
+- **iLumos cameras**: `ilumos_[a-h]@30`
 
 Port letters (a-h) are automatically mapped to port numbers (0-7).
 
@@ -208,7 +210,7 @@ Port letters (a-h) are automatically mapped to port numbers (0-7).
    └─ Verify board is supported
 
 2. Detect physically connected cameras via sysfs
-   ├─ Scan /sys/bus/i2c/devices/ for known I2C addresses (0x0e, 0x16)
+   ├─ Scan /sys/bus/i2c/devices/ for known I2C addresses (0x0e, 0x16, 0x30)
    ├─ Check driver is bound (driver/ symlink exists)
    ├─ Follow of_node symlink to get device tree path
    └─ Extract port letter from device tree node name
@@ -217,6 +219,7 @@ Port letters (a-h) are automatically mapped to port numbers (0-7).
    ├─ Search known I2C bus locations (cam_i2cmux, direct i2c@*)
    ├─ Find all xenics_dione_ir_*@0e devices
    ├─ Find all eg_ec_*@16 devices
+   ├─ Find all ilumos_*@30 devices
    └─ Extract port letters (a, b, c, etc.)
 
 4. For each camera port:
@@ -248,10 +251,12 @@ Different Tegra SoCs have different I2C bus layouts:
 └── bus@0/cam_i2cmux/
     ├── i2c@0/
     │   ├── xenics_dione_ir_a@0e
-    │   └── eg_ec_a@16
+    │   ├── eg_ec_a@16
+    │   └── ilumos_a@30
     └── i2c@1/
         ├── xenics_dione_ir_e@0e
-        └── eg_ec_e@16
+        ├── eg_ec_e@16
+        └── ilumos_e@30
 ```
 
 **Tegra T194 (Xavier NX)**:
@@ -260,10 +265,12 @@ Different Tegra SoCs have different I2C bus layouts:
 └── bus@0/cam_i2cmux/
     ├── i2c@0/
     │   ├── xenics_dione_ir_a@0e
-    │   └── eg_ec_a@16
+    │   ├── eg_ec_a@16
+    │   └── ilumos_a@30
     └── i2c@1/
         ├── xenics_dione_ir_c@0e
-        └── eg_ec_c@16
+        ├── eg_ec_c@16
+        └── ilumos_c@30
 ```
 
 **Tegra T234 (Orin family)**:
@@ -272,17 +279,21 @@ Different Tegra SoCs have different I2C bus layouts:
 └── bus@0/
     ├── i2c@31e0000/
     │   ├── xenics_dione_ir_a@0e
-    │   └── eg_ec_a@16
+    │   ├── eg_ec_a@16
+    │   └── ilumos_a@30
     ├── i2c@c240000/
     │   ├── xenics_dione_ir_g@0e
-    │   └── eg_ec_g@16
+    │   ├── eg_ec_g@16
+    │   └── ilumos_g@30
     └── cam_i2cmux/
         ├── i2c@0/
         │   ├── xenics_dione_ir_b@0e
-        │   └── eg_ec_b@16
+        │   ├── eg_ec_b@16
+        │   └── ilumos_b@30
         └── i2c@1/
             ├── xenics_dione_ir_c@0e
-            └── eg_ec_c@16
+            ├── eg_ec_c@16
+            └── ilumos_c@30
 ```
 
 The script automatically handles all these variants by searching known I2C bus locations.
@@ -302,7 +313,7 @@ Dione 640
 ```
 
 **Detection Logic**:
-1. Scan `/sys/bus/i2c/devices/` for devices at known I2C addresses (0x0e for Dione, 0x16 for EngineCore)
+1. Scan `/sys/bus/i2c/devices/` for devices at known I2C addresses (0x0e for Dione, 0x16 for EngineCore, 0x30 for iLumos)
 2. Check if a driver is bound (`driver/` symlink exists)
 3. Follow `of_node` symlink to match the device tree node and extract port letter
 4. Read camera details from driver sysfs attributes:
@@ -636,7 +647,7 @@ If the script reports "No cameras detected":
 
 2. **Search for camera devices manually**:
    ```bash
-   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" 2>/dev/null
+   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" -o -name "ilumos*" 2>/dev/null
    ```
 
 3. **Run in verbose mode**:
@@ -692,13 +703,13 @@ If a camera is configured but shows "not connected" status:
    sudo i2cdetect -y -r X
    ```
 
-   Dione cameras should appear at address 0x0e, EC cameras at 0x16.
+   Dione cameras should appear at address 0x0e, EC cameras at 0x16, iLumos cameras at 0x30.
 
 3. **Check kernel logs**:
    ```bash
    dmesg | grep -i camera
    dmesg | grep -i v4l2
-   dmesg | grep -i "dioneir\|eg_ec"
+   dmesg | grep -i "dioneir\|eg_ec\|ilumos"
    ```
 
    Look for errors like:

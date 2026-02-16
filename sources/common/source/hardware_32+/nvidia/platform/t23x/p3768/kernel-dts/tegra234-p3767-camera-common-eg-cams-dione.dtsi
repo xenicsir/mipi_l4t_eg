@@ -166,7 +166,7 @@
 			cam_i2cmux {
 				i2c@0 {
 					  dione_ir_cam0: xenics_dione_ir_b@0e {
-						 compatible = "xenics,dioneir";
+						 compatible = "xenics,dioneir", "exosens,dioneir";
 						 status = "okay";
 						 /* I2C device address */
 						 reg = <0x0e>;
@@ -469,7 +469,7 @@
 						 };
 					  };
 					  eg_ec_cam0: eg_ec_b@16 {
-						 compatible = "xenics,eg-ec-mipi";
+						 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 						 /* I2C device address */
 						 reg = <0x16>;
 						 status = "disabled";
@@ -820,10 +820,118 @@
 							};
 						};
 					};
+					ilumos_cam0: ilumos_b@30 {
+						 compatible = "exosens,ilumos";
+						 /* I2C device address */
+						 reg = <0x30>;
+						 status = "disabled";
+
+						 sensor_model = "ilumos";
+
+						 use_sensor_mode_id = "false";
+
+						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
+							num_lanes = "4";
+							lane_polarity = "6";
+							tegra_sinterface = "serial_b";
+							phy_mode = "DPHY";
+							discontinuous_clk = "yes";
+							dpcm_enable = "false";
+							cil_settletime = "0";
+							active_w = "2048";
+							active_h = "2048";
+							line_length = "2048";
+							mode_type = "raw";
+							pixel_phase = "grey";
+							csi_pixel_bit_depth = "16";
+							pix_clk_hz = "100000000";
+							embedded_metadata_height = "0";
+
+							/* unused */
+							gain_factor = "16";
+							exposure_factor = "1000000";
+							min_gain_val = "16"; /* 1.00x */
+							max_gain_val = "170"; /* 10.66x */
+							step_gain_val = "1";
+							default_gain = "16"; /* 1.00x */
+							min_hdr_ratio = "1";
+							max_hdr_ratio = "1";
+
+							/* framerate */
+							framerate_factor = "1000000";
+							min_framerate = "40000000"; /* 40 fps */
+							max_framerate = "62000000"; /* 62 fps */
+							step_framerate = "1";
+							default_framerate = "60756000"; /* 60.756 fps */
+
+							/* unused */
+							min_exp_time = "13"; /* us */
+							max_exp_time = "683709"; /* us */
+							step_exp_time = "1";
+							default_exp_time = "2495"; /* us */
+						 };
+						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
+							num_lanes = "4";
+							lane_polarity = "6";
+							tegra_sinterface = "serial_b";
+							phy_mode = "DPHY";
+							discontinuous_clk = "yes";
+							dpcm_enable = "false";
+							cil_settletime = "0";
+							active_w = "2048";
+							active_h = "1088";
+							line_length = "2048";
+							mode_type = "raw";
+							pixel_phase = "grey";
+							csi_pixel_bit_depth = "16";
+							pix_clk_hz = "100000000";
+							embedded_metadata_height = "0";
+
+							/* unused */
+							gain_factor = "16";
+							exposure_factor = "1000000";
+							min_gain_val = "16"; /* 1.00x */
+							max_gain_val = "170"; /* 10.66x */
+							step_gain_val = "1";
+							default_gain = "16"; /* 1.00x */
+							min_hdr_ratio = "1";
+							max_hdr_ratio = "1";
+
+							/* framerate */
+							framerate_factor = "1000000";
+							min_framerate = "40000000"; /* 40 fps */
+							max_framerate = "62000000"; /* 62 fps */
+							step_framerate = "1";
+							default_framerate = "60756000"; /* 60.756 fps */
+
+							/* unused */
+							min_exp_time = "13"; /* us */
+							max_exp_time = "683709"; /* us */
+							step_exp_time = "1";
+							default_exp_time = "2495"; /* us */
+						 };
+
+						 ports {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							port@0 {
+							   reg = <0>;
+							   ilumos_out0: endpoint {
+#ifdef DSBOARD_ORNXS
+								  port-index = <0>;
+#else
+								  port-index = <1>;
+#endif
+								  bus-width = <4>;
+								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
+							   };
+							};
+						};
+					};
 				};
 				i2c@1 {
 					  dione_ir_cam1: xenics_dione_ir_c@0e {
-						 compatible = "xenics,dioneir";
+						 compatible = "xenics,dioneir", "exosens,dioneir";
 						 reg = <0x0e>;
 						 status = "okay";
 						 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -1035,7 +1143,7 @@
 						 };
 					  };
 					  eg_ec_cam1: eg_ec_c@16 {
-						 compatible = "xenics,eg-ec-mipi";
+						 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 						 reg = <0x16>;
 						 status = "disabled";
 
@@ -1292,6 +1400,109 @@
 							   eg_ec_out1: endpoint {
 								  port-index = <2>;
 								  bus-width = <2>;
+								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
+							   };
+							};
+						};
+					};
+					ilumos_cam1: ilumos_c@30 {
+						 compatible = "exosens,ilumos";
+						 reg = <0x30>;
+						 status = "disabled";
+
+						 sensor_model = "ilumos";
+
+						 use_sensor_mode_id = "false";
+
+						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
+							num_lanes = "4";
+							tegra_sinterface = "serial_c";
+							phy_mode = "DPHY";
+							discontinuous_clk = "yes";
+							dpcm_enable = "false";
+							cil_settletime = "0";
+							active_w = "2048";
+							active_h = "2048";
+							line_length = "2048";
+							mode_type = "raw";
+							pixel_phase = "grey";
+							csi_pixel_bit_depth = "16";
+							pix_clk_hz = "100000000";
+							embedded_metadata_height = "0";
+
+
+							/* unused */
+							gain_factor = "16";
+							exposure_factor = "1000000";
+							min_gain_val = "16"; /* 1.00x */
+							max_gain_val = "170"; /* 10.66x */
+							step_gain_val = "1";
+							default_gain = "16"; /* 1.00x */
+							min_hdr_ratio = "1";
+							max_hdr_ratio = "1";
+
+							/* framerate */
+							framerate_factor = "1000000";
+							min_framerate = "40000000"; /* 40 fps */
+							max_framerate = "62000000"; /* 62 fps */
+							step_framerate = "1";
+							default_framerate = "60756000"; /* 60.756 fps */
+
+							/* unused */
+							min_exp_time = "13"; /* us */
+							max_exp_time = "683709"; /* us */
+							step_exp_time = "1";
+							default_exp_time = "2495"; /* us */
+
+						 };
+						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
+							num_lanes = "4";
+							tegra_sinterface = "serial_c";
+							phy_mode = "DPHY";
+							discontinuous_clk = "yes";
+							dpcm_enable = "false";
+							cil_settletime = "0";
+							active_w = "2048";
+							active_h = "1088";
+							line_length = "2048";
+							mode_type = "raw";
+							pixel_phase = "grey";
+							csi_pixel_bit_depth = "16";
+							pix_clk_hz = "100000000";
+							embedded_metadata_height = "0";
+
+							/* unused */
+							gain_factor = "16";
+							exposure_factor = "1000000";
+							min_gain_val = "16"; /* 1.00x */
+							max_gain_val = "170"; /* 10.66x */
+							step_gain_val = "1";
+							default_gain = "16"; /* 1.00x */
+							min_hdr_ratio = "1";
+							max_hdr_ratio = "1";
+
+							/* framerate */
+							framerate_factor = "1000000";
+							min_framerate = "40000000"; /* 40 fps */
+							max_framerate = "62000000"; /* 62 fps */
+							step_framerate = "1";
+							default_framerate = "60756000"; /* 60.756 fps */
+
+							/* unused */
+							min_exp_time = "13"; /* us */
+							max_exp_time = "683709"; /* us */
+							step_exp_time = "1";
+							default_exp_time = "2495"; /* us */
+
+						 };
+						 ports {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							port@0 {
+							   reg = <0>;
+							   ilumos_out1: endpoint {
+								  port-index = <2>;
+								  bus-width = <4>;
 								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
 							   };
 							};

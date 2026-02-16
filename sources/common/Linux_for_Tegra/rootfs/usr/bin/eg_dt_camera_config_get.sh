@@ -36,6 +36,7 @@ CAMERA_DATABASE=(
     "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
     "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
     "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
+    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
 )
 
 # Output mode

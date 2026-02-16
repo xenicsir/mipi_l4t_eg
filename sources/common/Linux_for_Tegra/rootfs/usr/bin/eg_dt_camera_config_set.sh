@@ -7,6 +7,8 @@ declare -A CAMERA_LANES=(
 	[MicroCube]="EC_1_lane"
 	[SmartIR640]="EC_2_lanes"
 	[Crius1280]="EC_2_lanes"
+	[iLumos]="iLumos"
+	[ilumos]="iLumos"
 )
 
 SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')
@@ -29,7 +31,7 @@ usage() {
 	echo "  $(basename "$0")                                              # all ports with $DEFAULT_CAMERA"
 	echo "  $(basename "$0") 0/Dione"
 	echo "  $(basename "$0") 0/MicroCube 1/SmartIR640"
-	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/Crius1280"
+	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/iLumos"
 }
 
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then

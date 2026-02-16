@@ -47,10 +47,20 @@ trap "rm -f $DEST_PATHS_FILE" EXIT
 # Note: VENDOR_SOURCE_DIR is set by environment (e.g., Linux_for_Tegra_forecr)
 
 #******************************************************************************
-# Function: Copy files with rsync and track destination paths
+# Function: Copy source files with automatic 3-way merge for overlapping files
+#
+# Sources are copied in layers (common → version-specific → vendor).
+# When a file already exists in the destination AND was modified by a previous
+# layer (differs from the original BSP), this function performs a 3-way merge
+# using the original Nvidia BSP file (from git) as the common ancestor.
+#
+# This ensures modifications from all layers are combined automatically.
+# For example, if the generic layer adds a Makefile entry and the vendor layer
+# adds different entries, the result will contain both.
+#
 # Args: source_dir dest_dir dest_prefix verbose
 #******************************************************************************
-rsync_copy() {
+merge_copy() {
    local src_dir="$1"
    local dest_dir="$2"
    local dest_prefix="$3"  # Prefix for tracking (relative to L4T_DIR)
@@ -60,25 +70,64 @@ rsync_copy() {
       return
    fi
 
+   local merge_count=0
+   local copy_count=0
+   local conflict_count=0
+
    [[ "$verbose" == "1" ]] && echo "Copying from $src_dir..."
 
-   # Get list of files that will be copied (use itemize to get actual files)
-   local files=$(rsync -a --dry-run --itemize-changes "$src_dir/" "$dest_dir/" 2>/dev/null | grep "^>f" | sed 's/^[^ ]* //')
+   while IFS= read -r src_file; do
+      local rel_path="${src_file#$src_dir/}"
+      local dest_file="$dest_dir/$rel_path"
 
-   # Track destination paths
-   for f in $files; do
+      # Track destination path
       if [[ -n "$dest_prefix" ]]; then
-         echo "${dest_prefix}/${f}" >> "$DEST_PATHS_FILE"
+         echo "${dest_prefix}/${rel_path}" >> "$DEST_PATHS_FILE"
       else
-         echo "$f" >> "$DEST_PATHS_FILE"
+         echo "$rel_path" >> "$DEST_PATHS_FILE"
       fi
-   done
 
-   # Actually copy
-   if [[ "$verbose" == "1" ]]; then
-      sudo rsync -iahHAXxvz --progress "$src_dir/" "$dest_dir/"
-   else
-      sudo rsync -a "$src_dir/" "$dest_dir/" 2>/dev/null
+      sudo mkdir -p "$(dirname "$dest_file")"
+
+      # Check if dest file was already modified by a previous copy layer
+      if [[ -f "$dest_file" ]]; then
+         # Compute git-relative path (from L4T_DIR repo root)
+         local git_path="${dest_file#$L4T_DIR/}"
+         local base_tmp=$(mktemp)
+
+         if sudo git -C "$L4T_DIR" show HEAD:"$git_path" > "$base_tmp" 2>/dev/null && [[ -s "$base_tmp" ]]; then
+            # Check if dest was modified from BSP by a previous layer
+            if ! diff -q "$dest_file" "$base_tmp" &>/dev/null; then
+               # Dest has prior modifications - 3-way merge
+               local merge_tmp=$(mktemp)
+               cp "$dest_file" "$merge_tmp"
+               if git merge-file -q "$merge_tmp" "$base_tmp" "$src_file" 2>/dev/null; then
+                  sudo cp "$merge_tmp" "$dest_file"
+                  merge_count=$((merge_count + 1))
+                  [[ "$verbose" == "1" ]] && echo -e "  ${GREEN}MERGED${NC}: $git_path"
+               else
+                  # Merge had conflicts - retry with --union (include both sides)
+                  cp "$dest_file" "$merge_tmp"
+                  git merge-file --union -q "$merge_tmp" "$base_tmp" "$src_file" 2>/dev/null
+                  sudo cp "$merge_tmp" "$dest_file"
+                  merge_count=$((merge_count + 1))
+                  [[ "$verbose" == "1" ]] && echo -e "  ${YELLOW}MERGED (union)${NC}: $git_path"
+               fi
+               rm -f "$merge_tmp" "$base_tmp"
+               continue
+            fi
+         fi
+
+         rm -f "$base_tmp"
+      fi
+
+      # No merge needed - simple copy
+      sudo cp -a "$src_file" "$dest_file"
+      copy_count=$((copy_count + 1))
+   done < <(find "$src_dir" \( -type f -o -type l \))
+
+   if [[ $merge_count -gt 0 ]]; then
+      echo "  Sources merged: $merge_count files, $copy_count copied"
    fi
 }
 
@@ -195,26 +244,26 @@ rm -f "$TRACKED_PATHS"
 copy_exosens_sources() {
    local verbose="$1"
 
-   # Copy common Linux_for_Tegra files
-   rsync_copy "$ROOT_DIR/sources/common/Linux_for_Tegra" "$L4T_DIR" "" "$verbose"
+   # Layer 1: Common Exosens files (shared across all L4T versions)
+   merge_copy "$ROOT_DIR/sources/common/Linux_for_Tegra" "$L4T_DIR" "" "$verbose"
 
-   # Copy version-specific Linux_for_Tegra files
-   rsync_copy "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" "$L4T_DIR" "" "$verbose"
+   # Layer 2: Version-specific Exosens files
+   merge_copy "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" "$L4T_DIR" "" "$verbose"
 
-   # Copy common source files based on L4T major version
+   # Layer 3: Common source files (drivers, device trees)
    if [[ $L4T_VERSION_MAJOR -ge 36 ]]; then
       # L4T 36.x structure
-      rsync_copy "$ROOT_DIR/sources/common/source/hardware_36+" "$L4T_DIR/source/hardware" "source/hardware" "$verbose"
-      rsync_copy "$ROOT_DIR/sources/common/source/nvidia-oot" "$L4T_DIR/source/nvidia-oot" "source/nvidia-oot" "$verbose"
+      merge_copy "$ROOT_DIR/sources/common/source/hardware_36+" "$L4T_DIR/source/hardware" "source/hardware" "$verbose"
+      merge_copy "$ROOT_DIR/sources/common/source/nvidia-oot" "$L4T_DIR/source/nvidia-oot" "source/nvidia-oot" "$verbose"
    else
       # L4T 32.x/35.x structure
-      rsync_copy "$ROOT_DIR/sources/common/source/hardware_32+" "$L4T_DIR/source/public/hardware" "source/public/hardware" "$verbose"
-      rsync_copy "$ROOT_DIR/sources/common/source/nvidia-oot/drivers" "$L4T_DIR/source/public/kernel/nvidia/drivers" "source/public/kernel/nvidia/drivers" "$verbose"
+      merge_copy "$ROOT_DIR/sources/common/source/hardware_32+" "$L4T_DIR/source/public/hardware" "source/public/hardware" "$verbose"
+      merge_copy "$ROOT_DIR/sources/common/source/nvidia-oot/drivers" "$L4T_DIR/source/public/kernel/nvidia/drivers" "source/public/kernel/nvidia/drivers" "$verbose"
    fi
 
-   # Copy vendor-specific files
+   # Layer 4: Vendor-specific files (3-way merge for overlapping files)
    if [[ -n "$VENDOR_SOURCE_DIR" ]]; then
-      rsync_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
+      merge_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
    fi
 }
 

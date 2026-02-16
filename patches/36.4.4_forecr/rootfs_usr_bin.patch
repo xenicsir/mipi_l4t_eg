@@ -1393,10 +1393,10 @@ index 0000000..3f65049
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..ec8476c
+index 0000000..7cb60a5
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
-@@ -0,0 +1,541 @@
+@@ -0,0 +1,609 @@
 +#!/bin/bash
 +#******************************************************************************
 +# eg_dt_camera_config_get.sh - Get Exosens camera configuration from device tree
@@ -1610,7 +1610,36 @@ index 0000000..ec8476c
 +        camera_video_dev[$port_num]=$(find_video_device "$conn_i2c_bus" "$conn_i2c_addr")
 +        camera_i2c_chardev[$port_num]=$(find_i2c_chardev "$conn_i2c_bus" "$conn_i2c_addr" "$conn_driver")
 +
-+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]}" >&2
++        # Read camera details from sysfs and V4L2
++        local sysfs_path="/sys/bus/i2c/devices/${conn_i2c_bus}-00${conn_i2c_addr}"
++        camera_model[$port_num]=$(cat "$sysfs_path/model" 2>/dev/null | tr -d '\n')
++        camera_serial[$port_num]=$(cat "$sysfs_path/serial_number" 2>/dev/null | tr -d '\n')
++
++        # Read native resolution and pixel format from sysfs (preferred)
++        camera_resolution[$port_num]=$(cat "$sysfs_path/resolution" 2>/dev/null | tr -d '\n')
++        camera_pixfmt[$port_num]=$(cat "$sysfs_path/pixel_format" 2>/dev/null | tr -d '\n')
++
++        # Fallback to V4L2 for resolution and pixel format
++        if [[ -z "${camera_resolution[$port_num]}" ]] || [[ -z "${camera_pixfmt[$port_num]}" ]]; then
++            if [[ -n "${camera_video_dev[$port_num]}" ]] && command -v v4l2-ctl &>/dev/null; then
++                local v4l2_fmt
++                v4l2_fmt=$(v4l2-ctl --device "${camera_video_dev[$port_num]}" --get-fmt-video 2>/dev/null)
++                if [[ -n "$v4l2_fmt" ]]; then
++                    if [[ -z "${camera_resolution[$port_num]}" ]]; then
++                        local wh
++                        wh=$(echo "$v4l2_fmt" | grep -oP 'Width/Height\s*:\s*\K[0-9]+/[0-9]+')
++                        if [[ -n "$wh" ]]; then
++                            camera_resolution[$port_num]="${wh}"
++                        fi
++                    fi
++                    if [[ -z "${camera_pixfmt[$port_num]}" ]]; then
++                        camera_pixfmt[$port_num]=$(echo "$v4l2_fmt" | grep -oP "Pixel Format\s*:\s*'\K[^']+")
++                    fi
++                fi
++            fi
++        fi
++
++        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]}" >&2
 +
 +        # Match the configured camera type with the connected camera
 +        # Check if the display name matches OR if they're in the same category
@@ -1646,6 +1675,10 @@ index 0000000..ec8476c
 +    camera_connected[$port_num]="not connected"
 +    camera_video_dev[$port_num]=""
 +    camera_i2c_chardev[$port_num]=""
++    camera_model[$port_num]=""
++    camera_serial[$port_num]=""
++    camera_resolution[$port_num]=""
++    camera_pixfmt[$port_num]=""
 +    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num (letter: $port_letter): not connected" >&2
 +    return 1
 +}
@@ -1866,6 +1899,10 @@ index 0000000..ec8476c
 +declare -A camera_connected
 +declare -A camera_video_dev
 +declare -A camera_i2c_chardev
++declare -A camera_model
++declare -A camera_serial
++declare -A camera_resolution
++declare -A camera_pixfmt
 +for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
 +    cam_type="${camera_configs[$port]}"
 +    port_letter="${camera_letters[$port]}"
@@ -1892,6 +1929,10 @@ index 0000000..ec8476c
 +        conn_status="${camera_connected[$port]}"
 +        video_dev="${camera_video_dev[$port]}"
 +        i2c_dev="${camera_i2c_chardev[$port]}"
++        model="${camera_model[$port]}"
++        serial="${camera_serial[$port]}"
++        resolution="${camera_resolution[$port]}"
++        pixfmt="${camera_pixfmt[$port]}"
 +
 +        echo -n "    \"port_$port\": {"
 +        echo -n "\"type\": \"$cam_type\", "
@@ -1901,6 +1942,18 @@ index 0000000..ec8476c
 +        fi
 +        if [[ -n "$i2c_dev" ]]; then
 +            echo -n ", \"i2c_device\": \"$i2c_dev\""
++        fi
++        if [[ -n "$model" ]]; then
++            echo -n ", \"model\": \"$model\""
++        fi
++        if [[ -n "$serial" ]]; then
++            echo -n ", \"serial_number\": \"$serial\""
++        fi
++        if [[ -n "$resolution" ]]; then
++            echo -n ", \"width/height\": \"$resolution\""
++        fi
++        if [[ -n "$pixfmt" ]]; then
++            echo -n ", \"pixel_format\": \"$pixfmt\""
 +        fi
 +        echo -n "}"
 +    done
@@ -1925,11 +1978,26 @@ index 0000000..ec8476c
 +            conn_status="${camera_connected[$port]}"
 +            video_dev="${camera_video_dev[$port]}"
 +            i2c_dev="${camera_i2c_chardev[$port]}"
++            model="${camera_model[$port]}"
++            serial="${camera_serial[$port]}"
++            resolution="${camera_resolution[$port]}"
++            pixfmt="${camera_pixfmt[$port]}"
 +
-+            echo "  Port $port: $cam_type ($conn_status)"
++            display_name="$cam_type"
++            if [[ "$conn_status" == "connected" ]] && [[ -n "$model" ]]; then
++                display_name="$model"
++            fi
++            if [[ "$conn_status" == "connected" ]]; then
++                echo "  Port $port: $display_name ("$'\033[32m'"$conn_status"$'\033[0m'")"
++            else
++                echo "  Port $port: $display_name ("$'\033[31m'"$conn_status"$'\033[0m'")"
++            fi
 +            if [[ "$conn_status" == "connected" ]]; then
 +                [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
 +                [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
++                [[ -n "$serial" ]] && echo "    Serial:       $serial"
++                [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
++                [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
 +            fi
 +        done
 +        echo ""
@@ -1940,16 +2008,17 @@ index 0000000..ec8476c
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..ca32ea9
+index 0000000..ca67a6f
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,129 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
 +declare -A CAMERA_LANES=(
 +	[Dione]=""
 +	[MicroCube640]="EC_1_lane"
++	[MicroCube]="EC_1_lane"
 +	[SmartIR640]="EC_2_lanes"
 +	[Crius1280]="EC_2_lanes"
 +)
@@ -1973,8 +2042,8 @@ index 0000000..ca32ea9
 +	echo "Examples:"
 +	echo "  $(basename "$0")                                              # all ports with $DEFAULT_CAMERA"
 +	echo "  $(basename "$0") 0/Dione"
-+	echo "  $(basename "$0") 0/MicroCube640 1/SmartIR640"
-+	echo "  $(basename "$0") 0/Dione 1/MicroCube640 2/SmartIR640 3/Crius1280"
++	echo "  $(basename "$0") 0/MicroCube 1/SmartIR640"
++	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/Crius1280"
 +}
 +
 +if [[ "$1" == "-h" || "$1" == "--help" ]]; then

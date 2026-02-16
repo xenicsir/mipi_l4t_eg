@@ -211,7 +211,7 @@
 						#address-cells = <1>;
 						#size-cells = <0>;
 						  dione_ir_cam0: xenics_dione_ir_b@0e {
-							 compatible = "xenics,dioneir";
+							 compatible = "xenics,dioneir", "exosens,dioneir";
 							 status = "okay";
 							 /* I2C device address */
 							 reg = <0x0e>;
@@ -514,7 +514,7 @@
 							 };
 						  };
 						  eg_ec_cam0: eg_ec_b@16 {
-							 compatible = "xenics,eg-ec-mipi";
+							 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 							 /* I2C device address */
 							 reg = <0x16>;
 							 status = "disabled";
@@ -1371,7 +1371,7 @@
 						#address-cells = <1>;
 						#size-cells = <0>;
 						  dione_ir_cam1: xenics_dione_ir_c@0e {
-							 compatible = "xenics,dioneir";
+							 compatible = "xenics,dioneir", "exosens,dioneir";
 							 reg = <0x0e>;
 							 status = "okay";
 							 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -1583,7 +1583,7 @@
 							 };
 						  };
 						  eg_ec_cam1: eg_ec_c@16 {
-							 compatible = "xenics,eg-ec-mipi";
+							 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 							 reg = <0x16>;
 							 status = "disabled";
 

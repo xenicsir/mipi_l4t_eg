@@ -13,8 +13,8 @@ Total patches: 7
 Patch files:
   - rootfs_opt_eg.patch (23 files, 3236 lines)
   - rootfs_usr_bin.patch (12 files, 2261 lines)
-  - source_public_hardware.patch (49 files, 8628 lines)
-  - source_public_kernel_nvidia_drivers_media_i2c.patch (23 files, 7066 lines)
+  - source_public_hardware.patch (51 files, 8970 lines)
+  - source_public_kernel_nvidia_drivers_media_i2c.patch (23 files, 7128 lines)
   - source_public_kernel_nvidia_drivers_media_platform.patch (5 files, 140 lines)
   - source_public_kernel_nvidia_include_media.patch (2 files, 36 lines)
   - source_public_kernel.patch (3 files, 74 lines)

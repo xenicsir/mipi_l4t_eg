@@ -6342,7 +6342,7 @@ index 93728f4..d521e18 100644
  dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..adf1f5c
+index 0000000..d3fd5ce
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2297 @@
@@ -6543,7 +6543,7 @@ index 0000000..adf1f5c
 +
 +				i2c@31e0000 {											//M222 CSI 01		
 +				  dione_ir_cam0: xenics_dione_ir_a@0e {
-+					 compatible = "xenics,dioneir";
++					 compatible = "xenics,dioneir", "exosens,dioneir";
 +					 /* I2C device address */
 +					 reg = <0x0e>;
 +					 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -6840,7 +6840,7 @@ index 0000000..adf1f5c
 +					 };
 +				  };
 +				  eg_ec_cam0: eg_ec_a@16 {
-+					 compatible = "xenics,eg-ec-mipi";
++					 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +					 /* I2C device address */
 +					 reg = <0x16>;
 +					 status = "disabled";
@@ -7185,7 +7185,7 @@ index 0000000..adf1f5c
 +				};
 +				i2c@c240000 {												//M222 CSI 67			
 +				  dione_ir_cam1: xenics_dione_ir_g@0e {
-+					 compatible = "xenics,dioneir";
++					 compatible = "xenics,dioneir", "exosens,dioneir";
 +					 reg = <0x0e>;
 +					 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -7399,7 +7399,7 @@ index 0000000..adf1f5c
 +					 };
 +				  };
 +				  eg_ec_cam1: eg_ec_g@16 {
-+					 compatible = "xenics,eg-ec-mipi";
++					 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +					 reg = <0x16>;
 +					 status = "disabled";
 +
@@ -7661,7 +7661,7 @@ index 0000000..adf1f5c
 +				};
 +				i2c@c250000 {												//M222 CSI 45	
 +				  dione_ir_cam2: xenics_dione_ir_e@0e {
-+					 compatible = "xenics,dioneir";
++					 compatible = "xenics,dioneir", "exosens,dioneir";
 +					 reg = <0x0e>;
 +					 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -7875,7 +7875,7 @@ index 0000000..adf1f5c
 +					 };
 +				  };
 +				  eg_ec_cam2: eg_ec_e@16 {
-+					 compatible = "xenics,eg-ec-mipi";
++					 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +					 reg = <0x16>;
 +					 status = "disabled";
 +
@@ -8136,7 +8136,7 @@ index 0000000..adf1f5c
 +				};
 +				i2c@3180000 {											//M222 CSI 23				
 +				  dione_ir_cam3: xenics_dione_ir_c@0e {
-+					 compatible = "xenics,dioneir";
++					 compatible = "xenics,dioneir", "exosens,dioneir";
 +					 reg = <0x0e>;
 +					 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 +
@@ -8350,7 +8350,7 @@ index 0000000..adf1f5c
 +					 };
 +				  };
 +				  eg_ec_cam3: eg_ec_c@16 {
-+					 compatible = "xenics,eg-ec-mipi";
++					 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +					 reg = <0x16>;
 +					 status = "disabled";
 +
@@ -9760,7 +9760,7 @@ index 0000000..8882bbb
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..5a8a2fb
+index 0000000..53e3a84
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2273 @@
@@ -9977,7 +9977,7 @@ index 0000000..5a8a2fb
 +						#address-cells = <1>;
 +						#size-cells = <0>;
 +						  dione_ir_cam0: xenics_dione_ir_b@0e {
-+							 compatible = "xenics,dioneir";
++							 compatible = "xenics,dioneir", "exosens,dioneir";
 +							 status = "okay";
 +							 /* I2C device address */
 +							 reg = <0x0e>;
@@ -10280,7 +10280,7 @@ index 0000000..5a8a2fb
 +							 };
 +						  };
 +						  eg_ec_cam0: eg_ec_b@16 {
-+							 compatible = "xenics,eg-ec-mipi";
++							 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +							 /* I2C device address */
 +							 reg = <0x16>;
 +							 status = "disabled";
@@ -11137,7 +11137,7 @@ index 0000000..5a8a2fb
 +						#address-cells = <1>;
 +						#size-cells = <0>;
 +						  dione_ir_cam1: xenics_dione_ir_c@0e {
-+							 compatible = "xenics,dioneir";
++							 compatible = "xenics,dioneir", "exosens,dioneir";
 +							 reg = <0x0e>;
 +							 status = "okay";
 +							 fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -11349,7 +11349,7 @@ index 0000000..5a8a2fb
 +							 };
 +						  };
 +						  eg_ec_cam1: eg_ec_c@16 {
-+							 compatible = "xenics,eg-ec-mipi";
++							 compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
 +							 reg = <0x16>;
 +							 status = "disabled";
 +
