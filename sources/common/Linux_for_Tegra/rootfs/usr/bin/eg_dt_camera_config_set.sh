@@ -9,6 +9,14 @@ declare -A CAMERA_LANES=(
 	[Crius1280]="EC_2_lanes"
 	[iLumos]="iLumos"
 	[ilumos]="iLumos"
+	[Microlynx]="Microlynx"
+	[microlynx]="Microlynx"
+)
+
+# Cameras requiring x4 MIPI lanes
+declare -A CAMERA_X4=(
+	[iLumos]=1
+	[ilumos]=1
 )
 
 SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')
@@ -99,6 +107,20 @@ for arg in "$@"; do
 		echo "Error: unknown camera type '$camera_type' (from argument '$arg')."
 		echo "Supported cameras: $SUPPORTED_CAMERAS"
 		exit 1
+	fi
+
+	# x4 cameras on port 0 require proper CSI0_CLK routing (Forecr boards only)
+	if [[ -n "${CAMERA_X4[$camera_type]+x}" ]] && [[ "$port_number" -eq 0 ]]; then
+		case "$BOARD" in
+			dsboard-*|milboard-*|raiboard-*)
+				;; # Forecr boards support x4 on port 0 (CSI0_CLK correctly routed)
+			*)
+				echo "Error: $camera_type requires 4 MIPI lanes (x4) which is not supported on port 0 of $BOARD."
+				echo "On Nvidia devkit, CAM0 (J20) has a lane swap and uses CSI1_CLK, limiting it to x2."
+				echo "Use port 1 (CAM1/J21) which supports x4 via CSI2_CLK."
+				exit 1
+				;;
+		esac
 	fi
 
 	lanes="${CAMERA_LANES[$camera_type]}"

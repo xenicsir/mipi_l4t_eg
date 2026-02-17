@@ -67,8 +67,11 @@ _l4t_common_completion() {
         l4t_build.sh)
             extra_opts="-s --standalone"
             ;;
+        l4t_prepare.sh)
+            extra_opts="--archive-dir"
+            ;;
         l4t_gen_delivery_package.sh)
-            extra_opts="-p --package-version"
+            extra_opts="-p --package-version --delivery-dir"
             ;;
         l4t_verify_packages.sh)
             # l4t_verify_packages.sh - version/vendor/carrier are optional filters
@@ -102,6 +105,11 @@ _l4t_common_completion() {
             ;;
         -p|--package-version)
             # Package version - no completion, user provides value
+            return 0
+            ;;
+        --archive-dir|--delivery-dir)
+            # Directory completion
+            COMPREPLY=( $(compgen -d -- "$cur") )
             return 0
             ;;
     esac

@@ -8,8 +8,9 @@
 uint16_t GENCP_crc16(uint8_t *buf, uint32_t len)
 {
     uint32_t sum = 0;
+    uint32_t i;
 
-    for (uint32_t i = 0; i < len; i++)
+    for (i = 0; i < len; i++)
     {
         if (i & 1)
             sum += (uint32_t)buf[i];

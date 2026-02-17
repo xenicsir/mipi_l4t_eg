@@ -11,8 +11,8 @@ Carrier board: dsboard_ornx
 Total patches: 7
 
 Patch files:
-  - rootfs_opt_eg.patch (23 files, 3229 lines)
-  - rootfs_usr_bin.patch (12 files, 2261 lines)
+  - rootfs_opt_eg.patch (23 files, 3259 lines)
+  - rootfs_usr_bin.patch (12 files, 2264 lines)
   - source_public_hardware.patch (205 files, 36625 lines)
   - source_public_kernel_nvidia_drivers_media_i2c.patch (23 files, 7128 lines)
   - source_public_kernel_nvidia_drivers_media_platform.patch (5 files, 126 lines)

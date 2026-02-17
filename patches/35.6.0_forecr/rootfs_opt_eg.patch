@@ -645,10 +645,10 @@ index 0000000..373756e
 +Part of Forecr/Exosens Jetson BSP distribution.
 diff --git a/rootfs/opt/eg/doc/eg_dt_camera_config_get.md b/rootfs/opt/eg/doc/eg_dt_camera_config_get.md
 new file mode 100644
-index 0000000..dac4a29
+index 0000000..9066ac8
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/eg_dt_camera_config_get.md
-@@ -0,0 +1,811 @@
+@@ -0,0 +1,822 @@
 +# eg_dt_camera_config_get.sh - Documentation
 +
 +Automatic Exosens camera configuration detection from device tree.
@@ -835,6 +835,7 @@ index 0000000..dac4a29
 +| **Dione** | N/A | Presence of `xenics_dione_ir_*@0e` device with status "okay" | Dione 640, Dione 1280 |
 +| **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` | MicroCube |
 +| **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` | SmartIR640, Crius640, Crius1280, Aion640 |
++| **iLumos** | 4 | Presence of `ilumos_*@30` device with status "okay" | iLumos |
 +
 +**Note:** The "DT Type" column shows the name from the device tree configuration. When a camera is connected, the driver reads the actual model from the camera hardware via sysfs, and the output displays the real model name instead (e.g., "MicroCube" instead of "MicroCube640").
 +
@@ -844,6 +845,7 @@ index 0000000..dac4a29
 +
 +- **Dione cameras**: `xenics_dione_ir_[a-h]@0e`
 +- **EC cameras**: `eg_ec_[a-h]@16`
++- **iLumos cameras**: `ilumos_[a-h]@30`
 +
 +Port letters (a-h) are automatically mapped to port numbers (0-7).
 +
@@ -859,7 +861,7 @@ index 0000000..dac4a29
 +   └─ Verify board is supported
 +
 +2. Detect physically connected cameras via sysfs
-+   ├─ Scan /sys/bus/i2c/devices/ for known I2C addresses (0x0e, 0x16)
++   ├─ Scan /sys/bus/i2c/devices/ for known I2C addresses (0x0e, 0x16, 0x30)
 +   ├─ Check driver is bound (driver/ symlink exists)
 +   ├─ Follow of_node symlink to get device tree path
 +   └─ Extract port letter from device tree node name
@@ -868,6 +870,7 @@ index 0000000..dac4a29
 +   ├─ Search known I2C bus locations (cam_i2cmux, direct i2c@*)
 +   ├─ Find all xenics_dione_ir_*@0e devices
 +   ├─ Find all eg_ec_*@16 devices
++   ├─ Find all ilumos_*@30 devices
 +   └─ Extract port letters (a, b, c, etc.)
 +
 +4. For each camera port:
@@ -899,10 +902,12 @@ index 0000000..dac4a29
 +└── bus@0/cam_i2cmux/
 +    ├── i2c@0/
 +    │   ├── xenics_dione_ir_a@0e
-+    │   └── eg_ec_a@16
++    │   ├── eg_ec_a@16
++    │   └── ilumos_a@30
 +    └── i2c@1/
 +        ├── xenics_dione_ir_e@0e
-+        └── eg_ec_e@16
++        ├── eg_ec_e@16
++        └── ilumos_e@30
 +```
 +
 +**Tegra T194 (Xavier NX)**:
@@ -911,10 +916,12 @@ index 0000000..dac4a29
 +└── bus@0/cam_i2cmux/
 +    ├── i2c@0/
 +    │   ├── xenics_dione_ir_a@0e
-+    │   └── eg_ec_a@16
++    │   ├── eg_ec_a@16
++    │   └── ilumos_a@30
 +    └── i2c@1/
 +        ├── xenics_dione_ir_c@0e
-+        └── eg_ec_c@16
++        ├── eg_ec_c@16
++        └── ilumos_c@30
 +```
 +
 +**Tegra T234 (Orin family)**:
@@ -923,17 +930,21 @@ index 0000000..dac4a29
 +└── bus@0/
 +    ├── i2c@31e0000/
 +    │   ├── xenics_dione_ir_a@0e
-+    │   └── eg_ec_a@16
++    │   ├── eg_ec_a@16
++    │   └── ilumos_a@30
 +    ├── i2c@c240000/
 +    │   ├── xenics_dione_ir_g@0e
-+    │   └── eg_ec_g@16
++    │   ├── eg_ec_g@16
++    │   └── ilumos_g@30
 +    └── cam_i2cmux/
 +        ├── i2c@0/
 +        │   ├── xenics_dione_ir_b@0e
-+        │   └── eg_ec_b@16
++        │   ├── eg_ec_b@16
++        │   └── ilumos_b@30
 +        └── i2c@1/
 +            ├── xenics_dione_ir_c@0e
-+            └── eg_ec_c@16
++            ├── eg_ec_c@16
++            └── ilumos_c@30
 +```
 +
 +The script automatically handles all these variants by searching known I2C bus locations.
@@ -953,7 +964,7 @@ index 0000000..dac4a29
 +```
 +
 +**Detection Logic**:
-+1. Scan `/sys/bus/i2c/devices/` for devices at known I2C addresses (0x0e for Dione, 0x16 for EngineCore)
++1. Scan `/sys/bus/i2c/devices/` for devices at known I2C addresses (0x0e for Dione, 0x16 for EngineCore, 0x30 for iLumos)
 +2. Check if a driver is bound (`driver/` symlink exists)
 +3. Follow `of_node` symlink to match the device tree node and extract port letter
 +4. Read camera details from driver sysfs attributes:
@@ -1287,7 +1298,7 @@ index 0000000..dac4a29
 +
 +2. **Search for camera devices manually**:
 +   ```bash
-+   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" 2>/dev/null
++   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" -o -name "ilumos*" 2>/dev/null
 +   ```
 +
 +3. **Run in verbose mode**:
@@ -1343,13 +1354,13 @@ index 0000000..dac4a29
 +   sudo i2cdetect -y -r X
 +   ```
 +
-+   Dione cameras should appear at address 0x0e, EC cameras at 0x16.
++   Dione cameras should appear at address 0x0e, EC cameras at 0x16, iLumos cameras at 0x30.
 +
 +3. **Check kernel logs**:
 +   ```bash
 +   dmesg | grep -i camera
 +   dmesg | grep -i v4l2
-+   dmesg | grep -i "dioneir\|eg_ec"
++   dmesg | grep -i "dioneir\|eg_ec\|ilumos"
 +   ```
 +
 +   Look for errors like:
@@ -1462,10 +1473,10 @@ index 0000000..dac4a29
 +Part of Forecr/Exosens Jetson BSP distribution.
 diff --git a/rootfs/opt/eg/doc/eg_dt_camera_config_get_add_camera.md b/rootfs/opt/eg/doc/eg_dt_camera_config_get_add_camera.md
 new file mode 100644
-index 0000000..1c2d645
+index 0000000..0cd84bc
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/eg_dt_camera_config_get_add_camera.md
-@@ -0,0 +1,261 @@
+@@ -0,0 +1,278 @@
 +# Adding a New Camera Type to eg_dt_camera_config_get.sh
 +
 +This guide explains how to add support for a new camera type in the `eg_dt_camera_config_get.sh` script.
@@ -1499,6 +1510,7 @@ index 0000000..1c2d645
 +    "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
 +    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
 +    "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
++    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
 +)
 +```
 +
@@ -1530,7 +1542,22 @@ index 0000000..1c2d645
 +)
 +```
 +
-+### Example 2: Adding a Variant of Existing Camera
++### Example 2: Real-World Example - iLumos Camera
++
++The iLumos camera was added with its own I2C address (0x30) and 4 MIPI lanes:
++
++```bash
++CAMERA_DATABASE=(
++    "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
++    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
++    "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
++    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
++)
++```
++
++**Note**: Since iLumos uses a unique I2C address (0x30), no MIPI lane disambiguation is needed.
++
++### Example 3: Adding a Variant of Existing Camera
 +
 +Let's add an EC camera with 4 MIPI lanes:
 +
@@ -1545,7 +1572,7 @@ index 0000000..1c2d645
 +
 +**Note**: This camera shares the same I2C address and device tree pattern as other EC cameras. The script will differentiate them by checking the `mode0/num_lanes` value in the device tree.
 +
-+### Example 3: Camera with Different Port Naming
++### Example 4: Camera with Different Port Naming
 +
 +If your camera uses a different naming convention (e.g., `mycam_port_X@1a`):
 +
@@ -1688,6 +1715,7 @@ index 0000000..1c2d645
 +    "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
 +    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
 +    "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
++    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
 +
 +    # New VisionCam family
 +    # - All use I2C address 0x25
@@ -1729,10 +1757,10 @@ index 0000000..1c2d645
 +**Script Version**: 2.0 (Data-driven architecture)
 diff --git a/rootfs/opt/eg/doc/eg_dt_camera_config_set.md b/rootfs/opt/eg/doc/eg_dt_camera_config_set.md
 new file mode 100644
-index 0000000..e9a6a5a
+index 0000000..5795379
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/eg_dt_camera_config_set.md
-@@ -0,0 +1,632 @@
+@@ -0,0 +1,634 @@
 +# eg_dt_camera_config_set.sh - Documentation
 +
 +Configure Exosens camera device tree overlays on Jetson boards.
@@ -1779,7 +1807,7 @@ index 0000000..e9a6a5a
 +Each argument is a **port/camera pair** separated by a `/`:
 +
 +- **port_number**: Integer from 0 to N-1, where N is the number of camera ports detected on the board (e.g., 0-1 on DSBOARD-ORNXS, 0-3 on DSBOARD-ORNX, 0-5 on DSBOARD-XV2)
-+- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`
++- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`
 +
 +Example: `0/Dione`, `1/MicroCube640`, `2/SmartIR640`
 +
@@ -1811,8 +1839,9 @@ index 0000000..e9a6a5a
 +| **MicroCube640** | 1 | 0x16 | Exosens EC camera (1 lane) |
 +| **SmartIR640** | 2 | 0x16 | Exosens EC camera (2 lanes) |
 +| **Crius1280** | 2 | 0x16 | Exosens EC camera (2 lanes) |
++| **iLumos** | 4 | 0x30 | Exosens iLumos camera |
 +
-+**Note**: `SmartIR640` and `Crius1280` use the same device tree configuration (2 MIPI lanes).
++**Note**: `SmartIR640` and `Crius1280` use the same device tree configuration (2 MIPI lanes). `iLumos` is also accepted as `ilumos` (case-insensitive).
 +
 +---
 +
@@ -1861,7 +1890,8 @@ index 0000000..e9a6a5a
 +3. Build overlay arguments (from CAMERA_LANES database)
 +   ├─ For Dione: No additional overlay needed (empty lane config)
 +   ├─ For MicroCube640: Add "CAM<port>:EC_1_lane" overlay
-+   └─ For SmartIR640/Crius1280: Add "CAM<port>:EC_2_lanes" overlay
++   ├─ For SmartIR640/Crius1280: Add "CAM<port>:EC_2_lanes" overlay
++   └─ For iLumos: Add "CAM<port>:iLumos" overlay
 +
 +4. Apply configuration
 +   ├─ Call /opt/eg/jetson-io/config-by-hardware.py
@@ -1897,8 +1927,8 @@ index 0000000..e9a6a5a
 +```
 +Base: "Exosens Cameras"
 +Overlays:
-+  - CAM0:EC_1_lane, CAM0:EC_2_lanes
-+  - CAM1:EC_1_lane, CAM1:EC_2_lanes
++  - CAM0:EC_1_lane, CAM0:EC_2_lanes, CAM0:iLumos
++  - CAM1:EC_1_lane, CAM1:EC_2_lanes, CAM1:iLumos
 +  - ... up to CAM<N-1> (depending on detected port count)
 +```
 +
@@ -2188,13 +2218,13 @@ index 0000000..e9a6a5a
 +
 +### "Error: unknown camera type"
 +
-+Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`
++Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`
 +
 +```bash
 +# ✗ Wrong: typo in camera name
 +$ eg_dt_camera_config_set.sh 0/microcube640
 +Error: unknown camera type 'microcube640' (from argument '0/microcube640').
-+Supported cameras: Dione, MicroCube640, SmartIR640, Crius1280
++Supported cameras: Crius1280, Dione, MicroCube, MicroCube640, SmartIR640, iLumos
 +
 +# ✓ Correct: exact camera name
 +$ eg_dt_camera_config_set.sh 0/MicroCube640
@@ -2254,7 +2284,7 @@ index 0000000..e9a6a5a
 +
 +3. **Check device tree nodes**:
 +   ```bash
-+   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" 2>/dev/null
++   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" -o -name "ilumos*" 2>/dev/null
 +   ```
 +
 +4. **Check camera device nodes**:

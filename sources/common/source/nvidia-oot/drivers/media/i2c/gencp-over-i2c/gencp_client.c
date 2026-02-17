@@ -47,6 +47,7 @@ static uint8_t  GENCPCLIENT_isNonSwapCase(uint32_t address);
 void GENCPCLIENT_Init(struct unio_handle *h)
 {
     uint16_t status = GENCP_STATUS_SUCCESS;
+    uint32_t gencpVersion = 0;
     gGencpInitWasSuccessfull = true; // required for correct opperation of init functions, will be reset to false if needed...
 
     if(h) // if we have a valid pointer
@@ -64,7 +65,6 @@ void GENCPCLIENT_Init(struct unio_handle *h)
         PRINT_DEBUG("\n\rGENCP CLIENT     - Address of TxBuffer:             0x%p", pTxBuffer);
 
         // USE THIS REGISTER READ TO SEE IF THE COMMUNICATION WORKS, IF FAILURE DISABLE THE GENCP CIENT MODULE !!!
-        uint32_t gencpVersion = 0;
         status = GENCP_STATUS_SUCCESS;
         // Read twice incase it fails
         status = GENCPCLIENT_ReadRegister(GENCP_REG_GENCP_VERSION, &gencpVersion);
@@ -135,11 +135,12 @@ uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data)
 
     if(gGencpInitWasSuccessfull)
     {
-        PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Read register 0x%08x", address);
         uint32_t command_size_bytes = 0;
         uint32_t AckMsgRdyStatus = ACK_NOT_READY;
         uint8_t timerIsExpired = 0;
         uint32_t tempdata;
+
+        PRINT_DEBUG("\n\r\n\rGENCP CLIENT     - Read register 0x%08x", address);
 
         // WV [20201026] C O M P O S E   T H E   R E A D   C O M M A N D
         PRINT_DEBUG("\n\rGENCP CLIENT     - Compose the GENCP Read command...");
@@ -432,8 +433,8 @@ static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write
         }
         else
         {
+            uint32_t i, j;
             PRINT_DEBUG("\n\rGENCP CLIENT     - Compose Write: swap address range.");
-            uint32_t i,j = 0;
             // Swapping of normal register data which are integer values
             for(i = 0; i < write_length_b/4; i++)
             {
@@ -474,6 +475,7 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
 {
     uint32_t Status_u32 = ACK_NOT_READY;
     uint8_t* pAckStartPtr_u8 = (uint8_t*) pRxBuffer;
+    uint8_t byteReceived_u8 = 0xab;
 
     static uint8_t AckMsgState = HUNTING_PREAMBLE_0;
     static uint32_t RxIndex = 0;
@@ -492,8 +494,6 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
             memset(pRxBuffer, 0, sizeof(GENCP_MSG));
             AckMsgState = HUNTING_PREAMBLE_0;
         }
-
-        uint8_t byteReceived_u8 = 0xab;
         while (SUCCESS == unio_read_byte(unio_handle_ptr, &byteReceived_u8))
         {
             switch (AckMsgState)
@@ -626,11 +626,13 @@ static uint32_t GENCPCLIENT_GetPackageTransferTime()
 
 static void GENCPCLIENT_sendCommand(uint32_t size_bytes)
 {
+    uint32_t i;
+
     // Call to write command
     unio_write(unio_handle_ptr, (uint8_t*) &pTxBuffer->prefix.preamble_u16, size_bytes);
 
     PRINT_DEBUG("\n\rGENCP REQUEST: ");
-    for(uint32_t i=0; i<size_bytes; i++)
+    for(i=0; i<size_bytes; i++)
         PRINT_DEBUG("[%02xh] ", *(((uint8_t*) &pTxBuffer->prefix.preamble_u16)+i) );
 }
 

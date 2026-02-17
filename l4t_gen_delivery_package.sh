@@ -321,6 +321,7 @@ else
                *MicroCube640*)  cam_type="MicroCube640" ;;
                *MicroCube*)     cam_type="MicroCube640" ;;
                *iLumos*|*ilumos*) cam_type="iLumos" ;;
+               *Microlynx*|*microlynx*) cam_type="Microlynx" ;;
                *Dione*)         cam_type="Dione" ;;
                *)               continue ;;
             esac
@@ -415,7 +416,6 @@ if [[ $? -eq 0 ]]; then
    echo "============================================"
 
    # Copy to delivery directory if it exists
-   DELIVERY_DIR="$ROOT_DIR/delivery"
    if [[ -d "$DELIVERY_DIR" ]]; then
       DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${DEB_VERSION}"
       mkdir -p "$DELIVERY_SUBDIR"

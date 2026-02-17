@@ -21,10 +21,11 @@ int unio_read_buffer_init(struct unio_handle *h, size_t depth)
 static enum return_status __unio_parsed_byte (struct unio_handle *h, u8 *buf)
 {
     int ret;
+    u8 temp_buff[16];
+    size_t temp_size = sizeof(temp_buff)/sizeof(temp_buff[0]);
+
     if (rb_fifo.count == 0) {
         PRINT_DEBUG("No data available, doing a read\n");
-        u8 temp_buff[16]; // NOTE: make it a static param?
-        size_t temp_size = sizeof(temp_buff)/sizeof(temp_buff[0]);
 
         // Read 16 bytes from i2c
         ret = unio_read(h, &temp_buff[0], temp_size);
@@ -70,35 +71,37 @@ int unio_read_byte (struct unio_handle *h, u8 *buf)
 
 int unio_write(struct unio_handle *h, const u8 *buf, size_t len)
 {
-    PRINT_DEBUG("Writing to 0x%X, %lu bytes.\n", h->client->addr, len);
-    struct i2c_msg msg = {
-        .addr  = h->client->addr,
-        .flags = 0,               // write
-        .len   = len,
-        .buf   = (u8 *)buf,
-    };
+    int ret;
+    struct i2c_msg msg;
 
-    int ret = i2c_transfer(h->client->adapter, &msg, 1);
+    PRINT_DEBUG("Writing to 0x%X, %lu bytes.\n", h->client->addr, len);
+    msg.addr  = h->client->addr;
+    msg.flags = 0;               /* write */
+    msg.len   = len;
+    msg.buf   = (u8 *)buf;
+
+    ret = i2c_transfer(h->client->adapter, &msg, 1);
     PRINT_DEBUG("Write status: %d.\n", ret);
     return (ret == 1) ? 0 : ret;
 }
 
 int unio_read(struct unio_handle *h, u8 *buf, size_t len)
 {
-    // pr_info("Called from: %pS\n", __builtin_return_address(0));
+    int ret;
+    int i;
+    struct i2c_msg msg;
+
     PRINT_DEBUG("Reading from 0x%X, %lu bytes.\n", h->client->addr, len);
-    struct i2c_msg msg = {
-        .addr  = h->client->addr,
-        .flags = I2C_M_RD,        // read
-        .len   = len,
-        .buf   = buf,
-    };
+    msg.addr  = h->client->addr;
+    msg.flags = I2C_M_RD;        /* read */
+    msg.len   = len;
+    msg.buf   = buf;
 
-    int ret = i2c_transfer(h->client->adapter, &msg, 1);
+    ret = i2c_transfer(h->client->adapter, &msg, 1);
 
-    //This is required in kernel to print an array on one line.
+    /* This is required in kernel to print an array on one line. */
     PRINT_DEBUG("Read status: %d.\n Result: [", ret);
-    for (int i = 0; i < len; i++) {
+    for (i = 0; i < len; i++) {
         PRINT_DEBUG("0x%X", buf[i]);
         if (i < len-1) PRINT_DEBUG(", ");
     }

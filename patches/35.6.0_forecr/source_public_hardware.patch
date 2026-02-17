@@ -25533,10 +25533,10 @@ index 0000000..8882bbb
 +	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
-index b4c3f73..11a4c72 100644
+index b4c3f73..606fcb2 100644
 --- a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/Makefile
-@@ -42,6 +42,82 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-imx477-dual.dtbo
+@@ -42,6 +42,84 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-imx477-dual.dtbo
  dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-imx477-dual-4lane.dtbo
  dtbo-$(BUILD_ENABLE) += tegra234-p3767-overlay.dtbo
  dtbo-$(BUILD_ENABLE) += tegra234-p3768-overlay.dtbo
@@ -25616,6 +25616,8 @@ index b4c3f73..11a4c72 100644
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
++dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
++dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
  
  ifneq ($(dtb-y),)
  dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
@@ -34963,10 +34965,10 @@ index 0000000..fddf240
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..9cf5e47
+index 0000000..c9a8b96
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,1543 @@
+@@ -0,0 +1,1676 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -35789,6 +35791,7 @@ index 0000000..9cf5e47
 +							};
 +						};
 +					};
++#ifdef DSBOARD_ORNXS
 +					ilumos_cam0: ilumos_b@30 {
 +						 compatible = "exosens,ilumos";
 +						 /* I2C device address */
@@ -35886,12 +35889,79 @@ index 0000000..9cf5e47
 +							port@0 {
 +							   reg = <0>;
 +							   ilumos_out0: endpoint {
++								  port-index = <0>;
++								  bus-width = <4>;
++								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++							   };
++							};
++						};
++					};
++#endif
++					microlynx_cam0: microlynx_b@51 {
++						 compatible = "exosens,microlynx";
++						 /* I2C device address */
++						 reg = <0x51>;
++						 status = "disabled";
++
++						 sensor_model = "microlynx";
++
++						 use_sensor_mode_id = "false";
++
++						 line-height = <128>;
++
++						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "60000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60000000"; /* 60 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++							   reg = <0>;
++							   microlynx_out0: endpoint {
 +#ifdef DSBOARD_ORNXS
 +								  port-index = <0>;
 +#else
 +								  port-index = <1>;
 +#endif
-+								  bus-width = <4>;
++								  bus-width = <2>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
 +							   };
 +							};
@@ -36472,6 +36542,71 @@ index 0000000..9cf5e47
 +							   ilumos_out1: endpoint {
 +								  port-index = <2>;
 +								  bus-width = <4>;
++								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++							   };
++							};
++						};
++					};
++					microlynx_cam1: microlynx_c@51 {
++						 compatible = "exosens,microlynx";
++						 /* I2C device address */
++						 reg = <0x51>;
++						 status = "disabled";
++
++						 sensor_model = "microlynx";
++
++						 use_sensor_mode_id = "false";
++
++						 line-height = <128>;
++
++						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "60000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60000000"; /* 60 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++							   reg = <0>;
++							   microlynx_out1: endpoint {
++								  port-index = <2>;
++								  bus-width = <2>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
 +							   };
 +							};

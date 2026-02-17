@@ -66,15 +66,17 @@ int parse_gencp_raw(u8 *buff, size_t buff_len, struct ring_buffer *rb)
 {
     static u8 last_byte = 0xAA;
     static int word_count = 0;
+    size_t i;
 
-    for (size_t i = 0; i < buff_len; i++){
-        if(buff[i] != last_byte) { // ignore the duplicates
+    for (i = 0; i < buff_len; i++){
+        if(buff[i] != last_byte) { /* ignore the duplicates */
+            int ret;
+
             word_count++;
-            // XOR the two byte to check if they are the inverse of eachother
+            /* XOR the two bytes to check if they are the inverse of each other */
             if((buff[i] ^ last_byte) == 0xff) {
                 if (word_count > 1) {
                     word_count = 0;
-                    int ret;
                     ret = rb_push(rb, last_byte);
                     PRINT_DEBUG("Parsed: 0x%x\n", last_byte);
                     if (ret < 0) return -1;

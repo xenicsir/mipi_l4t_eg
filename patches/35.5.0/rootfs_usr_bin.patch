@@ -1393,10 +1393,10 @@ index 0000000..3f65049
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..7cb60a5
+index 0000000..518f9a1
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
-@@ -0,0 +1,609 @@
+@@ -0,0 +1,610 @@
 +#!/bin/bash
 +#******************************************************************************
 +# eg_dt_camera_config_get.sh - Get Exosens camera configuration from device tree
@@ -1435,6 +1435,7 @@ index 0000000..7cb60a5
 +    "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
 +    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
 +    "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
++    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
 +)
 +
 +# Output mode
@@ -2008,10 +2009,10 @@ index 0000000..7cb60a5
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..ca67a6f
+index 0000000..417e2e9
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,131 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -2021,6 +2022,8 @@ index 0000000..ca67a6f
 +	[MicroCube]="EC_1_lane"
 +	[SmartIR640]="EC_2_lanes"
 +	[Crius1280]="EC_2_lanes"
++	[iLumos]="iLumos"
++	[ilumos]="iLumos"
 +)
 +
 +SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')
@@ -2043,7 +2046,7 @@ index 0000000..ca67a6f
 +	echo "  $(basename "$0")                                              # all ports with $DEFAULT_CAMERA"
 +	echo "  $(basename "$0") 0/Dione"
 +	echo "  $(basename "$0") 0/MicroCube 1/SmartIR640"
-+	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/Crius1280"
++	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/iLumos"
 +}
 +
 +if [[ "$1" == "-h" || "$1" == "--help" ]]; then

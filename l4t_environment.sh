@@ -369,6 +369,10 @@ Optional:
   -p, --package-version VERSION  Package version for delivery package
   -s, --standalone               Build standalone kernel with -eg suffix
                                    (auto per l4t_versions.json)
+  --archive-dir DIR              Archive directory relative to ROOT_DIR
+                                   (default: archives)
+  --delivery-dir DIR             Delivery directory relative to ROOT_DIR
+                                   (default: delivery)
   -h, --help                     Show this help message
 
 Supported L4T versions:
@@ -390,6 +394,8 @@ parse_l4t_args() {
     CARRIER_BOARD=""
     PACKAGE_VERSION=""
     STANDALONE_BUILD=0
+    ARCHIVE_DIR_ARG=""
+    DELIVERY_DIR_ARG=""
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -413,6 +419,14 @@ parse_l4t_args() {
             -s|--standalone)
                 STANDALONE_BUILD=1
                 shift
+                ;;
+            --archive-dir)
+                ARCHIVE_DIR_ARG="$2"
+                shift 2
+                ;;
+            --delivery-dir)
+                DELIVERY_DIR_ARG="$2"
+                shift 2
                 ;;
             -h|--help)
                 show_l4t_help
@@ -526,7 +540,10 @@ compute_derived_vars() {
 
     # Directory paths
     ROOT_DIR=$(pwd)
-    ARCHIVE_DIR=$ROOT_DIR/archives
+    ARCHIVE_DIR=${ARCHIVE_DIR_ARG:+$ROOT_DIR/$ARCHIVE_DIR_ARG}
+    ARCHIVE_DIR=${ARCHIVE_DIR:-$ROOT_DIR/archives}
+    DELIVERY_DIR=${DELIVERY_DIR_ARG:+$ROOT_DIR/$DELIVERY_DIR_ARG}
+    DELIVERY_DIR=${DELIVERY_DIR:-$ROOT_DIR/delivery}
 
     # Git information
     GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")

@@ -279,11 +279,14 @@ check_files_exist() {
 }
 
 # Auto-detect Exosens camera modules from patch files
-# Args: version, vendor
+# Args: version, vendor, [carrier]
 # Outputs module names (without .ko) to stdout, one per line
+# When carrier is specified, filters out built-in modules (CONFIG_*=y)
+# that don't produce .ko files
 get_eg_modules_from_patch() {
     local version="$1"
     local vendor="$2"
+    local carrier="${3:-}"
     local version_major=$(echo "$version" | awk -F '.' '{print $1}')
 
     # Compute extended version (same logic as l4t_environment.sh)
@@ -300,9 +303,60 @@ get_eg_modules_from_patch() {
         patch_file="$SCRIPT_DIR/patches/${version_extended}/source_public_kernel_nvidia_drivers_media_i2c.patch"
     fi
 
-    if [[ -f "$patch_file" ]]; then
-        grep '^+obj-' "$patch_file" | sed 's/.*+=//' | tr -d '[:blank:]' | sed 's/\.o$//' | sort -u
+    if [[ ! -f "$patch_file" ]]; then
+        return
     fi
+
+    # For L4T >= 36, obj-m is used directly (always a loadable module)
+    if [[ $version_major -ge 36 ]]; then
+        grep '^+obj-' "$patch_file" | sed 's/.*+=//' | tr -d '[:blank:]' | sed 's/\.o$//' | sort -u
+        return
+    fi
+
+    # For L4T < 36, lines use obj-$(CONFIG_*) - need to check config value
+    # to distinguish loadable modules (=m) from built-in (=y)
+    # Format: +obj-$(CONFIG_FOO) += module_name.o
+    local config_module_pairs
+    config_module_pairs=$(grep '^+obj-' "$patch_file" | \
+        sed -E 's/^\+obj-\$\(([^)]+)\)[[:space:]]*\+=[[:space:]]*/\1 /' | \
+        sed -E 's/\.o[[:space:]]*$//')
+
+    if [[ -z "$config_module_pairs" ]]; then
+        return
+    fi
+
+    # Try to find defconfig to filter out built-in modules
+    local defconfig_file=""
+    if [[ -n "$carrier" ]]; then
+        local defconfig_name=$(get_carrier_defconfig "$carrier")
+        if [[ -n "$defconfig_name" ]]; then
+            # Compute source directory path
+            local carrier_suffix=$(get_carrier_dir_suffix "$carrier")
+            local lft_dir
+            if [[ "$vendor" == "generic" ]]; then
+                lft_dir="Linux_for_Tegra"
+            elif [[ -n "$carrier_suffix" ]]; then
+                lft_dir="Linux_for_Tegra_${vendor}_${carrier_suffix}"
+            else
+                lft_dir="Linux_for_Tegra_${vendor}"
+            fi
+            # Look for defconfig in kernel source tree
+            defconfig_file=$(ls "$SCRIPT_DIR/$version/$lft_dir"/source/public/kernel/kernel-*/arch/arm64/configs/"$defconfig_name" 2>/dev/null | head -1)
+        fi
+    fi
+
+    # Output modules, filtering out built-in (=y) when defconfig is available
+    while IFS=' ' read -r config_var mod_name; do
+        [[ -z "$mod_name" ]] && continue
+        if [[ -n "$defconfig_file" ]]; then
+            local config_val=$(grep "^${config_var}=" "$defconfig_file" 2>/dev/null | head -1)
+            if [[ "$config_val" == *"=y" ]]; then
+                # Built-in module (linked into kernel Image), no .ko produced
+                continue
+            fi
+        fi
+        echo "$mod_name"
+    done <<< "$config_module_pairs" | sort -u
 }
 
 #******************************************************************************
@@ -440,8 +494,9 @@ verify_package() {
     local modules_dir="$package_dir/lib/modules"
 
     # Auto-detect Exosens camera modules from patch files
+    # Pass carrier to filter out built-in modules (CONFIG_*=y) that have no .ko
     local eg_modules
-    eg_modules=$(get_eg_modules_from_patch "$version" "$vendor")
+    eg_modules=$(get_eg_modules_from_patch "$version" "$vendor" "$carrier")
 
     if [[ $standalone_build -eq 1 ]]; then
         check_dir "$modules_dir/$kernel_version" "Kernel modules directory"

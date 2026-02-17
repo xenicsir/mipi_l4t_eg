@@ -34,13 +34,15 @@ static void _timer_callback (struct timer_list *t){
 #endif
 
 int nb_timers_init(int num_timers) {
+    int i;
+
     _timer_array_ptr = MEM_ALLOC(sizeof(struct timer_def) * num_timers);
     _timer_array_len = (size_t)num_timers;
 
     if (!_timer_array_ptr)
         return -1;
 
-    for(int i=0; i<num_timers; i++){
+    for(i=0; i<num_timers; i++){
         _timer_array_ptr->id = i;
         timer_setup(&_timer_array_ptr[i].timer, _timer_callback, 0);
     }
@@ -98,7 +100,9 @@ int nb_timer_delete(int timer_id) {
 }
 
 int nb_timer_delete_all (void) {
-    for (size_t i = 0; i < _timer_array_len;i++){
+    size_t i;
+
+    for (i = 0; i < _timer_array_len;i++){
         nb_timer_delete(i);
     }
     MEM_FREE(_timer_array_ptr);
