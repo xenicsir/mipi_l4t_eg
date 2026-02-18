@@ -1393,10 +1393,10 @@ index 0000000..3f65049
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..518f9a1
+index 0000000..a6a98a2
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
-@@ -0,0 +1,610 @@
+@@ -0,0 +1,620 @@
 +#!/bin/bash
 +#******************************************************************************
 +# eg_dt_camera_config_get.sh - Get Exosens camera configuration from device tree
@@ -1436,6 +1436,7 @@ index 0000000..518f9a1
 +    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
 +    "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
 +    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
++    "microlynx:51:microlynx_([a-h])@51:Microlynx:2"
 +)
 +
 +# Output mode
@@ -1615,6 +1616,7 @@ index 0000000..518f9a1
 +        local sysfs_path="/sys/bus/i2c/devices/${conn_i2c_bus}-00${conn_i2c_addr}"
 +        camera_model[$port_num]=$(cat "$sysfs_path/model" 2>/dev/null | tr -d '\n')
 +        camera_serial[$port_num]=$(cat "$sysfs_path/serial_number" 2>/dev/null | tr -d '\n')
++        camera_fwver[$port_num]=$(cat "$sysfs_path/firmware_version" 2>/dev/null | tr -d '\n')
 +
 +        # Read native resolution and pixel format from sysfs (preferred)
 +        camera_resolution[$port_num]=$(cat "$sysfs_path/resolution" 2>/dev/null | tr -d '\n')
@@ -1640,7 +1642,7 @@ index 0000000..518f9a1
 +            fi
 +        fi
 +
-+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]}" >&2
++        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]} fw=${camera_fwver[$port_num]}" >&2
 +
 +        # Match the configured camera type with the connected camera
 +        # Check if the display name matches OR if they're in the same category
@@ -1678,6 +1680,7 @@ index 0000000..518f9a1
 +    camera_i2c_chardev[$port_num]=""
 +    camera_model[$port_num]=""
 +    camera_serial[$port_num]=""
++    camera_fwver[$port_num]=""
 +    camera_resolution[$port_num]=""
 +    camera_pixfmt[$port_num]=""
 +    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num (letter: $port_letter): not connected" >&2
@@ -1902,6 +1905,7 @@ index 0000000..518f9a1
 +declare -A camera_i2c_chardev
 +declare -A camera_model
 +declare -A camera_serial
++declare -A camera_fwver
 +declare -A camera_resolution
 +declare -A camera_pixfmt
 +for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
@@ -1932,6 +1936,7 @@ index 0000000..518f9a1
 +        i2c_dev="${camera_i2c_chardev[$port]}"
 +        model="${camera_model[$port]}"
 +        serial="${camera_serial[$port]}"
++        fwver="${camera_fwver[$port]}"
 +        resolution="${camera_resolution[$port]}"
 +        pixfmt="${camera_pixfmt[$port]}"
 +
@@ -1949,6 +1954,9 @@ index 0000000..518f9a1
 +        fi
 +        if [[ -n "$serial" ]]; then
 +            echo -n ", \"serial_number\": \"$serial\""
++        fi
++        if [[ -n "$fwver" ]]; then
++            echo -n ", \"firmware_version\": \"$fwver\""
 +        fi
 +        if [[ -n "$resolution" ]]; then
 +            echo -n ", \"width/height\": \"$resolution\""
@@ -1981,6 +1989,7 @@ index 0000000..518f9a1
 +            i2c_dev="${camera_i2c_chardev[$port]}"
 +            model="${camera_model[$port]}"
 +            serial="${camera_serial[$port]}"
++            fwver="${camera_fwver[$port]}"
 +            resolution="${camera_resolution[$port]}"
 +            pixfmt="${camera_pixfmt[$port]}"
 +
@@ -1997,6 +2006,7 @@ index 0000000..518f9a1
 +                [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
 +                [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
 +                [[ -n "$serial" ]] && echo "    Serial:       $serial"
++                [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
 +                [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
 +                [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
 +            fi
@@ -2009,10 +2019,10 @@ index 0000000..518f9a1
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..417e2e9
+index 0000000..9848d12
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,153 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -2024,6 +2034,14 @@ index 0000000..417e2e9
 +	[Crius1280]="EC_2_lanes"
 +	[iLumos]="iLumos"
 +	[ilumos]="iLumos"
++	[Microlynx]="Microlynx"
++	[microlynx]="Microlynx"
++)
++
++# Cameras requiring x4 MIPI lanes
++declare -A CAMERA_X4=(
++	[iLumos]=1
++	[ilumos]=1
 +)
 +
 +SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')
@@ -2114,6 +2132,20 @@ index 0000000..417e2e9
 +		echo "Error: unknown camera type '$camera_type' (from argument '$arg')."
 +		echo "Supported cameras: $SUPPORTED_CAMERAS"
 +		exit 1
++	fi
++
++	# x4 cameras on port 0 require proper CSI0_CLK routing (Forecr boards only)
++	if [[ -n "${CAMERA_X4[$camera_type]+x}" ]] && [[ "$port_number" -eq 0 ]]; then
++		case "$BOARD" in
++			dsboard-*|milboard-*|raiboard-*)
++				;; # Forecr boards support x4 on port 0 (CSI0_CLK correctly routed)
++			*)
++				echo "Error: $camera_type requires 4 MIPI lanes (x4) which is not supported on port 0 of $BOARD."
++				echo "On Nvidia devkit, CAM0 (J20) has a lane swap and uses CSI1_CLK, limiting it to x2."
++				echo "Use port 1 (CAM1/J21) which supports x4 via CSI2_CLK."
++				exit 1
++				;;
++		esac
 +	fi
 +
 +	lanes="${CAMERA_LANES[$camera_type]}"

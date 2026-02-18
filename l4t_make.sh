@@ -28,6 +28,8 @@
 #   -j, --jobs N                Run N configurations in parallel (default=0=auto)
 #   -p, --package-version VER   Package version for delivery (passed to gen-package)
 #   -s, --standalone            Force standalone build
+#   --archive-dir DIR           Archive directory for BSP downloads (passed to prepare)
+#   --delivery-dir DIR          Delivery directory for packages (passed to gen-package)
 #
 # Other:
 #   --list                      List all matching configurations and exit
@@ -58,6 +60,8 @@ VENDOR_FILTER=""
 CARRIER_FILTER=""
 PACKAGE_VERSION=""
 STANDALONE_OPT=""
+ARCHIVE_DIR_OPT=""
+DELIVERY_DIR_OPT=""
 
 DO_PREPARE=0
 DO_COPY_SOURCES=0
@@ -121,6 +125,14 @@ while [[ $# -gt 0 ]]; do
         -s|--standalone)
             STANDALONE_OPT="-s"
             shift
+            ;;
+        --archive-dir)
+            ARCHIVE_DIR_OPT="--archive-dir $2"
+            shift 2
+            ;;
+        --delivery-dir)
+            DELIVERY_DIR_OPT="--delivery-dir $2"
+            shift 2
             ;;
         --prepare)
             DO_PREPARE=1
@@ -260,6 +272,8 @@ echo "Configurations: $config_count"
 echo "Steps: $steps"
 [[ $FROM_SCRATCH -eq 1 ]] && echo "From scratch: yes (will delete existing build directories)"
 [[ $PARALLEL_JOBS -gt 1 ]] && echo "Parallel jobs: $PARALLEL_JOBS"
+[[ -n "$ARCHIVE_DIR_OPT" ]] && echo "Archive dir: ${ARCHIVE_DIR_OPT#--archive-dir }"
+[[ -n "$DELIVERY_DIR_OPT" ]] && echo "Delivery dir: ${DELIVERY_DIR_OPT#--delivery-dir }"
 [[ $DRY_RUN -eq 1 ]] && echo -e "${YELLOW}Mode: DRY RUN (no commands executed)${NC}"
 echo ""
 
@@ -291,7 +305,7 @@ run_config() {
     fi
 
     parse_config "$config"
-    local base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT")
+    local base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT)
     local config_failed=0
 
     # Handle --from-scratch
@@ -439,7 +453,7 @@ echo ""
 if [[ $DRY_RUN -eq 1 ]]; then
     for config in $configs; do
         parse_config "$config"
-        base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT")
+        base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT)
         echo -e "${CYAN}$CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER:${NC}"
         [[ $DO_PREPARE -eq 1 ]] && echo -e "    ${BLUE}[prepare]${NC} l4t_prepare.sh $base_args"
         [[ $DO_COPY_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[copy-sources]${NC} l4t_copy_sources.sh $base_args"

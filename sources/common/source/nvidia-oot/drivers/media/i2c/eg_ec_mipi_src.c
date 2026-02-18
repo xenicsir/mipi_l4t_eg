@@ -24,6 +24,7 @@
 #define ENGINECORE_REG_WIDTH		0x0180
 #define ENGINECORE_REG_HEIGHT		0x0184
 #define ENGINECORE_REG_PIXEL_FORMAT	0x0260
+#define ENGINECORE_REG_FIRMWARE_VERSION	0x00A0
 
 int eg_ec_chnod_open (struct inode * pInode, struct file * file);
 int eg_ec_chnod_release (struct inode * pInode, struct file * file);
@@ -90,6 +91,7 @@ struct eg_ec_mipi {
 	u32				native_width;
 	u32				native_height;
 	char				pixel_format[48];
+	char				firmware_version[16];
 };
 
 struct eg_ec_i2c_client {
@@ -646,6 +648,16 @@ static ssize_t pixel_format_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(pixel_format);
 
+static ssize_t firmware_version_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->firmware_version);
+}
+static DEVICE_ATTR_RO(firmware_version);
+
 static const char *eg_ec_pixel_format_name(u32 code)
 {
 	switch (code) {
@@ -767,11 +779,24 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 			dev_warn(dev, "failed to read pixel format\n");
 		}
 
-		dev_info(dev, "camera: %s, serial: %s, resolution: %ux%u, format: %s\n",
+		{
+			uint32_t fw_version = 0;
+			err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_FIRMWARE_VERSION,
+						  (uint8_t *)&fw_version, 4);
+			if (!err)
+				snprintf(priv->firmware_version,
+					 sizeof(priv->firmware_version),
+					 "0x%08x", fw_version);
+			else
+				dev_warn(dev, "failed to read firmware version\n");
+		}
+
+		dev_info(dev, "camera: %s, serial: %s, resolution: %ux%u, format: %s, fw: %s\n",
 			 priv->model[0] ? priv->model : "N/A",
 			 priv->serial_number[0] ? priv->serial_number : "N/A",
 			 priv->native_width, priv->native_height,
-			 priv->pixel_format[0] ? priv->pixel_format : "N/A");
+			 priv->pixel_format[0] ? priv->pixel_format : "N/A",
+			 priv->firmware_version[0] ? priv->firmware_version : "N/A");
 
 		/* Check MIPI lane consistency between camera and device tree */
 		{
@@ -834,6 +859,7 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
 	device_create_file(dev, &dev_attr_serial_number);
 	device_create_file(dev, &dev_attr_resolution);
 	device_create_file(dev, &dev_attr_pixel_format);
+	device_create_file(dev, &dev_attr_firmware_version);
 
 	dev_info(dev, "Registered %s device\n", i2c_clients[i].chnod_name);
 	return 0;
@@ -879,6 +905,7 @@ static void eg_ec_mipi_remove(struct i2c_client *client)
 		}
 	}
 
+	device_remove_file(dev, &dev_attr_firmware_version);
 	device_remove_file(dev, &dev_attr_pixel_format);
 	device_remove_file(dev, &dev_attr_resolution);
 	device_remove_file(dev, &dev_attr_serial_number);

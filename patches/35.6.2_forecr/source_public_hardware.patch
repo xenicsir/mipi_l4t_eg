@@ -36073,10 +36073,10 @@ index 0000000..25b8e82
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..9cf5e47
+index 0000000..c9a8b96
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,1543 @@
+@@ -0,0 +1,1676 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -36899,6 +36899,7 @@ index 0000000..9cf5e47
 +							};
 +						};
 +					};
++#ifdef DSBOARD_ORNXS
 +					ilumos_cam0: ilumos_b@30 {
 +						 compatible = "exosens,ilumos";
 +						 /* I2C device address */
@@ -36996,12 +36997,79 @@ index 0000000..9cf5e47
 +							port@0 {
 +							   reg = <0>;
 +							   ilumos_out0: endpoint {
++								  port-index = <0>;
++								  bus-width = <4>;
++								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++							   };
++							};
++						};
++					};
++#endif
++					microlynx_cam0: microlynx_b@51 {
++						 compatible = "exosens,microlynx";
++						 /* I2C device address */
++						 reg = <0x51>;
++						 status = "disabled";
++
++						 sensor_model = "microlynx";
++
++						 use_sensor_mode_id = "false";
++
++						 line-height = <128>;
++
++						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "60000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60000000"; /* 60 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++							   reg = <0>;
++							   microlynx_out0: endpoint {
 +#ifdef DSBOARD_ORNXS
 +								  port-index = <0>;
 +#else
 +								  port-index = <1>;
 +#endif
-+								  bus-width = <4>;
++								  bus-width = <2>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
 +							   };
 +							};
@@ -37582,6 +37650,71 @@ index 0000000..9cf5e47
 +							   ilumos_out1: endpoint {
 +								  port-index = <2>;
 +								  bus-width = <4>;
++								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++							   };
++							};
++						};
++					};
++					microlynx_cam1: microlynx_c@51 {
++						 compatible = "exosens,microlynx";
++						 /* I2C device address */
++						 reg = <0x51>;
++						 status = "disabled";
++
++						 sensor_model = "microlynx";
++
++						 use_sensor_mode_id = "false";
++
++						 line-height = <128>;
++
++						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "60000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60000000"; /* 60 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++							   reg = <0>;
++							   microlynx_out1: endpoint {
++								  port-index = <2>;
++								  bus-width = <2>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
 +							   };
 +							};
@@ -38188,6 +38321,71 @@ index 0000000..d78b4da
 +	};
 +
 +};
+diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts
+new file mode 100644
+index 0000000..f3a86df
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts
+@@ -0,0 +1,59 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-common/jetson/tegra234-p3767-0000-common.h>
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:Microlynx";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++
++	fragment@00 {
++		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out0>;
++		};
++	};
++
++   // Disable Dione cameras
++	fragment@2 {
++		target-path = "/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@3 {
++		target-path = "/cam_i2cmux/i2c@0/microlynx_b@51";
++		__overlay__ {
++         status = "okay";
++		};
++	};
++
++	fragment@6 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++			devname = "microlynx 8-0051";
++			proc-device-tree = "/proc/device-tree/i2c@31e0000/microlynx_b@51";
++		};
++	};
++
++	fragment@7 {
++		target-path = "/tegra-camera-platform/modules/module0";
++		__overlay__ {
++			badge = "jakku_front_RBPCV3";
++		};
++	};
++
++};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
 new file mode 100644
 index 0000000..65f62dd
@@ -38626,6 +38824,71 @@ index 0000000..db5a242
 +		target-path = "/tegra-camera-platform/modules/module1";
 +		__overlay__ {
 +			badge = "jakku_rear_RBPCV3";
++		};
++	};
++
++};
+diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts
+new file mode 100644
+index 0000000..c526807
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts
+@@ -0,0 +1,59 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-common/jetson/tegra234-p3767-0000-common.h>
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:Microlynx";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out1>;
++		};
++	};
++
++   // Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@31 {
++		target-path = "/cam_i2cmux/i2c@1/microlynx_c@51";
++		__overlay__ {
++         status = "okay";
++		};
++	};
++
++	fragment@32 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++			proc-device-tree = "/proc/device-tree/i2c@31e0000/microlynx_c@51";
++		};
++	};
++
++	fragment@33 {
++		target-path = "/tegra-camera-platform/modules/module1";
++		__overlay__ {
++			badge = "jakku_rear_RBP194";
 +		};
 +	};
 +

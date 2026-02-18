@@ -217,6 +217,7 @@ check_camera_connected() {
         local sysfs_path="/sys/bus/i2c/devices/${conn_i2c_bus}-00${conn_i2c_addr}"
         camera_model[$port_num]=$(cat "$sysfs_path/model" 2>/dev/null | tr -d '\n')
         camera_serial[$port_num]=$(cat "$sysfs_path/serial_number" 2>/dev/null | tr -d '\n')
+        camera_fwver[$port_num]=$(cat "$sysfs_path/firmware_version" 2>/dev/null | tr -d '\n')
 
         # Read native resolution and pixel format from sysfs (preferred)
         camera_resolution[$port_num]=$(cat "$sysfs_path/resolution" 2>/dev/null | tr -d '\n')
@@ -242,7 +243,7 @@ check_camera_connected() {
             fi
         fi
 
-        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]}" >&2
+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]} fw=${camera_fwver[$port_num]}" >&2
 
         # Match the configured camera type with the connected camera
         # Check if the display name matches OR if they're in the same category
@@ -280,6 +281,7 @@ check_camera_connected() {
     camera_i2c_chardev[$port_num]=""
     camera_model[$port_num]=""
     camera_serial[$port_num]=""
+    camera_fwver[$port_num]=""
     camera_resolution[$port_num]=""
     camera_pixfmt[$port_num]=""
     [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num (letter: $port_letter): not connected" >&2
@@ -504,6 +506,7 @@ declare -A camera_video_dev
 declare -A camera_i2c_chardev
 declare -A camera_model
 declare -A camera_serial
+declare -A camera_fwver
 declare -A camera_resolution
 declare -A camera_pixfmt
 for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
@@ -534,6 +537,7 @@ if [[ $JSON_OUTPUT -eq 1 ]]; then
         i2c_dev="${camera_i2c_chardev[$port]}"
         model="${camera_model[$port]}"
         serial="${camera_serial[$port]}"
+        fwver="${camera_fwver[$port]}"
         resolution="${camera_resolution[$port]}"
         pixfmt="${camera_pixfmt[$port]}"
 
@@ -551,6 +555,9 @@ if [[ $JSON_OUTPUT -eq 1 ]]; then
         fi
         if [[ -n "$serial" ]]; then
             echo -n ", \"serial_number\": \"$serial\""
+        fi
+        if [[ -n "$fwver" ]]; then
+            echo -n ", \"firmware_version\": \"$fwver\""
         fi
         if [[ -n "$resolution" ]]; then
             echo -n ", \"width/height\": \"$resolution\""
@@ -583,6 +590,7 @@ else
             i2c_dev="${camera_i2c_chardev[$port]}"
             model="${camera_model[$port]}"
             serial="${camera_serial[$port]}"
+            fwver="${camera_fwver[$port]}"
             resolution="${camera_resolution[$port]}"
             pixfmt="${camera_pixfmt[$port]}"
 
@@ -599,6 +607,7 @@ else
                 [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
                 [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
                 [[ -n "$serial" ]] && echo "    Serial:       $serial"
+                [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
                 [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
                 [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
             fi

@@ -8,7 +8,7 @@
 
 #define LOG_INFO
 // #define LOG_DEBUG
-#define LOG_ERROR
+// #define LOG_ERROR
 
 #ifndef PREFIX
     #define PREFIX "liblogger"

@@ -131,6 +131,13 @@ else
 	run_build_step "Installing kernel..." \
 		sudo -E make install -C kernel
 	##export IGNORE_PREEMPT_RT_PRESENCE=1
+	# Fix ownership on nvidia-oot source directories before building modules.
+	# For out-of-tree builds, the compiler writes .o.d dependency files directly
+	# into the source directories. Directories created by sudo (via patch or copy)
+	# may be root-owned, causing "Permission denied" when creating .o.d files.
+	if [[ -d "$L4T_SRC/nvidia-oot" ]]; then
+		sudo chown -R "$USER:$(id -gn)" "$L4T_SRC/nvidia-oot"
+	fi
 	run_build_step "Building kernel modules..." \
 		make modules
 	run_build_step "Installing modules..." \

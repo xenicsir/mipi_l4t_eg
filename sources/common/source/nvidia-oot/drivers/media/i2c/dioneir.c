@@ -196,6 +196,7 @@ struct dione_ir {
 
 	char				model[64];
 	char				serial_number[64];
+	char				firmware_version[64];
 	u32				native_width;
 	u32				native_height;
 };
@@ -1603,6 +1604,8 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
 
 	for (i = sizeof(buf) - 1; i >= 0 && buf[i] == 0xff; i--)
 		buf[i] = '\0';
+	strncpy(priv->firmware_version, buf, sizeof(priv->firmware_version) - 1);
+	priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
 
 	/* Read model name */
 	ret = dione_ir_i2c_read(priv->fpga_client, DIONE_IR_REG_MODEL_NAME,
@@ -1856,6 +1859,16 @@ static ssize_t pixel_format_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(pixel_format);
 
+static ssize_t firmware_version_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct camera_common_data *s_data = to_camera_common_data(dev);
+	struct dione_ir *priv = (struct dione_ir *)s_data->priv;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", priv->firmware_version);
+}
+static DEVICE_ATTR_RO(firmware_version);
+
 #ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
 static ssize_t restart_mipi_store(struct device *dev,
 				  struct device_attribute *attr,
@@ -1995,6 +2008,7 @@ static int dione_ir_probe(struct i2c_client *client,
 	device_create_file(dev, &dev_attr_serial_number);
 	device_create_file(dev, &dev_attr_resolution);
 	device_create_file(dev, &dev_attr_pixel_format);
+	device_create_file(dev, &dev_attr_firmware_version);
 #ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
 	device_create_file(dev, &dev_attr_restart_mipi);
 #endif
@@ -2036,6 +2050,7 @@ static void dione_ir_remove(struct i2c_client *client)
 #ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
 	device_remove_file(dev, &dev_attr_restart_mipi);
 #endif
+	device_remove_file(dev, &dev_attr_firmware_version);
 	device_remove_file(dev, &dev_attr_pixel_format);
 	device_remove_file(dev, &dev_attr_resolution);
 	device_remove_file(dev, &dev_attr_serial_number);

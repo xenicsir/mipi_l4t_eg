@@ -83,7 +83,7 @@ _l4t_common_completion() {
             ;;
         l4t_make.sh)
             # l4t_make.sh master orchestration script
-            extra_opts="-p --package-version -s --standalone --prepare --copy-sources --patch-sources --build --gen-package --from-scratch --abort-on-error --continue-on-error --dry-run --list"
+            extra_opts="-p --package-version -s --standalone --archive-dir --delivery-dir --prepare --copy-sources --patch-sources --build --gen-package --from-scratch --abort-on-error --continue-on-error --dry-run --list"
             ;;
     esac
 

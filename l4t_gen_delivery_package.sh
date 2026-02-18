@@ -415,13 +415,11 @@ if [[ $? -eq 0 ]]; then
    echo "Package generated: ${DEB_PACKAGE}"
    echo "============================================"
 
-   # Copy to delivery directory if it exists
-   if [[ -d "$DELIVERY_DIR" ]]; then
-      DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${DEB_VERSION}"
-      mkdir -p "$DELIVERY_SUBDIR"
-      cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
-      echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"
-   fi
+   # Copy to delivery directory
+   DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${DEB_VERSION}"
+   mkdir -p "$DELIVERY_SUBDIR"
+   cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
+   echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"
 else
    echo ""
    echo "Error: Package generation failed"

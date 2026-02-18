@@ -306,7 +306,7 @@ The script detects physically connected cameras using the **sysfs I2C subsystem*
 ```bash
 # The script scans /sys/bus/i2c/devices/ for known camera I2C addresses
 $ ls /sys/bus/i2c/devices/9-000e/
-driver/  model  serial_number  resolution  pixel_format  of_node  ...
+driver/  model  serial_number  firmware_version  resolution  pixel_format  of_node  ...
 
 $ cat /sys/bus/i2c/devices/9-000e/model
 Dione 640
@@ -319,6 +319,7 @@ Dione 640
 4. Read camera details from driver sysfs attributes:
    - `model` - Camera model name (e.g., "MicroCube", "Dione 1280")
    - `serial_number` - Camera serial number
+   - `firmware_version` - Firmware/FPGA version (e.g., "0x01020304")
    - `resolution` - Native resolution (e.g., "640x480", "1280x1024")
    - `pixel_format` - Native pixel format (e.g., "'AR24' (32-bit BGRA 8-8-8-8)")
 5. Find corresponding `/dev/videoN` and `/dev/<driver>-*` devices
@@ -793,6 +794,7 @@ If camera types are incorrect:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.3 | 2026-02-18 | Add firmware_version sysfs attribute display (human-readable and JSON) |
 | 2.2 | 2026-02-12 | Read camera details from driver sysfs (model, serial, resolution, pixel format), color-coded connection status, display actual model name from sysfs instead of DT type name, sysfs-first resolution/pixel format with v4l2-ctl fallback, JSON output includes camera details |
 | 2.1 | 2026-02-03 | Added connection detection: distinguishes configured vs physically connected cameras using V4L2 |
 | 2.0 | 2026-02-03 | Complete rewrite: auto-discovery, generic board support, JSON output, uses detect_jetson_board.sh |
