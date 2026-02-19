@@ -25,6 +25,9 @@ obj-m += dione_ir.o
 dione_ir-y += dioneir.o tc358746_calculation.o
 eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 obj-m += eg-ec-mipi.o
+obj-m += ilumos.o
+microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
+obj-m += microlynx.o
 
 endif
 

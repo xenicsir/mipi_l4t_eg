@@ -262,9 +262,62 @@ else
 fi
 
 #******************************************************************************
-# Step 6: Create post-install script
+# Step 6: Create pre-install script
 #******************************************************************************
 update_status "Creating install scripts..."
+
+# The package's /etc/version_eg_cams is not yet on disk when preinst runs
+# (dpkg unpacks files only after preinst succeeds), so we embed its content
+# verbatim here at build time. The L4T version is then extracted from it to
+# compare against the running system's /etc/nv_tegra_release.
+cat > /tmp/preinst << 'EOT'
+#!/bin/bash
+set -e
+EOT
+
+# Embed the exact same string that Step 3 writes to /etc/version_eg_cams
+cat >> /tmp/preinst << EOT
+PACKAGE_VERSION_LINE="jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT_COMMIT})"
+EOT
+
+cat >> /tmp/preinst << 'EOT'
+
+case "$1" in
+    install|upgrade)
+        # Extract the L4T version from the embedded version_eg_cams string:
+        # "jetson-l4t-35.6.2_eg ..." -> "35.6.2"
+        EXPECTED_L4T=$(echo "$PACKAGE_VERSION_LINE" | sed 's/^jetson-l4t-\([^_]*\)_.*/\1/')
+
+        if [[ ! -f /etc/nv_tegra_release ]]; then
+            echo "Error: /etc/nv_tegra_release not found." >&2
+            echo "This package requires NVIDIA Jetson Linux (L4T) ${EXPECTED_L4T}." >&2
+            exit 1
+        fi
+
+        NV_MAJOR=$(sed -n 's/.*# R\([0-9]*\) .*/\1/p' /etc/nv_tegra_release | head -1)
+        NV_REVISION=$(sed -n 's/.*REVISION: \([0-9.]*\).*/\1/p' /etc/nv_tegra_release | head -1)
+
+        if [[ -z "$NV_MAJOR" || -z "$NV_REVISION" ]]; then
+            echo "Error: Could not parse L4T version from /etc/nv_tegra_release." >&2
+            exit 1
+        fi
+
+        RUNNING_L4T="${NV_MAJOR}.${NV_REVISION}"
+
+        if [[ "$RUNNING_L4T" != "$EXPECTED_L4T" ]]; then
+            echo "Error: Incompatible L4T version." >&2
+            echo "  This package was built for L4T ${EXPECTED_L4T}." >&2
+            echo "  Running system: L4T ${RUNNING_L4T}" >&2
+            echo "  Install the package matching your L4T version." >&2
+            exit 1
+        fi
+        ;;
+esac
+EOT
+
+#******************************************************************************
+# Step 7: Create post-install script
+#******************************************************************************
 cat > /tmp/postinst << 'EOT'
 #!/bin/bash
 depmod
@@ -369,7 +422,7 @@ fi
 EOT
 
 #******************************************************************************
-# Step 7: Create post-remove script
+# Step 8: Create post-remove script
 #******************************************************************************
 cat > /tmp/postrm << 'EOT'
 #!/bin/bash
@@ -377,7 +430,7 @@ depmod
 EOT
 
 #******************************************************************************
-# Step 8: Build Debian package with fpm
+# Step 9: Build Debian package with fpm
 #******************************************************************************
 update_status "Building Debian package..."
 
@@ -404,6 +457,7 @@ fpm -v ${DEB_VERSION} \
    -s dir \
    -t deb \
    -n ${PACKAGE_NAME} \
+   --before-install /tmp/preinst \
    --after-install /tmp/postinst \
    --after-remove /tmp/postrm \
    --description "Exosens MIPI camera drivers for NVIDIA Jetson (L4T ${L4T_VERSION_EXTENDED})" \
@@ -427,7 +481,7 @@ else
 fi
 
 #******************************************************************************
-# Step 9: Verify generated package
+# Step 10: Verify generated package
 #******************************************************************************
 update_status "Verifying package..."
 

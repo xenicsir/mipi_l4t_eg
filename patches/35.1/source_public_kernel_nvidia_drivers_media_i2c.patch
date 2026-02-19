@@ -1,10 +1,10 @@
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/Kconfig b/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
 old mode 100644
 new mode 100755
-index 8362bc8..f25cbd3
+index 8362bc8..62a6849
 --- a/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
-@@ -184,6 +184,23 @@ config NV_VIDEO_AR0234
+@@ -184,6 +184,42 @@ config NV_VIDEO_AR0234
  	  To compile this driver as a module, choose M here: the module
  	  will be called ar0234.
  
@@ -25,14 +25,33 @@ index 8362bc8..f25cbd3
 +		This driver supports DIONE (640/1280/320/1024) infra camera sensors from Xenics.
 +		To compile this driver as a module, choose M here: the
 +		module will be called dione_ir.
++
++config VIDEO_ILUMOS
++	tristate "iLumos MIPI camera support"
++	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
++	select V4L2_FWNODE
++	help
++		This driver supports iLumos camera from Exosens.
++		To compile this driver as a module, choose M here: the
++		module will be called ilumos.
++
++config VIDEO_MICROLYNX
++	tristate "Microlynx MIPI camera support"
++	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
++	select V4L2_FWNODE
++	help
++		This driver supports Microlynx camera from Exosens.
++		To compile this driver as a module, choose M here: the
++		module will be called microlynx.
++
  endmenu
  
  endif
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/Makefile b/source/public/kernel/nvidia/drivers/media/i2c/Makefile
-index af6122b..3b14f31 100644
+index af6122b..5d1e7af 100644
 --- a/source/public/kernel/nvidia/drivers/media/i2c/Makefile
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/Makefile
-@@ -23,3 +23,7 @@ obj-$(CONFIG_I2C_IOEXPANDER_DESER_MAX9296) += max9296.o
+@@ -23,3 +23,16 @@ obj-$(CONFIG_I2C_IOEXPANDER_DESER_MAX9296) += max9296.o
  obj-$(CONFIG_NV_VIDEO_IMX390) += nv_imx390.o
  obj-$(CONFIG_NV_VIDEO_AR0234) += nv_ar0234.o
  obj-$(CONFIG_NV_DESER_MAX96712) += max96712.o
@@ -40,6 +59,15 @@ index af6122b..3b14f31 100644
 +obj-$(CONFIG_VIDEO_EG_EC_MIPI)	+= eg-ec-mipi.o
 +obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 +dione_ir-y += dioneir.o tc358746_calculation.o
++obj-$(CONFIG_VIDEO_ILUMOS) += ilumos.o
++microlynx-objs := \
++    microlynx_core.o \
++    gencp-over-i2c/libunio.o \
++    gencp-over-i2c/libunio_extras.o \
++    gencp-over-i2c/nb_timer.o \
++    gencp-over-i2c/gencp_common.o \
++    gencp-over-i2c/gencp_client.o
++obj-$(CONFIG_VIDEO_MICROLYNX) += microlynx.o
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c b/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c
 new file mode 100755
 index 0000000..a87daf3

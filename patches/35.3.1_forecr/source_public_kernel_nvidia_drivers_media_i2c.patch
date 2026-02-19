@@ -1,7 +1,7 @@
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/Kconfig b/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
 old mode 100644
 new mode 100755
-index 0592973..544a22e
+index 0592973..ef8cc16
 --- a/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
 @@ -13,6 +13,15 @@ config NV_VIDEO_IMX185
@@ -20,7 +20,7 @@ index 0592973..544a22e
  config NV_VIDEO_IMX477
          tristate "IMX477 camera sensor support"
  	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-@@ -193,6 +202,24 @@ config NV_VIDEO_AR0234
+@@ -193,6 +202,42 @@ config NV_VIDEO_AR0234
  	  To compile this driver as a module, choose M here: the module
  	  will be called ar0234.
  
@@ -42,11 +42,29 @@ index 0592973..544a22e
 +		To compile this driver as a module, choose M here: the
 +		module will be called dione_ir.
 +
++config VIDEO_ILUMOS
++	tristate "iLumos MIPI camera support"
++	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
++	select V4L2_FWNODE
++	help
++		This driver supports iLumos camera from Exosens.
++		To compile this driver as a module, choose M here: the
++		module will be called ilumos.
++
++config VIDEO_MICROLYNX
++	tristate "Microlynx MIPI camera support"
++	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
++	select V4L2_FWNODE
++	help
++		This driver supports Microlynx camera from Exosens.
++		To compile this driver as a module, choose M here: the
++		module will be called microlynx.
++
  config NV_VIDEO_HAWK_OWL
  	tristate "Hawk & Owl camera sensor support"
  	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/Makefile b/source/public/kernel/nvidia/drivers/media/i2c/Makefile
-index f8f6c3b..e59dce3 100644
+index f8f6c3b..c16081e 100644
 --- a/source/public/kernel/nvidia/drivers/media/i2c/Makefile
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/Makefile
 @@ -5,6 +5,7 @@ ccflags-y += -I$(srctree)/drivers/video/tegra/camera
@@ -57,7 +75,7 @@ index f8f6c3b..e59dce3 100644
  obj-$(CONFIG_NV_VIDEO_IMX477) += nv_imx477.o
  obj-$(CONFIG_NV_VIDEO_IMX219) += nv_imx219.o
  obj-$(CONFIG_NV_VIDEO_IMX268) += nv_imx268.o
-@@ -26,3 +27,7 @@ obj-$(CONFIG_NV_VIDEO_HAWK_OWL) += nv_hawk_owl.o
+@@ -26,3 +27,16 @@ obj-$(CONFIG_NV_VIDEO_HAWK_OWL) += nv_hawk_owl.o
  obj-$(CONFIG_NV_DESER_MAX96712) += max96712.o
  obj-$(CONFIG_VIDEO_ECAM) += ar1335.o
  ar1335-objs :=  ar1335_common.o
@@ -65,6 +83,15 @@ index f8f6c3b..e59dce3 100644
 +obj-$(CONFIG_VIDEO_EG_EC_MIPI)	+= eg-ec-mipi.o
 +obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 +dione_ir-y += dioneir.o tc358746_calculation.o
++obj-$(CONFIG_VIDEO_ILUMOS) += ilumos.o
++microlynx-objs := \
++    microlynx_core.o \
++    gencp-over-i2c/libunio.o \
++    gencp-over-i2c/libunio_extras.o \
++    gencp-over-i2c/nb_timer.o \
++    gencp-over-i2c/gencp_common.o \
++    gencp-over-i2c/gencp_client.o
++obj-$(CONFIG_VIDEO_MICROLYNX) += microlynx.o
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c b/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c
 new file mode 100755
 index 0000000..a87daf3

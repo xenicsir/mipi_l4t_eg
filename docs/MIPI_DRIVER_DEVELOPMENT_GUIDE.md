@@ -299,7 +299,41 @@ Only modify `Linux_for_Tegra/` (generic). The vendor Makefile entries will be me
 
 If the driver is not already in the target version's Makefile, add it (see [Scenario A Step 2](#step-2-driver-build-integration-per-version)).
 
-### Step 6: Regenerate patches
+### Step 6: Update Kconfig and defconfig (L4T 32+/35.x only)
+
+This step is required for in-tree kernel builds (32+/35.x). For 36.x (out-of-tree `nvidia-oot`), skip it.
+
+**Kconfig** — add the `config VIDEO_<CAMERA>` entry in:
+```
+sources/<version>/Linux_for_Tegra/source/public/kernel/nvidia/drivers/media/i2c/Kconfig
+```
+Insert after the `config VIDEO_DIONE_IR` block:
+```kconfig
+config VIDEO_<CAMERA>
+	tristate "<Camera> MIPI camera support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+		This driver supports <Camera> from Exosens.
+		To compile this driver as a module, choose M here: the
+		module will be called <camera>.
+```
+
+**defconfig** — enable the module in:
+```
+sources/<version>/Linux_for_Tegra/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
+```
+Add after `CONFIG_VIDEO_EG_EC_MIPI=m`:
+```
+CONFIG_VIDEO_<CAMERA>=m
+```
+
+Also add to all vendor defconfigs in `Linux_for_Tegra_<vendor>/source/public/kernel/kernel-5.10/arch/arm64/configs/`:
+```
+CONFIG_VIDEO_<CAMERA>=m
+```
+
+### Step 7: Regenerate patches
 
 ```bash
 ./l4t_copy_sources.sh -v <target_version>

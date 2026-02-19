@@ -29,6 +29,7 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
 - [Shell completion](#shell-completion)
 - [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
 - [Appendix B: Adding a new camera type](#appendix-b-adding-a-new-camera-type)
+- [Appendix C: Supported cameras — MIPI lanes and video formats](#appendix-c-supported-cameras--mipi-lanes-and-video-formats)
 
 ---
 
@@ -519,6 +520,96 @@ This appendix provides a summary of the files involved. For detailed step-by-ste
 The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
 
 After modifying all files, regenerate patches with `./l4t_copy_sources.sh` for each supported version.
+
+---
+
+## Appendix C: Supported cameras — MIPI lanes and video formats
+
+### Summary table
+
+| Camera | Driver | MIPI Lanes 
+|--------|--------|:----------:|
+| EngineCore (EC) | `eg-ec-mipi` | 1 or 2 |
+| Dione IR | `dioneir` | 2 |
+| iLumos | `ilumos` | 4 |
+| Microlynx | `microlynx` | 2 |
+
+---
+
+### EngineCore (EC)
+
+**Driver:** `eg-ec-mipi`
+**Compatible models:** MicroCube, SmartIR640, Crius1280
+
+**MIPI CSI-2 lanes:**
+
+| Model | Lanes |
+|-------|:-----:|
+| MicroCube | 1 |
+| SmartIR640, Crius1280 | 2 |
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 640 × 480 | 16-bit raw greyscale | `Y16` |
+| 640 × 480 | 32-bit BGRA | `AR24` |
+| 640 × 480 | YUV 4:2:2 | `YUYV` |
+| 1280 × 1024 | 16-bit raw greyscale | `Y16` |
+| 1280 × 1024 | 32-bit BGRA | `AR24` |
+| 1280 × 1024 | YUV 4:2:2 | `YUYV` |
+
+The `Y16` format requires L4T kernel 5.0 or later (L4T 35.x+).
+
+---
+
+### Dione IR
+
+**Driver:** `dioneir`
+**Bridge chip:** Toshiba TC358746 (parallel-to-CSI-2)
+
+**MIPI CSI-2 lanes:** 2
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 320 × 240 | 32-bit BGRA | `AR24` |
+| 640 × 480 | 32-bit BGRA | `AR24` |
+| 1024 × 768 | 32-bit BGRA | `AR24` |
+| 1280 × 1024 | 32-bit BGRA | `AR24` |
+
+The active resolution depends on the camera model. The TC358746 bridge handles the parallel-to-MIPI conversion; the pixel format is fixed to 32-bit BGRA as delivered over CSI-2.
+
+---
+
+### iLumos
+
+**Driver:** `ilumos`
+
+**MIPI CSI-2 lanes:** 4
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 2048 × 2048 | 16-bit raw greyscale | `Y16` |
+| 2048 × 1088 | 16-bit raw greyscale | `Y16` |
+
+---
+
+### Microlynx
+
+**Driver:** `microlynx`
+
+**MIPI CSI-2 lanes:** 2
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 1024 × 128 | 16-bit raw greyscale | `Y16` |
+
 
 ---
 
