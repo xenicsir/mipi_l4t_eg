@@ -372,7 +372,7 @@ static struct camera_common_sensor_ops ilumos_common_ops = {
 };
 
 static ssize_t model_show(struct device *dev,
-         struct device_attribute *attr, char *buf)
+      struct device_attribute *attr, char *buf)
 {
    struct camera_common_data *s_data = to_camera_common_data(dev);
    struct ilumos *priv = (struct ilumos *)s_data->priv;
@@ -382,7 +382,7 @@ static ssize_t model_show(struct device *dev,
 static DEVICE_ATTR_RO(model);
 
 static ssize_t serial_number_show(struct device *dev,
-         struct device_attribute *attr, char *buf)
+      struct device_attribute *attr, char *buf)
 {
    struct camera_common_data *s_data = to_camera_common_data(dev);
    struct ilumos *priv = (struct ilumos *)s_data->priv;
@@ -392,7 +392,7 @@ static ssize_t serial_number_show(struct device *dev,
 static DEVICE_ATTR_RO(serial_number);
 
 static ssize_t resolution_show(struct device *dev,
-         struct device_attribute *attr, char *buf)
+      struct device_attribute *attr, char *buf)
 {
    struct camera_common_data *s_data = to_camera_common_data(dev);
    struct ilumos *priv = (struct ilumos *)s_data->priv;
@@ -403,14 +403,14 @@ static ssize_t resolution_show(struct device *dev,
 static DEVICE_ATTR_RO(resolution);
 
 static ssize_t pixel_format_show(struct device *dev,
-         struct device_attribute *attr, char *buf)
+      struct device_attribute *attr, char *buf)
 {
    return scnprintf(buf, PAGE_SIZE, "'Y16 ' (16-bit Greyscale)\n");
 }
 static DEVICE_ATTR_RO(pixel_format);
 
 static ssize_t firmware_version_show(struct device *dev,
-         struct device_attribute *attr, char *buf)
+      struct device_attribute *attr, char *buf)
 {
    struct camera_common_data *s_data = to_camera_common_data(dev);
    struct ilumos *priv = (struct ilumos *)s_data->priv;

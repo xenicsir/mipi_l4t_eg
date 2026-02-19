@@ -22,6 +22,7 @@
 #   -a, --repo-a DIR    First repository (default: ../mipi_l4t_eg-a)
 #   -b, --repo-b DIR    Second repository (default: ../mipi_l4t_eg-b)
 #   -v, --verbose       Show all differences (default: truncate to 20)
+#   -w, --ignore-whitespace  Ignore whitespace differences (tabs/spaces)
 #   -h, --help          Show this help message
 #
 # Examples:
@@ -41,6 +42,7 @@ REPO_A="$PARENT_DIR/mipi_l4t_eg-a"
 REPO_B="$PARENT_DIR/mipi_l4t_eg-b"
 VERSION_FILTER=""
 VERBOSE=0
+IGNORE_WHITESPACE=0
 
 # Parse options
 while [[ $# -gt 0 ]]; do
@@ -55,6 +57,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -v|--verbose)
             VERBOSE=1
+            shift
+            ;;
+        -w|--ignore-whitespace)
+            IGNORE_WHITESPACE=1
             shift
             ;;
         -h|--help)
@@ -263,7 +269,9 @@ for version in "${sorted_versions[@]}"; do
             fi
 
             # Compare directories (excluding .git and build artifacts)
-            diff_output=$(diff -rq $EXTRA_EXCLUDES \
+            diff_options="-rq"
+            [[ $IGNORE_WHITESPACE -eq 1 ]] && diff_options="$diff_options -w"
+            diff_output=$(diff $diff_options $EXTRA_EXCLUDES \
                 --exclude='.git' \
                 --exclude='.gitignore' \
                 --exclude='*.o' \

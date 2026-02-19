@@ -34,7 +34,7 @@
 
 #endif // __KERNEL__
 #else // LINUX
-// Windows
+      // Windows
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,7 +52,7 @@
 #define LOG_ERROR       4
 #define LOG_FATAL       5
 
-#define LOG_LEVEL		LOG_ERROR
+#define LOG_LEVEL    LOG_ERROR
 
 
 #define CMD_WRITE       0x01
@@ -65,10 +65,10 @@
 #define ACK_READ_FIFO   0x88
 #define ACK_ERROR       0xC0
 
-#define FIFO_OP_CONTINUE	0
-#define FIFO_OP_START 		(1 << 0)
-#define FIFO_OP_END			(1 << 1)
-#define FIFO_OP_RETRY		(1 << 2)
+#define FIFO_OP_CONTINUE   0
+#define FIFO_OP_START      (1 << 0)
+#define FIFO_OP_END        (1 << 1)
+#define FIFO_OP_RETRY      (1 << 2)
 
 #if (defined (LINUX) || defined (__linux__))
 
@@ -88,7 +88,7 @@
 #define __ecctrl_i2c_write(file, buffer, size) i2c_master_send(file, buffer, size)
 #define __ecctrl_i2c_read(file, buffer, size) i2c_master_recv(file, buffer, size)
 
-#else	// __KERNEL__
+#else // __KERNEL__
 
 #define __ecctrl_i2c_print(dbg_level, ...) \
    if (dbg_level >= LOG_LEVEL) \
@@ -102,9 +102,9 @@
 #define __ecctrl_i2c_write(file, buffer, size) write(file, buffer, size)
 #define __ecctrl_i2c_read(file, buffer, size) read(file, buffer, size)
 
-#endif	// __KERNEL__
+#endif   // __KERNEL__
 #else // LINUX
-// Windows
+      // Windows
 #define __ecctrl_i2c_print(dbg_level, ...) \
    if (dbg_level >= LOG_LEVEL) \
    printf(__VA_ARGS__);
