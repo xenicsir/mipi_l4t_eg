@@ -284,16 +284,31 @@ cat >> /tmp/preinst << 'EOT'
 
 case "$1" in
     install|upgrade)
-        # Extract the L4T version from the embedded version_eg_cams string:
-        # "jetson-l4t-35.6.2_eg ..." -> "35.6.2"
-        EXPECTED_L4T=$(echo "$PACKAGE_VERSION_LINE" | sed 's/^jetson-l4t-\([^_]*\)_.*/\1/')
+        # Extract the L4T version and vendor from the embedded version_eg_cams string:
+        # Generic:  "jetson-l4t-35.6.2_eg ..." -> L4T=35.6.2, VENDOR=generic
+        # Forecr:   "jetson-l4t-35.6.2_forecr_eg ..." -> L4T=35.6.2, VENDOR=forecr
 
+        # Extract version_extended (35.6.2 or 35.6.2_forecr)
+        EXPECTED_VERSION_EXTENDED=$(echo "$PACKAGE_VERSION_LINE" | sed 's/^jetson-l4t-\([^_]*\(_[^_]*\)\?\)_eg.*/\1/')
+
+        # Extract L4T version (first part before vendor suffix)
+        EXPECTED_L4T=$(echo "$EXPECTED_VERSION_EXTENDED" | sed 's/_.*$//')
+
+        # Determine expected vendor: if version_extended contains underscore, it's forecr or other vendor
+        if [[ "$EXPECTED_VERSION_EXTENDED" =~ _forecr$ ]]; then
+            EXPECTED_VENDOR="forecr"
+        else
+            EXPECTED_VENDOR="generic"
+        fi
+
+        # Check /etc/nv_tegra_release
         if [[ ! -f /etc/nv_tegra_release ]]; then
             echo "Error: /etc/nv_tegra_release not found." >&2
             echo "This package requires NVIDIA Jetson Linux (L4T) ${EXPECTED_L4T}." >&2
             exit 1
         fi
 
+        # Extract L4T version from running system
         NV_MAJOR=$(sed -n 's/.*# R\([0-9]*\) .*/\1/p' /etc/nv_tegra_release | head -1)
         NV_REVISION=$(sed -n 's/.*REVISION: \([0-9.]*\).*/\1/p' /etc/nv_tegra_release | head -1)
 
@@ -304,11 +319,31 @@ case "$1" in
 
         RUNNING_L4T="${NV_MAJOR}.${NV_REVISION}"
 
+        # Check L4T version match
         if [[ "$RUNNING_L4T" != "$EXPECTED_L4T" ]]; then
             echo "Error: Incompatible L4T version." >&2
             echo "  This package was built for L4T ${EXPECTED_L4T}." >&2
             echo "  Running system: L4T ${RUNNING_L4T}" >&2
             echo "  Install the package matching your L4T version." >&2
+            exit 1
+        fi
+
+        # Detect running system's board vendor (generic NVIDIA vs Forecr/others)
+        RUNNING_VENDOR="generic"
+        if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
+            DTB=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
+            # Forecr boards have DTB names containing dsboard, milboard, raiboard
+            if [[ "$DTB" =~ (dsboard|milboard|raiboard) ]]; then
+                RUNNING_VENDOR="forecr"
+            fi
+        fi
+
+        # Check board vendor match
+        if [[ "$RUNNING_VENDOR" != "$EXPECTED_VENDOR" ]]; then
+            echo "Error: Board vendor mismatch." >&2
+            echo "  This package was built for: $EXPECTED_VENDOR" >&2
+            echo "  Running system: $RUNNING_VENDOR" >&2
+            echo "  Install the package matching your board type." >&2
             exit 1
         fi
         ;;
