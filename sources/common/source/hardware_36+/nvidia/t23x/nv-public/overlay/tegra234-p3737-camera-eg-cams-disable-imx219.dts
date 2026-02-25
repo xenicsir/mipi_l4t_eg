@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	overlay-name = "Exosens Cameras. Disable imx219";
+	jetson-header-name = "Jetson AGX CSI Connector";
+	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
+
+	/* Disable IMX219 camera nodes present in some carrier board base DTBs
+	 * (e.g. Auvidea X230D on L4T 36.4.3) to prevent probe conflicts. */
+	fragment@0 {
+		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
+		__overlay__ { status = "disabled"; };
+	};
+	fragment@1 {
+		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
+		__overlay__ { status = "disabled"; };
+	};
+	fragment@2 {
+		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
+		__overlay__ { status = "disabled"; };
+	};
+	fragment@3 {
+		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
+		__overlay__ { status = "disabled"; };
+	};
+};

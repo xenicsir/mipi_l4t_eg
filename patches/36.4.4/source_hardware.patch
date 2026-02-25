@@ -50,10 +50,10 @@ index 93728f4..fa9b50b 100644
  endif
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..781ec24
+index 0000000..dfe134d
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,2861 @@
+@@ -0,0 +1,2891 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -71,37 +71,41 @@ index 0000000..781ec24
 +					port@0 {								//M222 CSI 01		
 +						status = "okay";
 +						reg = <0>;
-+						endpoint {
++						rbpcv2_vi_in0: endpoint {
 +							status = "okay";
 +							port-index = <0>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out0>;
 +						};
 +					};
 +					port@1 {								//M222 CSI 67		
 +						status = "okay";
 +						reg = <1>;
-+						endpoint {
++						rbpcv2_vi_in1: endpoint {
 +							status = "okay";
 +							port-index = <5>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out1>;
 +						};
 +					};
 +					port@2 {								//M222 CSI 45	
 +						status = "okay";
 +						reg = <2>;
-+						endpoint {
++						rbpcv2_vi_in2: endpoint {
 +							status = "okay";
 +							port-index = <4>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out2>;
 +						};
 +					};
 +					port@3 {								//M222 CSI 23
 +						status = "okay";
 +						reg = <3>;
-+						endpoint {
++						rbpcv2_vi_in3: endpoint {
 +							status = "okay";
 +							port-index = <2>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out3>;
 +						};
 +					};
 +				};
@@ -127,7 +131,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 8-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@31e0000/xenics_dione_ir_a@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@31e0000/xenics_dione_ir_a@0e";
 +						};
 +					};
 +					module1 {
@@ -137,7 +141,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 1-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@c240000/xenics_dione_ir_g@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@c240000/xenics_dione_ir_g@0e";
 +						};
 +					};
 +					module2 {
@@ -147,7 +151,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 7-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@c250000/xenics_dione_ir_e@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@c250000/xenics_dione_ir_e@0e";
 +						};
 +					};
 +					module3 {
@@ -157,7 +161,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 2-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@3180000/xenics_dione_ir_e@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/xenics_dione_ir_e@0e";
 +						};
 +					};
 +				};
@@ -180,11 +184,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@0 {
++									rbpcv2_csi_in0: endpoint@0 {
 +										status = "okay";
 +										port-index = <0>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out0>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out0: endpoint@1 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in0>;
 +									};
 +								};
 +							};
@@ -199,11 +211,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@2 {
++									rbpcv2_csi_in1: endpoint@2 {
 +										status = "okay";
 +										port-index = <6>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out1>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out1: endpoint@3 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in1>;
 +									};
 +								};
 +							};
@@ -218,11 +238,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@4 {
++									rbpcv2_csi_in2: endpoint@4 {
 +										status = "okay";
 +										port-index = <4>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out2>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out2: endpoint@5 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in2>;
 +									};
 +								};
 +							};
@@ -237,11 +265,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@6 {
++									rbpcv2_csi_in3: endpoint@6 {
 +										status = "okay";
 +										port-index = <2>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out3>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out3: endpoint@7 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in3>;
 +									};
 +								};
 +							};
@@ -2885,32 +2921,26 @@ index 0000000..781ec24
 +	   };
 +   };
 +
-+	// Disable other cameras 
++#ifdef HAS_BASE_IMX219
++	/* Disable IMX219 camera nodes present in some carrier board base DTBs
++	 * (e.g. Auvidea X230D on L4T 36.4.3) to prevent probe conflicts. */
 +	fragment@1 {
 +		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
++		__overlay__ { status = "disabled"; };
 +	};
 +	fragment@2 {
 +		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
++		__overlay__ { status = "disabled"; };
 +	};
 +	fragment@3 {
 +		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
++		__overlay__ { status = "disabled"; };
 +	};
 +	fragment@4 {
 +		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
++		__overlay__ { status = "disabled"; };
 +	};
-+
++#endif
 +
 +};
 +
@@ -3189,6 +3219,118 @@ index 0000000..44c1cc5
 +	};
 +
 +};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-ilumos.dts
+new file mode 100644
+index 0000000..d73314e
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:iLumos";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<4>;
++			remote-endpoint = <&ilumos_out0>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@31e0000/xenics_dione_ir_a@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@3 {
++		target-path = "/bus@0/i2c@31e0000/ilumos_a@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++			devname = "ilumos 8-0030";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@31e0000/ilumos_a@30";
++		};
++	};
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-microlynx.dts
+new file mode 100644
+index 0000000..42894a1
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-microlynx.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:Microlynx";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out0>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@31e0000/xenics_dione_ir_a@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@3 {
++		target-path = "/bus@0/i2c@31e0000/microlynx_a@51";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++			devname = "microlynx 8-0051";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@31e0000/microlynx_a@51";
++		};
++	};
++
++};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ec-1-lane.dts
 new file mode 100644
 index 0000000..a6041a5
@@ -3459,6 +3601,118 @@ index 0000000..2717c64
 +		target-path = "/tegra-camera-platform/modules/module1";
 +		__overlay__ {
 +			badge = "imx219_bottomright_RBPCV2";
++		};
++	};
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ilumos.dts
+new file mode 100644
+index 0000000..cf388e9
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:iLumos";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<4>;
++			remote-endpoint = <&ilumos_out1>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@c240000/xenics_dione_ir_g@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@3 {
++		target-path = "/bus@0/i2c@c240000/ilumos_g@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++			devname = "ilumos 1-0030";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@c240000/ilumos_g@30";
++		};
++	};
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-microlynx.dts
+new file mode 100644
+index 0000000..3f6b170
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-microlynx.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:Microlynx";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out1>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@c240000/xenics_dione_ir_g@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@3 {
++		target-path = "/bus@0/i2c@c240000/microlynx_g@51";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++			devname = "microlynx 1-0051";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@c240000/microlynx_g@51";
 +		};
 +	};
 +
@@ -3737,6 +3991,118 @@ index 0000000..ab10bd3
 +	};
 +
 +};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-ilumos.dts
+new file mode 100644
+index 0000000..dd158a4
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM2:iLumos";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@2/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<4>;
++			remote-endpoint = <&ilumos_out2>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@c250000/xenics_dione_ir_e@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@3 {
++		target-path = "/bus@0/i2c@c250000/ilumos_e@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module2/drivernode0";
++		__overlay__ {
++			devname = "ilumos 7-0030";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@c250000/ilumos_e@30";
++		};
++	};
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-microlynx.dts
+new file mode 100644
+index 0000000..286daa7
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-microlynx.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM2:Microlynx";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@2/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out2>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@c250000/xenics_dione_ir_e@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@3 {
++		target-path = "/bus@0/i2c@c250000/microlynx_e@51";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module2/drivernode0";
++		__overlay__ {
++			devname = "microlynx 7-0051";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@c250000/microlynx_e@51";
++		};
++	};
++
++};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ec-1-lane.dts
 new file mode 100644
 index 0000000..1224606
@@ -4007,6 +4373,118 @@ index 0000000..2f991b3
 +		target-path = "/tegra-camera-platform/modules/module3";
 +		__overlay__ {
 +			badge = "imx219_bottomleft_RBPCV2";
++		};
++	};
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ilumos.dts
+new file mode 100644
+index 0000000..898e867
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM3:iLumos";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@3/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<4>;
++			remote-endpoint = <&ilumos_out3>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@3180000/xenics_dione_ir_c@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@3 {
++		target-path = "/bus@0/i2c@3180000/ilumos_c@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module3/drivernode0";
++		__overlay__ {
++			devname = "ilumos 2-0030";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/ilumos_c@30";
++		};
++	};
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-microlynx.dts
+new file mode 100644
+index 0000000..752de4d
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-microlynx.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM3:Microlynx";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	fragment@0 {
++		target-path = "/tegra-capture-vi/ports/port@3/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@1 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out3>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@2 {
++		target-path = "/bus@0/i2c@3180000/xenics_dione_ir_c@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@3 {
++		target-path = "/bus@0/i2c@3180000/microlynx_c@51";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@4 {
++		target-path = "/tegra-camera-platform/modules/module3/drivernode0";
++		__overlay__ {
++			devname = "microlynx 2-0051";
++			proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/microlynx_c@51";
 +		};
 +	};
 +
@@ -6914,6 +7392,87 @@ index 0000000..8348763
 +
 +
 +};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
+new file mode 100644
+index 0000000..d602f03
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/tegra234-p3767-0000-common.h>
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:iLumos";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<4>;
++         remote-endpoint = <&ilumos_out0>;
++		};
++	};
++
++   // Disable Dione cameras
++	fragment@12 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@13 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/ilumos_b@30";
++		__overlay__ {
++         status = "okay";
++		};
++	};
++
++	fragment@20 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/ilumos_b@30/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@21 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++         devname = "ilumos 9-0030";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/ilumos_b@30";
++		};
++	};
++
++  // Disable other cameras
++	fragment@30 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++	fragment@31 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++
++};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx219.dts
 new file mode 100644
 index 0000000..52236df
@@ -7204,6 +7763,87 @@ index 0000000..500fe91
 +
 +
 +};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts
+new file mode 100644
+index 0000000..a383f93
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/tegra234-p3767-0000-common.h>
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:Microlynx";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++         remote-endpoint = <&microlynx_out0>;
++		};
++	};
++
++   // Disable Dione cameras
++	fragment@12 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@13 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/microlynx_b@51";
++		__overlay__ {
++         status = "okay";
++		};
++	};
++
++	fragment@20 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/microlynx_b@51/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@21 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++         devname = "microlynx 9-0051";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/microlynx_b@51";
++		};
++	};
++
++  // Disable other cameras
++	fragment@30 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++	fragment@31 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++
++};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
 new file mode 100644
 index 0000000..0e59b4b
@@ -7448,6 +8088,87 @@ index 0000000..be1d9d5
 +
 +
 +};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
+new file mode 100644
+index 0000000..5ba580a
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/tegra234-p3767-0000-common.h>
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:iLumos";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
++		__overlay__ {
++			bus-width=<4>;
++         remote-endpoint = <&ilumos_out1>;
++		};
++	};
++
++   // Disable Dione cameras
++	fragment@12 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@13 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/ilumos_c@30";
++		__overlay__ {
++         status = "okay";
++		};
++	};
++
++	fragment@20 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/ilumos_c@30/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<4>;
++		};
++	};
++
++	fragment@21 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++         devname = "ilumos 10-0030";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/ilumos_c@30";
++		};
++	};
++
++  // Disable other cameras
++	fragment@30 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv3_imx477_c@1a";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++	fragment@31 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++
++};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx219.dts
 new file mode 100644
 index 0000000..b6e98a7
@@ -7609,6 +8330,87 @@ index 0000000..8e7ce3e
 +		};
 +	};
 +
++
++
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts
+new file mode 100644
+index 0000000..563de49
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/tegra234-p3767-0000-common.h>
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:Microlynx";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
++		__overlay__ {
++			bus-width=<2>;
++         remote-endpoint = <&microlynx_out1>;
++		};
++	};
++
++   // Disable Dione cameras
++	fragment@12 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@13 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/microlynx_c@51";
++		__overlay__ {
++         status = "okay";
++		};
++	};
++
++	fragment@20 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/microlynx_c@51/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@21 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++         devname = "microlynx 10-0051";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/microlynx_c@51";
++		};
++	};
++
++  // Disable other cameras
++	fragment@30 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv3_imx477_c@1a";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
++	fragment@31 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
++		__overlay__ {
++         status = "disabled";
++		};
++	};
 +
 +
 +};

@@ -45,6 +45,8 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3701-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-dual-hawk-ar0234-e3653-overlay.dtbo
 
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cams-dione.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cams-dione-global.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ec-1-lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ec-2-lanes.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ec-imx219.dtbo

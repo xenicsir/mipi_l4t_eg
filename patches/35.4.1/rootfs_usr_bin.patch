@@ -1,9 +1,9 @@
 diff --git a/rootfs/usr/bin/detect_jetson_board.sh b/rootfs/usr/bin/detect_jetson_board.sh
 new file mode 100755
-index 0000000..2cfdaaf
+index 0000000..c621d35
 --- /dev/null
 +++ b/rootfs/usr/bin/detect_jetson_board.sh
-@@ -0,0 +1,471 @@
+@@ -0,0 +1,476 @@
 +#!/bin/bash
 +#******************************************************************************
 +# detect_board.sh - Comprehensive Jetson board detection
@@ -239,7 +239,7 @@ index 0000000..2cfdaaf
 +    elif [[ "$model" =~ "Orbitty" ]]; then
 +        vendor="connecttech"; carrier="orbitty"; carrier_pn="Orbitty (TX2/TX1 compact)"
 +    # Auvidea carrier boards
-+    elif [[ "$model" =~ "X230D" ]] || [[ "$dtb" =~ "x230d" ]]; then
++    elif [[ "$model" =~ "X230" ]] || [[ "$dtb" =~ [Aa]uvidea.*[Xx]230 ]] || [[ "$dtb" =~ [Xx]230[Dd] ]]; then
 +        vendor="auvidea"; carrier="x230d"; carrier_pn="X230D (AGX Orin)"
 +    elif [[ "$model" =~ "JN30D" ]] || [[ "$dtb" =~ "jn30d" ]]; then
 +        vendor="auvidea"; carrier="jn30d"; carrier_pn="JN30D (Nano/TX2 NX compact)"
@@ -354,6 +354,11 @@ index 0000000..2cfdaaf
 +
 +    if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
 +        dtb=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
++    fi
++
++    # Fallback: parse extlinux.conf FDT line if nvidia,dtsfilename not available
++    if [[ -z "$dtb" ]] && [[ -f /boot/extlinux/extlinux.conf ]]; then
++        dtb=$(grep -oP '^\s*FDT\s+\K\S+' /boot/extlinux/extlinux.conf | head -1)
 +    fi
 +
 +    if [[ -f /proc/device-tree/compatible ]]; then
@@ -2019,10 +2024,10 @@ index 0000000..a6a98a2
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..9848d12
+index 0000000..c5b2060
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,177 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -2103,9 +2108,11 @@ index 0000000..9848d12
 +	  ;;
 +esac
 +
-+if [[ x$BOARD == xdsboard-ornxs ]]
-+then
++if [[ x$BOARD == xdsboard-ornxs ]]; then
 +   base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
++elif [[ "$BOARD" == "auvidea-x230d" ]] && \
++     [[ -d "/proc/device-tree/bus@0/i2c@31e0000/rbpcv2_imx219_a@10" ]]; then
++   base_devicetree="Exosens Cameras for Auvidea X230"
 +else
 +   base_devicetree="Exosens Cameras"
 +fi
@@ -2174,7 +2181,29 @@ index 0000000..9848d12
 +#done
 +
 +# Execute the command with all arguments
-+sudo $cmd "${cmd_args[@]}"
++# Capture output and errors
++output=$(sudo $cmd "${cmd_args[@]}" 2>&1)
++exit_code=$?
++
++# Display captured output (including errors)
++echo "$output"
++
++# Check if execution failed
++if [ $exit_code -ne 0 ]; then
++    echo "Error: Failed to configure camera device tree." >&2
++    echo "Exit code: $exit_code" >&2
++    exit $exit_code
++fi
++
++# Verify the DTB file was actually created
++dtb_file=$(echo "$output" | sed -n 's/Configuration saved to \(.*\)\./\1/p')
++if [ -n "$dtb_file" ] && [ ! -f "$dtb_file" ]; then
++    echo "Error: DTB file was not created despite success message." >&2
++    echo "Expected file: $dtb_file" >&2
++    echo "This usually indicates a permission issue with /boot directory." >&2
++    echo "Try running: sudo ls -ld /boot" >&2
++    exit 1
++fi
 +
 diff --git a/rootfs/usr/bin/eg_install_ssd.sh b/rootfs/usr/bin/eg_install_ssd.sh
 new file mode 100755

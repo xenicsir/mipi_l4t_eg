@@ -78,9 +78,21 @@ case "$BOARD" in
 	  ;;
 esac
 
-if [[ x$BOARD == xdsboard-ornxs ]]
-then
+disable_imx219_arg=""
+if [[ x$BOARD == xdsboard-ornxs ]]; then
    base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
+elif [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
+   # IMX219 nodes present in base DTB (e.g. Auvidea X230D 35.3.1): use per-channel DTBO + disable IMX219
+   base_devicetree="Exosens Cameras"
+   disable_imx219_dtbo="/boot/tegra234-p3737-camera-eg-cams-disable-imx219.dtbo"
+   if [[ ! -f "$disable_imx219_dtbo" ]]; then
+      echo "Error: IMX219 nodes found in device tree but DTBO not installed: $disable_imx219_dtbo" >&2
+      exit 1
+   fi
+   disable_imx219_arg="2=Exosens Cameras. Disable imx219"
+elif [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
+   # No IMX219, global DTBO present: base DTB uses global NVCSI endpoint numbering (35.x NVIDIA std / Auvidea 35.4.1+)
+   base_devicetree="Exosens Cameras (global)"
 else
    base_devicetree="Exosens Cameras"
 fi
@@ -140,7 +152,9 @@ done
 cmd="python /opt/eg/jetson-io/config-by-hardware.py -n"
 
 # Build command arguments dynamically
-cmd_args=("2=$base_devicetree" "${dtboarg[@]}")
+cmd_args=("2=$base_devicetree")
+[[ -n "$disable_imx219_arg" ]] && cmd_args+=("$disable_imx219_arg")
+cmd_args+=("${dtboarg[@]}")
 
 # Debug: Show all command arguments
 #echo "Number of arguments: ${#cmd_args[@]}"
@@ -149,5 +163,27 @@ cmd_args=("2=$base_devicetree" "${dtboarg[@]}")
 #done
 
 # Execute the command with all arguments
-sudo $cmd "${cmd_args[@]}"
+# Capture output and errors
+output=$(sudo $cmd "${cmd_args[@]}" 2>&1)
+exit_code=$?
+
+# Display captured output (including errors)
+echo "$output"
+
+# Check if execution failed
+if [ $exit_code -ne 0 ]; then
+    echo "Error: Failed to configure camera device tree." >&2
+    echo "Exit code: $exit_code" >&2
+    exit $exit_code
+fi
+
+# Verify the DTB file was actually created
+dtb_file=$(echo "$output" | sed -n 's/Configuration saved to \(.*\)\./\1/p')
+if [ -n "$dtb_file" ] && [ ! -f "$dtb_file" ]; then
+    echo "Error: DTB file was not created despite success message." >&2
+    echo "Expected file: $dtb_file" >&2
+    echo "This usually indicates a permission issue with /boot directory." >&2
+    echo "Try running: sudo ls -ld /boot" >&2
+    exit 1
+fi
 

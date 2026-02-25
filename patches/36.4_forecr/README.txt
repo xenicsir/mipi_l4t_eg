@@ -13,7 +13,7 @@ Total patches: 9
 Patch files:
   - rootfs_opt_eg.patch (23 files, 3285 lines)
   - rootfs_usr_bin.patch (12 files, 2296 lines)
-  - source_hardware.patch (127 files, 19068 lines)
+  - source_hardware.patch (139 files, 19840 lines)
   - source_kernel.patch (31 files, 13677 lines)
   - source_nvdisplay.patch (3 files, 33 lines)
   - source_nvidia-oot_drivers_media_i2c.patch (23 files, 7758 lines)

@@ -15,37 +15,41 @@
 					port@0 {								//M222 CSI 01		
 						status = "okay";
 						reg = <0>;
-						endpoint {
+						rbpcv2_vi_in0: endpoint {
 							status = "okay";
 							port-index = <0>;
 							bus-width = <2>;
+							remote-endpoint = <&rbpcv2_csi_out0>;
 						};
 					};
 					port@1 {								//M222 CSI 67		
 						status = "okay";
 						reg = <1>;
-						endpoint {
+						rbpcv2_vi_in1: endpoint {
 							status = "okay";
 							port-index = <5>;
 							bus-width = <2>;
+							remote-endpoint = <&rbpcv2_csi_out1>;
 						};
 					};
 					port@2 {								//M222 CSI 45	
 						status = "okay";
 						reg = <2>;
-						endpoint {
+						rbpcv2_vi_in2: endpoint {
 							status = "okay";
 							port-index = <4>;
 							bus-width = <2>;
+							remote-endpoint = <&rbpcv2_csi_out2>;
 						};
 					};
 					port@3 {								//M222 CSI 23
 						status = "okay";
 						reg = <3>;
-						endpoint {
+						rbpcv2_vi_in3: endpoint {
 							status = "okay";
 							port-index = <2>;
 							bus-width = <2>;
+							remote-endpoint = <&rbpcv2_csi_out3>;
 						};
 					};
 				};
@@ -123,11 +127,19 @@
 							port@0 {
 								status = "okay";
 								reg = <0>;
-								endpoint@0 {
+								rbpcv2_csi_in0: endpoint@0 {
 									status = "okay";
 									port-index = <0>;
 									bus-width = <2>;
 									remote-endpoint = <&xenics_dione_ir_out0>;
+								};
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+								rbpcv2_csi_out0: endpoint@1 {
+									status = "okay";
+									remote-endpoint = <&rbpcv2_vi_in0>;
 								};
 							};
 						};
@@ -139,16 +151,6 @@
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
-							port@0 {
-								status = "okay";
-								reg = <0>;
-								endpoint@0 {
-									status = "okay";
-									port-index = <6>;
-									bus-width = <2>;
-									remote-endpoint = <&xenics_dione_ir_out1>;
-								};
-							};
 						};
 					};
 					channel@2 {								//M222 CSI 45		
@@ -158,16 +160,6 @@
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
-							port@0 {
-								status = "okay";
-								reg = <0>;
-								endpoint@0 {
-									status = "okay";
-									port-index = <4>;
-									bus-width = <2>;
-									remote-endpoint = <&xenics_dione_ir_out2>;
-								};
-							};
 						};
 					};
 					channel@3 {								//M222 CSI 23
@@ -177,16 +169,6 @@
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
-							port@0 {
-								status = "okay";
-								reg = <0>;
-								endpoint@0 {
-									status = "okay";
-									port-index = <2>;
-									bus-width = <2>;
-									remote-endpoint = <&xenics_dione_ir_out3>;
-								};
-							};
 						};
 					};
 				};
@@ -2127,6 +2109,7 @@
 					   };
 					};
 				};
+			  };
 			  microlynx_cam3: microlynx_c@51 {
 				 compatible = "exosens,microlynx";
 				 reg = <0x51>;
@@ -2268,36 +2251,11 @@
 					};
 				 };
 			  };
-			  };
 		   };
 	   };
    };
 
-	// Disable other cameras 
-	fragment@1 {
-		target-path = "/i2c@c240000/rbpcv2_imx219_g@10";
-		__overlay__ {
-		 status = "disabled";
-		};
-	};
-	fragment@2 {
-		target-path = "/i2c@c250000/rbpcv2_imx219_e@10";
-		__overlay__ {
-		 status = "disabled";
-		};
-	};
-	fragment@3 {
-		target-path = "/i2c@31e0000/rbpcv2_imx219_a@10";
-		__overlay__ {
-		 status = "disabled";
-		};
-	};
-	fragment@4 {
-		target-path = "/i2c@3180000/rbpcv2_imx219_c@10";
-		__overlay__ {
-		 status = "disabled";
-		};
-	};
+
 
 
 };

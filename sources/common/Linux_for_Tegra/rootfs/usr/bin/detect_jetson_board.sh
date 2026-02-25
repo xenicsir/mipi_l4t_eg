@@ -233,7 +233,7 @@ detect_carrier() {
     elif [[ "$model" =~ "Orbitty" ]]; then
         vendor="connecttech"; carrier="orbitty"; carrier_pn="Orbitty (TX2/TX1 compact)"
     # Auvidea carrier boards
-    elif [[ "$model" =~ "X230D" ]] || [[ "$dtb" =~ "x230d" ]]; then
+    elif [[ "$model" =~ "X230" ]] || [[ "$dtb" =~ [Aa]uvidea.*[Xx]230 ]] || [[ "$dtb" =~ [Xx]230[Dd] ]]; then
         vendor="auvidea"; carrier="x230d"; carrier_pn="X230D (AGX Orin)"
     elif [[ "$model" =~ "JN30D" ]] || [[ "$dtb" =~ "jn30d" ]]; then
         vendor="auvidea"; carrier="jn30d"; carrier_pn="JN30D (Nano/TX2 NX compact)"
@@ -348,6 +348,11 @@ detect_board_type() {
 
     if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
         dtb=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
+    fi
+
+    # Fallback: parse extlinux.conf FDT line if nvidia,dtsfilename not available
+    if [[ -z "$dtb" ]] && [[ -f /boot/extlinux/extlinux.conf ]]; then
+        dtb=$(grep -oP '^\s*FDT\s+\K\S+' /boot/extlinux/extlinux.conf | head -1)
     fi
 
     if [[ -f /proc/device-tree/compatible ]]; then

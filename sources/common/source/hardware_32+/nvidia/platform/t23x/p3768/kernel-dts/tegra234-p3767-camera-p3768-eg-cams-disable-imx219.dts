@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	overlay-name = "Exosens Cameras. Disable imx219";
+	jetson-header-name = "Jetson 24pin CSI Connector";
+	compatible = "nvidia,p3768-0000+p3767-0000", "nvidia,p3768-0000+p3767-0001",
+		     "nvidia,p3768-0000+p3767-0003", "nvidia,p3768-0000+p3767-0004",
+		     "nvidia,p3768-0000+p3767-0005";
+
+	/* Disable IMX219 camera nodes present in p3768 carrier board base DTBs
+	 * to prevent probe conflicts with Exosens cameras. */
+	fragment@0 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+	fragment@1 {
+		target-path = "/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+};

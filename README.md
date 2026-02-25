@@ -23,6 +23,7 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
     - [Package installation](#package-installation)
     - [Configuring camera ports](#configuring-camera-ports)
   - [Quick start - Testing the camera](#quick-start---testing-the-camera)
+- [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
 - [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
   - [Linux boot configuration](#linux-boot-configuration)
   - [Orin NX/Nano CSI lanes issues](#orin-nxnano-csi-lanes-issues)
@@ -463,6 +464,21 @@ This provides tab-completion for:
 - L4T versions (`-v 36.4.4`)
 - Vendors (`-V forecr`)
 - Carrier boards (`-c dsboard_ornx`)
+
+---
+
+## Camera Format Performance Benchmark
+
+For applications requiring specific video format support or optimization, refer to the **[Camera Format Performance Benchmark](tools/camera-format-benchmark/)** for comprehensive performance analysis and automation scripts.
+
+This benchmark compares three camera formats (YUYV, Y16, AR24) across real-time display and H.264 encoding scenarios on NVIDIA Jetson Orin NX with JetPack 6.2.1 (L4T 36.4.4). It includes:
+
+- **Performance metrics:** CPU load, GPU utilization, power consumption
+- **Use case recommendations:** Display-only, recording, simultaneous display+recording
+- **GStreamer command examples** for each scenario
+- **Technical analysis** of format selection trade-offs
+
+The benchmark provides objective performance data to guide format selection based on your specific application requirements.
 
 ---
 
