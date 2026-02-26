@@ -6182,10 +6182,10 @@ index 0000000..b59501d
 +	};
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-index 93728f4..4a6db2c 100644
+index 93728f4..2309c2b 100644
 --- a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-@@ -9,62 +9,110 @@ dtb-y :=
+@@ -9,62 +9,112 @@ dtb-y :=
  dtbo-y :=
  makefile-path := t23x/nv-public/overlay
  
@@ -6312,6 +6312,7 @@ index 93728f4..4a6db2c 100644
 +dtbo-y += tegra234-p3767-camera-dsboard-ornxs-imx477.dtbo
 +
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cams-dione.dtbo
++dtbo-y += tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
@@ -6328,6 +6329,7 @@ index 93728f4..4a6db2c 100644
 +dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 +
 +dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
++dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cam0-ec-1-lane.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cam0-ec-2-lanes.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cam0-ec-imx219.dtbo
@@ -6354,10 +6356,10 @@ index 93728f4..4a6db2c 100644
  dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..781ec24
+index 0000000..7b35a8e
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,2861 @@
+@@ -0,0 +1,2870 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -6375,37 +6377,41 @@ index 0000000..781ec24
 +					port@0 {								//M222 CSI 01		
 +						status = "okay";
 +						reg = <0>;
-+						endpoint {
++						rbpcv2_vi_in0: endpoint {
 +							status = "okay";
 +							port-index = <0>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out0>;
 +						};
 +					};
 +					port@1 {								//M222 CSI 67		
 +						status = "okay";
 +						reg = <1>;
-+						endpoint {
++						rbpcv2_vi_in1: endpoint {
 +							status = "okay";
 +							port-index = <5>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out1>;
 +						};
 +					};
 +					port@2 {								//M222 CSI 45	
 +						status = "okay";
 +						reg = <2>;
-+						endpoint {
++						rbpcv2_vi_in2: endpoint {
 +							status = "okay";
 +							port-index = <4>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out2>;
 +						};
 +					};
 +					port@3 {								//M222 CSI 23
 +						status = "okay";
 +						reg = <3>;
-+						endpoint {
++						rbpcv2_vi_in3: endpoint {
 +							status = "okay";
 +							port-index = <2>;
 +							bus-width = <2>;
++							remote-endpoint = <&rbpcv2_csi_out3>;
 +						};
 +					};
 +				};
@@ -6431,7 +6437,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 8-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@31e0000/xenics_dione_ir_a@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@31e0000/xenics_dione_ir_a@0e";
 +						};
 +					};
 +					module1 {
@@ -6441,7 +6447,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 1-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@c240000/xenics_dione_ir_g@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@c240000/xenics_dione_ir_g@0e";
 +						};
 +					};
 +					module2 {
@@ -6451,7 +6457,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 7-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@c250000/xenics_dione_ir_e@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@c250000/xenics_dione_ir_e@0e";
 +						};
 +					};
 +					module3 {
@@ -6461,7 +6467,7 @@ index 0000000..781ec24
 +						drivernode0 {
 +							pcl_id = "v4l2_sensor";
 +							devname = "dione_ir 2-0016";
-+							proc-device-tree = "/proc/device-tree/i2c@3180000/xenics_dione_ir_e@0e";
++							proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/xenics_dione_ir_e@0e";
 +						};
 +					};
 +				};
@@ -6484,11 +6490,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@0 {
++									rbpcv2_csi_in0: endpoint@0 {
 +										status = "okay";
 +										port-index = <0>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out0>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out0: endpoint@1 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in0>;
 +									};
 +								};
 +							};
@@ -6503,11 +6517,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@2 {
++									rbpcv2_csi_in1: endpoint@2 {
 +										status = "okay";
 +										port-index = <6>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out1>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out1: endpoint@3 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in1>;
 +									};
 +								};
 +							};
@@ -6522,11 +6544,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@4 {
++									rbpcv2_csi_in2: endpoint@4 {
 +										status = "okay";
 +										port-index = <4>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out2>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out2: endpoint@5 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in2>;
 +									};
 +								};
 +							};
@@ -6541,11 +6571,19 @@ index 0000000..781ec24
 +								port@0 {
 +									status = "okay";
 +									reg = <0>;
-+									endpoint@6 {
++									rbpcv2_csi_in3: endpoint@6 {
 +										status = "okay";
 +										port-index = <2>;
 +										bus-width = <2>;
 +										remote-endpoint = <&xenics_dione_ir_out3>;
++									};
++								};
++								port@1 {
++									status = "okay";
++									reg = <1>;
++									rbpcv2_csi_out3: endpoint@7 {
++										status = "okay";
++										remote-endpoint = <&rbpcv2_vi_in3>;
 +									};
 +								};
 +							};
@@ -9189,33 +9227,6 @@ index 0000000..781ec24
 +	   };
 +   };
 +
-+	// Disable other cameras 
-+	fragment@1 {
-+		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
-+	};
-+	fragment@2 {
-+		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
-+	};
-+	fragment@3 {
-+		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
-+	};
-+	fragment@4 {
-+		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
-+		__overlay__ {
-+		 status = "disabled";
-+		};
-+	};
-+
-+
 +};
 +
 +
@@ -10781,6 +10792,42 @@ index 0000000..8882bbb
 +	overlay-name = "Exosens Cameras";
 +	jetson-header-name = "Jetson AGX CSI Connector";
 +	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cams-disable-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cams-disable-imx219.dts
+new file mode 100644
+index 0000000..fcee765
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cams-disable-imx219.dts
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. Disable imx219";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	/* Disable IMX219 camera nodes present in some carrier board base DTBs
++	 * (e.g. Auvidea X230D on L4T 36.4.3) to prevent probe conflicts. */
++	fragment@0 {
++		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
++		__overlay__ { status = "disabled"; };
++	};
++	fragment@1 {
++		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
++		__overlay__ { status = "disabled"; };
++	};
++	fragment@2 {
++		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
++		__overlay__ { status = "disabled"; };
++	};
++	fragment@3 {
++		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
++		__overlay__ { status = "disabled"; };
++	};
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644

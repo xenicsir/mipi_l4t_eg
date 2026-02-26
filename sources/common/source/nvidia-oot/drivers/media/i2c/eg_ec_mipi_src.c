@@ -90,6 +90,7 @@ struct eg_ec_mipi {
    char           serial_number[32];
    u32            native_width;
    u32            native_height;
+   u32            native_pixfmt;
    char           pixel_format[48];
    char           firmware_version[16];
 };
@@ -658,6 +659,46 @@ static ssize_t firmware_version_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(firmware_version);
 
+/*
+ * Find the frmfmt index matching a given native resolution and pixel format.
+ * pixfmt is the EngineCore register value: 20=Y16/RAW16, 21=AR24/RGB888, 22=YUYV.
+ * Returns the frmfmt index, or -1 if no match.
+ */
+static int eg_ec_find_native_mode(u32 width, u32 height, u32 pixfmt)
+{
+   int i;
+   int target_mode = -1;
+
+   /* Determine which mode enum value matches (width, height, pixfmt) */
+   if (width == 640 && height == 480) {
+      switch (pixfmt) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+         case 20: target_mode = EC_MIPI_MODE_640x480_RAW16; break;
+#endif
+         case 21: target_mode = EC_MIPI_MODE_640x480_RGB888; break;
+         case 22: target_mode = EC_MIPI_MODE_640x480_YUYV; break;
+      }
+   } else if (width == 1280 && height == 1024) {
+      switch (pixfmt) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+         case 20: target_mode = EC_MIPI_MODE_1280x1024_RAW16; break;
+#endif
+         case 21: target_mode = EC_MIPI_MODE_1280x1024_RGB888; break;
+         case 22: target_mode = EC_MIPI_MODE_1280x1024_YUYV; break;
+      }
+   }
+
+   if (target_mode < 0)
+      return -1;
+
+   for (i = 0; i < ARRAY_SIZE(eg_ec_mipi_frmfmt); i++) {
+      if (eg_ec_mipi_frmfmt[i].mode == target_mode)
+         return i;
+   }
+
+   return -1;
+}
+
 static const char *eg_ec_pixel_format_name(u32 code)
 {
    switch (code) {
@@ -767,6 +808,7 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
       err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_PIXEL_FORMAT,
             (uint8_t *)&pixfmt_code, 4);
       if (!err) {
+         priv->native_pixfmt = pixfmt_code;
          pixfmt_name = eg_ec_pixel_format_name(pixfmt_code);
          if (pixfmt_name)
             strncpy(priv->pixel_format, pixfmt_name,
@@ -853,6 +895,26 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
       dev_err(dev, "tegra camera subdev registration failed\n");
       tegracam_device_unregister(tc_dev);
       goto err_camera_register;
+   }
+
+   /* Set default sensor_mode_id to the mode matching the camera's native
+    * resolution and pixel format.  Without this, the tegracam framework
+    * defaults to sensor_mode_id=0 (640x480 RAW16), which causes GStreamer
+    * to fail on cameras with different native parameters (e.g. Crius1280
+    * at 1280x1024). */
+   {
+      int m = eg_ec_find_native_mode(priv->native_width,
+            priv->native_height, priv->native_pixfmt);
+      if (m >= 0) {
+         tc_dev->s_data->sensor_mode_id = m;
+         tc_dev->s_data->def_mode = eg_ec_mipi_frmfmt[m].mode;
+         tc_dev->s_data->def_width = eg_ec_mipi_frmfmt[m].size.width;
+         tc_dev->s_data->def_height = eg_ec_mipi_frmfmt[m].size.height;
+         dev_info(dev,
+               "default sensor_mode_id set to %d (%ux%u)\n",
+               m, eg_ec_mipi_frmfmt[m].size.width,
+               eg_ec_mipi_frmfmt[m].size.height);
+      }
    }
 
    device_create_file(dev, &dev_attr_model);

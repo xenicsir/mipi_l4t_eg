@@ -1,12 +1,13 @@
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-index 93728f4..3f04338 100644
+index 93728f4..ad40ba1 100644
 --- a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-@@ -66,6 +66,46 @@ dtbo-y += tegra234-p3767-camera-p3768-imx219-imx477.dtbo
+@@ -66,6 +66,47 @@ dtbo-y += tegra234-p3767-camera-p3768-imx219-imx477.dtbo
  dtbo-y += tegra234-p3767-camera-p3768-imx477-C.dtbo
  dtbo-y += tegra234-p3767-camera-p3768-imx477-A.dtbo
  
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cams-dione.dtbo
++dtbo-y += tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
@@ -23,7 +24,7 @@ index 93728f4..3f04338 100644
 +dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 +
 +dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
-+dtbo-y += tegra234-p3737-camera-auvidea-x230-eg-cams-dione.dtbo
++dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cam0-ec-1-lane.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cam0-ec-2-lanes.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cam0-ec-imx219.dtbo
@@ -51,10 +52,10 @@ index 93728f4..3f04338 100644
  endif
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..dfe134d
+index 0000000..7b35a8e
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,2891 @@
+@@ -0,0 +1,2870 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -2922,27 +2923,6 @@ index 0000000..dfe134d
 +	   };
 +   };
 +
-+#ifdef HAS_BASE_IMX219
-+	/* Disable IMX219 camera nodes present in some carrier board base DTBs
-+	 * (e.g. Auvidea X230D on L4T 36.4.3) to prevent probe conflicts. */
-+	fragment@1 {
-+		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
-+		__overlay__ { status = "disabled"; };
-+	};
-+	fragment@2 {
-+		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
-+		__overlay__ { status = "disabled"; };
-+	};
-+	fragment@3 {
-+		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
-+		__overlay__ { status = "disabled"; };
-+	};
-+	fragment@4 {
-+		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
-+		__overlay__ { status = "disabled"; };
-+	};
-+#endif
-+
 +};
 +
 +
@@ -4508,6 +4488,42 @@ index 0000000..8882bbb
 +	overlay-name = "Exosens Cameras";
 +	jetson-header-name = "Jetson AGX CSI Connector";
 +	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cams-disable-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cams-disable-imx219.dts
+new file mode 100644
+index 0000000..fcee765
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cams-disable-imx219.dts
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. Disable imx219";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	/* Disable IMX219 camera nodes present in some carrier board base DTBs
++	 * (e.g. Auvidea X230D on L4T 36.4.3) to prevent probe conflicts. */
++	fragment@0 {
++		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
++		__overlay__ { status = "disabled"; };
++	};
++	fragment@1 {
++		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
++		__overlay__ { status = "disabled"; };
++	};
++	fragment@2 {
++		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
++		__overlay__ { status = "disabled"; };
++	};
++	fragment@3 {
++		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
++		__overlay__ { status = "disabled"; };
++	};
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644

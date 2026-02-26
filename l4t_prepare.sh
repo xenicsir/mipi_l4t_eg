@@ -115,22 +115,28 @@ else
 fi
 
 # Get toolchain
+# The toolchain is shared across all vendor builds for a given L4T version.
+# Use a version-scoped lock to avoid races when multiple vendors run --prepare
+# in parallel (e.g. generic + forecr for the same version).
 cd $JETSON_DIR
 if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${JETSON_TOOCHAIN_ARCHIVE} ]]; then
    update_status "Downloading toolchain..."
    wget -q $JETSON_TOOCHAIN_ARCHIVE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${JETSON_TOOCHAIN_ARCHIVE}
 fi
-if [[ -f $JETSON_DIR/.toolchain_done ]]; then
-   update_status "Toolchain already extracted, skipping"
-else
-   rm -rf $JETSON_DIR/$TOOLCHAIN_DIR
-   mkdir $JETSON_DIR/$TOOLCHAIN_DIR
-   cd $JETSON_DIR/$TOOLCHAIN_DIR
-   update_status "Extracting toolchain..."
-   fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/$JETSON_TOOCHAIN_ARCHIVE"
-   cd $JETSON_DIR
-   touch .toolchain_done
-fi
+(
+   flock -x 200
+   if [[ -f $JETSON_DIR/.toolchain_done ]]; then
+      update_status "Toolchain already extracted, skipping"
+   else
+      rm -rf $JETSON_DIR/$TOOLCHAIN_DIR
+      mkdir $JETSON_DIR/$TOOLCHAIN_DIR
+      cd $JETSON_DIR/$TOOLCHAIN_DIR
+      update_status "Extracting toolchain..."
+      fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/$JETSON_TOOCHAIN_ARCHIVE"
+      cd $JETSON_DIR
+      touch .toolchain_done
+   fi
+) 200>"$JETSON_DIR/.toolchain_lock"
 
 # Decompress Linux sources
 cd $JETSON_DIR

@@ -1,74 +1,176 @@
-To check which cameras are associated to /dev/videoX devices :
-v4l2-ctl --list-devices
+================================================================================
+EG CAMERA STREAMING EXAMPLES
+================================================================================
 
-===========================
-Jetson boards except Nano : 
-===========================
-* Mono16 :
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="Y16 " --set-ctrl=sensor_mode=0 --stream-count=1  --stream-to=video.raw
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="Y16 " --set-ctrl=sensor_mode=3 --stream-count=1  --stream-to=video.raw
-* ARGB888 :
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24" --set-ctrl=sensor_mode=1 --stream-count=1 --stream-to=video.raw
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="AR24" --set-ctrl=sensor_mode=4 --stream-count=1 --stream-to=video.raw
-* YCbCr  :
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="YUYV" --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=video.raw
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=video.raw
+To check which cameras are associated to /dev/videoX devices:
+  eg_dt_camera_config_get.sh
 
-* gstream :
-	- Mono16 :
-	to a file (1 image) :
-		gst-launch-1.0 v4l2src device="/dev/video0" num-buffers=1 ! "video/x-raw, format=(string)GRAY16_LE" ! filesink location=video.raw
-	to the screen :
-		gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" ! videoconvert ! ximagesink sync=false
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)GRAY16_LE, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
 
-	- RGB888 :
-	native ARGB888 :
-		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)BGRA" ! filesink location=video.raw
-	RGB888
-		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)BGRA" ! videoconvert ! video/x-raw,format=BGR ! filesink location=video.raw
-	to the screen :
-		gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=4;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
-	to a UDP port for gstreamer, host address 192.168.1.1 :
-		gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=(string)RGB, width=640, height=480" ! videoconvert ! x264enc tune=zerolatency ! rtph264pay ! udpsink host=192.168.1.1 port=50000
-		Command for the receiver host : gst-launch-1.0 udpsrc port=50000 caps="application/x-rtp, media=video, encoding-name=H264" ! rtph264depay ! avdec_h264 ! autovideosink sync=false
-    to a UDP port for VLC, host address 192.168.1.1 :
-	    gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=(string)RGB, width=640, height=480" ! videoconvert ! x264enc key-int-max=12 ! mpegtsmux ! udpsink host=192.168.1.1 port=50000
-    to a TCP port for VLC: 
-	    gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=(string)RGB, width=640, height=480" ! videoconvert ! x264enc key-int-max=12 ! mpegtsmux ! tcpserversink host=0.0.0.0 port=50000
+================================================================================
+JETSON BOARDS
+================================================================================
 
-	- YCbYr :
-	to a file (1 image) :
-		gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 ! "video/x-raw, format=(string)YUY2" ! filesink location=video.raw
-	to the screen :
-		gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=640, height=480" ! videoconvert ! ximagesink sync=false
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=5;gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+MONO16 (Y16 - 16-bit Greyscale)
+────────────────────────────────
 
-	to a TCP port :
-		v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=5;gst-launch-1.0 -v v4l2src device=/dev/video0  ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! videoconvert ! video/x-raw,format=Y444 ! x264enc key-int-max=12 byte-stream=true ! mpegtsmux ! tcpserversink host=0.0.0.0 port=50000
+  640x480:
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=640,height=480,pixelformat="Y16 " \
+      --stream-count=1 --stream-to=video.raw
 
-=============
-Jetson Nano : 
-=============
-* ARGB888 :
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24" --set-ctrl=sensor_mode=0 --stream-count=1 --stream-to=video.raw
-   gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
+  1280x1024:
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=1280,height=1024,pixelformat="Y16 " \
+      --stream-count=1 --stream-to=video.raw
 
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="AR24" --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=video.raw
-   v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=2;gst-launch-1.0 -v v4l2src device="/dev/video0" ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
 
-* YCbCr  :
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="YUYV" --set-ctrl=sensor_mode=1 --stream-count=1 --stream-to=video.raw
-   gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=640, height=480" ! videoconvert ! ximagesink sync=false
+ARGB888 (32-bit BGRA)
+─────────────────────
 
-	v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" --set-ctrl=sensor_mode=3 --stream-count=1 --stream-to=video.raw
-	v4l2-ctl -d /dev/video0 --set-ctrl=sensor_mode=3;gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+  640x480:
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=640,height=480,pixelformat="AR24" \
+      --stream-count=1 --stream-to=video.raw
 
-===============
-Other cameras : 
-===============
-* imx219
-v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=RG10 --stream-mmap
-export DISPLAY=:1; gst-launch-1.0 nvarguscamerasrc sensor-id=0 ! "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080,format=(string)NV12, framerate=(fraction)30/1" ! nvvidconv ! xvimagesink sync=false
+  1280x1024:
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=1280,height=1024,pixelformat="AR24" \
+      --stream-count=1 --stream-to=video.raw
 
+
+YUYV (YCbCr 4:2:2 Packed)
+──────────────────────────
+
+  640x480:
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=640,height=480,pixelformat="YUYV" \
+      --stream-count=1 --stream-to=video.raw
+
+  1280x1024:
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" \
+      --stream-count=1 --stream-to=video.raw
+
+
+GSTREAMER EXAMPLES
+───────────────────
+
+MONO16 (Y16 - 16-bit Greyscale)
+
+  Capture to file (1 frame):
+    gst-launch-1.0 v4l2src device="/dev/video0" num-buffers=1 \
+      ! "video/x-raw, format=(string)GRAY16_LE" \
+      ! filesink location=video.raw
+
+  Display 640x480:
+    gst-launch-1.0 -v v4l2src device="/dev/video0" \
+      ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" \
+      ! videoconvert ! ximagesink sync=false
+
+  Display 1280x1024:
+    gst-launch-1.0 -v v4l2src device="/dev/video0" \
+      ! "video/x-raw, format=(string)GRAY16_LE, width=1280, height=1024" \
+      ! videoconvert ! ximagesink sync=false
+
+
+ARGB888 (32-bit BGRA)
+
+  Capture native ARGB888 to file (1 frame):
+    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
+      ! "video/x-raw, format=(string)BGRA" \
+      ! filesink location=video.raw
+
+  Convert to RGB888 and save:
+    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
+      ! "video/x-raw, format=(string)BGRA" \
+      ! videoconvert ! video/x-raw,format=BGR \
+      ! filesink location=video.raw
+
+  Display 640x480:
+    gst-launch-1.0 -v v4l2src device="/dev/video0" \
+      ! "video/x-raw, format=(string)BGRA, width=640, height=480" \
+      ! videoconvert ! ximagesink sync=false
+
+  Display 1280x1024:
+    gst-launch-1.0 -v v4l2src device="/dev/video0" \
+      ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" \
+      ! videoconvert ! ximagesink sync=false
+
+  Stream to UDP (GStreamer receiver, host 192.168.1.1):
+    gst-launch-1.0 v4l2src device=/dev/video0 \
+      ! "video/x-raw, format=(string)RGB, width=640, height=480" \
+      ! videoconvert ! x264enc tune=zerolatency ! rtph264pay \
+      ! udpsink host=192.168.1.1 port=50000
+
+    Receiver:
+      gst-launch-1.0 udpsrc port=50000 \
+        caps="application/x-rtp, media=video, encoding-name=H264" \
+        ! rtph264depay ! avdec_h264 ! autovideosink sync=false
+
+  Stream to UDP (VLC receiver, host 192.168.1.1):
+    gst-launch-1.0 v4l2src device=/dev/video0 \
+      ! "video/x-raw, format=(string)RGB, width=640, height=480" \
+      ! videoconvert ! x264enc key-int-max=12 ! mpegtsmux \
+      ! udpsink host=192.168.1.1 port=50000
+
+  Stream to TCP (VLC receiver):
+    gst-launch-1.0 v4l2src device=/dev/video0 \
+      ! "video/x-raw, format=(string)RGB, width=640, height=480" \
+      ! videoconvert ! x264enc key-int-max=12 ! mpegtsmux \
+      ! tcpserversink host=0.0.0.0 port=50000
+
+
+YUYV (YCbCr 4:2:2 Packed)
+
+  Capture to file (1 frame):
+    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
+      ! "video/x-raw, format=(string)YUY2" \
+      ! filesink location=video.raw
+
+  Display 640x480:
+    gst-launch-1.0 -v v4l2src device=/dev/video0 \
+      ! "video/x-raw, format=(string)YUY2, width=640, height=480" \
+      ! videoconvert ! ximagesink sync=false
+
+  Display 1280x1024:
+    gst-launch-1.0 -v v4l2src device=/dev/video0 \
+      ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" \
+      ! videoconvert ! ximagesink sync=false
+
+  Stream to TCP:
+    gst-launch-1.0 -v v4l2src device=/dev/video0 \
+      ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" \
+      ! videoconvert ! video/x-raw,format=Y444 \
+      ! x264enc key-int-max=12 byte-stream=true ! mpegtsmux \
+      ! tcpserversink host=0.0.0.0 port=50000
+
+
+
+================================================================================
+OTHER CAMERAS (e.g. IMX219)
+================================================================================
+
+  v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=RG10 \
+    --stream-mmap
+
+  export DISPLAY=:1
+  gst-launch-1.0 nvarguscamerasrc sensor-id=0 \
+    ! "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, \
+       format=(string)NV12, framerate=(fraction)30/1" \
+    ! nvvidconv ! xvimagesink sync=false
+
+
+================================================================================
+NOTES
+================================================================================
+
+• Y16 (16-bit greyscale) is not supported on Jetson Nano (T210). Use AR24
+  or YUYV instead.
+
+• For GStreamer, the format and dimensions are negotiated automatically
+  when not explicitly constrained in the caps filter.
+
+• Line continuations (\) are for readability. Copy commands as-is or
+  remove backslashes and put everything on one line.
+
+• DISPLAY=:1 sets the X11 display for graphical output on a remote host.

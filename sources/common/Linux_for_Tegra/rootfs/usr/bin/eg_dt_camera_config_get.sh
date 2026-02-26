@@ -34,7 +34,7 @@
 #
 CAMERA_DATABASE=(
     "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
-    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
+    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube:1"
     "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
     "ilumos:30:ilumos_([a-h])@30:iLumos:4"
     "microlynx:51:microlynx_([a-h])@51:Microlynx:2"
@@ -582,7 +582,7 @@ else
     if [[ ${#camera_configs[@]} -eq 0 ]]; then
         echo "No cameras configured in device tree"
     else
-        echo "Camera ports:"
+        echo "Camera ports configuration:"
         for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
             cam_type="${camera_configs[$port]}"
             conn_status="${camera_connected[$port]}"
@@ -610,6 +610,28 @@ else
                 [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
                 [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
                 [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
+                if [[ -n "$video_dev" ]] && [[ -n "$resolution" ]] && [[ -n "$pixfmt" ]]; then
+                    _w="${resolution%%[x/]*}"
+                    _h="${resolution##*[x/]}"
+                    # Extract 4-char code: sysfs gives "'AR24' (desc)", V4L2 gives "AR24"
+                    _raw="${pixfmt#\'}"
+                    _code="${_raw:0:4}"
+                    _v4l2fmt="" ; _gstfmt=""
+                    case "$_code" in
+                        "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
+                        "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
+                        "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
+                    esac
+                    if [[ -n "$_v4l2fmt" ]]; then
+                        if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_code" == "Y16 " || "$_code" == "Y16" ]]; then
+                            echo "    Warning: Y16 (16-bit greyscale) is not supported on Jetson Nano (t210). Use AR24 or YUYV."
+                        else
+                            echo "    Streaming:"
+                            echo "      v4l2-ctl -d $video_dev --stream-mmap --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            echo "      gst-launch-1.0 -v v4l2src device=$video_dev ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" ! videoconvert ! ximagesink sync=false"
+                        fi
+                    fi
+                fi
             fi
         done
         echo ""

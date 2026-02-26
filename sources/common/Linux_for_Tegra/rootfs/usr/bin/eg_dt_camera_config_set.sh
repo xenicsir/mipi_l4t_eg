@@ -81,19 +81,26 @@ esac
 disable_imx219_arg=""
 if [[ x$BOARD == xdsboard-ornxs ]]; then
    base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
-elif [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
-   # IMX219 nodes present in base DTB (e.g. Auvidea X230D 35.3.1): use per-channel DTBO + disable IMX219
-   base_devicetree="Exosens Cameras"
-   disable_imx219_dtbo="/boot/tegra234-p3737-camera-eg-cams-disable-imx219.dtbo"
-   if [[ ! -f "$disable_imx219_dtbo" ]]; then
-      echo "Error: IMX219 nodes found in device tree but DTBO not installed: $disable_imx219_dtbo" >&2
-      exit 1
+elif grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null; then
+   # tegra234 (Orin family) — IMX219 and global-DTBO logic only applies here
+   if [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
+      # IMX219 nodes present in base DTB (e.g. Auvidea 35.x/36.4/36.4.3): use per-channel DTBO + disable IMX219
+      base_devicetree="Exosens Cameras"
+      disable_imx219_dtbo="/boot/tegra234-p3737-camera-eg-cams-disable-imx219.dtbo"
+      if [[ ! -f "$disable_imx219_dtbo" ]]; then
+         echo "Error: IMX219 nodes found in device tree but DTBO not installed: $disable_imx219_dtbo" >&2
+         exit 1
+      fi
+      disable_imx219_arg="2=Exosens Cameras. Disable imx219"
+   elif [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
+      # No IMX219, global DTBO present: base DTB uses global NVCSI endpoint numbering (35.x NVIDIA std / Auvidea 35.4.1+)
+      base_devicetree="Exosens Cameras (global)"
+   else
+      base_devicetree="Exosens Cameras"
    fi
-   disable_imx219_arg="2=Exosens Cameras. Disable imx219"
-elif [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
-   # No IMX219, global DTBO present: base DTB uses global NVCSI endpoint numbering (35.x NVIDIA std / Auvidea 35.4.1+)
-   base_devicetree="Exosens Cameras (global)"
 else
+   # Other SoCs (e.g. tegra194 Xavier NX): IMX219 nodes may be present in base DTB
+   # but do not conflict with EG camera overlays — no disable needed
    base_devicetree="Exosens Cameras"
 fi
 
@@ -177,7 +184,7 @@ if [ $exit_code -ne 0 ]; then
     exit $exit_code
 fi
 
-# Verify the DTB file was actually created
+# Verify the DTB file was actually created (35.x / fdtoverlay-on-apply path)
 dtb_file=$(echo "$output" | sed -n 's/Configuration saved to \(.*\)\./\1/p')
 if [ -n "$dtb_file" ] && [ ! -f "$dtb_file" ]; then
     echo "Error: DTB file was not created despite success message." >&2
@@ -185,5 +192,49 @@ if [ -n "$dtb_file" ] && [ ! -f "$dtb_file" ]; then
     echo "This usually indicates a permission issue with /boot directory." >&2
     echo "Try running: sudo ls -ld /boot" >&2
     exit 1
+fi
+
+# In 36.x, jetson-io writes an OVERLAYS line to extlinux.conf and the
+# bootloader applies fdtoverlay at boot time — there is no apply-time
+# validation.  Perform a dry-run fdtoverlay check here so that a corrupt
+# or incompatible DTBO is caught before the next reboot.
+if echo "$output" | grep -q "extlinux.conf to add following DTBO"; then
+    extlinux_conf="/boot/extlinux/extlinux.conf"
+    base_dtb=$(grep -A30 '^LABEL JetsonIO' "$extlinux_conf" \
+               | grep -oP '^\s*FDT\s+\K\S+' | head -1)
+    overlays_line=$(grep -A30 '^LABEL JetsonIO' "$extlinux_conf" \
+                    | grep -oP '^\s*OVERLAYS\s+\K\S+' | head -1)
+
+    if [[ -z "$base_dtb" || -z "$overlays_line" ]]; then
+        echo "Warning: could not parse FDT/OVERLAYS from $extlinux_conf — skipping fdtoverlay check." >&2
+    else
+        IFS=',' read -ra _dtbos <<< "$overlays_line"
+        _tmpout=$(mktemp /tmp/eg_dtcheck_XXXXXX.dtb)
+        _errtmp=$(mktemp /tmp/eg_dtcheck_err_XXXXXX.txt)
+
+        echo ""
+        echo "Validating DTBOs with fdtoverlay (dry-run)..."
+        if fdtoverlay -i "$base_dtb" -o "$_tmpout" "${_dtbos[@]}" 2>"$_errtmp"; then
+            rm -f "$_tmpout" "$_errtmp"
+            echo "fdtoverlay validation: OK"
+        else
+            _err_msg=$(cat "$_errtmp")
+            rm -f "$_tmpout" "$_errtmp"
+            echo "" >&2
+            echo "ERROR: fdtoverlay validation FAILED!" >&2
+            echo "The following DTBOs were written to extlinux.conf but cannot be applied:" >&2
+            for _dtbo in "${_dtbos[@]}"; do
+                echo "  $_dtbo" >&2
+            done
+            echo "" >&2
+            echo "fdtoverlay error output:" >&2
+            echo "$_err_msg" >&2
+            echo "" >&2
+            echo "WARNING: The system will likely FAIL TO BOOT with this configuration." >&2
+            echo "Please fix the invalid DTBO(s) and re-run this script before rebooting." >&2
+            echo "The previous extlinux.conf was backed up as: ${extlinux_conf}.jetson-io-backup" >&2
+            exit 1
+        fi
+    fi
 fi
 

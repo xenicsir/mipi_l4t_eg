@@ -158,7 +158,6 @@ deployment_matrix:
 After modifying `deployment_matrix_data.yaml`, regenerate all output formats:
 
 ```bash
-cd docs/
 python3 generate_deployment_matrix.py
 ```
 

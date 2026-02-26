@@ -85,12 +85,18 @@ Camera ports:
     Serial:       21971
     Resolution:   640x480
     Pixel format: 'Y16 ' (16-bit Greyscale)
+    Streaming:
+      v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="Y16 "
+      gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" ! videoconvert ! ximagesink sync=false
   Port 1: Dione 1280 (connected)       # model from sysfs
     Video device: /dev/video1
     I2C device:   /dev/dioneir-i2c-10-000e-5b
     Serial:       20823
     Resolution:   1280x1024
     Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+    Streaming:
+      v4l2-ctl -d /dev/video1 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="AR24"
+      gst-launch-1.0 -v v4l2src device=/dev/video1 ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
 
 Total configured: 2 camera(s)
 ```
@@ -106,6 +112,7 @@ Total configured: 2 camera(s)
 - **Serial**: Camera serial number read from driver sysfs (if available)
 - **Resolution**: Native camera resolution from driver sysfs (preferred), fallback to V4L2 current format
 - **Pixel format**: Native pixel format from driver sysfs (preferred), fallback to V4L2 current format
+- **Streaming**: Ready-to-use v4l2-ctl and GStreamer commands for the detected device, resolution, and pixel format (shown when all three are available)
 
 ### 2. Verbose Mode
 
@@ -357,6 +364,9 @@ Camera ports:
     Serial:       20823
     Resolution:   640x480
     Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+    Streaming:
+      v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24"
+      gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
   Port 1: MicroCube640 (not connected)    # DT type (no camera connected)
 
 Total configured: 2 camera(s)
@@ -794,11 +804,7 @@ If camera types are incorrect:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 2.3 | 2026-02-18 | Add firmware_version sysfs attribute display (human-readable and JSON) |
-| 2.2 | 2026-02-12 | Read camera details from driver sysfs (model, serial, resolution, pixel format), color-coded connection status, display actual model name from sysfs instead of DT type name, sysfs-first resolution/pixel format with v4l2-ctl fallback, JSON output includes camera details |
-| 2.1 | 2026-02-03 | Added connection detection: distinguishes configured vs physically connected cameras using V4L2 |
-| 2.0 | 2026-02-03 | Complete rewrite: auto-discovery, generic board support, JSON output, uses detect_jetson_board.sh |
-| 1.0 | 2025-02-02 | Initial version with hardcoded board types |
+| 1.0 | 2026-02-26 | Initial release |
 
 ---
 

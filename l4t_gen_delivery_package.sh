@@ -266,21 +266,28 @@ fi
 #******************************************************************************
 update_status "Creating install scripts..."
 
+# Use build-specific temp file names to avoid collisions when multiple
+# builds run in parallel (e.g. generic and forecr for the same L4T version).
+_BUILD_ID="${L4T_VERSION_EXTENDED}_${CARRIER_BOARD:-generic}"
+_PREINST="/tmp/preinst_${_BUILD_ID}"
+_POSTINST="/tmp/postinst_${_BUILD_ID}"
+_POSTRM="/tmp/postrm_${_BUILD_ID}"
+
 # The package's /etc/version_eg_cams is not yet on disk when preinst runs
 # (dpkg unpacks files only after preinst succeeds), so we embed its content
 # verbatim here at build time. The L4T version is then extracted from it to
 # compare against the running system's /etc/nv_tegra_release.
-cat > /tmp/preinst << 'EOT'
+cat > "$_PREINST" << 'EOT'
 #!/bin/bash
 set -e
 EOT
 
 # Embed the exact same string that Step 3 writes to /etc/version_eg_cams
-cat >> /tmp/preinst << EOT
+cat >> "$_PREINST" << EOT
 PACKAGE_VERSION_LINE="jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT_COMMIT})"
 EOT
 
-cat >> /tmp/preinst << 'EOT'
+cat >> "$_PREINST" << 'EOT'
 
 case "$1" in
     install|upgrade)
@@ -357,19 +364,19 @@ EOT
 #******************************************************************************
 # Step 7: Create post-install script
 #******************************************************************************
-cat > /tmp/postinst << 'EOT'
+cat > "$_POSTINST" << 'EOT'
 #!/bin/bash
 depmod
 EOT
 
 # Inject L4T version into postinst (unquoted EOT for variable expansion)
-cat >> /tmp/postinst << EOT
+cat >> "$_POSTINST" << EOT
 
 L4T_VERSION_MAJOR=$L4T_VERSION_MAJOR
 EOT
 
 # Add Exosens camera overlay configuration (quoted EOT, no expansion)
-cat >> /tmp/postinst << 'EOT'
+cat >> "$_POSTINST" << 'EOT'
 
 # Configure Exosens camera overlay if not already done
 if ! grep -q "JetsonIO" /boot/extlinux/extlinux.conf 2>/dev/null; then
@@ -460,7 +467,7 @@ EOT
 #******************************************************************************
 # Step 8: Create post-remove script
 #******************************************************************************
-cat > /tmp/postrm << 'EOT'
+cat > "$_POSTRM" << 'EOT'
 #!/bin/bash
 depmod
 EOT
@@ -493,9 +500,9 @@ fpm -v ${DEB_VERSION} \
    -s dir \
    -t deb \
    -n ${PACKAGE_NAME} \
-   --before-install /tmp/preinst \
-   --after-install /tmp/postinst \
-   --after-remove /tmp/postrm \
+   --before-install "$_PREINST" \
+   --after-install "$_POSTINST" \
+   --after-remove "$_POSTRM" \
    --description "Exosens MIPI camera drivers for NVIDIA Jetson (L4T ${L4T_VERSION_EXTENDED})" \
    .
 
