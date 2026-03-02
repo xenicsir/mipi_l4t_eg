@@ -2046,10 +2046,10 @@ index 0000000..31bff8a
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..6bb7ef2
+index 0000000..1bce772
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,240 @@
+@@ -0,0 +1,301 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -2099,6 +2099,24 @@ index 0000000..6bb7ef2
 +	exit 0
 +fi
 +
++# Returns 0 (true) if any node matching PATTERN is active in the given DTB file.
++# A node is considered active if it does not have an explicit status = "disabled".
++# Per the DT spec, absence of status property means "okay" (active).
++# Usage: _camera_node_active_in_dtb <dtb_file> <node_pattern>
++# Example: _camera_node_active_in_dtb merged.dtb "rbpcv2_imx219"
++_camera_node_active_in_dtb() {
++    local dtb="$1"
++    local pattern="$2"
++    command -v dtc &>/dev/null || return 1
++    dtc -I dtb -O dts "$dtb" 2>/dev/null | awk -v pat="$pattern" '
++        $0 ~ (pat "[^{]*{") { p=1; d=1; disabled=0 }
++        p && $0 !~ pat && /{/ { d++ }
++        p && /status = "disabled"/ { disabled=1 }
++        p && /}/ { d--; if (d<=0) { if (!disabled) found=1; p=0 } }
++        END { exit !found }
++    '
++}
++
 +BOARD=$(detect_jetson_board.sh --short)
 +
 +# Detect number of camera ports from device tree
@@ -2130,30 +2148,37 @@ index 0000000..6bb7ef2
 +	  ;;
 +esac
 +
-+disable_imx219_arg=""
++# Select base overlay name
 +if [[ x$BOARD == xdsboard-ornxs ]]; then
 +   base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
-+elif grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null; then
-+   # tegra234 (Orin family) — IMX219 and global-DTBO logic only applies here
-+   if [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
-+      # IMX219 nodes present in base DTB (e.g. Auvidea 35.x/36.4/36.4.3): use per-channel DTBO + disable IMX219
-+      base_devicetree="Exosens Cameras"
-+      disable_imx219_dtbo="/boot/tegra234-p3737-camera-eg-cams-disable-imx219.dtbo"
-+      if [[ ! -f "$disable_imx219_dtbo" ]]; then
-+         echo "Error: IMX219 nodes found in device tree but DTBO not installed: $disable_imx219_dtbo" >&2
-+         exit 1
-+      fi
-+      disable_imx219_arg="2=Exosens Cameras. Disable imx219"
-+   elif [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
-+      # No IMX219, global DTBO present: base DTB uses global NVCSI endpoint numbering (35.x NVIDIA std / Auvidea 35.4.1+)
-+      base_devicetree="Exosens Cameras (global)"
-+   else
-+      base_devicetree="Exosens Cameras"
-+   fi
 +else
-+   # Other SoCs (e.g. tegra194 Xavier NX): IMX219 nodes may be present in base DTB
-+   # but do not conflict with EG camera overlays — no disable needed
 +   base_devicetree="Exosens Cameras"
++fi
++
++# IMX219/IMX477 conflict detection — all boards
++# Cache jetson-io overlay list once (avoid multiple sudo calls)
++disable_imx219_arg=""
++disable_imx477_arg=""
++_jetson_io_overlays=$(sudo /opt/eg/jetson-io/config-by-hardware.py -l 2>/dev/null)
++
++if [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
++   if echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx219"; then
++      disable_imx219_arg="2=Exosens Cameras. Disable imx219"
++   fi
++fi
++
++if [[ -n "$(find -L /proc/device-tree -name "rbpcv3_imx477*" -type d 2>/dev/null | head -1)" ]]; then
++   if echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx477"; then
++      disable_imx477_arg="2=Exosens Cameras. Disable imx477"
++   fi
++fi
++
++# Upgrade to global DTBO on tegra234 when no Disable overlays are needed
++if [[ $base_devicetree == "Exosens Cameras" ]] && \
++   [[ -z "$disable_imx219_arg" ]] && [[ -z "$disable_imx477_arg" ]] && \
++   grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null && \
++   [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
++   base_devicetree="Exosens Cameras (global)"
 +fi
 +
 +dtboarg=()
@@ -2213,6 +2238,7 @@ index 0000000..6bb7ef2
 +# Build command arguments dynamically
 +cmd_args=("2=$base_devicetree")
 +[[ -n "$disable_imx219_arg" ]] && cmd_args+=("$disable_imx219_arg")
++[[ -n "$disable_imx477_arg" ]] && cmd_args+=("$disable_imx477_arg")
 +cmd_args+=("${dtboarg[@]}")
 +
 +# Debug: Show all command arguments
@@ -2246,6 +2272,24 @@ index 0000000..6bb7ef2
 +    exit 1
 +fi
 +
++# 35.x: check for active IMX219/IMX477 nodes in the merged DTB
++if [ -n "$dtb_file" ] && [ -f "$dtb_file" ]; then
++    if _camera_node_active_in_dtb "$dtb_file" "rbpcv2_imx219"; then
++        echo "" >&2
++        echo "Error: IMX219 camera node(s) are still active in the merged device tree." >&2
++        echo "Exosens cameras may not work correctly." >&2
++        echo "The 'Exosens Cameras. Disable imx219' overlay is not configured for this board." >&2
++        exit 1
++    fi
++    if _camera_node_active_in_dtb "$dtb_file" "rbpcv3_imx477"; then
++        echo "" >&2
++        echo "Error: IMX477 camera node(s) are still active in the merged device tree." >&2
++        echo "Exosens cameras may not work correctly." >&2
++        echo "The 'Exosens Cameras. Disable imx477' overlay is not configured for this board." >&2
++        exit 1
++    fi
++fi
++
 +# In 36.x, jetson-io writes an OVERLAYS line to extlinux.conf and the
 +# bootloader applies fdtoverlay at boot time — there is no apply-time
 +# validation.  Perform a dry-run fdtoverlay check here so that a corrupt
@@ -2267,6 +2311,23 @@ index 0000000..6bb7ef2
 +        echo ""
 +        echo "Validating DTBOs with fdtoverlay (dry-run)..."
 +        if fdtoverlay -i "$base_dtb" -o "$_tmpout" "${_dtbos[@]}" 2>"$_errtmp"; then
++            # Check for active IMX219/IMX477 nodes in the merged device tree
++            if _camera_node_active_in_dtb "$_tmpout" "rbpcv2_imx219"; then
++                rm -f "$_tmpout" "$_errtmp"
++                echo "" >&2
++                echo "Error: IMX219 camera node(s) are still active in the merged device tree." >&2
++                echo "Exosens cameras may not work correctly." >&2
++                echo "The 'Exosens Cameras. Disable imx219' overlay is not configured for this board." >&2
++                exit 1
++            fi
++            if _camera_node_active_in_dtb "$_tmpout" "rbpcv3_imx477"; then
++                rm -f "$_tmpout" "$_errtmp"
++                echo "" >&2
++                echo "Error: IMX477 camera node(s) are still active in the merged device tree." >&2
++                echo "Exosens cameras may not work correctly." >&2
++                echo "The 'Exosens Cameras. Disable imx477' overlay is not configured for this board." >&2
++                exit 1
++            fi
 +            rm -f "$_tmpout" "$_errtmp"
 +            echo "fdtoverlay validation: OK"
 +        else
