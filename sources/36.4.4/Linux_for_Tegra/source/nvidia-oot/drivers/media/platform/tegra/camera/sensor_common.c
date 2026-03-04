@@ -269,6 +269,8 @@ static int extract_pixel_format(
 		*format = V4L2_PIX_FMT_VYUY;
 	else if (strncmp(pixel_t, "raw_grey16", size) == 0)
 		*format = V4L2_PIX_FMT_Y16;
+	else if (strncmp(pixel_t, "raw_grey_be16", size) == 0)
+		*format = V4L2_PIX_FMT_Y16_BE;
 	else {
 		pr_err("%s: Need to extend format %s\n", __func__, pixel_t);
 		return -EINVAL;

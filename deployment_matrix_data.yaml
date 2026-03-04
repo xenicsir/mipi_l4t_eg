@@ -12,7 +12,7 @@
 #     git_branch: "branch-name" (displayed as GitHub link)
 #     deb_package: "package-name.deb" or "" (if not available)
 
-github_repo: "https://github.com/xenicsir/mipi_l4t_eg/tree"
+github_repo: "https://github.com/xenicsir/mipi_l4t_eg"
 package_repo_base: "https://releases.example.com/mipi-drivers"
 
 platforms:
@@ -24,7 +24,7 @@ platforms:
     csi_lanes: 2
 
   - id: xavier_nx
-    name: "Xavier NX"
+    name: "Xavier NX (T194)"
     description: "Jetson Xavier NX developer kit"
     l4t_series: "32.x, 35.x"
     som: "Tegra194"

@@ -37,6 +37,10 @@ Constructor Parameters
     com_device   : str   (default: "COM0") - Serial port (Windows only, e.g., "COM20")
     device_type  : str   (default: "I2C")  - Communication type: "I2C" or "USB"
     gencp_enable : bool  (default: False)  - Enable GenCP protocol
+    force_slave  : bool  (default: False)  - Use I2C_SLAVE_FORCE (0x0706) instead of
+                                             I2C_SLAVE (0x0703). Required when a kernel
+                                             driver (e.g. microlynx) already holds the
+                                             I2C address; otherwise ioctl returns EBUSY.
 
 Note: On Windows, device_type is automatically set to "USB".
 
@@ -140,6 +144,7 @@ import numpy as np
 import ctypes
 
 IOCTL_I2C_SLAVE=0x0703
+IOCTL_I2C_SLAVE_FORCE=0x0706   # use when kernel driver holds the I2C address
 IOCTL_I2C_TIMEOUT=0x0702
 
 GencpStatus = {
@@ -158,7 +163,7 @@ GencpStatus = {
 
 class dioneCtrl(object):
 
-  def __init__(self, bus=6, dev_addr=0x5a, com_device="COM0", device_type="I2C", gencp_enable=False):
+  def __init__(self, bus=6, dev_addr=0x5a, com_device="COM0", device_type="I2C", gencp_enable=False, force_slave=False):
 
     self.device_type = device_type
     if (platform.system() == "Windows") :
@@ -168,8 +173,9 @@ class dioneCtrl(object):
         self.fr=io.open("/dev/i2c-"+str(bus), "rb", buffering=0)
         self.fw=io.open("/dev/i2c-"+str(bus), "wb", buffering=0)
 
-        fcntl.ioctl(self.fr, IOCTL_I2C_SLAVE, dev_addr)
-        fcntl.ioctl(self.fw, IOCTL_I2C_SLAVE, dev_addr)
+        _slave_ioctl = IOCTL_I2C_SLAVE_FORCE if force_slave else IOCTL_I2C_SLAVE
+        fcntl.ioctl(self.fr, _slave_ioctl, dev_addr)
+        fcntl.ioctl(self.fw, _slave_ioctl, dev_addr)
         fcntl.ioctl(self.fr, IOCTL_I2C_TIMEOUT, 100)
         fcntl.ioctl(self.fw, IOCTL_I2C_TIMEOUT, 100)
     else :

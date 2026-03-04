@@ -689,16 +689,16 @@
 					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1024";
 					active_h = "128";
 					line_length = "1024";
 					mode_type = "raw";
-					pixel_phase = "grey";
+					pixel_phase = "grey_be";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "60000000";
+					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
 				 };
 
@@ -1167,16 +1167,16 @@
 					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1024";
 					active_h = "128";
 					line_length = "1024";
 					mode_type = "raw";
-					pixel_phase = "grey";
+					pixel_phase = "grey_be";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "60000000";
+					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
 				 };
 
@@ -1645,16 +1645,16 @@
 					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1024";
 					active_h = "128";
 					line_length = "1024";
 					mode_type = "raw";
-					pixel_phase = "grey";
+					pixel_phase = "grey_be";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "60000000";
+					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
 				 };
 
@@ -2123,16 +2123,16 @@
 					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1024";
 					active_h = "128";
 					line_length = "1024";
 					mode_type = "raw";
-					pixel_phase = "grey";
+					pixel_phase = "grey_be";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "60000000";
+					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
 				 };
 

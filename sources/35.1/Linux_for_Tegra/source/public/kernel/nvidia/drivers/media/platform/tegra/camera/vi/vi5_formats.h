@@ -119,6 +119,8 @@ static const struct tegra_video_format vi5_video_formats[] = {
 	/* RAW 16 */
         TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
                                 RAW16, Y16, "RAW16"),
+        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
+        			RAW16, Y16_BE, "RAW16_BE"),
 
 	/* RGB888 */
 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,

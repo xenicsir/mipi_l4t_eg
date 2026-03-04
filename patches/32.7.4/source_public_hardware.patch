@@ -1,6 +1,6 @@
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..e77d0f4
+index 0000000..0f3ec0c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1102 @@
@@ -602,16 +602,16 @@ index 0000000..e77d0f4
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_a";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -979,16 +979,16 @@ index 0000000..e77d0f4
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_c";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -3663,7 +3663,7 @@ index 0000000..c94036c
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..01f3644
+index 0000000..7e8fbdf
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2263 @@
@@ -4358,16 +4358,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -4836,16 +4836,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -5314,16 +5314,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -5792,16 +5792,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -7478,6 +7478,95 @@ index 0000000..c9c6b6b
 +	};
 +
 +};
+diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-dione-global.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-dione-global.dts
+new file mode 100644
+index 0000000..af0f48e
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-dione-global.dts
+@@ -0,0 +1,83 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++#include "tegra234-p3737-camera-common-eg-cams-dione.dtsi"
++
++/ {
++	overlay-name = "Exosens Cameras (global)";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	/*
++	 * NVCSI channels 1-3: global endpoint numbering.
++	 * Applied when no IMX219 nodes in /proc/device-tree (Auvidea 35.4.1, NVIDIA std).
++	 */
++	fragment@1 {
++		target = <&csi_chan1_port0>;
++		__overlay__ {
++			rbpcv2_csi_in1: endpoint@2 {
++				status = "okay";
++				port-index = <6>;
++				bus-width = <2>;
++				remote-endpoint = <&xenics_dione_ir_out1>;
++			};
++		};
++	};
++
++	fragment@2 {
++		target = <&csi_chan1_port1>;
++		__overlay__ {
++			rbpcv2_csi_out1: endpoint@3 {
++				status = "okay";
++				remote-endpoint = <&rbpcv2_vi_in1>;
++			};
++		};
++	};
++
++	fragment@3 {
++		target = <&csi_chan2_port0>;
++		__overlay__ {
++			rbpcv2_csi_in2: endpoint@4 {
++				status = "okay";
++				port-index = <4>;
++				bus-width = <2>;
++				remote-endpoint = <&xenics_dione_ir_out2>;
++			};
++		};
++	};
++
++	fragment@4 {
++		target = <&csi_chan2_port1>;
++		__overlay__ {
++			rbpcv2_csi_out2: endpoint@5 {
++				status = "okay";
++				remote-endpoint = <&rbpcv2_vi_in2>;
++			};
++		};
++	};
++
++	fragment@5 {
++		target = <&csi_chan3_port0>;
++		__overlay__ {
++			rbpcv2_csi_in3: endpoint@6 {
++				status = "okay";
++				port-index = <2>;
++				bus-width = <2>;
++				remote-endpoint = <&xenics_dione_ir_out3>;
++			};
++		};
++	};
++
++	fragment@6 {
++		target = <&csi_chan3_port1>;
++		__overlay__ {
++			rbpcv2_csi_out3: endpoint@7 {
++				status = "okay";
++				remote-endpoint = <&rbpcv2_vi_in3>;
++			};
++		};
++	};
++};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-dione.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-dione.dts
 new file mode 100644
 index 0000000..1eea8ab
@@ -7568,9 +7657,53 @@ index 0000000..1eea8ab
 +	};
 +
 +};
+diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-disable-imx219.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-disable-imx219.dts
+new file mode 100644
+index 0000000..3f87262
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cams-disable-imx219.dts
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. Disable imx219";
++	jetson-header-name = "Jetson AGX CSI Connector";
++	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005";
++
++	/* Disable IMX219 camera nodes present in some carrier board base DTBs
++	 * (e.g. Auvidea X230D) to prevent probe conflicts. */
++	fragment@0 {
++		target-path = "/i2c@c240000/rbpcv2_imx219_g@10";
++		__overlay__ {
++		 status = "disabled";
++		};
++	};
++	fragment@1 {
++		target-path = "/i2c@c250000/rbpcv2_imx219_e@10";
++		__overlay__ {
++		 status = "disabled";
++		};
++	};
++	fragment@2 {
++		target-path = "/i2c@31e0000/rbpcv2_imx219_a@10";
++		__overlay__ {
++		 status = "disabled";
++		};
++	};
++	fragment@3 {
++		target-path = "/i2c@3180000/rbpcv2_imx219_c@10";
++		__overlay__ {
++		 status = "disabled";
++		};
++	};
++};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..c9a8b96
+index 0000000..dd949af
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1676 @@
@@ -8519,16 +8652,16 @@ index 0000000..c9a8b96
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_b";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1024";
 +							active_h = "128";
 +							line_length = "1024";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "60000000";
++							pix_clk_hz = "112500000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -9168,16 +9301,16 @@ index 0000000..c9a8b96
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1024";
 +							active_h = "128";
 +							line_length = "1024";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "60000000";
++							pix_clk_hz = "112500000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10408,4 +10541,38 @@ index 0000000..91be2fd
 +	overlay-name = "Exosens Cameras";
 +	jetson-header-name = "Jetson 24pin CSI Connector";
 +	compatible = JETSON_COMPATIBLE_P3768;
++};
+diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts
+new file mode 100644
+index 0000000..5b5c256
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. Disable imx219";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = "nvidia,p3768-0000+p3767-0000", "nvidia,p3768-0000+p3767-0001",
++		     "nvidia,p3768-0000+p3767-0003", "nvidia,p3768-0000+p3767-0004",
++		     "nvidia,p3768-0000+p3767-0005";
++
++	/* Disable IMX219 camera nodes present in p3768 carrier board base DTBs
++	 * to prevent probe conflicts with Exosens cameras. */
++	fragment@0 {
++		target-path = "/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++	fragment@1 {
++		target-path = "/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
 +};

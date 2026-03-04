@@ -26,7 +26,7 @@ index 925e46f..ae41566
  endif
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..e77d0f4
+index 0000000..0f3ec0c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1102 @@
@@ -628,16 +628,16 @@ index 0000000..e77d0f4
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_a";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -1005,16 +1005,16 @@ index 0000000..e77d0f4
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_c";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -3704,7 +3704,7 @@ index 8e040d6..e100dc5
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..01f3644
+index 0000000..7e8fbdf
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2263 @@
@@ -4399,16 +4399,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -4877,16 +4877,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -5355,16 +5355,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -5833,16 +5833,16 @@ index 0000000..01f3644
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1024";
 +					active_h = "128";
 +					line_length = "1024";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "60000000";
++					pix_clk_hz = "112500000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -7772,7 +7772,7 @@ index 60243ed..3638b36 100644
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..c9a8b96
+index 0000000..dd949af
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1676 @@
@@ -8721,16 +8721,16 @@ index 0000000..c9a8b96
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_b";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1024";
 +							active_h = "128";
 +							line_length = "1024";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "60000000";
++							pix_clk_hz = "112500000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -9370,16 +9370,16 @@ index 0000000..c9a8b96
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1024";
 +							active_h = "128";
 +							line_length = "1024";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "60000000";
++							pix_clk_hz = "112500000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */

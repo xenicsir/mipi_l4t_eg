@@ -1,8 +1,8 @@
 diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c
-index 2b0b341..74388ff 100644
+index 2b0b341..6d5c474 100644
 --- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c
 +++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/camera_common.c
-@@ -131,6 +131,11 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
+@@ -131,6 +131,16 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
  		V4L2_COLORSPACE_SRGB,
  		V4L2_PIX_FMT_VYUY,
  	},
@@ -10,6 +10,11 @@ index 2b0b341..74388ff 100644
 +		MEDIA_BUS_FMT_FIXED,
 +		V4L2_COLORSPACE_RAW,
 +		V4L2_PIX_FMT_Y16,
++	},
++	{
++		MEDIA_BUS_FMT_FIXED,
++		V4L2_COLORSPACE_RAW,
++		V4L2_PIX_FMT_Y16_BE,
 +	},
  	/*
  	 * The below two formats are not supported by VI4,
@@ -49,15 +54,17 @@ index b104ab3..8f3d9a0 100644
  	if (tegra_chan->valid_ports > 1)
  		vi_port = (stream_id > 0) ? 1 : 0;
 diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c
-index d50b22e..3cfb9aa 100644
+index d50b22e..c09a527 100644
 --- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c
 +++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/sensor_common.c
-@@ -273,8 +273,10 @@ static int extract_pixel_format(
+@@ -273,8 +273,12 @@ static int extract_pixel_format(
  		*format = V4L2_PIX_FMT_UYVY;
  	else if (strncmp(pixel_t, "yuv_vyuy16", size) == 0)
  		*format = V4L2_PIX_FMT_VYUY;
 +	else if (strncmp(pixel_t, "raw_grey16", size) == 0)
 +		*format = V4L2_PIX_FMT_Y16;
++	else if (strncmp(pixel_t, "raw_grey_be16", size) == 0)
++		*format = V4L2_PIX_FMT_Y16_BE;
  	else {
 -		pr_err("%s: Need to extend format%s\n", __func__, pixel_t);
 +		pr_err("%s: Need to extend format %s\n", __func__, pixel_t);
@@ -90,16 +97,18 @@ index 04aaa6a..b43c214 100644
  
  	if (!tc_dev->sensor_ops) {
 diff --git a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h
-index 51cbbad..915eb1e 100644
+index 51cbbad..4caa40b 100644
 --- a/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 +++ b/source/public/kernel/nvidia/drivers/media/platform/tegra/camera/vi/vi5_formats.h
-@@ -116,6 +116,10 @@ static const struct tegra_video_format vi5_video_formats[] = {
+@@ -116,6 +116,12 @@ static const struct tegra_video_format vi5_video_formats[] = {
  	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
  				RAW12, SBGGR12, "BGBG.. GRGR.."),
  
 +	/* RAW 16 */
 +        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
 +                                RAW16, Y16, "RAW16"),
++        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
++        			RAW16, Y16_BE, "RAW16_BE"),
 +
  	/* RGB888 */
  	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,

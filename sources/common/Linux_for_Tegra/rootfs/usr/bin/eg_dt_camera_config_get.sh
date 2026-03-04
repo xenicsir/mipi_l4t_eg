@@ -215,6 +215,7 @@ check_camera_connected() {
 
         # Read camera details from sysfs and V4L2
         local sysfs_path="/sys/bus/i2c/devices/${conn_i2c_bus}-00${conn_i2c_addr}"
+        camera_sysfs_paths[$port_num]="$sysfs_path"
         camera_model[$port_num]=$(cat "$sysfs_path/model" 2>/dev/null | tr -d '\n')
         camera_serial[$port_num]=$(cat "$sysfs_path/serial_number" 2>/dev/null | tr -d '\n')
         camera_fwver[$port_num]=$(cat "$sysfs_path/firmware_version" 2>/dev/null | tr -d '\n')
@@ -509,6 +510,7 @@ declare -A camera_serial
 declare -A camera_fwver
 declare -A camera_resolution
 declare -A camera_pixfmt
+declare -A camera_sysfs_paths
 for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
     cam_type="${camera_configs[$port]}"
     port_letter="${camera_letters[$port]}"
@@ -593,6 +595,7 @@ else
             fwver="${camera_fwver[$port]}"
             resolution="${camera_resolution[$port]}"
             pixfmt="${camera_pixfmt[$port]}"
+            sysfs_path="${camera_sysfs_paths[$port]}"
 
             display_name="$cam_type"
             if [[ "$conn_status" == "connected" ]] && [[ -n "$model" ]]; then
@@ -606,6 +609,7 @@ else
             if [[ "$conn_status" == "connected" ]]; then
                 [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
                 [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
+                [[ -n "$sysfs_path" ]] && echo "    Sysfs:        $sysfs_path"
                 [[ -n "$serial" ]] && echo "    Serial:       $serial"
                 [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
                 [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
@@ -613,22 +617,28 @@ else
                 if [[ -n "$video_dev" ]] && [[ -n "$resolution" ]] && [[ -n "$pixfmt" ]]; then
                     _w="${resolution%%[x/]*}"
                     _h="${resolution##*[x/]}"
-                    # Extract 4-char code: sysfs gives "'AR24' (desc)", V4L2 gives "AR24"
-                    _raw="${pixfmt#\'}"
-                    _code="${_raw:0:4}"
+                    # Extract fourcc code between the two single-quotes:
+                    # sysfs gives "'Y16 ' (desc)" or "'Y16 -BE' (desc)", V4L2 gives "Y16"
+                    _raw="${pixfmt#\'}"        # strip leading '
+                    _code="${_raw%%\'*}"       # take everything up to next '
                     _v4l2fmt="" ; _gstfmt=""
                     case "$_code" in
                         "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
+                        "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
                         "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
                         "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
                     esac
-                    if [[ -n "$_v4l2fmt" ]]; then
-                        if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_code" == "Y16 " || "$_code" == "Y16" ]]; then
-                            echo "    Warning: Y16 (16-bit greyscale) is not supported on Jetson Nano (t210). Use AR24 or YUYV."
+                    if [[ -n "$_gstfmt" ]]; then
+                        if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_gstfmt" == GRAY16* ]]; then
+                            echo "    Warning: 16-bit greyscale is not supported on Jetson Nano (t210). Use AR24 or YUYV."
                         else
                             echo "    Streaming:"
-                            echo "      v4l2-ctl -d $video_dev --stream-mmap --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            [[ -n "$_v4l2fmt" ]] && echo "      v4l2-ctl -d $video_dev --stream-mmap --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
                             echo "      gst-launch-1.0 -v v4l2src device=$video_dev ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" ! videoconvert ! ximagesink sync=false"
+                            if [[ "$cam_type" == "Microlynx" ]]; then
+                                echo "      # Single line (first):"
+                                echo "      gst-launch-1.0 -v v4l2src device=$video_dev ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" ! videocrop top=0 bottom=$((_h - 1)) ! \"video/x-raw, width=$_w, height=1\" ! videoconvert ! ximagesink sync=false"
+                            fi
                         fi
                     fi
                 fi

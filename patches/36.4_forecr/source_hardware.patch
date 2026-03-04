@@ -5469,7 +5469,7 @@ index 93728f4..0c2315d 100644
  dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..7b35a8e
+index 0000000..ffb0ad6
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2870 @@
@@ -6358,16 +6358,16 @@ index 0000000..7b35a8e
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_a";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -6975,16 +6975,16 @@ index 0000000..7b35a8e
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_g";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -7591,16 +7591,16 @@ index 0000000..7b35a8e
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_e";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -8207,16 +8207,16 @@ index 0000000..7b35a8e
 +						lane_polarity = "6";
 +						tegra_sinterface = "serial_c";
 +						phy_mode = "DPHY";
-+						discontinuous_clk = "yes";
++						discontinuous_clk = "no";
 +						dpcm_enable = "false";
 +						cil_settletime = "0";
 +						active_w = "1024";
 +						active_h = "128";
 +						line_length = "1024";
 +						mode_type = "raw";
-+						pixel_phase = "grey";
++						pixel_phase = "grey_be";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "60000000";
++						pix_clk_hz = "112500000";
 +						embedded_metadata_height = "0";
 +					};
 +
@@ -9005,7 +9005,7 @@ index 0000000..2717c64
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ilumos.dts
 new file mode 100644
-index 0000000..cf388e9
+index 0000000..f7b3bd0
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam1-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -9027,7 +9027,7 @@ index 0000000..cf388e9
 +	};
 +
 +	fragment@1 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@0";
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
 +		__overlay__ {
 +			bus-width=<4>;
 +			remote-endpoint = <&ilumos_out1>;
@@ -9391,7 +9391,7 @@ index 0000000..ab10bd3
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-ilumos.dts
 new file mode 100644
-index 0000000..dd158a4
+index 0000000..459e43f
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -9413,7 +9413,7 @@ index 0000000..dd158a4
 +	};
 +
 +	fragment@1 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@0";
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@4";
 +		__overlay__ {
 +			bus-width=<4>;
 +			remote-endpoint = <&ilumos_out2>;
@@ -9447,7 +9447,7 @@ index 0000000..dd158a4
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-microlynx.dts
 new file mode 100644
-index 0000000..286daa7
+index 0000000..7dc1334
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam2-microlynx.dts
 @@ -0,0 +1,50 @@
@@ -9469,7 +9469,7 @@ index 0000000..286daa7
 +	};
 +
 +	fragment@1 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@0";
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@4";
 +		__overlay__ {
 +			bus-width=<2>;
 +			remote-endpoint = <&microlynx_out2>;
@@ -9777,7 +9777,7 @@ index 0000000..2f991b3
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ilumos.dts
 new file mode 100644
-index 0000000..898e867
+index 0000000..5e4b799
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -9799,7 +9799,7 @@ index 0000000..898e867
 +	};
 +
 +	fragment@1 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@0";
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@6";
 +		__overlay__ {
 +			bus-width=<4>;
 +			remote-endpoint = <&ilumos_out3>;
@@ -9833,7 +9833,7 @@ index 0000000..898e867
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-microlynx.dts
 new file mode 100644
-index 0000000..752de4d
+index 0000000..fca6afc
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam3-microlynx.dts
 @@ -0,0 +1,50 @@
@@ -9855,7 +9855,7 @@ index 0000000..752de4d
 +	};
 +
 +	fragment@1 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@0";
++		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@6";
 +		__overlay__ {
 +			bus-width=<2>;
 +			remote-endpoint = <&microlynx_out3>;
@@ -9944,7 +9944,7 @@ index 0000000..fcee765
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..d95bc3b
+index 0000000..03dc0c9
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2614 @@
@@ -10938,16 +10938,16 @@ index 0000000..d95bc3b
 +								lane_polarity = "6";
 +								tegra_sinterface = "serial_b";
 +								phy_mode = "DPHY";
-+								discontinuous_clk = "yes";
++								discontinuous_clk = "no";
 +								dpcm_enable = "false";
 +								cil_settletime = "0";
 +								active_w = "1024";
 +								active_h = "128";
 +								line_length = "1024";
 +								mode_type = "raw";
-+								pixel_phase = "grey";
++								pixel_phase = "grey_be";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "60000000";
++								pix_clk_hz = "112500000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -12087,16 +12087,16 @@ index 0000000..d95bc3b
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
 +								phy_mode = "DPHY";
-+								discontinuous_clk = "yes";
++								discontinuous_clk = "no";
 +								dpcm_enable = "false";
 +								cil_settletime = "0";
 +								active_w = "1024";
 +								active_h = "128";
 +								line_length = "1024";
 +								mode_type = "raw";
-+								pixel_phase = "grey";
++								pixel_phase = "grey_be";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "60000000";
++								pix_clk_hz = "112500000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -19525,6 +19525,40 @@ index 0000000..6549cd7
 +
 +#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
 +
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts
+new file mode 100644
+index 0000000..26986c7
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. Disable imx219";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = "nvidia,p3768-0000+p3767-0000", "nvidia,p3768-0000+p3767-0001",
++		     "nvidia,p3768-0000+p3767-0003", "nvidia,p3768-0000+p3767-0004",
++		     "nvidia,p3768-0000+p3767-0005";
++
++	/* Disable IMX219 camera nodes present in p3768 carrier board base DTBs
++	 * to prevent probe conflicts with Exosens cameras. */
++	fragment@0 {
++		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++	fragment@1 {
++		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3768-0000+p3767-0000-dynamic.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3768-0000+p3767-0000-dynamic.dts
 index b9fed39..db62260 100644
 --- a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3768-0000+p3767-0000-dynamic.dts

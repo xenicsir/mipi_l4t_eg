@@ -8,9 +8,12 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
+#include <linux/miscdevice.h>
+#include <linux/mutex.h>
 #include <linux/of_device.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <linux/uaccess.h>
 #include <linux/version.h>
 #include <media/tegracam_core.h>
 
@@ -19,6 +22,54 @@
 
 #define PREFIX "microlynx"
 #include "gencp-over-i2c/liblogger.h"
+
+/* ---- GenCP userspace chardev (/dev/microlynx-<bus>-<addr>) ------------- */
+
+/**
+ * struct microlynx_reg_op - ioctl payload for 32-bit register read/write
+ * @addr: GenCP register address
+ * @val:  value written (WRITE_REG) or value returned (READ_REG)
+ */
+struct microlynx_reg_op {
+	__u32 addr;
+	__u32 val;
+};
+
+#define MICROLYNX_STR_MAX 256
+
+/**
+ * struct microlynx_str_op - ioctl payload for GenCP string read
+ * @addr: GenCP register address of the string
+ * @len:  number of bytes to read (clamped to MICROLYNX_STR_MAX)
+ * @buf:  buffer filled with the string data on return
+ */
+struct microlynx_str_op {
+	__u32 addr;
+	__u32 len;
+	__u8  buf[MICROLYNX_STR_MAX];
+};
+
+#define MICROLYNX_IOCTL_MAGIC    'M'
+/* _IOWR('M', 1, struct microlynx_reg_op) */
+#define MICROLYNX_IOCTL_READ_REG  _IOWR(MICROLYNX_IOCTL_MAGIC, 1, \
+					struct microlynx_reg_op)
+/* _IOW('M', 2, struct microlynx_reg_op) */
+#define MICROLYNX_IOCTL_WRITE_REG _IOW(MICROLYNX_IOCTL_MAGIC,  2, \
+					struct microlynx_reg_op)
+/* _IOWR('M', 3, struct microlynx_str_op) */
+#define MICROLYNX_IOCTL_READ_STR  _IOWR(MICROLYNX_IOCTL_MAGIC, 3, \
+					struct microlynx_str_op)
+
+/*
+ * Module-level mutex: GENCPCLIENT uses process-global state (pRxBuffer,
+ * pTxBuffer, unio_handle_ptr).  Serialise all GenCP calls behind this lock.
+ *
+ * Limitation: when two Microlynx cameras are probed, the global GenCP state
+ * is left pointing to the last camera probed.  Userspace access to the first
+ * camera may silently use the wrong I2C handle.  This will be fixed once
+ * gencp_client is refactored to per-instance state.
+ */
+static DEFINE_MUTEX(microlynx_gencp_lock);
 
 /* Microlynx specific registers */
 #define REG_ACQ_START_W   0x500F0000
@@ -77,6 +128,10 @@ struct microlynx {
    char   serial_number[64];
    char   pixel_format[64];
    char   firmware_version[32];
+
+   /* GenCP chardev — /dev/microlynx-<bus>-<addr> */
+   struct miscdevice    miscdev;
+   char                 miscdev_name[32];
 };
 
 static int microlynx_sensor_check(struct microlynx *priv)
@@ -171,7 +226,7 @@ static int microlynx_sensor_check(struct microlynx *priv)
    }
 
    /* Set pixel format */
-   strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)", sizeof(priv->pixel_format) - 1);
+   strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)", sizeof(priv->pixel_format) - 1);
    priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 
    priv->gencp_initialized = true;
@@ -400,6 +455,90 @@ static const struct v4l2_subdev_internal_ops microlynx_subdev_internal_ops = {
    .open = microlynx_open,
 };
 
+/* ---- GenCP chardev file operations ------------------------------------ */
+
+static int microlynx_cdev_open(struct inode *inode, struct file *file)
+{
+   /*
+    * The misc layer sets file->private_data to the struct miscdevice *.
+    * Use container_of to reach the enclosing struct microlynx.
+    */
+   struct microlynx *priv =
+      container_of(file->private_data, struct microlynx, miscdev);
+   file->private_data = priv;
+   return 0;
+}
+
+static int microlynx_cdev_release(struct inode *inode, struct file *file)
+{
+   return 0;
+}
+
+static long microlynx_cdev_ioctl(struct file *file, unsigned int cmd,
+               unsigned long arg)
+{
+   struct microlynx *priv = file->private_data;
+   int ret = 0;
+
+   if (!priv->gencp_initialized)
+      return -ENODEV;
+
+   mutex_lock(&microlynx_gencp_lock);
+
+   switch (cmd) {
+   case MICROLYNX_IOCTL_READ_REG: {
+      struct microlynx_reg_op op;
+
+      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
+         ret = -EFAULT;
+         break;
+      }
+      ret = GENCPCLIENT_ReadRegister(op.addr, &op.val);
+      if (ret == 0 && copy_to_user((void __user *)arg, &op, sizeof(op)))
+         ret = -EFAULT;
+      break;
+   }
+   case MICROLYNX_IOCTL_WRITE_REG: {
+      struct microlynx_reg_op op;
+
+      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
+         ret = -EFAULT;
+         break;
+      }
+      ret = GENCPCLIENT_WriteRegister(op.addr, op.val);
+      break;
+   }
+   case MICROLYNX_IOCTL_READ_STR: {
+      struct microlynx_str_op op;
+
+      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
+         ret = -EFAULT;
+         break;
+      }
+      op.len = min_t(u32, op.len, MICROLYNX_STR_MAX);
+      ret = GENCPCLIENT_ReadString(op.addr, op.buf, op.len);
+      if (ret == 0 && copy_to_user((void __user *)arg, &op, sizeof(op)))
+         ret = -EFAULT;
+      break;
+   }
+   default:
+      ret = -ENOTTY;
+      break;
+   }
+
+   mutex_unlock(&microlynx_gencp_lock);
+   return ret;
+}
+
+static const struct file_operations microlynx_cdev_fops = {
+   .owner          = THIS_MODULE,
+   .open           = microlynx_cdev_open,
+   .release        = microlynx_cdev_release,
+   .unlocked_ioctl = microlynx_cdev_ioctl,
+};
+
+/* ----------------------------------------------------------------------- */
+
 static int microlynx_probe(struct i2c_client *client,
       const struct i2c_device_id *id)
 {
@@ -463,6 +602,19 @@ static int microlynx_probe(struct i2c_client *client,
    device_create_file(dev, &dev_attr_pixel_format);
    device_create_file(dev, &dev_attr_firmware_version);
 
+   /* Register GenCP chardev for userspace access */
+   snprintf(priv->miscdev_name, sizeof(priv->miscdev_name),
+         "microlynx-%d-%04x", client->adapter->nr, client->addr);
+   priv->miscdev.minor  = MISC_DYNAMIC_MINOR;
+   priv->miscdev.name   = priv->miscdev_name;
+   priv->miscdev.fops   = &microlynx_cdev_fops;
+   priv->miscdev.parent = dev;
+   if (misc_register(&priv->miscdev))
+      dev_warn(dev, "failed to register GenCP chardev; userspace access via microlynxCtrl.py will not work\n");
+   else
+      dev_info(dev, "GenCP chardev registered at /dev/%s\n",
+            priv->miscdev_name);
+
    dev_info(dev, "Registered microlynx device (width=%u, height=%u)\n",
          priv->native_width, priv->line_height);
    return 0;
@@ -483,6 +635,8 @@ static void microlynx_remove(struct i2c_client *client)
    device_remove_file(dev, &dev_attr_serial_number);
    device_remove_file(dev, &dev_attr_resolution);
    device_remove_file(dev, &dev_attr_pixel_format);
+
+   misc_deregister(&priv->miscdev);
 
    tegracam_v4l2subdev_unregister(priv->tc_dev);
    tegracam_device_unregister(priv->tc_dev);
