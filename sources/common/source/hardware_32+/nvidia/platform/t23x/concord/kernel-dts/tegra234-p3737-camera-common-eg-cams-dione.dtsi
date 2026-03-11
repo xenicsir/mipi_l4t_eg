@@ -681,10 +681,10 @@
 				 reg = <0x51>;
 				 status = "disabled";
 				 sensor_model = "microlynx";
-				 use_sensor_mode_id = "false";
+				 use_sensor_mode_id = "true";
 				 line-height = <128>;
 
-				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
+				 mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
 					num_lanes = "2";
 					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
@@ -697,6 +697,24 @@
 					line_length = "1024";
 					mode_type = "raw";
 					pixel_phase = "grey_be";
+					csi_pixel_bit_depth = "16";
+					pix_clk_hz = "112500000";
+					embedded_metadata_height = "0";
+				 };
+
+				 mode1 { // MICROLYNX_MODE_1024x128_RAW16
+					num_lanes = "2";
+					lane_polarity = "6";
+					tegra_sinterface = "serial_a";
+					phy_mode = "DPHY";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					active_w = "1024";
+					active_h = "128";
+					line_length = "1024";
+					mode_type = "raw";
+					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
 					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
@@ -1159,10 +1177,10 @@
 				 reg = <0x51>;
 				 status = "disabled";
 				 sensor_model = "microlynx";
-				 use_sensor_mode_id = "false";
+				 use_sensor_mode_id = "true";
 				 line-height = <128>;
 
-				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
+				 mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
 					num_lanes = "2";
 					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
@@ -1175,6 +1193,24 @@
 					line_length = "1024";
 					mode_type = "raw";
 					pixel_phase = "grey_be";
+					csi_pixel_bit_depth = "16";
+					pix_clk_hz = "112500000";
+					embedded_metadata_height = "0";
+				 };
+
+				 mode1 { // MICROLYNX_MODE_1024x128_RAW16
+					num_lanes = "2";
+					lane_polarity = "6";
+					tegra_sinterface = "serial_g";
+					phy_mode = "DPHY";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					active_w = "1024";
+					active_h = "128";
+					line_length = "1024";
+					mode_type = "raw";
+					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
 					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
@@ -1637,10 +1673,10 @@
 				 reg = <0x51>;
 				 status = "disabled";
 				 sensor_model = "microlynx";
-				 use_sensor_mode_id = "false";
+				 use_sensor_mode_id = "true";
 				 line-height = <128>;
 
-				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
+				 mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
 					num_lanes = "2";
 					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
@@ -1653,6 +1689,24 @@
 					line_length = "1024";
 					mode_type = "raw";
 					pixel_phase = "grey_be";
+					csi_pixel_bit_depth = "16";
+					pix_clk_hz = "112500000";
+					embedded_metadata_height = "0";
+				 };
+
+				 mode1 { // MICROLYNX_MODE_1024x128_RAW16
+					num_lanes = "2";
+					lane_polarity = "6";
+					tegra_sinterface = "serial_e";
+					phy_mode = "DPHY";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					active_w = "1024";
+					active_h = "128";
+					line_length = "1024";
+					mode_type = "raw";
+					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
 					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";
@@ -2115,10 +2169,10 @@
 				 reg = <0x51>;
 				 status = "disabled";
 				 sensor_model = "microlynx";
-				 use_sensor_mode_id = "false";
+				 use_sensor_mode_id = "true";
 				 line-height = <128>;
 
-				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
+				 mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
 					num_lanes = "2";
 					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
@@ -2131,6 +2185,24 @@
 					line_length = "1024";
 					mode_type = "raw";
 					pixel_phase = "grey_be";
+					csi_pixel_bit_depth = "16";
+					pix_clk_hz = "112500000";
+					embedded_metadata_height = "0";
+				 };
+
+				 mode1 { // MICROLYNX_MODE_1024x128_RAW16
+					num_lanes = "2";
+					lane_polarity = "6";
+					tegra_sinterface = "serial_c";
+					phy_mode = "DPHY";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					active_w = "1024";
+					active_h = "128";
+					line_length = "1024";
+					mode_type = "raw";
+					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
 					pix_clk_hz = "112500000";
 					embedded_metadata_height = "0";

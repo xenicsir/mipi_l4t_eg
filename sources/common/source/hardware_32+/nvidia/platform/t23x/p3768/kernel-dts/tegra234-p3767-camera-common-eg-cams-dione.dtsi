@@ -476,7 +476,7 @@
 
 						 sensor_model = "eg_ec";
 
-						 use_sensor_mode_id = "false";
+						 use_sensor_mode_id = "true";
 
 						 physical_w = "7.680";
 						 physical_h = "5.760";
@@ -934,11 +934,11 @@
 
 						 sensor_model = "microlynx";
 
-						 use_sensor_mode_id = "false";
+						 use_sensor_mode_id = "true";
 
 						 line-height = <128>;
 
-						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
+						 mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
 							num_lanes = "2";
 							lane_polarity = "6";
 							tegra_sinterface = "serial_b";
@@ -951,6 +951,47 @@
 							line_length = "1024";
 							mode_type = "raw";
 							pixel_phase = "grey_be";
+							csi_pixel_bit_depth = "16";
+							pix_clk_hz = "112500000";
+							embedded_metadata_height = "0";
+
+							/* unused */
+							gain_factor = "16";
+							exposure_factor = "1000000";
+							min_gain_val = "16"; /* 1.00x */
+							max_gain_val = "170"; /* 10.66x */
+							step_gain_val = "1";
+							default_gain = "16"; /* 1.00x */
+							min_hdr_ratio = "1";
+							max_hdr_ratio = "1";
+
+							/* framerate */
+							framerate_factor = "1000000";
+							min_framerate = "40000000"; /* 40 fps */
+							max_framerate = "62000000"; /* 62 fps */
+							step_framerate = "1";
+							default_framerate = "60000000"; /* 60 fps */
+
+							/* unused */
+							min_exp_time = "13"; /* us */
+							max_exp_time = "683709"; /* us */
+							step_exp_time = "1";
+							default_exp_time = "2495"; /* us */
+						 };
+
+						 mode1 { // MICROLYNX_MODE_1024x128_RAW16
+							num_lanes = "2";
+							lane_polarity = "6";
+							tegra_sinterface = "serial_b";
+							phy_mode = "DPHY";
+							discontinuous_clk = "no";
+							dpcm_enable = "false";
+							cil_settletime = "0";
+							active_w = "1024";
+							active_h = "128";
+							line_length = "1024";
+							mode_type = "raw";
+							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
 							pix_clk_hz = "112500000";
 							embedded_metadata_height = "0";
@@ -1217,7 +1258,7 @@
 
 						 sensor_model = "eg_ec";
 
-						 use_sensor_mode_id = "false";
+						 use_sensor_mode_id = "true";
 
 						 physical_w = "7.680";
 						 physical_h = "5.760";
@@ -1584,11 +1625,11 @@
 
 						 sensor_model = "microlynx";
 
-						 use_sensor_mode_id = "false";
+						 use_sensor_mode_id = "true";
 
 						 line-height = <128>;
 
-						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
+						 mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
 							num_lanes = "2";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
@@ -1600,6 +1641,46 @@
 							line_length = "1024";
 							mode_type = "raw";
 							pixel_phase = "grey_be";
+							csi_pixel_bit_depth = "16";
+							pix_clk_hz = "112500000";
+							embedded_metadata_height = "0";
+
+							/* unused */
+							gain_factor = "16";
+							exposure_factor = "1000000";
+							min_gain_val = "16"; /* 1.00x */
+							max_gain_val = "170"; /* 10.66x */
+							step_gain_val = "1";
+							default_gain = "16"; /* 1.00x */
+							min_hdr_ratio = "1";
+							max_hdr_ratio = "1";
+
+							/* framerate */
+							framerate_factor = "1000000";
+							min_framerate = "40000000"; /* 40 fps */
+							max_framerate = "62000000"; /* 62 fps */
+							step_framerate = "1";
+							default_framerate = "60000000"; /* 60 fps */
+
+							/* unused */
+							min_exp_time = "13"; /* us */
+							max_exp_time = "683709"; /* us */
+							step_exp_time = "1";
+							default_exp_time = "2495"; /* us */
+						 };
+
+						 mode1 { // MICROLYNX_MODE_1024x128_RAW16
+							num_lanes = "2";
+							tegra_sinterface = "serial_c";
+							phy_mode = "DPHY";
+							discontinuous_clk = "no";
+							dpcm_enable = "false";
+							cil_settletime = "0";
+							active_w = "1024";
+							active_h = "128";
+							line_length = "1024";
+							mode_type = "raw";
+							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
 							pix_clk_hz = "112500000";
 							embedded_metadata_height = "0";

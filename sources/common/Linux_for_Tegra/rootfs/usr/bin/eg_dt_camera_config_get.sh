@@ -601,6 +601,7 @@ else
             if [[ "$conn_status" == "connected" ]] && [[ -n "$model" ]]; then
                 display_name="$model"
             fi
+            echo ""
             if [[ "$conn_status" == "connected" ]]; then
                 echo "  Port $port: $display_name ("$'\033[32m'"$conn_status"$'\033[0m'")"
             else
@@ -633,11 +634,25 @@ else
                             echo "    Warning: 16-bit greyscale is not supported on Jetson Nano (t210). Use AR24 or YUYV."
                         else
                             echo "    Streaming:"
-                            [[ -n "$_v4l2fmt" ]] && echo "      v4l2-ctl -d $video_dev --stream-mmap --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
-                            echo "      gst-launch-1.0 -v v4l2src device=$video_dev ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" ! videoconvert ! ximagesink sync=false"
+                            if [[ -n "$_v4l2fmt" ]]; then
+                                echo "      v4l2-ctl -d $video_dev \\"
+                                echo "        --stream-mmap \\"
+                                echo "        --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            fi
+                            echo "      gst-launch-1.0 -v \\"
+                            echo "        v4l2src device=$video_dev \\"
+                            echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
+                            echo "        ! videoconvert \\"
+                            echo "        ! ximagesink sync=false"
                             if [[ "$cam_type" == "Microlynx" ]]; then
                                 echo "      # Single line (first):"
-                                echo "      gst-launch-1.0 -v v4l2src device=$video_dev ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" ! videocrop top=0 bottom=$((_h - 1)) ! \"video/x-raw, width=$_w, height=1\" ! videoconvert ! ximagesink sync=false"
+                                echo "      gst-launch-1.0 -v \\"
+                                echo "        v4l2src device=$video_dev \\"
+                                echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
+                                echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
+                                echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
+                                echo "        ! videoconvert \\"
+                                echo "        ! ximagesink sync=false"
                             fi
                         fi
                     fi

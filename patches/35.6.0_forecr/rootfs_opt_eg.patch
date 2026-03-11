@@ -2420,16 +2420,24 @@ index 0000000..dee302b
 +
 diff --git a/rootfs/opt/eg/doc/streaming_examples.txt b/rootfs/opt/eg/doc/streaming_examples.txt
 new file mode 100644
-index 0000000..bb7b3e8
+index 0000000..8726ac9
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/streaming_examples.txt
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,184 @@
 +================================================================================
 +EG CAMERA STREAMING EXAMPLES
 +================================================================================
 +
 +To check which cameras are associated to /dev/videoX devices:
 +  eg_dt_camera_config_get.sh
++
++
++================================================================================
++INSTALLATION
++================================================================================
++
++ffmpeg (for ffplay) :
++  sudo apt-get install ffmpeg
 +
 +
 +================================================================================
