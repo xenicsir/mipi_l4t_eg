@@ -118,8 +118,37 @@ void GENCPCLIENT_Cleanup(void)
 {
    nb_timer_delete_all();
    MEM_FREE(pRxBuffer);
+   pRxBuffer = NULL;
    MEM_FREE(pTxBuffer);
+   pTxBuffer = NULL;
+   gGencpInitWasSuccessfull = false;
    PRINT_INFO("GENCP Client cleaned up\n");
+}
+
+/*
+ * GENCPCLIENT_Select - Switch the global GenCP state to a different camera.
+ *
+ * Call this before any GENCPCLIENT_ReadRegister / WriteRegister when multiple
+ * Microlynx cameras are probed.  It restores the correct I2C handle and
+ * re-enables the GenCP functions without doing a full re-init (no extra I2C
+ * round-trips, no memory reallocation if buffers are already valid).
+ */
+void GENCPCLIENT_Select(struct unio_handle *h)
+{
+   if (!h)
+      return;
+   unio_handle_ptr = h;
+   /* Restore everything that GENCPCLIENT_Cleanup tore down:
+    *  - ring buffer + read-buffer-enable flag in the unio_handle
+    *  - software timers used for ACK timeout detection
+    *  - Rx/Tx message buffers (re-alloc only if freed by Cleanup) */
+   unio_read_buffer_init(h, 8);
+   nb_timers_init(2);
+   if (!pRxBuffer)
+      pRxBuffer = (GENCP_MSG *)MEM_ALLOC(sizeof(GENCP_MSG));
+   if (!pTxBuffer)
+      pTxBuffer = (GENCP_MSG *)MEM_ALLOC(sizeof(GENCP_MSG));
+   gGencpInitWasSuccessfull = (pRxBuffer != NULL && pTxBuffer != NULL);
 }
 /*_____                _                                                 _
   |  __ \              | |                                               | |

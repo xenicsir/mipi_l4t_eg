@@ -64,10 +64,11 @@ struct microlynx_str_op {
  * Module-level mutex: GENCPCLIENT uses process-global state (pRxBuffer,
  * pTxBuffer, unio_handle_ptr).  Serialise all GenCP calls behind this lock.
  *
- * Limitation: when two Microlynx cameras are probed, the global GenCP state
- * is left pointing to the last camera probed.  Userspace access to the first
- * camera may silently use the wrong I2C handle.  This will be fixed once
- * gencp_client is refactored to per-instance state.
+ * Multi-camera workaround: GENCPCLIENT_Select() is called before every
+ * GENCPCLIENT_ReadRegister / WriteRegister invocation (in cdev_ioctl and
+ * start_streaming) to restore the global state to the correct camera's I2C
+ * handle.  The long-term fix is to refactor gencp_client to per-instance
+ * state.
  */
 static DEFINE_MUTEX(microlynx_gencp_lock);
 
@@ -82,6 +83,9 @@ static DEFINE_MUTEX(microlynx_gencp_lock);
 #define REG_SERIAL_R      0x00000144
 #define REG_MODEL_NAME_R  0x00000044
 #define REG_PIX_ENDIAN_R  0x00040018  /* 0=LE (Y16), 1=BE (Y16_BE) */
+#define REG_PIXEL_FORMAT  0x500e0018
+#define PIXEL_FORMAT_MONO16 0x01100007u
+#define PIXEL_FORMAT_MONO14 0x01100025u
 
 
 static const struct of_device_id microlynx_of_match[] = {
@@ -93,10 +97,11 @@ MODULE_DEVICE_TABLE(of, microlynx_of_match);
 enum {
    MICROLYNX_MODE_1024x128_RAW16_BE,
    MICROLYNX_MODE_1024x128_RAW16,
+   MICROLYNX_MODE_1024x128_RAW14,
 };
 
-static const int microlynx_60fps[] = {
-   60,
+static const int microlynx_351fps[] = {
+   351,
 };
 
 /*
@@ -104,8 +109,9 @@ static const int microlynx_60fps[] = {
  * device tree!
  */
 static const struct camera_common_frmfmt microlynx_frmfmt[] = {
-   {{1024, 128},  microlynx_60fps, 1, 0, MICROLYNX_MODE_1024x128_RAW16_BE},
-   {{1024, 128},  microlynx_60fps, 1, 0, MICROLYNX_MODE_1024x128_RAW16},
+   {{1024, 128},  microlynx_351fps,  1, 0, MICROLYNX_MODE_1024x128_RAW16_BE},
+   {{1024, 128},  microlynx_351fps,  1, 0, MICROLYNX_MODE_1024x128_RAW16},
+   {{1024, 128},  microlynx_351fps, 1, 0, MICROLYNX_MODE_1024x128_RAW14},
 };
 
 static const u32 ctrl_cid_list[] = {
@@ -126,7 +132,6 @@ struct microlynx {
    u32    line_height;
    u32    native_width;
    bool   gencp_initialized;
-
    char   model[64];
    char   serial_number[64];
    char   pixel_format[64];
@@ -228,32 +233,42 @@ static int microlynx_sensor_check(struct microlynx *priv)
       dev_warn(dev, "failed to read serial number\n");
    }
 
-   /* Determine pixel format and sensor mode from camera endianness register.
-    * REG_PIX_ENDIAN_R = 1 → pixels are BE on the CSI bus → Y16_BE on Tegra
-    * REG_PIX_ENDIAN_R = 0 → pixels are LE on the CSI bus → Y16 on Tegra
-    */
-   status = GENCPCLIENT_ReadRegister(REG_PIX_ENDIAN_R, &read_data);
+   // Default pixel format
+   priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16;
+   priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16;
+   strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
+         sizeof(priv->pixel_format) - 1);
+
+   status = GENCPCLIENT_ReadRegister(REG_PIXEL_FORMAT, &read_data);
    if (status == 0) {
-      if (read_data == 1) {
-         priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16_BE;
-         priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16_BE;
-         strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
+      if (read_data == PIXEL_FORMAT_MONO14) {
+         priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW14;
+         priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW14;
+         strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
                sizeof(priv->pixel_format) - 1);
-         PRINT_INFO("Pixel format: Y16_BE (CSI big-endian)\n");
+         PRINT_INFO("Pixel format: Y14\n");
       } else {
-         priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16;
-         priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16;
-         strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
-               sizeof(priv->pixel_format) - 1);
-         PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
-      }
-   } else {
-      dev_warn(dev, "failed to read pixel endianness register, defaulting to Y16\n");
-      priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16;
-      priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16;
-      strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
-            sizeof(priv->pixel_format) - 1);
+         /* Determine pixel format and sensor mode from camera endianness register.
+          * REG_PIX_ENDIAN_R = 1 → pixels are BE on the CSI bus → Y16_BE on Tegra
+          * REG_PIX_ENDIAN_R = 0 → pixels are LE on the CSI bus → Y16 on Tegra
+          */
+         status = GENCPCLIENT_ReadRegister(REG_PIX_ENDIAN_R, &read_data);
+         if (status == 0) {
+            if (read_data == 1) {
+               priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16_BE;
+               priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16_BE;
+               strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
+                     sizeof(priv->pixel_format) - 1);
+               PRINT_INFO("Pixel format: Y16_BE (CSI big-endian)\n");
+            } else {
+               PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
+            }
+         } else {
+            PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
+         }
+       }
    }
+   
    priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 
    priv->gencp_initialized = true;
@@ -379,6 +394,12 @@ static int microlynx_start_streaming(struct tegracam_device *tc_dev)
       dev_err(tc_dev->dev, "GenCP not initialized\n");
       return -EIO;
    }
+
+   /* Restore global GenCP state to this camera's I2C handle.
+    * Required when multiple Microlynx cameras are probed: the global
+    * unio_handle_ptr / gGencpInitWasSuccessfull are overwritten during
+    * probe of the last camera (which may have failed). */
+   GENCPCLIENT_Select(&priv->io_handle);
 
    /* Camera should always be streaming. But we can check that. */
    status = GENCPCLIENT_ReadRegister(REG_ACQ_STATUS_R, &read_data);
@@ -511,6 +532,8 @@ static long microlynx_cdev_ioctl(struct file *file, unsigned int cmd,
       return -ENODEV;
 
    mutex_lock(&microlynx_gencp_lock);
+   /* Restore global GenCP state to this camera's I2C handle (multi-camera). */
+   GENCPCLIENT_Select(&priv->io_handle);
 
    switch (cmd) {
    case MICROLYNX_IOCTL_READ_REG: {

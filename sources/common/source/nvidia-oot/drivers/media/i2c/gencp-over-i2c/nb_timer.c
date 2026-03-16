@@ -36,6 +36,10 @@ static void _timer_callback (struct timer_list *t){
 int nb_timers_init(int num_timers) {
     int i;
 
+    /* Clean up any previous allocation to avoid leaking on re-init. */
+    if (_timer_array_ptr)
+        nb_timer_delete_all();
+
     _timer_array_ptr = MEM_ALLOC(sizeof(struct timer_def) * num_timers);
     _timer_array_len = (size_t)num_timers;
 

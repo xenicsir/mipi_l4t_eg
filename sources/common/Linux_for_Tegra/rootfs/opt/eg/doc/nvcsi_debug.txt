@@ -1,9 +1,89 @@
-To enable NVCSI logs :
-	nvcsi_traces.sh
+NVCSI / VI diagnostic — quick reference
+========================================
 
-To display logs :
-	cat /sys/kernel/debug/tracing/trace | less
+AUTOMATED DIAGNOSTIC (recommended)
+------------------------------------
+  sudo python3 /usr/bin/read_nvcsi.py
 
-To read NVCSI registers :  WARNING, do it during video streaming, unless the kernel crashes
-	/usr/bin/nvcsi_read_register*.sh
+  Decodes RTCPU NVCSI interrupt bits, VI capture errors (corr_err/uncorr_err),
+  and gives a diagnosis with recommended actions.
+  Run while the camera is streaming (v4l2-ctl, gstreamer, …).
 
+
+MANUAL TRACING
+--------------
+Enable RTCPU traces only (without running the full diagnostic):
+  sudo python3 /usr/bin/read_nvcsi.py --enable
+
+Display trace:
+  cat /sys/kernel/debug/tracing/trace | less
+  # or in real time:
+  cat /sys/kernel/debug/tracing/trace_pipe
+
+Read and decode the current trace buffer without re-capturing:
+  sudo python3 /usr/bin/read_nvcsi.py --read
+
+Stop tracing:
+  echo 0 > /sys/kernel/debug/tracing/tracing_on
+
+
+CLOCK CHECK
+-----------
+  # T234 (Orin): data path clock is nvcsilp (not nvcsi)
+  cat /sys/kernel/debug/bpmp/debug/clk/nvcsilp/rate   # expected ≥ 204 MHz
+  cat /sys/kernel/debug/bpmp/debug/clk/vi/rate         # expected ≥ 100 MHz
+
+
+DECODE err_data IN corr_err/uncorr_err MESSAGES
+------------------------------------------------
+  # Example dmesg line:
+  # tegra-capture-vi: corr_err: discarding frame N, flags: 0, err_data 512
+  #   512 = 0x200 = CAPTURE_CHANNEL_ERROR_PIXEL_SHORT_LINE (bit 9)
+  #   → VI received fewer pixels per line than configured
+  #
+  # Common err_data values (CAPTURE_CHANNEL_ERROR_* from camrtc-capture.h):
+  #   0x020 = bit 5  PIXEL_MISSING_LE     line end not received
+  #   0x040 = bit 6  PIXEL_RUNAWAY        too many pixels sent
+  #   0x100 = bit 8  PIXEL_LONG_LINE      line longer than configured
+  #   0x200 = bit 9  PIXEL_SHORT_LINE     line shorter than configured
+  #   0x8000= bit15  DTYPE_MISMATCH       pixel format mismatch
+  #   0x20000=bit17  FORCE_FE             CSIMUX stream reset / timeout
+
+
+DECODE rtcpu_nvcsi_intr STATUS IN TRACE
+---------------------------------------
+  # type=STREAM_VC  (VC-level, most common):
+  #   0x01  PPFSM_TIMEOUT        no FS/FE within timeout window
+  #   0x02  PH_ECC_SINGLE_BIT   packet header ECC error (corrected)
+  #   0x04  PD_CRC_ERR           payload data CRC error
+  #   0x08  PD_WC_SHORT_ERR      payload shorter than Word Count
+  #   0x10  PH_SINGLE_CRC_ERR   packet header single CRC error
+  #
+  # type=CIL  (D-PHY physical layer):
+  #   0x002  SOT_SB_ERR0         lane 0 SOT single-bit error
+  #   0x004  SOT_MB_ERR0         lane 0 SOT multi-bit error
+  #   0x020  SOT_SB_ERR1         lane 1 SOT single-bit error
+  #   0x040  SOT_MB_ERR1         lane 1 SOT multi-bit error
+  #   0x1000 LANE_ALIGN_ERR      D-PHY lane alignment error
+
+
+COMMON PROBLEMS AND FIXES
+--------------------------
+  PD_CRC_ERR (every frame, all packets):
+    → Wrong D-PHY settling time: add mipi_calibration block or adjust
+      tclk_settle / ths_settle in DTSI
+    → Cable too long or poor connector
+    → MIPI clock too high: reduce pix_clk_hz in sensor mode
+
+  PPFSM_TIMEOUT:
+    → Camera not streaming / I2C init failed
+    → Frame rate too low vs PPFSM timeout threshold
+    → Check dmesg for I2C probe errors
+
+  PIXEL_SHORT_LINE (without CRC errors):
+    → Wrong active_w in sensor mode or wrong num-lanes in DTSI
+    → Camera in a different resolution mode than configured
+
+  DTYPE_MISMATCH:
+    → pixel_phase in DTSI doesn't match camera output format
+    → RAW16=0x2e, RAW8=0x2a, YUV422=0x1e

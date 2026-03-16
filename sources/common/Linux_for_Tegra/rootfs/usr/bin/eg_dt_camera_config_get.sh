@@ -624,6 +624,7 @@ else
                     _code="${_raw%%\'*}"       # take everything up to next '
                     _v4l2fmt="" ; _gstfmt=""
                     case "$_code" in
+                        "Y14 "|"Y14") _v4l2fmt='"Y14 "' ; _gstfmt="GRAY14_LE" ;;
                         "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
                         "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
                         "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;

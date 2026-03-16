@@ -1,10 +1,10 @@
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 old mode 100644
 new mode 100755
-index 010c996..3d57ec6
+index 010c996..568fc32
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
-@@ -129,6 +129,16 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
+@@ -129,6 +129,21 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
  		V4L2_COLORSPACE_SRGB,
  		V4L2_PIX_FMT_VYUY,
  	},
@@ -13,10 +13,15 @@ index 010c996..3d57ec6
 +		V4L2_COLORSPACE_RAW,
 +		V4L2_PIX_FMT_Y16,
 +	},
-+	{
++   {
 +		MEDIA_BUS_FMT_FIXED,
 +		V4L2_COLORSPACE_RAW,
 +		V4L2_PIX_FMT_Y16_BE,
++	},
++	{
++		MEDIA_BUS_FMT_FIXED,
++		V4L2_COLORSPACE_RAW,
++		V4L2_PIX_FMT_Y14,
 +	},
  };
  
@@ -24,10 +29,10 @@ index 010c996..3d57ec6
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
 old mode 100644
 new mode 100755
-index 92cc2fd..59e1873
+index 92cc2fd..6c3398f
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
-@@ -267,8 +267,12 @@ static int extract_pixel_format(
+@@ -267,8 +267,14 @@ static int extract_pixel_format(
  		*format = V4L2_PIX_FMT_UYVY;
  	else if (strncmp(pixel_t, "yuv_vyuy16", size) == 0)
  		*format = V4L2_PIX_FMT_VYUY;
@@ -35,6 +40,8 @@ index 92cc2fd..59e1873
 +		*format = V4L2_PIX_FMT_Y16;
 +	else if (strncmp(pixel_t, "raw_grey_be16", size) == 0)
 +		*format = V4L2_PIX_FMT_Y16_BE;
++	else if (strncmp(pixel_t, "raw_grey14", size) == 0)
++		*format = V4L2_PIX_FMT_Y14;
  	else {
 -		pr_err("%s: Need to extend format%s\n", __func__, pixel_t);
 +		pr_err("%s: Need to extend format %s\n", __func__, pixel_t);
@@ -71,7 +78,7 @@ index 142e53d..e5bdae8
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 old mode 100644
 new mode 100755
-index 1d0c113..8fa9936
+index 1d0c113..6366c21
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 @@ -2,7 +2,13 @@
@@ -89,11 +96,15 @@ index 1d0c113..8fa9936
   */
  
  #ifndef __VI5_FORMATS_H_
-@@ -111,9 +117,17 @@ static const struct tegra_video_format vi5_video_formats[] = {
+@@ -111,9 +117,21 @@ static const struct tegra_video_format vi5_video_formats[] = {
  	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
  				RAW12, SBGGR12, "BGBG.. GRGR.."),
  
-+	/* RAW 16 */
++	/* RAW 14: packed 14-bit (CSI-2 DT=0x2d), unpacked to 16-bit via pad0_en=1 */
++   TEGRA_VIDEO_FORMAT(RAW14, 14, FIXED, 2, 1, T_R16,
++            RAW14, Y14, "RAW14"),
++ 
++   /* RAW 16 */
 +   TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
 +            RAW16, Y16, "RAW16"),
 +   TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,

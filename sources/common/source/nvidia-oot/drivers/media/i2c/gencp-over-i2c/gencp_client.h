@@ -16,6 +16,7 @@
 
 void GENCPCLIENT_Init(struct unio_handle *h);
 void GENCPCLIENT_Cleanup(void);
+void GENCPCLIENT_Select(struct unio_handle *h);
 uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data);
 // uint16_t GENCPCLIENT_ReadRegister64bit(uint32_t address, uint64_t* data);
 uint16_t GENCPCLIENT_WriteRegister(uint32_t address, uint32_t data);
