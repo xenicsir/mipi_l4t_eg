@@ -547,18 +547,19 @@ static int eg_ec_mipi_set_mode(struct tegracam_device *tc_dev)
 
 static int eg_ec_mipi_start_streaming(struct tegracam_device *tc_dev)
 {
-   uint8_t data[4];
-   memset(data, 0, sizeof(data));
-   data[0] = 1;
-   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
+//   uint8_t data[4];
+//   memset(data, 0, sizeof(data));
+//   data[0] = 1;
+//   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
+
    return 0;
 }
 
 static int eg_ec_mipi_stop_streaming(struct tegracam_device *tc_dev)
 {
-   uint8_t data[4];
-   memset(data, 0, sizeof(data));
-   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
+//   uint8_t data[4];
+//   memset(data, 0, sizeof(data));
+//   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
    return 0;
 }
 
@@ -890,31 +891,38 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
    priv->s_data = tc_dev->s_data;
    priv->subdev = &tc_dev->s_data->subdev;
    tegracam_set_privdata(tc_dev, (void *)priv);
-   err = tegracam_v4l2subdev_register(tc_dev, true);
-   if (err) {
-      dev_err(dev, "tegra camera subdev registration failed\n");
-      tegracam_device_unregister(tc_dev);
-      goto err_camera_register;
-   }
 
-   /* Set default sensor_mode_id to the mode matching the camera's native
-    * resolution and pixel format.  Without this, the tegracam framework
-    * defaults to sensor_mode_id=0 (640x480 RAW16), which causes GStreamer
-    * to fail on cameras with different native parameters (e.g. Crius1280
-    * at 1280x1024). */
+   /* Detect the camera's native mode and set the default dimensions
+    * BEFORE tegracam_v4l2subdev_register().
+    *
+    * tegracam_device_register() hard-codes mode_idx=0 (640x480 RAW16).
+    * Setting def_width/def_height/def_mode here ensures that the
+    * bind-time s_fmt in camera_common_try_fmt() selects the correct
+    * resolution by width/height matching instead of falling back to
+    * mode0. */
    {
       int m = eg_ec_find_native_mode(priv->native_width,
             priv->native_height, priv->native_pixfmt);
       if (m >= 0) {
          tc_dev->s_data->sensor_mode_id = m;
          tc_dev->s_data->def_mode = eg_ec_mipi_frmfmt[m].mode;
-         tc_dev->s_data->def_width = eg_ec_mipi_frmfmt[m].size.width;
-         tc_dev->s_data->def_height = eg_ec_mipi_frmfmt[m].size.height;
+         tc_dev->s_data->def_width  = tc_dev->s_data->fmt_width  =
+               eg_ec_mipi_frmfmt[m].size.width;
+         tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
+               eg_ec_mipi_frmfmt[m].size.height;
+
          dev_info(dev,
                "default sensor_mode_id set to %d (%ux%u)\n",
                m, eg_ec_mipi_frmfmt[m].size.width,
                eg_ec_mipi_frmfmt[m].size.height);
       }
+   }
+
+   err = tegracam_v4l2subdev_register(tc_dev, true);
+   if (err) {
+      dev_err(dev, "tegra camera subdev registration failed\n");
+      tegracam_device_unregister(tc_dev);
+      goto err_camera_register;
    }
 
    device_create_file(dev, &dev_attr_model);

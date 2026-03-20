@@ -52,7 +52,7 @@ index 93728f4..ad40ba1 100644
  endif
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..9796e59
+index 0000000..c086082
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2942 @@
@@ -849,7 +849,7 @@ index 0000000..9796e59
 +						mode_type = "rgb";
 +						pixel_phase = "rgb888";
 +						csi_pixel_bit_depth = "24";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "133333336";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -1485,7 +1485,7 @@ index 0000000..9796e59
 +						mode_type = "rgb";
 +						pixel_phase = "rgb888";
 +						csi_pixel_bit_depth = "24";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "133333336";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -2119,7 +2119,7 @@ index 0000000..9796e59
 +						mode_type = "rgb";
 +						pixel_phase = "rgb888";
 +						csi_pixel_bit_depth = "24";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "133333336";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -2753,7 +2753,7 @@ index 0000000..9796e59
 +						mode_type = "rgb";
 +						pixel_phase = "rgb888";
 +						csi_pixel_bit_depth = "24";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "133333336";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -4599,7 +4599,7 @@ index 0000000..fcee765
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..ae340b2
+index 0000000..b5bf290
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2786 @@
@@ -5346,7 +5346,7 @@ index 0000000..ae340b2
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "133333336";
++								pix_clk_hz = "100000000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -5386,7 +5386,7 @@ index 0000000..ae340b2
 +								mode_type = "rgb";
 +								pixel_phase = "rgb888";
 +								csi_pixel_bit_depth = "24";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "133333336";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -5426,7 +5426,7 @@ index 0000000..ae340b2
 +								mode_type = "yuv";
 +								pixel_phase = "yuyv";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "133333336";
++								pix_clk_hz = "100000000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -6596,7 +6596,7 @@ index 0000000..ae340b2
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "133333336";
++								pix_clk_hz = "100000000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -6635,7 +6635,7 @@ index 0000000..ae340b2
 +								mode_type = "rgb";
 +								pixel_phase = "rgb888";
 +								csi_pixel_bit_depth = "24";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "133333336";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -6674,7 +6674,7 @@ index 0000000..ae340b2
 +								mode_type = "yuv";
 +								pixel_phase = "yuyv";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "133333336";
++								pix_clk_hz = "100000000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -7533,7 +7533,7 @@ index 0000000..8495fe0
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..8348763
+index 0000000..f633b7b
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
 @@ -0,0 +1,116 @@
@@ -7605,21 +7605,21 @@ index 0000000..8348763
 +		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -8229,7 +8229,7 @@ index 0000000..0e59b4b
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..be1d9d5
+index 0000000..8dff8f7
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
 @@ -0,0 +1,116 @@
@@ -8301,21 +8301,21 @@ index 0000000..be1d9d5
 +		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {

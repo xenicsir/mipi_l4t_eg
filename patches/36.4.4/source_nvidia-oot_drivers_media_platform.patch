@@ -75,6 +75,50 @@ index 142e53d..e5bdae8
  	}
  
  	if (!tc_dev->sensor_ops) {
+diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c
+index 46ecdb1..fe256ed 100644
+--- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c
++++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c
+@@ -1914,7 +1914,38 @@ static void tegra_channel_populate_dev_info(struct tegra_camera_dev_info *cdev,
+ 		cdev->pixel_rate = pixelclock * (max_num_lanes / NUM_LANES_PER_BRICK);
+ 	else
+ 		cdev->pixel_rate = pixelclock;
+-	cdev->pixel_bit_depth = chan->fmtinfo->width;
++	/*
++	 * Bug: using chan->fmtinfo->width for pixel_bit_depth is incorrect for
++	 * MEDIA_BUS_FMT_FIXED sensors (multiple pixel depths, e.g. RAW14/RAW16/RGB888).
++	 * The bind-time fmtinfo is determined by vi5_video_formats[] entry ordering,
++	 * not by the sensor's actual CSI depth.  For such sensors, derive the max
++	 * csi_pixel_bit_depth from DT signal properties:
++	 *   D-PHY: mipi_clock = pix_clk * depth / (2 * num_lanes)
++	 *       => depth = mipi_clock * 2 * num_lanes / pix_clk
++	 * For standard sensors the formula yields the same value as fmtinfo->width.
++	 */
++	if (s_data != NULL) {
++		u32 max_depth = 0;
++		int i;
++
++		for (i = 0; i < s_data->sensor_props.num_modes; i++) {
++			struct sensor_mode_properties *sm =
++				&s_data->sensor_props.sensor_modes[i];
++			u64 pclk  = sm->signal_properties.pixel_clock.val;
++			u64 mclock = sm->signal_properties.mipi_clock.val;
++			u32 lanes = sm->signal_properties.num_lanes;
++			u32 depth;
++
++			if (pclk == 0 || mclock == 0 || lanes == 0)
++				continue;
++			depth = (u32)div64_u64(mclock * 2 * lanes, pclk);
++			if (depth > max_depth)
++				max_depth = depth;
++		}
++		cdev->pixel_bit_depth = max_depth > 0 ? max_depth : chan->fmtinfo->width;
++	} else {
++		cdev->pixel_bit_depth = chan->fmtinfo->width;
++	}
+ 	cdev->bpp = chan->fmtinfo->bpp.numerator;
+ 	/* BW in kBps */
+ 	cdev->bw = cdev->pixel_rate * cdev->bpp / 1024;
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 old mode 100644
 new mode 100755

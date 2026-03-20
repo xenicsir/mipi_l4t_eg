@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	overlay-name = "Exosens Cameras. CAM1:iLumos";
+	jetson-header-name = "Jetson Nano CSI Connector";
+	compatible = "nvidia,p3449-0000-b00+p3448-0000-b00", "nvidia,p3449-0000-b00+p3448-0002-b00";
+
+	fragment@10 {
+		target-path = "/host1x/vi/ports/port@1/endpoint";
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@11 {
+		target-path = "/host1x/nvcsi/channel@1/ports/port@2/endpoint@2";
+		__overlay__ {
+			bus-width=<2>;
+			remote-endpoint = <&ilumos_out1>;
+		};
+	};
+
+	// Disable Dione cameras
+	fragment@12 {
+		target-path = "/cam_i2cmux/i2c@1/xenics_dione_ir_e@0e";
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	// Enable iLumos
+	fragment@13 {
+		target-path = "/cam_i2cmux/i2c@1/ilumos_e@30";
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@14 {
+		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
+		__overlay__ {
+			devname = "ilumos 8-0030";
+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/ilumos_e@30";
+		};
+	};
+
+};

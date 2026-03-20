@@ -14,14 +14,14 @@
 	fragment@10 {
 		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
 		__overlay__ {
-			bus-width=<4>;
+			bus-width=<2>;
 		};
 	};
 
 	fragment@11 {
 		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
 		__overlay__ {
-			bus-width=<4>;
+			bus-width=<2>;
          remote-endpoint = <&ilumos_out0>;
 		};
 	};
@@ -45,7 +45,7 @@
 	fragment@20 {
 		target-path = "/bus@0/cam_i2cmux/i2c@0/ilumos_b@30/ports/port@0/endpoint";
 		__overlay__ {
-			bus-width=<4>;
+			bus-width=<2>;
 		};
 	};
 
