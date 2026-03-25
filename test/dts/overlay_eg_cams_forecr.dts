@@ -1,0 +1,13 @@
+// Minimal overlay for "Exosens Cameras for DSBOARD-ORNXS"
+/dts-v1/;
+/plugin/;
+/ {
+	compatible = "nvidia,tegra234";
+
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			eg-cameras-forecr-test { status = "okay"; };
+		};
+	};
+};

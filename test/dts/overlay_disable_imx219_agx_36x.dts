@@ -1,0 +1,27 @@
+// Overlay that disables the 4 IMX219 nodes present in Auvidea X230D 36.x base DTBs
+// (36.4, 36.4.3: nodes live under /bus@0/i2c@... with 36.x path prefix)
+/dts-v1/;
+/plugin/;
+/ {
+	compatible = "nvidia,tegra234";
+
+	fragment@0 {
+		target-path = "/bus@0/i2c@31e0000/rbpcv2_imx219_a@10";
+		__overlay__ { status = "disabled"; };
+	};
+
+	fragment@1 {
+		target-path = "/bus@0/i2c@3180000/rbpcv2_imx219_c@10";
+		__overlay__ { status = "disabled"; };
+	};
+
+	fragment@2 {
+		target-path = "/bus@0/i2c@c240000/rbpcv2_imx219_g@10";
+		__overlay__ { status = "disabled"; };
+	};
+
+	fragment@3 {
+		target-path = "/bus@0/i2c@c250000/rbpcv2_imx219_e@10";
+		__overlay__ { status = "disabled"; };
+	};
+};
