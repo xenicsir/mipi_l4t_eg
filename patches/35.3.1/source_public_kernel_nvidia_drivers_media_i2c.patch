@@ -3332,10 +3332,10 @@ index 0000000..4458e5b
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..8d6729f
+index 0000000..86b14d3
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,1002 @@
+@@ -0,0 +1,1010 @@
 +/*
 + * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
@@ -3885,18 +3885,1056 @@ index 0000000..8d6729f
 +
 +static int eg_ec_mipi_start_streaming(struct tegracam_device *tc_dev)
 +{
-+   uint8_t data[4];
-+   memset(data, 0, sizeof(data));
-+   data[0] = 1;
-+   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
++//   uint8_t data[4];
++//   memset(data, 0, sizeof(data));
++//   data[0] = 1;
++//   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
++
 +   return 0;
 +}
 +
 +static int eg_ec_mipi_stop_streaming(struct tegracam_device *tc_dev)
 +{
-+   uint8_t data[4];
-+   memset(data, 0, sizeof(data));
-+   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
++//   uint8_t data[4];
++//   memset(data, 0, sizeof(data));
++//   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
++   return 0;
++}
++
++static struct camera_common_sensor_ops eg_ec_mipi_common_ops = {
++   .numfrmfmts = ARRAY_SIZE(eg_ec_mipi_frmfmt),
++   .frmfmt_table = eg_ec_mipi_frmfmt,
++   .power_on = eg_ec_mipi_power_on,
++   .power_off = eg_ec_mipi_power_off,
++   .parse_dt = eg_ec_mipi_parse_dt,
++   .power_get = eg_ec_mipi_power_get,
++   .power_put = eg_ec_mipi_power_put,
++   .set_mode = eg_ec_mipi_set_mode,
++   .start_streaming = eg_ec_mipi_start_streaming,
++   .stop_streaming = eg_ec_mipi_stop_streaming,
++};
++
++static int eg_ec_mipi_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
++{
++   return 0;
++}
++
++static const char *eg_ec_model_name(u32 code)
++{
++   switch (code) {
++      case 0x0A0600: return "Aion640";
++      case 0x090601: return "Crius640";
++      case 0x070600: return "Crius640";
++      case 0x080600: return "Crius1280";
++      case 0x090600: return "MicroCube";
++      case 0x010600: return "SmartIR640";
++      case 0x050600: return "SmartIR1024";
++      default:       return NULL;
++   }
++}
++
++/*
++ * Returns the expected number of MIPI data lanes for a given model code.
++ * Returns 0 if no check is required for this model.
++ */
++static int eg_ec_expected_lanes(u32 code)
++{
++   switch (code) {
++      case 0x090600: return 1;  /* MicroCube: 1 lane */
++      case 0x010600: return 2;  /* SmartIR640: 2 lanes */
++      case 0x080600: return 2;  /* Crius1280: 2 lanes */
++      default:       return 0;  /* No check */
++   }
++}
++
++static ssize_t model_show(struct device *dev,
++      struct device_attribute *attr, char *buf)
++{
++   struct camera_common_data *s_data = to_camera_common_data(dev);
++   struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
++
++   return scnprintf(buf, PAGE_SIZE, "%s\n", priv->model);
++}
++static DEVICE_ATTR_RO(model);
++
++static ssize_t serial_number_show(struct device *dev,
++      struct device_attribute *attr, char *buf)
++{
++   struct camera_common_data *s_data = to_camera_common_data(dev);
++   struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
++
++   return scnprintf(buf, PAGE_SIZE, "%s\n", priv->serial_number);
++}
++static DEVICE_ATTR_RO(serial_number);
++
++static ssize_t resolution_show(struct device *dev,
++      struct device_attribute *attr, char *buf)
++{
++   struct camera_common_data *s_data = to_camera_common_data(dev);
++   struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
++
++   return scnprintf(buf, PAGE_SIZE, "%ux%u\n",
++         priv->native_width, priv->native_height);
++}
++static DEVICE_ATTR_RO(resolution);
++
++static ssize_t pixel_format_show(struct device *dev,
++      struct device_attribute *attr, char *buf)
++{
++   struct camera_common_data *s_data = to_camera_common_data(dev);
++   struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
++
++   return scnprintf(buf, PAGE_SIZE, "%s\n", priv->pixel_format);
++}
++static DEVICE_ATTR_RO(pixel_format);
++
++static ssize_t firmware_version_show(struct device *dev,
++      struct device_attribute *attr, char *buf)
++{
++   struct camera_common_data *s_data = to_camera_common_data(dev);
++   struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
++
++   return scnprintf(buf, PAGE_SIZE, "%s\n", priv->firmware_version);
++}
++static DEVICE_ATTR_RO(firmware_version);
++
++/*
++ * Find the frmfmt index matching a given native resolution and pixel format.
++ * pixfmt is the EngineCore register value: 20=Y16/RAW16, 21=AR24/RGB888, 22=YUYV.
++ * Returns the frmfmt index, or -1 if no match.
++ */
++static int eg_ec_find_native_mode(u32 width, u32 height, u32 pixfmt)
++{
++   int i;
++   int target_mode = -1;
++
++   /* Determine which mode enum value matches (width, height, pixfmt) */
++   if (width == 640 && height == 480) {
++      switch (pixfmt) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++         case 20: target_mode = EC_MIPI_MODE_640x480_RAW16; break;
++#endif
++         case 21: target_mode = EC_MIPI_MODE_640x480_RGB888; break;
++         case 22: target_mode = EC_MIPI_MODE_640x480_YUYV; break;
++      }
++   } else if (width == 1280 && height == 1024) {
++      switch (pixfmt) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++         case 20: target_mode = EC_MIPI_MODE_1280x1024_RAW16; break;
++#endif
++         case 21: target_mode = EC_MIPI_MODE_1280x1024_RGB888; break;
++         case 22: target_mode = EC_MIPI_MODE_1280x1024_YUYV; break;
++      }
++   }
++
++   if (target_mode < 0)
++      return -1;
++
++   for (i = 0; i < ARRAY_SIZE(eg_ec_mipi_frmfmt); i++) {
++      if (eg_ec_mipi_frmfmt[i].mode == target_mode)
++         return i;
++   }
++
++   return -1;
++}
++
++static const char *eg_ec_pixel_format_name(u32 code)
++{
++   switch (code) {
++      case 20: return "'Y16 ' (16-bit Greyscale)";
++      case 21: return "'AR24' (32-bit BGRA 8-8-8-8)";
++      case 22: return "'YUYV' (YUYV 4:2:2)";
++      default: return NULL;
++   }
++}
++
++static const struct v4l2_subdev_internal_ops eg_ec_mipi_subdev_internal_ops = {
++   .open = eg_ec_mipi_open,
++};
++
++static int eg_ec_mipi_probe(struct i2c_client *client,
++      const struct i2c_device_id *id)
++{
++   struct device *dev = &client->dev;
++   struct tegracam_device *tc_dev;
++   struct eg_ec_mipi *priv;
++   int err;
++   int i;
++   uint32_t upgradeMode;
++
++   dev_dbg(dev, "probing v4l2 eg_ec_mipi sensor at addr 0x%0x\n", client->addr);
++
++   // Find the first i2c client available
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (i2c_clients[i].i2c_client == NULL)
++      {
++         i2c_clients[i].i2c_client = client;
++         sprintf(i2c_clients[i].chnod_name,  "%s-%s", dev_driver_string(dev), dev_name(dev));
++         err = eg_ec_chnod_register_device(i);
++         if (err)
++         {
++            dev_err(dev, "chnod register failed\n");
++            i2c_clients[i].chnod_name[0] = 0;
++            return err;
++         }
++
++         // Try to communicate with the camera
++         err = eg_ec_mipi_read_reg(i2c_clients[i].i2c_client, ENGINECORE_REG_UPGRADE_MODE, (uint8_t*)&upgradeMode, sizeof(upgradeMode));
++         if (err)
++         {
++            dev_err(dev, "Failed to communicate with the camera\n");
++            goto err_camera_register;
++         }
++
++         break;
++
++      }
++   }
++
++   if (!IS_ENABLED(CONFIG_OF) || !client->dev.of_node)
++      goto err_camera_register;
++
++   priv = devm_kzalloc(dev,
++         sizeof(struct eg_ec_mipi), GFP_KERNEL);
++   if (!priv)
++      goto err_camera_register;
++
++   /* Read camera identification registers */
++   {
++      uint32_t model_code = 0;
++      uint32_t pixfmt_code = 0;
++      const char *name;
++      const char *pixfmt_name;
++      int j;
++
++      err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_PRODUCT_CODE,
++            (uint8_t *)&model_code, 4);
++      if (!err) {
++         name = eg_ec_model_name(model_code);
++         if (name)
++            strncpy(priv->model, name, sizeof(priv->model) - 1);
++         else
++            snprintf(priv->model, sizeof(priv->model),
++                  "Unknown (0x%06x)", model_code);
++      } else {
++         dev_warn(dev, "failed to read model code\n");
++      }
++
++      err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_SERIAL_NUMBER,
++            (uint8_t *)priv->serial_number,
++            sizeof(priv->serial_number));
++      if (!err) {
++         for (j = sizeof(priv->serial_number) - 1; j >= 0 &&
++               (priv->serial_number[j] == (char)0xff ||
++                priv->serial_number[j] == '\0'); j--)
++            priv->serial_number[j] = '\0';
++      } else {
++         priv->serial_number[0] = '\0';
++         dev_warn(dev, "failed to read serial number\n");
++      }
++
++      err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_WIDTH,
++            (uint8_t *)&priv->native_width, 4);
++      if (err)
++         dev_warn(dev, "failed to read width\n");
++
++      err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_HEIGHT,
++            (uint8_t *)&priv->native_height, 4);
++      if (err)
++         dev_warn(dev, "failed to read height\n");
++
++      err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_PIXEL_FORMAT,
++            (uint8_t *)&pixfmt_code, 4);
++      if (!err) {
++         priv->native_pixfmt = pixfmt_code;
++         pixfmt_name = eg_ec_pixel_format_name(pixfmt_code);
++         if (pixfmt_name)
++            strncpy(priv->pixel_format, pixfmt_name,
++                  sizeof(priv->pixel_format) - 1);
++         else
++            snprintf(priv->pixel_format,
++                  sizeof(priv->pixel_format),
++                  "0x%02x", pixfmt_code);
++      } else {
++         dev_warn(dev, "failed to read pixel format\n");
++      }
++
++      {
++         uint32_t fw_version = 0;
++         err = eg_ec_mipi_read_reg(client, ENGINECORE_REG_FIRMWARE_VERSION,
++               (uint8_t *)&fw_version, 4);
++         if (!err)
++            snprintf(priv->firmware_version,
++                  sizeof(priv->firmware_version),
++                  "%d.%d.%d (%d)", (fw_version >> 16)&0xFF, (fw_version >> 8)&0xFF, (fw_version >> 0)&0xFF, (fw_version >> 24)&0xFF);
++         else
++            dev_warn(dev, "failed to read firmware version\n");
++      }
++
++      dev_info(dev, "camera: %s, serial: %s, resolution: %ux%u, format: %s, fw: %s\n",
++            priv->model[0] ? priv->model : "N/A",
++            priv->serial_number[0] ? priv->serial_number : "N/A",
++            priv->native_width, priv->native_height,
++            priv->pixel_format[0] ? priv->pixel_format : "N/A",
++            priv->firmware_version[0] ? priv->firmware_version : "N/A");
++
++      /* Check MIPI lane consistency between camera and device tree */
++      {
++         int expected_lanes = eg_ec_expected_lanes(model_code);
++
++         if (expected_lanes > 0) {
++            struct device_node *ep;
++            u32 bus_width = 0;
++
++            ep = of_graph_get_next_endpoint(
++                  client->dev.of_node, NULL);
++            if (ep) {
++               of_property_read_u32(ep, "bus-width",
++                     &bus_width);
++               of_node_put(ep);
++            }
++
++            if (bus_width && bus_width != expected_lanes) {
++               dev_err(dev,
++                     "%s requires %d MIPI lane(s) but device tree configures %u (bus-width). Check device tree configuration.\n",
++                     priv->model, expected_lanes,
++                     bus_width);
++               goto err_camera_register;
++            }
++         }
++      }
++   }
++
++   tc_dev = devm_kzalloc(dev,
++         sizeof(struct tegracam_device), GFP_KERNEL);
++   if (!tc_dev)
++      goto err_camera_register;
++
++   priv->i2c_client = tc_dev->client = client;
++   tc_dev->dev = dev;
++   strncpy(tc_dev->name, "eg_ec_mipi", sizeof(tc_dev->name));
++   tc_dev->dev_regmap_config = NULL;
++   tc_dev->sensor_ops = &eg_ec_mipi_common_ops;
++   tc_dev->v4l2sd_internal_ops = &eg_ec_mipi_subdev_internal_ops;
++   tc_dev->tcctrl_ops = &eg_ec_mipi_ctrl_ops;
++
++   err = tegracam_device_register(tc_dev);
++   if (err) {
++      dev_err(dev, "tegra camera driver registration failed\n");
++      goto err_camera_register;
++   }
++   tc_dev->s_data->i2c_client = client;
++   priv->tc_dev = tc_dev;
++   priv->s_data = tc_dev->s_data;
++   priv->subdev = &tc_dev->s_data->subdev;
++   tegracam_set_privdata(tc_dev, (void *)priv);
++
++   /* Detect the camera's native mode and set the default dimensions
++    * BEFORE tegracam_v4l2subdev_register().
++    *
++    * tegracam_device_register() hard-codes mode_idx=0 (640x480 RAW16).
++    * Setting def_width/def_height/def_mode here ensures that the
++    * bind-time s_fmt in camera_common_try_fmt() selects the correct
++    * resolution by width/height matching instead of falling back to
++    * mode0. */
++   {
++      int m = eg_ec_find_native_mode(priv->native_width,
++            priv->native_height, priv->native_pixfmt);
++      if (m >= 0) {
++         tc_dev->s_data->sensor_mode_id = m;
++         tc_dev->s_data->def_mode = eg_ec_mipi_frmfmt[m].mode;
++         tc_dev->s_data->def_width  = tc_dev->s_data->fmt_width  =
++               eg_ec_mipi_frmfmt[m].size.width;
++         tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
++               eg_ec_mipi_frmfmt[m].size.height;
++
++         dev_info(dev,
++               "default sensor_mode_id set to %d (%ux%u)\n",
++               m, eg_ec_mipi_frmfmt[m].size.width,
++               eg_ec_mipi_frmfmt[m].size.height);
++      }
++   }
++
++   err = tegracam_v4l2subdev_register(tc_dev, true);
++   if (err) {
++      dev_err(dev, "tegra camera subdev registration failed\n");
++      tegracam_device_unregister(tc_dev);
++      goto err_camera_register;
++   }
++
++   device_create_file(dev, &dev_attr_model);
++   device_create_file(dev, &dev_attr_serial_number);
++   device_create_file(dev, &dev_attr_resolution);
++   device_create_file(dev, &dev_attr_pixel_format);
++   device_create_file(dev, &dev_attr_firmware_version);
++
++   dev_info(dev, "Registered %s device\n", i2c_clients[i].chnod_name);
++   return 0;
++
++err_camera_register:
++   device_destroy(i2c_clients[i].pClass_chnod, i2c_clients[i].chnod_device_number);
++   class_destroy(i2c_clients[i].pClass_chnod);
++   unregister_chrdev(i2c_clients[i].chnod_major_number, i2c_clients[i].chnod_name);
++   i2c_clients[i].chnod_name[0] = 0;
++   return -EIO;
++}
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,1)
++static int eg_ec_mipi_remove(struct i2c_client *client)
++#else
++static void eg_ec_mipi_remove(struct i2c_client *client)
++#endif
++{
++   struct device *dev = &client->dev;
++   struct camera_common_data *s_data = to_camera_common_data(&client->dev);
++   struct eg_ec_mipi *priv = (struct eg_ec_mipi *)s_data->priv;
++   char tmp[128];
++   int i;
++
++   tegracam_v4l2subdev_unregister(priv->tc_dev);
++   tegracam_device_unregister(priv->tc_dev);
++
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (i2c_clients[i].chnod_name[0] != 0)
++      {
++         if(i2c_clients[i].chnod_major_number != 0)
++         {
++            device_destroy(i2c_clients[i].pClass_chnod, i2c_clients[i].chnod_device_number);
++            class_destroy(i2c_clients[i].pClass_chnod);
++            unregister_chrdev(i2c_clients[i].chnod_major_number, i2c_clients[i].chnod_name);
++         }
++         sprintf(tmp,  "%s-%s", dev_driver_string(dev), dev_name(dev));
++         dev_info(dev, "Removed %s device\n", i2c_clients[i].chnod_name);
++         i2c_clients[i].i2c_client = NULL;
++         i2c_clients[i].chnod_name[0] = 0;
++         break;
++      }
++   }
++
++   device_remove_file(dev, &dev_attr_firmware_version);
++   device_remove_file(dev, &dev_attr_pixel_format);
++   device_remove_file(dev, &dev_attr_resolution);
++   device_remove_file(dev, &dev_attr_serial_number);
++   device_remove_file(dev, &dev_attr_model);
++
++#if LINUX_VERSION_CODE <= KERNEL_VERSION(6,1,1)
++   return 0;
++#endif
++}
++
++static const struct i2c_device_id eg_ec_mipi_id[] = {
++   { "eg-ec-mipi", 0 },
++   { }
++};
++MODULE_DEVICE_TABLE(i2c, eg_ec_mipi_id);
++
++static struct i2c_driver eg_ec_mipi_i2c_driver = {
++   .driver = {
++      .name = "eg-ec-mipi",
++      .owner = THIS_MODULE,
++      .of_match_table = of_match_ptr(eg_ec_mipi_of_match),
++   },
++   .probe = eg_ec_mipi_probe,
++   .remove = eg_ec_mipi_remove,
++   .id_table = eg_ec_mipi_id,
++};
++module_i2c_driver(eg_ec_mipi_i2c_driver);
++
++MODULE_AUTHOR("Exosens");
++MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for EngineCore cameras");
++MODULE_LICENSE("GPL v2");
++MODULE_VERSION("1.0");
+diff --git a/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c.save b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c.save
+new file mode 100755
+index 0000000..48af12b
+--- /dev/null
++++ b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c.save
+@@ -0,0 +1,1060 @@
++/*
++ * A V4L2 driver for Exosens MIPI EngineCore cameras.
++ *
++ * Based on Sony imx219 NVIDIA camera driver
++ * Copyright Copyright (C) 2023 Exosens
++ *
++ */
++
++//#define DEBUG
++#include <linux/i2c.h>
++#include <linux/i2c-mux.h>
++#include <linux/of_device.h>
++#include <linux/of_graph.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <media/tegracam_core.h>
++#include "ecctrl_i2c_common.h"
++
++#define MAX_I2C_CLIENTS_NUMBER 128
++
++#define ENGINECORE_REG_UPGRADE_MODE 0x0000
++#define ENGINECORE_REG_SERIAL_NUMBER   0x0040
++#define ENGINECORE_REG_PRODUCT_CODE 0x0080
++#define ENGINECORE_REG_WIDTH     0x0180
++#define ENGINECORE_REG_HEIGHT    0x0184
++#define ENGINECORE_REG_PIXEL_FORMAT 0x0260
++#define ENGINECORE_REG_FIRMWARE_VERSION   0x00A0
++
++int eg_ec_chnod_open (struct inode * pInode, struct file * file);
++int eg_ec_chnod_release (struct inode * pInode, struct file * file);
++
++static const struct of_device_id eg_ec_mipi_of_match[] = {
++   { .compatible = "xenics,eg-ec-mipi", },
++   { .compatible = "exosens,eg-ec-mipi", },
++   { },
++};
++MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
++
++enum {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++   EC_MIPI_MODE_640x480_RAW16,
++#endif
++   EC_MIPI_MODE_640x480_RGB888,
++   EC_MIPI_MODE_640x480_YUYV,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++   EC_MIPI_MODE_1280x1024_RAW16,
++#endif
++   EC_MIPI_MODE_1280x1024_RGB888,
++   EC_MIPI_MODE_1280x1024_YUYV,
++};
++
++static const int eg_ec_mipi_60fps[] = {
++   60,
++};
++
++/*
++ * WARNING: frmfmt ordering need to match mode definition in
++ * device tree!
++ */
++static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RAW16},
++#endif
++   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RGB888},
++   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_YUYV},
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RAW16},
++#endif
++   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RGB888},
++   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_YUYV},
++};
++
++
++static const u32 ctrl_cid_list[] = {
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
++   TEGRA_CAMERA_CID_GAIN,
++   TEGRA_CAMERA_CID_EXPOSURE,
++   TEGRA_CAMERA_CID_FRAME_RATE,
++#endif
++   TEGRA_CAMERA_CID_SENSOR_MODE_ID,
++};
++
++struct eg_ec_mipi {
++   struct i2c_client    *i2c_client;
++   struct v4l2_subdev      *subdev;
++   struct camera_common_data  *s_data;
++   struct tegracam_device     *tc_dev;
++
++   char           model[64];
++   char           serial_number[32];
++   u32            native_width;
++   u32            native_height;
++   u32            native_pixfmt;
++   char           pixel_format[48];
++   char           firmware_version[16];
++};
++
++struct eg_ec_i2c_client {
++   struct i2c_client *i2c_client;
++   char chnod_name[128];
++   int i2c_locked ;
++   int chnod_major_number;
++   dev_t chnod_device_number;
++   struct class *pClass_chnod;
++};
++
++struct eg_ec_i2c_client i2c_clients[MAX_I2C_CLIENTS_NUMBER];
++
++static ssize_t eg_ec_chnod_read(
++      struct file *file_ptr
++      , char __user *user_buffer
++      , size_t count
++      , loff_t *position)
++{
++   int ret = -EINVAL;
++   int i;
++   u8 *buffer_i2c = NULL;
++
++   // printk( KERN_NOTICE "eg-ec chnod: Device file read at offset = %i, bytes count = %u\n"
++   // , (int)*position
++   // , (unsigned int)count );
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
++   // Need this delay to work on Jetson Nano
++   __ecctrl_i2c_usleep(1000);
++#endif
++
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (strcmp(i2c_clients[i].chnod_name, file_ptr->f_path.dentry->d_name.name) == 0)
++      {
++         buffer_i2c =  kmalloc(count, GFP_KERNEL);
++         if (buffer_i2c)
++         {
++            ret = i2c_master_recv(i2c_clients[i].i2c_client, buffer_i2c, count);
++            if (ret <= 0)
++            {
++               printk(KERN_ERR "%s : Error sending read request, ret = %d\n", __func__, ret);
++               kfree(buffer_i2c);
++               return -1;
++            }
++
++            if( copy_to_user(user_buffer, buffer_i2c, count) != 0 )
++            {
++               printk(KERN_ERR "%s : Error, failed to copy from user\n", __func__);
++               kfree(buffer_i2c);
++               return -EFAULT;
++            }
++
++            kfree(buffer_i2c);
++         }
++         else
++         {
++            printk(KERN_ERR "%s : Error allocating memory\n", __func__);
++            return -1;
++         }
++      }
++   }
++
++   return ret;
++}
++
++static ssize_t eg_ec_chnod_write(
++      struct file *file_ptr
++      , const char __user *user_buffer
++      , size_t count
++      , loff_t *position)
++{
++   int ret = -EINVAL;
++   u8 *buffer_i2c = NULL;
++   int i;
++
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (strcmp(i2c_clients[i].chnod_name, file_ptr->f_path.dentry->d_name.name) == 0)
++      {
++         // printk( KERN_NOTICE "eg-ec chnod: Device file write at offset = %i, bytes count = %u\n"
++         // , (int)*position
++         // , (unsigned int)count );
++
++         buffer_i2c =  kmalloc(count, GFP_KERNEL);
++         if (buffer_i2c)
++         {
++            if( copy_from_user(buffer_i2c, user_buffer, count) != 0 )
++            {
++               printk(KERN_ERR "%s : Error, failed to copy from user\n", __func__);
++               kfree(buffer_i2c);
++               return -EFAULT;
++            }
++
++            ret = i2c_master_send(i2c_clients[i].i2c_client, buffer_i2c, count);
++            if (ret <= 0)
++            {
++               printk(KERN_ERR "%s : Error sending Write request, ret = %d\n", __func__, ret);
++               kfree(buffer_i2c);
++               return -1;
++            }
++            kfree(buffer_i2c);
++         }
++         else
++         {
++            printk(KERN_ERR "%s : Error allocating memory\n", __func__);
++            return -1;
++         }
++         break;
++      }
++   }
++
++   return ret;
++}
++
++int eg_ec_chnod_open (struct inode * pInode, struct file * file)
++{
++   int i;
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (strcmp(i2c_clients[i].chnod_name, file->f_path.dentry->d_name.name) == 0)
++      {
++         if (i2c_clients[i].i2c_locked == 0)
++         {
++            i2c_clients[i].i2c_locked = 1;
++            return 0;
++         }
++         else
++         {
++            return -EBUSY;
++         }
++         break;
++      }
++   }
++   return -EINVAL;
++}
++
++int eg_ec_chnod_release (struct inode * pInode, struct file * file)
++{
++   int i;
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (strcmp(i2c_clients[i].chnod_name, file->f_path.dentry->d_name.name) == 0)
++      {
++         i2c_clients[i].i2c_locked = 0;
++         return 0;
++      }
++   }
++   return -EINVAL;
++}
++
++static long eg_ec_chnod_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++{
++   int i;
++   switch (cmd) {
++      case ECCTRL_I2C_TIMEOUT_SET:
++         {
++            for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++            {
++               if (strcmp(i2c_clients[i].chnod_name, file->f_path.dentry->d_name.name) == 0)
++               {
++                  i2c_clients[i].i2c_client->adapter->timeout = (int)arg;
++                  return 0;
++               }
++            }
++            return -EINVAL;
++         }
++      default:
++         {
++            return -EINVAL;
++         }
++   }
++}
++
++
++static struct file_operations eg_ec_chnod_register_fops = 
++{
++   .owner   = THIS_MODULE,
++   .read    = eg_ec_chnod_read,
++   .write   = eg_ec_chnod_write,
++   .open    = eg_ec_chnod_open,
++   .release = eg_ec_chnod_release,
++   .unlocked_ioctl = eg_ec_chnod_ioctl,
++};
++static inline int eg_ec_chnod_register_device(int i2c_ind)
++{
++   struct device *pDev;
++   int result = 0;
++   result = register_chrdev( 0, i2c_clients[i2c_ind].chnod_name, &eg_ec_chnod_register_fops );
++   if( result < 0 )
++   {
++      printk( KERN_WARNING "eg-ec register chnod:  can\'t register character device with error code = %i\n", result );
++      return result;
++   }
++   i2c_clients[i2c_ind].chnod_major_number = result;
++   printk( KERN_DEBUG "eg-ec register chnod: registered character device with major number = %i and minor numbers 0...255\n", i2c_clients[i2c_ind].chnod_major_number );
++
++   i2c_clients[i2c_ind].chnod_device_number = MKDEV(i2c_clients[i2c_ind].chnod_major_number, 0);
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6,4,0)
++   i2c_clients[i2c_ind].pClass_chnod = class_create(THIS_MODULE, i2c_clients[i2c_ind].chnod_name);
++#else
++   i2c_clients[i2c_ind].pClass_chnod = class_create(i2c_clients[i2c_ind].chnod_name);
++#endif
++   if (IS_ERR(i2c_clients[i2c_ind].pClass_chnod)) {
++      printk(KERN_WARNING "\ncan't create class");
++      unregister_chrdev_region(i2c_clients[i2c_ind].chnod_device_number, 1);
++      return -EIO;
++   }
++
++   if (IS_ERR(pDev = device_create(i2c_clients[i2c_ind].pClass_chnod, NULL, i2c_clients[i2c_ind].chnod_device_number, NULL, i2c_clients[i2c_ind].chnod_name))) {
++      printk(KERN_WARNING "Can't create device /dev/%s\n", i2c_clients[i2c_ind].chnod_name);
++      class_destroy(i2c_clients[i2c_ind].pClass_chnod);
++      unregister_chrdev_region(i2c_clients[i2c_ind].chnod_device_number, 1);
++      return -EIO;
++   }
++   return 0;
++}
++
++
++static inline int eg_ec_mipi_write_reg(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, int size)
++{
++   ecctrl_i2c_t args;
++   int i;
++   int err;
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (i2c_clients[i].i2c_client == i2c_client)
++      {
++         if (i2c_clients[i].i2c_locked == 0)
++         {
++            i2c_clients[i].i2c_locked = 1;
++            __ecctrl_i2c_timeout_set(i2c_client, 0);
++            args.data_address = address;
++            args.data = data;
++            args.data_size = size;
++            args.i2c_timeout = 100;
++            args.i2c_tries_max = 1;
++            args.cb = NULL;
++            err = __ecctrl_i2c_write_reg(i2c_client, &args);
++            i2c_clients[i].i2c_locked = 0;
++            return err;
++         }
++         else
++         {
++            return -EBUSY;
++         }
++      }
++   }
++   return -EINVAL;
++}
++
++static inline int eg_ec_mipi_read_reg(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, uint8_t size)
++{
++   ecctrl_i2c_t args;
++   int i;
++   int err;
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (i2c_clients[i].i2c_client == i2c_client)
++      {
++         if (i2c_clients[i].i2c_locked == 0)
++         {
++            i2c_clients[i].i2c_locked = 1;
++            __ecctrl_i2c_timeout_set(i2c_client, 0);
++            args.data_address = address;
++            args.data = data;
++            args.data_size = size;
++            args.i2c_timeout = 0;
++            args.i2c_tries_max = 1;
++            args.cb = NULL;
++            err = __ecctrl_i2c_read_reg(i2c_client, &args);
++            i2c_clients[i].i2c_locked = 0;
++            return err;
++         }
++         else
++         {
++            return -EBUSY;
++         }
++      }
++   }
++   return -EINVAL;
++}
++
++static inline int eg_ec_mipi_write_fifo(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, uint32_t size)
++{
++   ecctrl_i2c_t args;
++   int i;
++   int err;
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (i2c_clients[i].i2c_client == i2c_client)
++      {
++         if (i2c_clients[i].i2c_locked == 0)
++         {
++            i2c_clients[i].i2c_locked = 1;
++            __ecctrl_i2c_timeout_set(i2c_client, 0);
++            args.data_address = address;
++            args.data = data;
++            args.data_size = size;
++            args.i2c_timeout = 0;
++            args.i2c_tries_max = 0;
++            args.cb = NULL;
++            args.fifo_flags = FIFO_FLAG_START | FIFO_FLAG_END;
++            err = __ecctrl_i2c_write_fifo(i2c_client, &args);
++            i2c_clients[i].i2c_locked = 0;
++            return err;
++         }
++         else
++         {
++            return -EBUSY;
++         }
++      }
++   }
++   return -EINVAL;
++
++}
++
++static inline int eg_ec_mipi_read_fifo(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, uint32_t size)
++{
++   ecctrl_i2c_t args;
++   int i;
++   int err;
++   for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
++   {
++      if (i2c_clients[i].i2c_client == i2c_client)
++      {
++         if (i2c_clients[i].i2c_locked == 0)
++         {
++            i2c_clients[i].i2c_locked = 1;
++            __ecctrl_i2c_timeout_set(i2c_client, 0);
++            args.data_address = address;
++            args.data = data;
++            args.data_size = size;
++            args.i2c_timeout = 0;
++            args.i2c_tries_max = -1;
++            args.cb = NULL;
++            args.fifo_flags = FIFO_FLAG_START | FIFO_FLAG_END;
++            err = __ecctrl_i2c_read_fifo(i2c_client, &args);
++            i2c_clients[i].i2c_locked = 0;
++            return err;
++         }
++         else
++         {
++            return -EBUSY;
++         }
++      }
++   }
++   return -EINVAL;
++}
++
++static int eg_ec_mipi_set_group_hold(struct tegracam_device *tc_dev, bool val)
++{
++   // group hold is not supported
++   dev_dbg(tc_dev->dev, "%s val=%d\n", __func__, val);
++   return 0;
++}
++
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
++static int eg_ec_mipi_ir_set_gain(struct tegracam_device *tc_dev, s64 val)
++{
++   dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
++   return 0;
++}
++
++static int eg_ec_mipi_ir_set_frame_rate(struct tegracam_device *tc_dev, s64 val)
++{
++   dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
++   return 0;
++}
++
++static int eg_ec_mipi_ir_set_exposure(struct tegracam_device *tc_dev, s64 val)
++{
++   dev_dbg(tc_dev->dev, "%s val=%lld\n", __func__, val);
++   return 0;
++}
++#endif
++
++static struct tegracam_ctrl_ops eg_ec_mipi_ctrl_ops = {
++   .numctrls = ARRAY_SIZE(ctrl_cid_list),
++   .ctrl_cid_list = ctrl_cid_list,
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5,15,0)
++   .set_gain = eg_ec_mipi_ir_set_gain,
++   .set_exposure = eg_ec_mipi_ir_set_exposure,
++   .set_frame_rate = eg_ec_mipi_ir_set_frame_rate,
++#endif
++   .set_group_hold = eg_ec_mipi_set_group_hold,
++};
++
++static int eg_ec_mipi_power_on(struct camera_common_data *s_data)
++{
++   // Power is not managed here
++   struct device *dev = s_data->dev;
++   dev_dbg(dev, "%s\n", __func__);
++   return 0;
++}
++
++static int eg_ec_mipi_power_off(struct camera_common_data *s_data)
++{
++   // Power is not managed here
++   struct device *dev = s_data->dev;
++   dev_dbg(dev, "%s\n", __func__);
++   return 0;
++}
++
++static int eg_ec_mipi_power_put(struct tegracam_device *tc_dev)
++{
++   // Power is not managed here
++   dev_dbg(tc_dev->dev, "%s\n", __func__);
++   return 0;
++}
++
++static int eg_ec_mipi_power_get(struct tegracam_device *tc_dev)
++{
++   // Power is not managed here
++   dev_dbg(tc_dev->dev, "%s\n", __func__);
++   return 0;
++}
++
++static struct camera_common_pdata *eg_ec_mipi_parse_dt(
++      struct tegracam_device *tc_dev)
++{
++   struct device *dev = tc_dev->dev;
++   struct device_node *np = dev->of_node;
++   struct camera_common_pdata *board_priv_pdata;
++   const struct of_device_id *match;
++
++   if (!np)
++      return NULL;
++
++   match = of_match_device(eg_ec_mipi_of_match, dev);
++   if (!match) {
++      dev_err(dev, "Failed to find matching dt id\n");
++      return NULL;
++   }
++
++   // Just need to allocate data for tegra registration
++   board_priv_pdata = devm_kzalloc(dev,
++         sizeof(*board_priv_pdata), GFP_KERNEL);
++   if (!board_priv_pdata)
++      return NULL;
++
++   return board_priv_pdata;
++}
++
++static int eg_ec_mipi_set_mode(struct tegracam_device *tc_dev)
++{
++   // Configuration is done independently by a control application
++   dev_dbg(tc_dev->dev, "%s\n", __func__);
++   return 0;
++}
++
++/*
++ * Flag set to 0 at module load, 1 after the first successful start_streaming.
++ * Used to apply a one-time NVCSI warm-up delay only on cold boot.
++ */
++static atomic_t eg_ec_nvcsi_warmed_up = ATOMIC_INIT(0);
++
++static int eg_ec_mipi_start_streaming(struct tegracam_device *tc_dev)
++{
++   /*
++    * On cold boot the Crius1280 (and any EC camera that streams MIPI
++    * continuously) has been transmitting HS since power-on.  NVCSI SCIL
++    * deskew calibration at 1.6 Gbps takes ~3 s on cold hardware (TRM
++    * §7.2.1.2 NVCSI SCIL — "Deskew calibration of the brick for D-PHY").
++    * start_streaming is called at step 10 of the TRM initial sequence,
++    * AFTER NVCSI CIL reset is removed (step 9) but BEFORE VI submits its
++    * task descriptor (step 11).  A sleep here therefore falls outside the
++    * 2500 ms VI capture timeout and lets the SCIL finish calibration before
++    * VI starts counting.
++    *
++    * After the first successful stream the SCIL state is warm and subsequent
++    * start_streaming calls need no delay.
++    */
++   if (!atomic_xchg(&eg_ec_nvcsi_warmed_up, 1)) {
++      dev_info(tc_dev->dev,
++            "first stream-on: waiting 4 s for NVCSI SCIL deskew calibration "
++            "(cold boot, continuous HS camera)\n");
++      msleep(4000);
++   }
++   return 0;
++}
++
++static int eg_ec_mipi_stop_streaming(struct tegracam_device *tc_dev)
++{
++//   uint8_t data[4];
++//   memset(data, 0, sizeof(data));
++//   eg_ec_mipi_write_reg(tc_dev->s_data->i2c_client, 0x20C, data, 4);
 +   return 0;
 +}
 +
@@ -4235,21 +5273,57 @@ index 0000000..8d6729f
 +      goto err_camera_register;
 +   }
 +
-+   /* Set default sensor_mode_id to the mode matching the camera's native
-+    * resolution and pixel format.  Without this, the tegracam framework
-+    * defaults to sensor_mode_id=0 (640x480 RAW16), which causes GStreamer
-+    * to fail on cameras with different native parameters (e.g. Crius1280
-+    * at 1280x1024). */
++   /* Detect the camera's native mode and configure the tegracam framework
++    * to use it.  Without this, tegracam_device_register() defaults to
++    * mode_idx=0 (640x480 RAW16), which is wrong for cameras like Crius1280
++    * that natively stream 1280x1024 AR24.
++    *
++    * Three fields must be updated together:
++    *
++    * 1. sensor_mode_id / use_sensor_mode_id: the DT sets use_sensor_mode_id
++    *    to "false" for EC cameras, so camera_common_try_fmt() uses
++    *    resolution-based matching.  For Crius1280 this picks mode3 (the
++    *    first 1280x1024 entry = RAW16, 16bpp, 100 MHz) instead of mode4
++    *    (RGB888, 24bpp, 133 MHz).  NVCSI is then configured for the wrong
++    *    pixel bit-depth and lane bitrate, causing PIXEL_SHORT_LINE errors
++    *    and uncorrectable capture timeouts.  Setting use_sensor_mode_id=true
++    *    here overrides the DT default and forces try_fmt() to use
++    *    sensor_mode_id (the hardware-detected mode) for NVCSI setup.
++    *
++    * 2. def_width / def_height / fmt_width / fmt_height: camera_common_g_fmt()
++    *    returns these after probe.  Correct values let nvargus-daemon
++    *    request the right resolution in S_FMT from the start.
++    *
++    * 3. colorfmt: camera_common_g_fmt() also returns this.  Setting it to
++    *    the native pixel format (e.g. RGB24 for Crius1280) ensures
++    *    nvargus passes the correct mbus code to S_FMT. */
 +   {
 +      int m = eg_ec_find_native_mode(priv->native_width,
 +            priv->native_height, priv->native_pixfmt);
 +      if (m >= 0) {
++         const struct camera_common_colorfmt *cf;
++         u32 pix_fmt;
++
 +         tc_dev->s_data->sensor_mode_id = m;
++         tc_dev->s_data->use_sensor_mode_id = true;
 +         tc_dev->s_data->def_mode = eg_ec_mipi_frmfmt[m].mode;
-+         tc_dev->s_data->def_width = eg_ec_mipi_frmfmt[m].size.width;
-+         tc_dev->s_data->def_height = eg_ec_mipi_frmfmt[m].size.height;
++         tc_dev->s_data->def_width  = tc_dev->s_data->fmt_width  =
++               eg_ec_mipi_frmfmt[m].size.width;
++         tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
++               eg_ec_mipi_frmfmt[m].size.height;
++
++         /* Update colorfmt from the DT sensor_props so G_FMT returns the
++          * right pixel format (e.g. RGB24 for AR24) right after probe. */
++         if (m < (int)tc_dev->s_data->sensor_props.num_modes) {
++            pix_fmt = tc_dev->s_data->sensor_props.sensor_modes[m]
++                        .image_properties.pixel_format;
++            cf = camera_common_find_pixelfmt(pix_fmt);
++            if (cf)
++               tc_dev->s_data->colorfmt = cf;
++         }
++
 +         dev_info(dev,
-+               "default sensor_mode_id set to %d (%ux%u)\n",
++               "native mode detected: id=%d (%ux%u), use_sensor_mode_id forced\n",
 +               m, eg_ec_mipi_frmfmt[m].size.width,
 +               eg_ec_mipi_frmfmt[m].size.height);
 +      }
@@ -4340,10 +5414,10 @@ index 0000000..8d6729f
 +MODULE_VERSION("1.0");
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.c b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.c
 new file mode 100644
-index 0000000..c985b20
+index 0000000..56da466
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.c
-@@ -0,0 +1,710 @@
+@@ -0,0 +1,739 @@
 +/*
 + *
 + * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
@@ -4464,8 +5538,37 @@ index 0000000..c985b20
 +{
 +   nb_timer_delete_all();
 +   MEM_FREE(pRxBuffer);
++   pRxBuffer = NULL;
 +   MEM_FREE(pTxBuffer);
++   pTxBuffer = NULL;
++   gGencpInitWasSuccessfull = false;
 +   PRINT_INFO("GENCP Client cleaned up\n");
++}
++
++/*
++ * GENCPCLIENT_Select - Switch the global GenCP state to a different camera.
++ *
++ * Call this before any GENCPCLIENT_ReadRegister / WriteRegister when multiple
++ * Microlynx cameras are probed.  It restores the correct I2C handle and
++ * re-enables the GenCP functions without doing a full re-init (no extra I2C
++ * round-trips, no memory reallocation if buffers are already valid).
++ */
++void GENCPCLIENT_Select(struct unio_handle *h)
++{
++   if (!h)
++      return;
++   unio_handle_ptr = h;
++   /* Restore everything that GENCPCLIENT_Cleanup tore down:
++    *  - ring buffer + read-buffer-enable flag in the unio_handle
++    *  - software timers used for ACK timeout detection
++    *  - Rx/Tx message buffers (re-alloc only if freed by Cleanup) */
++   unio_read_buffer_init(h, 8);
++   nb_timers_init(2);
++   if (!pRxBuffer)
++      pRxBuffer = (GENCP_MSG *)MEM_ALLOC(sizeof(GENCP_MSG));
++   if (!pTxBuffer)
++      pTxBuffer = (GENCP_MSG *)MEM_ALLOC(sizeof(GENCP_MSG));
++   gGencpInitWasSuccessfull = (pRxBuffer != NULL && pTxBuffer != NULL);
 +}
 +/*_____                _                                                 _
 +  |  __ \              | |                                               | |
@@ -5056,10 +6159,10 @@ index 0000000..c985b20
 +}
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.h b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.h
 new file mode 100644
-index 0000000..eef1264
+index 0000000..37fec84
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/gencp_client.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,28 @@
 +/*
 + *
 + * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
@@ -5078,6 +6181,7 @@ index 0000000..eef1264
 +
 +void GENCPCLIENT_Init(struct unio_handle *h);
 +void GENCPCLIENT_Cleanup(void);
++void GENCPCLIENT_Select(struct unio_handle *h);
 +uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data);
 +// uint16_t GENCPCLIENT_ReadRegister64bit(uint32_t address, uint64_t* data);
 +uint16_t GENCPCLIENT_WriteRegister(uint32_t address, uint32_t data);
@@ -5833,10 +6937,10 @@ index 0000000..f83d848
 +#endif /* LIB_UNIO_EXTRA_H */
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/nb_timer.c b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/nb_timer.c
 new file mode 100644
-index 0000000..c75fb64
+index 0000000..3154b42
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/gencp-over-i2c/nb_timer.c
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,119 @@
 +/*
 + *
 + * Copyright (c) 2026, Xenics Exosens, All Rights Reserved.
@@ -5874,6 +6978,10 @@ index 0000000..c75fb64
 +
 +int nb_timers_init(int num_timers) {
 +    int i;
++
++    /* Clean up any previous allocation to avoid leaking on re-init. */
++    if (_timer_array_ptr)
++        nb_timer_delete_all();
 +
 +    _timer_array_ptr = MEM_ALLOC(sizeof(struct timer_def) * num_timers);
 +    _timer_array_len = (size_t)num_timers;
@@ -5994,10 +7102,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..340cc71
+index 0000000..0f897ca
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,771 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -6008,20 +7116,71 @@ index 0000000..340cc71
 +
 +#include <linux/i2c.h>
 +#include <linux/i2c-mux.h>
++#include <linux/miscdevice.h>
 +#include <linux/of_device.h>
 +#include <linux/gpio.h>
 +#include <linux/of_gpio.h>
++#include <linux/uaccess.h>
 +#include <linux/version.h>
 +#include <media/tegracam_core.h>
 +
-+/* ilumos specific registers */
++/* ilumos GenCP registers */
 +#define REG_ACQ_START_W   0x50000A00
 +#define REG_ACQ_STATUS_R  0x50000A20
-+#define REG_IMG_HEIGHT_RW 0x50000004
-+#define REG_IMG_WIDTH_RW  0x50000000
 +#define REG_FIRW_VER_R    0x10000000
 +#define REG_SERIAL_R      0x00144
 +#define REG_MODEL_NAME_R  0x00044
++#define REG_IMG_HEIGHT_R  0x50000004
++#define REG_IMG_WIDTH_R   0x50000000 
++#
++/* Crosslink bridge register interface */
++#define REG_CROSSLINK_ADDR          0x50000C00
++#define REG_CROSSLINK_DATA          0x50000C04
++#define REG_CROSSLINK_R_WR_CMD      0x50000C08
++
++#define REG_CROSSLINK_FW_VERSION    0x0
++#define REG_CROSSLINK_PIXEL_FORMAT  0x2
++#define REG_CROSSLINK_LINE_LENGTH   0x3
++#define REG_CROSSLINK_FIFO_STATUS   0x7
++#define REG_CROSSLINK_FRAME_COUNTER 0x8
++#define REG_CROSSLINK_FRAME_SIZE    0x9
++
++#define READ_CROSSLINK      0x1
++#define WRITE_CROSSLINK     0x0
++
++#define PIXEL_FORMAT_MONO16 0x2E
++#define PIXEL_FORMAT_MONO14 0x2D
++
++#define ILUMOS_STR_MAX    256
++
++/* ---- ioctl interface (/dev/ilumos-<bus>-<addr>) ------------------------- */
++
++/**
++ * struct ilumos_reg_op - ioctl payload for 32-bit register read/write
++ * @addr: register address
++ * @val:  value written (WRITE_REG) or value returned (READ_REG)
++ */
++struct ilumos_reg_op {
++   __u32 addr;
++   __u32 val;
++};
++
++/**
++ * struct ilumos_str_op - ioctl payload for string read
++ * @addr: register address of the string
++ * @len:  number of bytes to read (clamped to ILUMOS_STR_MAX)
++ * @buf:  buffer filled with the string data on return
++ */
++struct ilumos_str_op {
++   __u32 addr;
++   __u32 len;
++   __u8  buf[ILUMOS_STR_MAX];
++};
++
++#define ILUMOS_IOCTL_MAGIC    'I'
++#define ILUMOS_IOCTL_READ_REG  _IOWR(ILUMOS_IOCTL_MAGIC, 1, struct ilumos_reg_op)
++#define ILUMOS_IOCTL_WRITE_REG _IOW (ILUMOS_IOCTL_MAGIC, 2, struct ilumos_reg_op)
++#define ILUMOS_IOCTL_READ_STR  _IOWR(ILUMOS_IOCTL_MAGIC, 3, struct ilumos_str_op)
 +
 +static const struct of_device_id ilumos_of_match[] = {
 +   { .compatible = "exosens,ilumos", },
@@ -6032,6 +7191,10 @@ index 0000000..340cc71
 +enum {
 +   ILUMOS_MODE_2048x2048_RAW16,
 +   ILUMOS_MODE_2048x1088_RAW16,
++   ILUMOS_MODE_1280x1024_RAW16,
++   ILUMOS_MODE_2048x2048_RAW14,
++   ILUMOS_MODE_2048x1088_RAW14,
++   ILUMOS_MODE_1280x1024_RAW14,
 +};
 +
 +static const int ilumos_60fps[] = {
@@ -6045,6 +7208,10 @@ index 0000000..340cc71
 +static const struct camera_common_frmfmt ilumos_frmfmt[] = {
 +   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16},
 +   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16},
++   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW16},
++   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW14},
++   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW14},
++   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW14},
 +};
 +
 +static int ilumos_find_frmfmt(u32 width, u32 height)
@@ -6080,11 +7247,16 @@ index 0000000..340cc71
 +   char        model[64];
 +   char        serial_number[64];
 +   char        firmware_version[64];
-+   u32            native_width;
-+   u32            native_height;
++   char        pixel_format[64];
++   u32         native_width;
++   u32         native_height;
++
++   /* chardev — /dev/ilumos-<bus>-<addr> */
++   struct miscdevice miscdev;
++   char              miscdev_name[32];
 +};
 +
-+static int ilumos_i2c_read(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
++static int ilumos_i2c_read_register(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
 +{
 +   struct i2c_msg msgs[2];
 +   u8 tx_data[6];
@@ -6135,7 +7307,7 @@ index 0000000..340cc71
 +   return ret;
 +}
 +
-+static int ilumos_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
++static int ilumos_i2c_write_register(struct i2c_client *client, u32 reg, u32 val)
 +{
 +   struct i2c_msg msgs;
 +   u8 tx_data[10];
@@ -6156,75 +7328,222 @@ index 0000000..340cc71
 +}
 +
 +
++static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
++                                              u32 reg, u32 *val)
++{
++   int ret;
++
++   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_ADDR, reg);
++   if (ret)
++      return ret;
++
++   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
++                                   READ_CROSSLINK);
++   if (ret)
++      return ret;
++
++   return ilumos_i2c_read_register(client, REG_CROSSLINK_DATA,
++                                   (u8 *)val, sizeof(*val));
++}
++
++static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
++                                  u8 *buf, u16 len)
++{
++   if (len > ILUMOS_STR_MAX)
++      return -EINVAL;
++   return ilumos_i2c_read_register(client, reg, buf, len);
++}
++
++/* ---- chardev file operations ------------------------------------------ */
++
++static int ilumos_cdev_open(struct inode *inode, struct file *file)
++{
++   struct ilumos *priv =
++      container_of(file->private_data, struct ilumos, miscdev);
++   file->private_data = priv;
++   return 0;
++}
++
++static int ilumos_cdev_release(struct inode *inode, struct file *file)
++{
++   return 0;
++}
++
++static long ilumos_cdev_ioctl(struct file *file, unsigned int cmd,
++                              unsigned long arg)
++{
++   struct ilumos *priv = file->private_data;
++   int ret = 0;
++
++   switch (cmd) {
++   case ILUMOS_IOCTL_READ_REG: {
++      struct ilumos_reg_op op;
++
++      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
++         ret = -EFAULT;
++         break;
++      }
++      ret = ilumos_i2c_read_register(priv->i2c_client, op.addr,
++                                     (u8 *)&op.val, sizeof(op.val));
++      if (ret == 0 && copy_to_user((void __user *)arg, &op, sizeof(op)))
++         ret = -EFAULT;
++      break;
++   }
++   case ILUMOS_IOCTL_WRITE_REG: {
++      struct ilumos_reg_op op;
++
++      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
++         ret = -EFAULT;
++         break;
++      }
++      ret = ilumos_i2c_write_register(priv->i2c_client, op.addr, op.val);
++      break;
++   }
++   case ILUMOS_IOCTL_READ_STR: {
++      struct ilumos_str_op op;
++
++      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
++         ret = -EFAULT;
++         break;
++      }
++      op.len = min_t(u32, op.len, ILUMOS_STR_MAX);
++      ret = ilumos_i2c_read_string(priv->i2c_client, op.addr,
++                                   op.buf, op.len);
++      if (ret == 0 && copy_to_user((void __user *)arg, &op, sizeof(op)))
++         ret = -EFAULT;
++      break;
++   }
++   default:
++      ret = -ENOTTY;
++      break;
++   }
++
++   return ret;
++}
++
++static const struct file_operations ilumos_cdev_fops = {
++   .owner          = THIS_MODULE,
++   .open           = ilumos_cdev_open,
++   .release        = ilumos_cdev_release,
++   .unlocked_ioctl = ilumos_cdev_ioctl,
++};
++
 +static int ilumos_sensor_check(struct ilumos *priv)
 +{
 +   struct device *dev = &priv->i2c_client->dev;
-+   int status, mode, i;
++   int i, mode;
 +   u8 buf[64];
++   u32 read_data;
 +   u32 width, height;
++   bool is_raw14 = false;
 +
-+   /* FPGA firmware read */
-+   status = ilumos_i2c_read(priv->i2c_client, REG_FIRW_VER_R,
-+         buf, sizeof(buf));
-+   if (status < 0)
-+   {
-+      goto error_exit;
-+   }
-+   for (i = sizeof(buf) - 1; i >= 0 && buf[i] == (u8)0xff; i--)
-+      buf[i] = '\0';
-+   strncpy(priv->firmware_version, buf, sizeof(priv->firmware_version) - 1);
-+   priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
-+
-+   status = ilumos_i2c_read(priv->i2c_client, REG_IMG_WIDTH_RW,
-+         (u8 *)&width, sizeof(width));
-+   if (status < 0)
-+   {
-+      goto error_exit;
++   /* FPGA firmware version */
++   if (ilumos_i2c_read_string(priv->i2c_client, REG_FIRW_VER_R,
++                              buf, sizeof(buf)) == 0) {
++      for (i = sizeof(buf) - 1; i >= 0 && buf[i] == (u8)0xff; i--)
++         buf[i] = '\0';
++      strncpy(priv->firmware_version, buf, sizeof(priv->firmware_version) - 1);
++      priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
++      dev_info(dev, "FPGA firmware version = %s\n", priv->firmware_version);
++   } else {
++      dev_warn(dev, "FPGA firmware read failed\n");
 +   }
 +
-+   status = ilumos_i2c_read(priv->i2c_client, REG_IMG_HEIGHT_RW,
-+         (u8 *)&height, sizeof(height));
-+   if (status < 0)
-+   {
-+      goto error_exit;
++   /* Pixel format via Crosslink */
++   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
++                                          REG_CROSSLINK_PIXEL_FORMAT,
++                                          &read_data) == 0) {
++      if (read_data == PIXEL_FORMAT_MONO14) {
++         is_raw14 = true;
++         dev_info(dev, "PIXEL_FORMAT = 0x%08x (RAW14)\n", read_data);
++      } else {
++         dev_info(dev, "PIXEL_FORMAT = 0x%08x (RAW16)\n", read_data);
++      }
++   } else {
++      dev_warn(dev, "PIXEL_FORMAT read failed, assuming RAW16\n");
 +   }
 +
++   /* Read Width and Height via Crosslink FRAME_SIZE */
++   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
++                                          REG_CROSSLINK_FRAME_SIZE,
++                                          &read_data) != 0) {
++      dev_err(dev, "Crosslink FRAME_SIZE read failed\n");
++      
++      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
++                                   (u8 *)&width, sizeof(width)) == 0) {
++         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
++                                      (u8 *)&height, sizeof(height)) == 0) {
++         } else {
++            dev_warn(dev, "failed to read height\n");
++            goto error_exit;
++         }
++      } else {
++         dev_warn(dev, "failed to read width\n");
++         goto error_exit;
++      }
++   }
++   else
++   {
++      width = read_data & 0xFFFF;
++      height = read_data >> 16;
++   }
++   dev_info(dev, "Frame width = %u px\n", width);
++   dev_info(dev, "Frame height = %u px\n", height);
++
++
++   /* ilumos_frmfmt: indices 0-2 = RAW16, indices 3-5 = RAW14 (same resolutions) */
 +   mode = ilumos_find_frmfmt(width, height);
 +   if (mode < 0) {
++      dev_err(dev, "unsupported resolution %ux%u\n", width, height);
 +      goto error_exit;
 +   }
++   if (is_raw14)
++      mode += 3;
 +
-+   priv->native_width = width;
++   priv->tc_dev->s_data->sensor_mode_id = mode;
++   priv->tc_dev->s_data->def_mode       = mode;
++
++   if (is_raw14)
++      strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
++              sizeof(priv->pixel_format) - 1);
++   else
++      strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
++              sizeof(priv->pixel_format) - 1);
++   priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
++
++   dev_info(dev, "mode=%d  pixel_format=%s\n", mode, priv->pixel_format);
++
++   priv->native_width  = width;
 +   priv->native_height = height;
 +
-+   /* Read model name */
-+   status = ilumos_i2c_read(priv->i2c_client, REG_MODEL_NAME_R,
-+         (u8 *)priv->model, sizeof(priv->model));
-+   if (status < 0) {
-+      priv->model[0] = '\0';
-+      dev_warn(dev, "failed to read model name\n");
-+   } else {
++   /* Model name */
++   if (ilumos_i2c_read_string(priv->i2c_client, REG_MODEL_NAME_R,
++                                (u8 *)priv->model, sizeof(priv->model)) == 0) {
 +      for (i = sizeof(priv->model) - 1; i >= 0 &&
 +            (priv->model[i] == (char)0xff || priv->model[i] == '\0'); i--)
 +         priv->model[i] = '\0';
++   } else {
++      priv->model[0] = '\0';
++      dev_warn(dev, "failed to read model name\n");
 +   }
 +
-+   /* Read serial number */
-+   status = ilumos_i2c_read(priv->i2c_client, REG_SERIAL_R,
-+         (u8 *)priv->serial_number, sizeof(priv->serial_number));
-+   if (status < 0) {
++   /* Serial number */
++   if (ilumos_i2c_read_string(priv->i2c_client, REG_SERIAL_R,
++                                (u8 *)priv->serial_number,
++                                sizeof(priv->serial_number)) == 0) {
++      for (i = sizeof(priv->serial_number) - 1; i >= 0 &&
++            (priv->serial_number[i] == (char)0xff ||
++             priv->serial_number[i] == '\0'); i--)
++         priv->serial_number[i] = '\0';
++   } else {
 +      priv->serial_number[0] = '\0';
 +      dev_warn(dev, "failed to read serial number\n");
-+   } else {
-+      for (i = sizeof(priv->serial_number) - 1; i >= 0 &&
-+            (priv->serial_number[i] == (char)0xff || priv->serial_number[i] == '\0'); i--)
-+         priv->serial_number[i] = '\0';
 +   }
 +
 +   return 0;
 +
 +error_exit:
-+   dev_err(dev, "Probing failed");
++   dev_err(dev, "Probing failed\n");
 +   return -EIO;
 +}
 +
@@ -6337,11 +7656,11 @@ index 0000000..340cc71
 +
 +   dev_dbg(tc_dev->dev, "%s\n", __func__);
 +
-+   status = ilumos_i2c_read(priv->i2c_client, REG_ACQ_STATUS_R,
++   status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
 +         (u8 *)&read_data, sizeof(read_data));
 +   if (status == 0) {
 +      if (read_data != 0x1) {
-+         status = ilumos_i2c_write32(priv->i2c_client, REG_ACQ_START_W, 1);
++         status = ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 1);
 +      }
 +   } else {
 +      dev_err(tc_dev->dev, "%s : Register read failed\n", __func__);
@@ -6405,7 +7724,10 @@ index 0000000..340cc71
 +static ssize_t pixel_format_show(struct device *dev,
 +      struct device_attribute *attr, char *buf)
 +{
-+   return scnprintf(buf, PAGE_SIZE, "'Y16 ' (16-bit Greyscale)\n");
++   struct camera_common_data *s_data = to_camera_common_data(dev);
++   struct ilumos *priv = (struct ilumos *)s_data->priv;
++
++   return scnprintf(buf, PAGE_SIZE, "%s\n", priv->pixel_format);
 +}
 +static DEVICE_ATTR_RO(pixel_format);
 +
@@ -6490,6 +7812,18 @@ index 0000000..340cc71
 +   device_create_file(dev, &dev_attr_pixel_format);
 +   device_create_file(dev, &dev_attr_firmware_version);
 +
++   /* Register chardev for userspace register access */
++   snprintf(priv->miscdev_name, sizeof(priv->miscdev_name),
++            "ilumos-%d-%04x", client->adapter->nr, client->addr);
++   priv->miscdev.minor  = MISC_DYNAMIC_MINOR;
++   priv->miscdev.name   = priv->miscdev_name;
++   priv->miscdev.fops   = &ilumos_cdev_fops;
++   priv->miscdev.parent = dev;
++   if (misc_register(&priv->miscdev))
++      dev_warn(dev, "failed to register chardev; ilumosCtrl will not work\n");
++   else
++      dev_info(dev, "chardev registered at /dev/%s\n", priv->miscdev_name);
++
 +   return 0;
 +}
 +
@@ -6502,6 +7836,8 @@ index 0000000..340cc71
 +   struct device *dev = &client->dev;
 +   struct camera_common_data *s_data = to_camera_common_data(&client->dev);
 +   struct ilumos *priv = (struct ilumos *)s_data->priv;
++
++   misc_deregister(&priv->miscdev);
 +
 +   device_remove_file(dev, &dev_attr_firmware_version);
 +   device_remove_file(dev, &dev_attr_pixel_format);
@@ -6543,10 +7879,10 @@ index 0000000..340cc71
 +MODULE_VERSION("1.0");
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/microlynx_core.c b/source/public/kernel/nvidia/drivers/media/i2c/microlynx_core.c
 new file mode 100644
-index 0000000..0e33533
+index 0000000..2e9c52e
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/microlynx_core.c
-@@ -0,0 +1,702 @@
+@@ -0,0 +1,725 @@
 +/*
 + * A V4L2 driver for Exosens Microlynx MIPI IR cameras.
 + *
@@ -6613,10 +7949,11 @@ index 0000000..0e33533
 + * Module-level mutex: GENCPCLIENT uses process-global state (pRxBuffer,
 + * pTxBuffer, unio_handle_ptr).  Serialise all GenCP calls behind this lock.
 + *
-+ * Limitation: when two Microlynx cameras are probed, the global GenCP state
-+ * is left pointing to the last camera probed.  Userspace access to the first
-+ * camera may silently use the wrong I2C handle.  This will be fixed once
-+ * gencp_client is refactored to per-instance state.
++ * Multi-camera workaround: GENCPCLIENT_Select() is called before every
++ * GENCPCLIENT_ReadRegister / WriteRegister invocation (in cdev_ioctl and
++ * start_streaming) to restore the global state to the correct camera's I2C
++ * handle.  The long-term fix is to refactor gencp_client to per-instance
++ * state.
 + */
 +static DEFINE_MUTEX(microlynx_gencp_lock);
 +
@@ -6631,6 +7968,9 @@ index 0000000..0e33533
 +#define REG_SERIAL_R      0x00000144
 +#define REG_MODEL_NAME_R  0x00000044
 +#define REG_PIX_ENDIAN_R  0x00040018  /* 0=LE (Y16), 1=BE (Y16_BE) */
++#define REG_PIXEL_FORMAT  0x500e0018
++#define PIXEL_FORMAT_MONO16 0x01100007u
++#define PIXEL_FORMAT_MONO14 0x01100025u
 +
 +
 +static const struct of_device_id microlynx_of_match[] = {
@@ -6642,10 +7982,11 @@ index 0000000..0e33533
 +enum {
 +   MICROLYNX_MODE_1024x128_RAW16_BE,
 +   MICROLYNX_MODE_1024x128_RAW16,
++   MICROLYNX_MODE_1024x128_RAW14,
 +};
 +
-+static const int microlynx_60fps[] = {
-+   60,
++static const int microlynx_351fps[] = {
++   351,
 +};
 +
 +/*
@@ -6653,8 +7994,9 @@ index 0000000..0e33533
 + * device tree!
 + */
 +static const struct camera_common_frmfmt microlynx_frmfmt[] = {
-+   {{1024, 128},  microlynx_60fps, 1, 0, MICROLYNX_MODE_1024x128_RAW16_BE},
-+   {{1024, 128},  microlynx_60fps, 1, 0, MICROLYNX_MODE_1024x128_RAW16},
++   {{1024, 128},  microlynx_351fps,  1, 0, MICROLYNX_MODE_1024x128_RAW16_BE},
++   {{1024, 128},  microlynx_351fps,  1, 0, MICROLYNX_MODE_1024x128_RAW16},
++   {{1024, 128},  microlynx_351fps, 1, 0, MICROLYNX_MODE_1024x128_RAW14},
 +};
 +
 +static const u32 ctrl_cid_list[] = {
@@ -6675,7 +8017,6 @@ index 0000000..0e33533
 +   u32    line_height;
 +   u32    native_width;
 +   bool   gencp_initialized;
-+
 +   char   model[64];
 +   char   serial_number[64];
 +   char   pixel_format[64];
@@ -6777,32 +8118,42 @@ index 0000000..0e33533
 +      dev_warn(dev, "failed to read serial number\n");
 +   }
 +
-+   /* Determine pixel format and sensor mode from camera endianness register.
-+    * REG_PIX_ENDIAN_R = 1 → pixels are BE on the CSI bus → Y16_BE on Tegra
-+    * REG_PIX_ENDIAN_R = 0 → pixels are LE on the CSI bus → Y16 on Tegra
-+    */
-+   status = GENCPCLIENT_ReadRegister(REG_PIX_ENDIAN_R, &read_data);
++   // Default pixel format
++   priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16;
++   priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16;
++   strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
++         sizeof(priv->pixel_format) - 1);
++
++   status = GENCPCLIENT_ReadRegister(REG_PIXEL_FORMAT, &read_data);
 +   if (status == 0) {
-+      if (read_data == 1) {
-+         priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16_BE;
-+         priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16_BE;
-+         strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
++      if (read_data == PIXEL_FORMAT_MONO14) {
++         priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW14;
++         priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW14;
++         strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
 +               sizeof(priv->pixel_format) - 1);
-+         PRINT_INFO("Pixel format: Y16_BE (CSI big-endian)\n");
++         PRINT_INFO("Pixel format: Y14\n");
 +      } else {
-+         priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16;
-+         priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16;
-+         strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
-+               sizeof(priv->pixel_format) - 1);
-+         PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
-+      }
-+   } else {
-+      dev_warn(dev, "failed to read pixel endianness register, defaulting to Y16\n");
-+      priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16;
-+      priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16;
-+      strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
-+            sizeof(priv->pixel_format) - 1);
++         /* Determine pixel format and sensor mode from camera endianness register.
++          * REG_PIX_ENDIAN_R = 1 → pixels are BE on the CSI bus → Y16_BE on Tegra
++          * REG_PIX_ENDIAN_R = 0 → pixels are LE on the CSI bus → Y16 on Tegra
++          */
++         status = GENCPCLIENT_ReadRegister(REG_PIX_ENDIAN_R, &read_data);
++         if (status == 0) {
++            if (read_data == 1) {
++               priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16_BE;
++               priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16_BE;
++               strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
++                     sizeof(priv->pixel_format) - 1);
++               PRINT_INFO("Pixel format: Y16_BE (CSI big-endian)\n");
++            } else {
++               PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
++            }
++         } else {
++            PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
++         }
++       }
 +   }
++   
 +   priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 +
 +   priv->gencp_initialized = true;
@@ -6928,6 +8279,12 @@ index 0000000..0e33533
 +      dev_err(tc_dev->dev, "GenCP not initialized\n");
 +      return -EIO;
 +   }
++
++   /* Restore global GenCP state to this camera's I2C handle.
++    * Required when multiple Microlynx cameras are probed: the global
++    * unio_handle_ptr / gGencpInitWasSuccessfull are overwritten during
++    * probe of the last camera (which may have failed). */
++   GENCPCLIENT_Select(&priv->io_handle);
 +
 +   /* Camera should always be streaming. But we can check that. */
 +   status = GENCPCLIENT_ReadRegister(REG_ACQ_STATUS_R, &read_data);
@@ -7060,6 +8417,8 @@ index 0000000..0e33533
 +      return -ENODEV;
 +
 +   mutex_lock(&microlynx_gencp_lock);
++   /* Restore global GenCP state to this camera's I2C handle (multi-camera). */
++   GENCPCLIENT_Select(&priv->io_handle);
 +
 +   switch (cmd) {
 +   case MICROLYNX_IOCTL_READ_REG: {

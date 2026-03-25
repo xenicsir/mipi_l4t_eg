@@ -5773,10 +5773,10 @@ index 0000000..49ef9bb
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/Makefile b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/Makefile
 old mode 100644
 new mode 100755
-index 925e46f..d1c956c
+index 925e46f..0e93c50
 --- a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/Makefile
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/Makefile
-@@ -24,6 +24,24 @@ dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx477-imx219.dtbo
+@@ -24,6 +24,26 @@ dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx477-imx219.dtbo
  dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx477-dual.dtbo
  dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-camera-imx219-dual.dtbo
  dtbo-$(BUILD_ENABLE) += tegra194-p3668-p3509-overlay.dtbo
@@ -5797,16 +5797,18 @@ index 925e46f..d1c956c
 +dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx477.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-microlynx.dtbo
 +dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-microlynx.dtbo
++dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-ilumos.dtbo
++dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ilumos.dtbo
 +
  
  ifneq ($(dtb-y),)
  dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..7f57da6
+index 0000000..3b9a1d2
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,1138 @@
+@@ -0,0 +1,1716 @@
 +/*
 + * Copyright (c) 2022, Device-ALab.  All rights reserved.
 + *
@@ -6342,7 +6344,7 @@ index 0000000..7f57da6
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +						};
 +						mode4 { // EC_MODE_1280x1024_RGB888
@@ -6358,7 +6360,7 @@ index 0000000..7f57da6
 +							mode_type = "rgb";
 +							pixel_phase = "rgb888";
 +							csi_pixel_bit_depth = "24";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "133333336";
 +							embedded_metadata_height = "0";
 +						};
 +						mode5 { // EC_MODE_1280x1024_YUYV
@@ -6374,7 +6376,7 @@ index 0000000..7f57da6
 +							mode_type = "yuv";
 +							pixel_phase = "yuyv";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +						};
 +
@@ -6391,63 +6393,352 @@ index 0000000..7f57da6
 +							};
 +						};
 +					};
-+				};
-+				microlynx_cam0: microlynx_a@51 {
-+					compatible = "exosens,microlynx";
-+					reg = <0x51>;
-+					status = "disabled";
-+					sensor_model = "microlynx";
-+					use_sensor_mode_id = "true";
-+					line-height = <128>;
 +
-+					mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
-+						num_lanes = "2";
-+						lane_polarity = "6";
-+						tegra_sinterface = "serial_a";
-+						phy_mode = "DPHY";
-+						discontinuous_clk = "no";
-+						dpcm_enable = "false";
-+						cil_settletime = "0";
-+						active_w = "1024";
-+						active_h = "128";
-+						line_length = "1024";
-+						mode_type = "raw";
-+						pixel_phase = "grey_be";
-+						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "112500000";
-+						embedded_metadata_height = "0";
-+					};
++					ilumos_cam0: ilumos_a@30 {
++						compatible = "exosens,ilumos";
++						/* I2C device address */
++						reg = <0x30>;
++						status = "disabled";
 +
-+					mode1 { // MICROLYNX_MODE_1024x128_RAW16
-+						num_lanes = "2";
-+						lane_polarity = "6";
-+						tegra_sinterface = "serial_a";
-+						phy_mode = "DPHY";
-+						discontinuous_clk = "no";
-+						dpcm_enable = "false";
-+						cil_settletime = "0";
-+						active_w = "1024";
-+						active_h = "128";
-+						line_length = "1024";
-+						mode_type = "raw";
-+						pixel_phase = "grey";
-+						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "112500000";
-+						embedded_metadata_height = "0";
-+					};
++						sensor_model = "ilumos";
 +
-+					ports {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						port@0 {
-+							reg = <0>;
-+							microlynx_out0: endpoint {
-+								port-index = <0>;
-+								bus-width = <2>;
-+								remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++						use_sensor_mode_id = "false";
++
++						mode0 { // ILUMOS_MODE_2048x2048_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode1 { // ILUMOS_MODE_2048x1088_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode2 { // ILUMOS_MODE_1280x1024_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "85000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode3 { // ILUMOS_MODE_2048x2048_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode4 { // ILUMOS_MODE_2048x1088_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode5 { // ILUMOS_MODE_1280x1024_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								ilumos_out0: endpoint {
++									port-index = <0>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++								};
 +							};
 +						};
 +					};
++
++					microlynx_cam0: microlynx_a@51 {
++						compatible = "exosens,microlynx";
++						reg = <0x51>;
++						status = "disabled";
++						sensor_model = "microlynx";
++						use_sensor_mode_id = "true";
++						line-height = <128>;
++
++						mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey_be";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "112500000";
++							embedded_metadata_height = "0";
++						};
++
++						mode1 { // MICROLYNX_MODE_1024x128_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "112500000";
++							embedded_metadata_height = "0";
++						};
++
++						mode2 { // MICROLYNX_MODE_1024x128_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++						};
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								microlynx_out0: endpoint {
++									port-index = <0>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++								};
++							};
++						};
++					};
++
 +				};
 +
 +				i2c@1 {
@@ -6738,7 +7029,7 @@ index 0000000..7f57da6
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +						};
 +						mode4 { // EC_MODE_1280x1024_RGB888
@@ -6754,7 +7045,7 @@ index 0000000..7f57da6
 +							mode_type = "rgb";
 +							pixel_phase = "rgb888";
 +							csi_pixel_bit_depth = "24";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "133333336";
 +							embedded_metadata_height = "0";
 +						};
 +						mode5 { // EC_MODE_1280x1024_YUYV
@@ -6770,7 +7061,7 @@ index 0000000..7f57da6
 +							mode_type = "yuv";
 +							pixel_phase = "yuyv";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +						};
 +						ports {
@@ -6786,63 +7077,352 @@ index 0000000..7f57da6
 +							};
 +						};
 +					};
-+				};
-+				microlynx_cam1: microlynx_c@51 {
-+					compatible = "exosens,microlynx";
-+					reg = <0x51>;
-+					status = "disabled";
-+					sensor_model = "microlynx";
-+					use_sensor_mode_id = "true";
-+					line-height = <128>;
 +
-+					mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
-+						num_lanes = "2";
-+						lane_polarity = "6";
-+						tegra_sinterface = "serial_c";
-+						phy_mode = "DPHY";
-+						discontinuous_clk = "no";
-+						dpcm_enable = "false";
-+						cil_settletime = "0";
-+						active_w = "1024";
-+						active_h = "128";
-+						line_length = "1024";
-+						mode_type = "raw";
-+						pixel_phase = "grey_be";
-+						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "112500000";
-+						embedded_metadata_height = "0";
-+					};
++					ilumos_cam1: ilumos_c@30 {
++						compatible = "exosens,ilumos";
++						/* I2C device address */
++						reg = <0x30>;
++						status = "disabled";
 +
-+					mode1 { // MICROLYNX_MODE_1024x128_RAW16
-+						num_lanes = "2";
-+						lane_polarity = "6";
-+						tegra_sinterface = "serial_c";
-+						phy_mode = "DPHY";
-+						discontinuous_clk = "no";
-+						dpcm_enable = "false";
-+						cil_settletime = "0";
-+						active_w = "1024";
-+						active_h = "128";
-+						line_length = "1024";
-+						mode_type = "raw";
-+						pixel_phase = "grey";
-+						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "112500000";
-+						embedded_metadata_height = "0";
-+					};
++						sensor_model = "ilumos";
 +
-+					ports {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						port@0 {
-+							reg = <0>;
-+							microlynx_out1: endpoint {
-+								port-index = <2>;
-+								bus-width = <2>;
-+								remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++						use_sensor_mode_id = "false";
++
++						mode0 { // ILUMOS_MODE_2048x2048_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode1 { // ILUMOS_MODE_2048x1088_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode2 { // ILUMOS_MODE_1280x1024_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "85000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode3 { // ILUMOS_MODE_2048x2048_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode4 { // ILUMOS_MODE_2048x1088_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode5 { // ILUMOS_MODE_1280x1024_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								ilumos_out1: endpoint {
++									port-index = <2>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++								};
 +							};
 +						};
 +					};
++
++					microlynx_cam1: microlynx_c@51 {
++						compatible = "exosens,microlynx";
++						reg = <0x51>;
++						status = "disabled";
++						sensor_model = "microlynx";
++						use_sensor_mode_id = "true";
++						line-height = <128>;
++
++						mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey_be";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "112500000";
++							embedded_metadata_height = "0";
++						};
++
++						mode1 { // MICROLYNX_MODE_1024x128_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "112500000";
++							embedded_metadata_height = "0";
++						};
++
++						mode2 { // MICROLYNX_MODE_1024x128_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++						};
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								microlynx_out1: endpoint {
++									port-index = <2>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++								};
++							};
++						};
++					};
++
 +				};
 +
 +			};
@@ -6947,7 +7527,7 @@ index 0000000..7f57da6
 +};
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-1-lane.dts
 new file mode 100644
-index 0000000..48d5d7a
+index 0000000..18bb465
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-1-lane.dts
 @@ -0,0 +1,99 @@
@@ -7017,21 +7597,21 @@ index 0000000..48d5d7a
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -7052,7 +7632,7 @@ index 0000000..48d5d7a
 +};
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..6cf3453
+index 0000000..05cf310
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-2-lanes.dts
 @@ -0,0 +1,99 @@
@@ -7122,21 +7702,21 @@ index 0000000..6cf3453
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -7151,6 +7731,62 @@ index 0000000..6cf3453
 +		__overlay__ {
 +         devname = "eg_ec 9-0016";
 +			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_a@16";
++		};
++	};
++
++};
+diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ilumos.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ilumos.dts
+new file mode 100644
+index 0000000..ce981ce
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:iLumos";
++	jetson-header-name = "Jetson Nano CSI Connector";
++	compatible = "nvidia,p3449-0000+p3668-0000", "nvidia,p3449-0000+p3668-0001", "nvidia,p3509-0000+p3668-0000", "nvidia,p3509-0000+p3668-0001";
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&ilumos_out0>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@13 {
++		target-path = "/cam_i2cmux/i2c@0/ilumos_a@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@14 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++			devname = "ilumos 9-0030";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/ilumos_a@30";
 +		};
 +	};
 +
@@ -7371,7 +8007,7 @@ index 0000000..0cacd8a
 +};
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ec-1-lane.dts
 new file mode 100644
-index 0000000..c63e6eb
+index 0000000..a039cd3
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ec-1-lane.dts
 @@ -0,0 +1,100 @@
@@ -7441,21 +8077,21 @@ index 0000000..c63e6eb
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -7477,7 +8113,7 @@ index 0000000..c63e6eb
 +};
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..43cd1d6
+index 0000000..dc51418
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ec-2-lanes.dts
 @@ -0,0 +1,100 @@
@@ -7547,21 +8183,21 @@ index 0000000..43cd1d6
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -7579,6 +8215,62 @@ index 0000000..43cd1d6
 +		};
 +	};
 +
++
++};
+diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ilumos.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ilumos.dts
+new file mode 100644
+index 0000000..b261bf4
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:iLumos";
++	jetson-header-name = "Jetson Nano CSI Connector";
++	compatible = "nvidia,p3449-0000+p3668-0000", "nvidia,p3449-0000+p3668-0001", "nvidia,p3509-0000+p3668-0000", "nvidia,p3509-0000+p3668-0001";
++
++	fragment@10 {
++		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&ilumos_out1>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@13 {
++		target-path = "/cam_i2cmux/i2c@1/ilumos_c@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@14 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++			devname = "ilumos 10-0030";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/ilumos_c@30";
++		};
++	};
 +
 +};
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-imx219.dts b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam1-imx219.dts
@@ -8466,10 +9158,10 @@ index 0000000..efee341
 +
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..aaff67b
+index 0000000..bd1b37c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,960 @@
+@@ -0,0 +1,1336 @@
 +/*
 + * Copyright (c) 2022, Device-ALab.  All rights reserved.
 + *
@@ -8989,7 +9681,7 @@ index 0000000..aaff67b
 +							mode_type = "rgb";
 +							pixel_phase = "rgb888";
 +							csi_pixel_bit_depth = "24";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "133333336";
 +							embedded_metadata_height = "0";
 +						};
 +						mode3 { // EC_MODE_1280x1024_YUYV
@@ -9005,7 +9697,7 @@ index 0000000..aaff67b
 +							mode_type = "yuv";
 +							pixel_phase = "yuyv";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +						};
 +
@@ -9022,8 +9714,196 @@ index 0000000..aaff67b
 +							};
 +						};
 +					};
-+				};
 +
++					ilumos_cam0: ilumos_a@30 {
++						compatible = "exosens,ilumos";
++						/* I2C device address */
++						reg = <0x30>;
++						status = "disabled";
++
++						sensor_model = "ilumos";
++
++						use_sensor_mode_id = "false";
++
++						mode0 { // ILUMOS_MODE_2048x2048_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode1 { // ILUMOS_MODE_2048x1088_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode2 { // ILUMOS_MODE_1280x1024_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								ilumos_out0: endpoint {
++									port-index = <0>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++								};
++							};
++						};
++					};
++
++					microlynx_cam0: microlynx_a@51 {
++						compatible = "exosens,microlynx";
++						/* I2C device address */
++						reg = <0x51>;
++						status = "disabled";
++						sensor_model = "microlynx";
++						use_sensor_mode_id = "true";
++						line-height = <128>;
++
++						mode0 { // MICROLYNX_MODE_1024x128_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_a";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++						};
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								microlynx_out0: endpoint {
++									port-index = <0>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in0>;
++								};
++							};
++						};
++					};
++
++				};
 +				i2c@1 {
 +					dione_ir_cam1: xenics_dione_ir_e@0e {
 +						compatible = "xenics,dioneir", "exosens,dioneir";
@@ -9296,7 +10176,7 @@ index 0000000..aaff67b
 +							mode_type = "rgb";
 +							pixel_phase = "rgb888";
 +							csi_pixel_bit_depth = "24";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "133333336";
 +							embedded_metadata_height = "0";
 +						};
 +						mode3 { // EC_MODE_1280x1024_YUYV
@@ -9312,7 +10192,7 @@ index 0000000..aaff67b
 +							mode_type = "yuv";
 +							pixel_phase = "yuyv";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +						};
 +						ports {
@@ -9328,8 +10208,196 @@ index 0000000..aaff67b
 +							};
 +						};
 +					};
-+				};
 +
++					ilumos_cam1: ilumos_e@30 {
++						compatible = "exosens,ilumos";
++						/* I2C device address */
++						reg = <0x30>;
++						status = "disabled";
++
++						sensor_model = "ilumos";
++
++						use_sensor_mode_id = "false";
++
++						mode0 { // ILUMOS_MODE_2048x2048_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_e";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode1 { // ILUMOS_MODE_2048x1088_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_e";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						mode2 { // ILUMOS_MODE_1280x1024_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_e";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						};
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								ilumos_out1: endpoint {
++									port-index = <4>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++								};
++							};
++						};
++					};
++
++					microlynx_cam1: microlynx_e@51 {
++						compatible = "exosens,microlynx";
++						/* I2C device address */
++						reg = <0x51>;
++						status = "disabled";
++						sensor_model = "microlynx";
++						use_sensor_mode_id = "true";
++						line-height = <128>;
++
++						mode0 { // MICROLYNX_MODE_1024x128_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_e";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++						};
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++							port@0 {
++								reg = <0>;
++								microlynx_out1: endpoint {
++									port-index = <4>;
++									bus-width = <2>;
++									remote-endpoint = <&rbpcv2_imx219_csi_in1>;
++								};
++							};
++						};
++					};
++
++				};
 +			};
 +			tegra-camera-platform {
 +				compatible = "nvidia, tegra-camera-platform";
@@ -9432,7 +10500,7 @@ index 0000000..aaff67b
 +};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-1-lane.dts
 new file mode 100644
-index 0000000..8975508
+index 0000000..ebad9a6
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-1-lane.dts
 @@ -0,0 +1,85 @@
@@ -9495,14 +10563,14 @@ index 0000000..8975508
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode2";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@17 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -9523,7 +10591,7 @@ index 0000000..8975508
 +};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..04a4464
+index 0000000..cd9f8d2
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-2-lanes.dts
 @@ -0,0 +1,85 @@
@@ -9586,14 +10654,14 @@ index 0000000..04a4464
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode2";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -9608,6 +10676,62 @@ index 0000000..04a4464
 +		__overlay__ {
 +         devname = "eg_ec 7-0016";
 +			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_a@16";
++		};
++	};
++
++};
+diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ilumos.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ilumos.dts
+new file mode 100644
+index 0000000..506d998
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:iLumos";
++	jetson-header-name = "Jetson Nano CSI Connector";
++	compatible = "nvidia,p3449-0000-b00+p3448-0000-b00", "nvidia,p3449-0000-b00+p3448-0002-b00";
++
++	fragment@10 {
++		target-path = "/host1x/vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x/nvcsi/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&ilumos_out0>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@13 {
++		target-path = "/cam_i2cmux/i2c@0/ilumos_a@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@14 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++			devname = "ilumos 7-0030";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/ilumos_a@30";
 +		};
 +	};
 +
@@ -9770,9 +10894,65 @@ index 0000000..11545ae
 +	};
 +
 +};
+diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-microlynx.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-microlynx.dts
+new file mode 100644
+index 0000000..18c25a2
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-microlynx.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM0:Microlynx";
++	jetson-header-name = "Jetson Nano CSI Connector";
++	compatible = "nvidia,p3449-0000-b00+p3448-0000-b00", "nvidia,p3449-0000-b00+p3448-0002-b00";
++
++	fragment@10 {
++		target-path = "/host1x/vi/ports/port@0/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x/nvcsi/channel@0/ports/port@0/endpoint@0";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out0>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@0/xenics_dione_ir_a@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@13 {
++		target-path = "/cam_i2cmux/i2c@0/microlynx_a@51";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@14 {
++		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
++		__overlay__ {
++			devname = "microlynx 7-0051";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/microlynx_a@51";
++		};
++	};
++
++};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ec-1-lane.dts
 new file mode 100644
-index 0000000..de8d787
+index 0000000..efb3cb2
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ec-1-lane.dts
 @@ -0,0 +1,86 @@
@@ -9835,14 +11015,14 @@ index 0000000..de8d787
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_e@16/mode2";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@17 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_e@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -9864,7 +11044,7 @@ index 0000000..de8d787
 +};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..b9b6724
+index 0000000..8e8edb0
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ec-2-lanes.dts
 @@ -0,0 +1,86 @@
@@ -9927,14 +11107,14 @@ index 0000000..b9b6724
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_e@16/mode2";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_e@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -9952,6 +11132,62 @@ index 0000000..b9b6724
 +		};
 +	};
 +
++
++};
+diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ilumos.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ilumos.dts
+new file mode 100644
+index 0000000..db77b7f
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-ilumos.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:iLumos";
++	jetson-header-name = "Jetson Nano CSI Connector";
++	compatible = "nvidia,p3449-0000-b00+p3448-0000-b00", "nvidia,p3449-0000-b00+p3448-0002-b00";
++
++	fragment@10 {
++		target-path = "/host1x/vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x/nvcsi/channel@1/ports/port@2/endpoint@2";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&ilumos_out1>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@1/xenics_dione_ir_e@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable iLumos
++	fragment@13 {
++		target-path = "/cam_i2cmux/i2c@1/ilumos_e@30";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@14 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++			devname = "ilumos 8-0030";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/ilumos_e@30";
++		};
++	};
 +
 +};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-imx219.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-imx219.dts
@@ -10107,6 +11343,62 @@ index 0000000..748d81c
 +		target-path = "/tegra-camera-platform/modules/module1";
 +		__overlay__ {
 +			badge = "porg_rear_RBPCV2";
++		};
++	};
++
++};
+diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-microlynx.dts b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-microlynx.dts
+new file mode 100644
+index 0000000..4692f4c
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam1-microlynx.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/dts-v1/;
++/plugin/;
++
++/ {
++	overlay-name = "Exosens Cameras. CAM1:Microlynx";
++	jetson-header-name = "Jetson Nano CSI Connector";
++	compatible = "nvidia,p3449-0000-b00+p3448-0000-b00", "nvidia,p3449-0000-b00+p3448-0002-b00";
++
++	fragment@10 {
++		target-path = "/host1x/vi/ports/port@1/endpoint";
++		__overlay__ {
++			bus-width=<2>;
++		};
++	};
++
++	fragment@11 {
++		target-path = "/host1x/nvcsi/channel@1/ports/port@2/endpoint@2";
++		__overlay__ {
++			bus-width=<2>;
++			remote-endpoint = <&microlynx_out1>;
++		};
++	};
++
++	// Disable Dione cameras
++	fragment@12 {
++		target-path = "/cam_i2cmux/i2c@1/xenics_dione_ir_e@0e";
++		__overlay__ {
++			status = "disabled";
++		};
++	};
++
++	// Enable Microlynx
++	fragment@13 {
++		target-path = "/cam_i2cmux/i2c@1/microlynx_e@51";
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@14 {
++		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
++		__overlay__ {
++			devname = "microlynx 8-0051";
++			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/microlynx_e@51";
 +		};
 +	};
 +
@@ -22905,10 +24197,10 @@ index 0000000..76934ac
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..578c600
+index 0000000..882c2ad
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,2335 @@
+@@ -0,0 +1,3059 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -23538,7 +24830,7 @@ index 0000000..578c600
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode4 { // EC_MODE_1280x1024_RGB888
@@ -23554,7 +24846,7 @@ index 0000000..578c600
 +					mode_type = "rgb";
 +					pixel_phase = "rgb888";
 +					csi_pixel_bit_depth = "24";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "133333336";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode5 { // EC_MODE_1280x1024_YUYV
@@ -23570,7 +24862,7 @@ index 0000000..578c600
 +					mode_type = "yuv";
 +					pixel_phase = "yuyv";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -23631,6 +24923,23 @@ index 0000000..578c600
 +					embedded_metadata_height = "0";
 +				 };
 +
++				 mode2 { // MICROLYNX_MODE_1024x128_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_a";
++					phy_mode = "DPHY";
++					discontinuous_clk = "no";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1024";
++					active_h = "128";
++					line_length = "1024";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++				 };
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -23652,7 +24961,7 @@ index 0000000..578c600
 +				 use_sensor_mode_id = "false";
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
@@ -23693,7 +25002,7 @@ index 0000000..578c600
 +				 };
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
@@ -23733,6 +25042,170 @@ index 0000000..578c600
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_a";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "16";
++					pix_clk_hz = "85000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_a";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "2048";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_a";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "1088";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_a";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -23740,7 +25213,7 @@ index 0000000..578c600
 +					   reg = <0>;
 +					   ilumos_out0: endpoint {
 +						  port-index = <0>;
-+						  bus-width = <4>;
++						  bus-width = <2>;
 +						  remote-endpoint = <&rbpcv2_csi_in0>;
 +					   };
 +					};
@@ -24035,7 +25508,7 @@ index 0000000..578c600
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode4 { // EC_MODE_1280x1024_RGB888
@@ -24051,7 +25524,7 @@ index 0000000..578c600
 +					mode_type = "rgb";
 +					pixel_phase = "rgb888";
 +					csi_pixel_bit_depth = "24";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "133333336";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode5 { // EC_MODE_1280x1024_YUYV
@@ -24067,7 +25540,7 @@ index 0000000..578c600
 +					mode_type = "yuv";
 +					pixel_phase = "yuyv";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				 ports {
@@ -24127,6 +25600,23 @@ index 0000000..578c600
 +					embedded_metadata_height = "0";
 +				 };
 +
++				 mode2 { // MICROLYNX_MODE_1024x128_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_g";
++					phy_mode = "DPHY";
++					discontinuous_clk = "no";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1024";
++					active_h = "128";
++					line_length = "1024";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++				 };
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -24148,7 +25638,7 @@ index 0000000..578c600
 +				 use_sensor_mode_id = "false";
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
@@ -24189,7 +25679,7 @@ index 0000000..578c600
 +				 };
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
@@ -24229,6 +25719,170 @@ index 0000000..578c600
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_g";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "16";
++					pix_clk_hz = "85000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_g";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "2048";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_g";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "1088";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_g";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -24236,7 +25890,7 @@ index 0000000..578c600
 +					   reg = <0>;
 +					   ilumos_out1: endpoint {
 +						  port-index = <6>;
-+						  bus-width = <4>;
++						  bus-width = <2>;
 +						  remote-endpoint = <&rbpcv2_csi_in1>;
 +					   };
 +					};
@@ -24531,7 +26185,7 @@ index 0000000..578c600
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode4 { // EC_MODE_1280x1024_RGB888
@@ -24547,7 +26201,7 @@ index 0000000..578c600
 +					mode_type = "rgb";
 +					pixel_phase = "rgb888";
 +					csi_pixel_bit_depth = "24";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "133333336";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode5 { // EC_MODE_1280x1024_YUYV
@@ -24563,7 +26217,7 @@ index 0000000..578c600
 +					mode_type = "yuv";
 +					pixel_phase = "yuyv";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				 ports {
@@ -24623,6 +26277,23 @@ index 0000000..578c600
 +					embedded_metadata_height = "0";
 +				 };
 +
++				 mode2 { // MICROLYNX_MODE_1024x128_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_e";
++					phy_mode = "DPHY";
++					discontinuous_clk = "no";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1024";
++					active_h = "128";
++					line_length = "1024";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++				 };
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -24644,7 +26315,7 @@ index 0000000..578c600
 +				 use_sensor_mode_id = "false";
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
@@ -24685,7 +26356,7 @@ index 0000000..578c600
 +				 };
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
@@ -24725,6 +26396,170 @@ index 0000000..578c600
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_e";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "16";
++					pix_clk_hz = "85000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_e";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "2048";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_e";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "1088";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_e";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -24732,7 +26567,7 @@ index 0000000..578c600
 +					   reg = <0>;
 +					   ilumos_out2: endpoint {
 +						  port-index = <4>;
-+						  bus-width = <4>;
++						  bus-width = <2>;
 +						  remote-endpoint = <&rbpcv2_csi_in2>;
 +					   };
 +					};
@@ -25027,7 +26862,7 @@ index 0000000..578c600
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode4 { // EC_MODE_1280x1024_RGB888
@@ -25043,7 +26878,7 @@ index 0000000..578c600
 +					mode_type = "rgb";
 +					pixel_phase = "rgb888";
 +					csi_pixel_bit_depth = "24";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "133333336";
 +					embedded_metadata_height = "0";
 +				 };
 +				 mode5 { // EC_MODE_1280x1024_YUYV
@@ -25059,7 +26894,7 @@ index 0000000..578c600
 +					mode_type = "yuv";
 +					pixel_phase = "yuyv";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "133333336";
++					pix_clk_hz = "100000000";
 +					embedded_metadata_height = "0";
 +				 };
 +				ports {
@@ -25119,6 +26954,23 @@ index 0000000..578c600
 +					embedded_metadata_height = "0";
 +				 };
 +
++				 mode2 { // MICROLYNX_MODE_1024x128_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_c";
++					phy_mode = "DPHY";
++					discontinuous_clk = "no";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1024";
++					active_h = "128";
++					line_length = "1024";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++				 };
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -25140,7 +26992,7 @@ index 0000000..578c600
 +				 use_sensor_mode_id = "false";
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
@@ -25181,7 +27033,7 @@ index 0000000..578c600
 +				 };
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
-+					num_lanes = "4";
++					num_lanes = "2";
 +					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
@@ -25221,6 +27073,170 @@ index 0000000..578c600
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_c";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "16";
++					pix_clk_hz = "85000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_c";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "2048";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_c";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "2048";
++					active_h = "1088";
++					line_length = "2048";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
++				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
++					num_lanes = "2";
++					lane_polarity = "6";
++					tegra_sinterface = "serial_c";
++					phy_mode = "DPHY";
++					discontinuous_clk = "yes";
++					dpcm_enable = "false";
++					cil_settletime = "0";
++					active_w = "1280";
++					active_h = "1024";
++					line_length = "1280";
++					mode_type = "raw";
++					pixel_phase = "grey";
++					csi_pixel_bit_depth = "14";
++					pix_clk_hz = "100000000";
++					embedded_metadata_height = "0";
++
++					/* unused */
++					gain_factor = "16";
++					exposure_factor = "1000000";
++					min_gain_val = "16"; /* 1.00x */
++					max_gain_val = "170"; /* 10.66x */
++					step_gain_val = "1";
++					default_gain = "16"; /* 1.00x */
++					min_hdr_ratio = "1";
++					max_hdr_ratio = "1";
++
++					/* framerate */
++					framerate_factor = "1000000";
++					min_framerate = "40000000"; /* 40 fps */
++					max_framerate = "62000000"; /* 62 fps */
++					step_framerate = "1";
++					default_framerate = "60756000"; /* 60.756 fps */
++
++					/* unused */
++					min_exp_time = "13"; /* us */
++					max_exp_time = "683709"; /* us */
++					step_exp_time = "1";
++					default_exp_time = "2495"; /* us */
++				 };
++
 +				 ports {
 +					#address-cells = <1>;
 +					#size-cells = <0>;
@@ -25228,7 +27244,7 @@ index 0000000..578c600
 +					   reg = <0>;
 +					   ilumos_out3: endpoint {
 +						  port-index = <2>;
-+						  bus-width = <4>;
++						  bus-width = <2>;
 +						  remote-endpoint = <&rbpcv2_csi_in3>;
 +					   };
 +					};
@@ -25246,7 +27262,7 @@ index 0000000..578c600
 +
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-1-lane.dts
 new file mode 100644
-index 0000000..0cd987b
+index 0000000..ec69baf
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-1-lane.dts
 @@ -0,0 +1,99 @@
@@ -25316,21 +27332,21 @@ index 0000000..0cd987b
 +		target-path = "/i2c@31e0000/eg_ec_a@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@31e0000/eg_ec_a@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@31e0000/eg_ec_a@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -25351,7 +27367,7 @@ index 0000000..0cd987b
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..b512fd3
+index 0000000..fcb08bf
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-2-lanes.dts
 @@ -0,0 +1,101 @@
@@ -25423,21 +27439,21 @@ index 0000000..b512fd3
 +		target-path = "/i2c@31e0000/eg_ec_a@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@31e0000/eg_ec_a@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@31e0000/eg_ec_a@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -25522,7 +27538,7 @@ index 0000000..4446cb5
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ilumos.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ilumos.dts
 new file mode 100644
-index 0000000..46d5c54
+index 0000000..53db16c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -25539,14 +27555,14 @@ index 0000000..46d5c54
 +	fragment@0 {
 +		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +		};
 +	};
 +
 +	fragment@1 {
 +		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +			remote-endpoint = <&ilumos_out0>;
 +		};
 +	};
@@ -25634,7 +27650,7 @@ index 0000000..0edd226
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ec-1-lane.dts
 new file mode 100644
-index 0000000..4074538
+index 0000000..dd5d0b1
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ec-1-lane.dts
 @@ -0,0 +1,99 @@
@@ -25704,21 +27720,21 @@ index 0000000..4074538
 +		target-path = "/i2c@c240000/eg_ec_g@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@c240000/eg_ec_g@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@c240000/eg_ec_g@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -25739,7 +27755,7 @@ index 0000000..4074538
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..421deb2
+index 0000000..0b4b516
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ec-2-lanes.dts
 @@ -0,0 +1,100 @@
@@ -25810,21 +27826,21 @@ index 0000000..421deb2
 +		target-path = "/i2c@c240000/eg_ec_g@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@c240000/eg_ec_g@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@c240000/eg_ec_g@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -25909,7 +27925,7 @@ index 0000000..2a99507
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ilumos.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ilumos.dts
 new file mode 100644
-index 0000000..33be552
+index 0000000..49fc5fa
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam1-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -25926,14 +27942,14 @@ index 0000000..33be552
 +	fragment@0 {
 +		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +		};
 +	};
 +
 +	fragment@1 {
 +		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@0";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +			remote-endpoint = <&ilumos_out1>;
 +		};
 +	};
@@ -26021,7 +28037,7 @@ index 0000000..82967d4
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ec-1-lane.dts
 new file mode 100644
-index 0000000..78905ca
+index 0000000..b68f42c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ec-1-lane.dts
 @@ -0,0 +1,99 @@
@@ -26091,21 +28107,21 @@ index 0000000..78905ca
 +		target-path = "/i2c@c250000/eg_ec_e@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@c250000/eg_ec_e@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@c250000/eg_ec_e@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -26126,7 +28142,7 @@ index 0000000..78905ca
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ec-2-lanes.dts
 new file mode 100644
-index 0000000..05e581c
+index 0000000..6491034
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ec-2-lanes.dts
 @@ -0,0 +1,100 @@
@@ -26197,21 +28213,21 @@ index 0000000..05e581c
 +		target-path = "/i2c@c250000/eg_ec_e@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@c250000/eg_ec_e@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@c250000/eg_ec_e@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -26296,7 +28312,7 @@ index 0000000..bf84047
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ilumos.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ilumos.dts
 new file mode 100644
-index 0000000..7816937
+index 0000000..4a8ed0c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam2-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -26313,14 +28329,14 @@ index 0000000..7816937
 +	fragment@0 {
 +		target-path = "/tegra-capture-vi/ports/port@2/endpoint";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +		};
 +	};
 +
 +	fragment@1 {
 +		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@2/ports/port@0/endpoint@0";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +			remote-endpoint = <&ilumos_out2>;
 +		};
 +	};
@@ -26408,7 +28424,7 @@ index 0000000..7439fbd
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ec-1-lane.dts
 new file mode 100644
-index 0000000..b7ad11d
+index 0000000..ff60d45
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ec-1-lane.dts
 @@ -0,0 +1,99 @@
@@ -26478,21 +28494,21 @@ index 0000000..b7ad11d
 +		target-path = "/i2c@3180000/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@3180000/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@3180000/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -26513,7 +28529,7 @@ index 0000000..b7ad11d
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ec-2-lanes.dts
 new file mode 100644
-index 0000000..c013c59
+index 0000000..64f48e8
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ec-2-lanes.dts
 @@ -0,0 +1,99 @@
@@ -26583,21 +28599,21 @@ index 0000000..c013c59
 +		target-path = "/i2c@3180000/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@8 {
 +		target-path = "/i2c@3180000/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@9 {
 +		target-path = "/i2c@3180000/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@10 {
@@ -26682,7 +28698,7 @@ index 0000000..45755a8
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ilumos.dts b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ilumos.dts
 new file mode 100644
-index 0000000..d5d2d35
+index 0000000..428f427
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam3-ilumos.dts
 @@ -0,0 +1,50 @@
@@ -26699,14 +28715,14 @@ index 0000000..d5d2d35
 +	fragment@0 {
 +		target-path = "/tegra-capture-vi/ports/port@3/endpoint";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +		};
 +	};
 +
 +	fragment@1 {
 +		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@3/ports/port@0/endpoint@0";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +			remote-endpoint = <&ilumos_out3>;
 +		};
 +	};
@@ -37561,10 +39577,10 @@ index 0000000..25b8e82
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..9cedbb1
+index 0000000..73d08a8
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,1757 @@
+@@ -0,0 +1,2162 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -38263,7 +40279,7 @@ index 0000000..9cedbb1
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -38303,7 +40319,7 @@ index 0000000..9cedbb1
 +							mode_type = "rgb";
 +							pixel_phase = "rgb888";
 +							csi_pixel_bit_depth = "24";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "133333336";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -38343,7 +40359,7 @@ index 0000000..9cedbb1
 +							mode_type = "yuv";
 +							pixel_phase = "yuyv";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -38387,7 +40403,6 @@ index 0000000..9cedbb1
 +							};
 +						};
 +					};
-+#ifdef DSBOARD_ORNXS
 +					ilumos_cam0: ilumos_b@30 {
 +						 compatible = "exosens,ilumos";
 +						 /* I2C device address */
@@ -38399,7 +40414,7 @@ index 0000000..9cedbb1
 +						 use_sensor_mode_id = "false";
 +
 +						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
-+							num_lanes = "4";
++							num_lanes = "2";
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_b";
 +							phy_mode = "DPHY";
@@ -38439,7 +40454,7 @@ index 0000000..9cedbb1
 +							default_exp_time = "2495"; /* us */
 +						 };
 +						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
-+							num_lanes = "4";
++							num_lanes = "2";
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_b";
 +							phy_mode = "DPHY";
@@ -38479,6 +40494,170 @@ index 0000000..9cedbb1
 +							default_exp_time = "2495"; /* us */
 +						 };
 +
++						 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "85000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 mode3 { // ILUMOS_MODE_2048x2048_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 mode4 { // ILUMOS_MODE_2048x1088_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
++						 mode5 { // ILUMOS_MODE_1280x1024_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
++
 +						 ports {
 +							#address-cells = <1>;
 +							#size-cells = <0>;
@@ -38486,13 +40665,12 @@ index 0000000..9cedbb1
 +							   reg = <0>;
 +							   ilumos_out0: endpoint {
 +								  port-index = <0>;
-+								  bus-width = <4>;
++								  bus-width = <2>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
 +							   };
 +							};
 +						};
 +					};
-+#endif
 +					microlynx_cam0: microlynx_b@51 {
 +						 compatible = "exosens,microlynx";
 +						 /* I2C device address */
@@ -38587,6 +40765,46 @@ index 0000000..9cedbb1
 +							default_exp_time = "2495"; /* us */
 +						 };
 +
++						 mode2 { // MICROLYNX_MODE_1024x128_RAW14
++							num_lanes = "2";
++							lane_polarity = "6";
++							tegra_sinterface = "serial_b";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60000000"; /* 60 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
 +						 ports {
 +							#address-cells = <1>;
 +							#size-cells = <0>;
@@ -38964,7 +41182,7 @@ index 0000000..9cedbb1
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -39003,7 +41221,7 @@ index 0000000..9cedbb1
 +							mode_type = "rgb";
 +							pixel_phase = "rgb888";
 +							csi_pixel_bit_depth = "24";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "133333336";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -39042,7 +41260,7 @@ index 0000000..9cedbb1
 +							mode_type = "yuv";
 +							pixel_phase = "yuyv";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "133333336";
++							pix_clk_hz = "100000000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -39091,7 +41309,7 @@ index 0000000..9cedbb1
 +						 use_sensor_mode_id = "false";
 +
 +						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
-+							num_lanes = "4";
++							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
 +							discontinuous_clk = "yes";
@@ -39132,7 +41350,7 @@ index 0000000..9cedbb1
 +
 +						 };
 +						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
-+							num_lanes = "4";
++							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
 +							discontinuous_clk = "yes";
@@ -39171,6 +41389,170 @@ index 0000000..9cedbb1
 +							default_exp_time = "2495"; /* us */
 +
 +						 };
++
++						 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "16";
++							pix_clk_hz = "85000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++
++						 };
++
++						 mode3 { // ILUMOS_MODE_2048x2048_RAW14
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "2048";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++
++						 };
++
++						 mode4 { // ILUMOS_MODE_2048x1088_RAW14
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "2048";
++							active_h = "1088";
++							line_length = "2048";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++
++						 };
++
++						 mode5 { // ILUMOS_MODE_1280x1024_RAW14
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "yes";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1280";
++							active_h = "1024";
++							line_length = "1280";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60756000"; /* 60.756 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++
++						 };
 +						 ports {
 +							#address-cells = <1>;
 +							#size-cells = <0>;
@@ -39178,7 +41560,7 @@ index 0000000..9cedbb1
 +							   reg = <0>;
 +							   ilumos_out1: endpoint {
 +								  port-index = <2>;
-+								  bus-width = <4>;
++								  bus-width = <2>;
 +								  remote-endpoint = <&rbpcv2_imx219_csi_in1>;
 +							   };
 +							};
@@ -39276,6 +41658,45 @@ index 0000000..9cedbb1
 +							default_exp_time = "2495"; /* us */
 +						 };
 +
++						 mode2 { // MICROLYNX_MODE_1024x128_RAW14
++							num_lanes = "2";
++							tegra_sinterface = "serial_c";
++							phy_mode = "DPHY";
++							discontinuous_clk = "no";
++							dpcm_enable = "false";
++							cil_settletime = "0";
++							active_w = "1024";
++							active_h = "128";
++							line_length = "1024";
++							mode_type = "raw";
++							pixel_phase = "grey";
++							csi_pixel_bit_depth = "14";
++							pix_clk_hz = "100000000";
++							embedded_metadata_height = "0";
++
++							/* unused */
++							gain_factor = "16";
++							exposure_factor = "1000000";
++							min_gain_val = "16"; /* 1.00x */
++							max_gain_val = "170"; /* 10.66x */
++							step_gain_val = "1";
++							default_gain = "16"; /* 1.00x */
++							min_hdr_ratio = "1";
++							max_hdr_ratio = "1";
++
++							/* framerate */
++							framerate_factor = "1000000";
++							min_framerate = "40000000"; /* 40 fps */
++							max_framerate = "62000000"; /* 62 fps */
++							step_framerate = "1";
++							default_framerate = "60000000"; /* 60 fps */
++
++							/* unused */
++							min_exp_time = "13"; /* us */
++							max_exp_time = "683709"; /* us */
++							step_exp_time = "1";
++							default_exp_time = "2495"; /* us */
++						 };
 +						 ports {
 +							#address-cells = <1>;
 +							#size-cells = <0>;
@@ -39345,7 +41766,7 @@ index 0000000..6a0555d
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
 new file mode 100644
-index 0000000..6943fd5
+index 0000000..7e01716
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
 @@ -0,0 +1,101 @@
@@ -39417,21 +41838,21 @@ index 0000000..6943fd5
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -39452,7 +41873,7 @@ index 0000000..6943fd5
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..3dc7cbb
+index 0000000..c81826c
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
 @@ -0,0 +1,101 @@
@@ -39524,21 +41945,21 @@ index 0000000..3dc7cbb
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@0/eg_ec_b@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -39559,7 +41980,7 @@ index 0000000..3dc7cbb
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
 new file mode 100644
-index 0000000..563b7d8
+index 0000000..acc91d7
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
 @@ -0,0 +1,60 @@
@@ -39578,14 +41999,14 @@ index 0000000..563b7d8
 +	fragment@00 {
 +		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +		};
 +	};
 +
 +	fragment@1 {
 +		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +			remote-endpoint = <&ilumos_out0>;
 +		};
 +	};
@@ -39957,7 +42378,7 @@ index 0000000..f3a86df
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
 new file mode 100644
-index 0000000..65f62dd
+index 0000000..0f24555
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
 @@ -0,0 +1,102 @@
@@ -40029,21 +42450,21 @@ index 0000000..65f62dd
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "1";
-+         pix_clk_hz = "20000000";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -40065,7 +42486,7 @@ index 0000000..65f62dd
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..e397ffd
+index 0000000..34a9f10
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
 @@ -0,0 +1,102 @@
@@ -40137,21 +42558,21 @@ index 0000000..e397ffd
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@18 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "100000000";
++         pix_clk_hz = "133333336";
 +		};
 +	};
 +	fragment@19 {
 +		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 +		__overlay__ {
 +         num_lanes = "2";
-+         pix_clk_hz = "133333336";
++         pix_clk_hz = "100000000";
 +		};
 +	};
 +	fragment@20 {
@@ -40173,7 +42594,7 @@ index 0000000..e397ffd
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
 new file mode 100644
-index 0000000..6d6d08e
+index 0000000..07451b4
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
 @@ -0,0 +1,59 @@
@@ -40193,14 +42614,14 @@ index 0000000..6d6d08e
 +	fragment@10 {
 +		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +		};
 +	};
 +
 +	fragment@11 {
 +		target-path = "/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
 +		__overlay__ {
-+			bus-width=<4>;
++			bus-width=<2>;
 +			remote-endpoint = <&ilumos_out1>;
 +		};
 +	};

@@ -63,6 +63,9 @@ STANDALONE_OPT=""
 ARCHIVE_DIR_OPT=""
 DELIVERY_DIR_OPT=""
 
+NO_ARGS=0
+[[ $# -eq 0 ]] && NO_ARGS=1
+
 DO_PREPARE=0
 DO_COPY_SOURCES=0
 DO_PATCH_SOURCES=0
@@ -598,6 +601,24 @@ else
             failed_configs+=("$CFG_VERSION:$CFG_VENDOR:$CFG_CARRIER")
         fi
     done
+fi
+
+#******************************************************************************
+# Run integration tests (only in "do all" mode, after successful build)
+#******************************************************************************
+if [[ $NO_ARGS -eq 1 && $total_failed -eq 0 ]]; then
+    echo ""
+    echo "============================================"
+    echo -e "${CYAN}Running integration tests...${NC}"
+    echo "============================================"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        echo -e "    ${BLUE}[test]${NC} bash test/run_all.sh"
+    else
+        if ! bash "$SCRIPT_DIR/test/run_all.sh"; then
+            echo -e "${RED}Integration tests FAILED${NC}"
+            exit 1
+        fi
+    fi
 fi
 
 #******************************************************************************

@@ -15,8 +15,8 @@ declare -A CAMERA_LANES=(
 
 # Cameras requiring x4 MIPI lanes
 declare -A CAMERA_X4=(
-	[iLumos]=1
-	[ilumos]=1
+#   [iLumos]=1
+#   [ilumos]=1
 )
 
 SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')

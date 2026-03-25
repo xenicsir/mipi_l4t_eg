@@ -865,7 +865,6 @@
 								};
 							 };
 						  };
-#ifdef DSBOARD_ORNXS
 						  ilumos_cam0: ilumos_b@30 {
 							 compatible = "exosens,ilumos";
 							 /* I2C device address */
@@ -971,7 +970,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "16";
-								pix_clk_hz = "100000000";
+								pix_clk_hz = "85000000";
 								embedded_metadata_height = "0";
 
 								/* unused */
@@ -1134,7 +1133,6 @@
 								};
 							 };
 						  };
-#endif
 						  microlynx_cam0: microlynx_b@51 {
 							 compatible = "exosens,microlynx";
 							 /* I2C device address */
@@ -2373,7 +2371,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "16";
-								pix_clk_hz = "100000000";
+								pix_clk_hz = "85000000";
 								embedded_metadata_height = "0";
 
 								/* unused */

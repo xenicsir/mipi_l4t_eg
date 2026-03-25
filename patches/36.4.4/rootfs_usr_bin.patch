@@ -2078,7 +2078,7 @@ index 0000000..e95af00
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..1bce772
+index 0000000..f0dbe9c
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 @@ -0,0 +1,301 @@
@@ -2099,8 +2099,8 @@ index 0000000..1bce772
 +
 +# Cameras requiring x4 MIPI lanes
 +declare -A CAMERA_X4=(
-+	[iLumos]=1
-+	[ilumos]=1
++#   [iLumos]=1
++#   [ilumos]=1
 +)
 +
 +SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')

@@ -8,20 +8,71 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
+#include <linux/miscdevice.h>
 #include <linux/of_device.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <linux/uaccess.h>
 #include <linux/version.h>
 #include <media/tegracam_core.h>
 
-/* ilumos specific registers */
+/* ilumos GenCP registers */
 #define REG_ACQ_START_W   0x50000A00
 #define REG_ACQ_STATUS_R  0x50000A20
-#define REG_IMG_HEIGHT_RW 0x50000004
-#define REG_IMG_WIDTH_RW  0x50000000
 #define REG_FIRW_VER_R    0x10000000
 #define REG_SERIAL_R      0x00144
 #define REG_MODEL_NAME_R  0x00044
+#define REG_IMG_HEIGHT_R  0x50000004
+#define REG_IMG_WIDTH_R   0x50000000 
+#
+/* Crosslink bridge register interface */
+#define REG_CROSSLINK_ADDR          0x50000C00
+#define REG_CROSSLINK_DATA          0x50000C04
+#define REG_CROSSLINK_R_WR_CMD      0x50000C08
+
+#define REG_CROSSLINK_FW_VERSION    0x0
+#define REG_CROSSLINK_PIXEL_FORMAT  0x2
+#define REG_CROSSLINK_LINE_LENGTH   0x3
+#define REG_CROSSLINK_FIFO_STATUS   0x7
+#define REG_CROSSLINK_FRAME_COUNTER 0x8
+#define REG_CROSSLINK_FRAME_SIZE    0x9
+
+#define READ_CROSSLINK      0x1
+#define WRITE_CROSSLINK     0x0
+
+#define PIXEL_FORMAT_MONO16 0x2E
+#define PIXEL_FORMAT_MONO14 0x2D
+
+#define ILUMOS_STR_MAX    256
+
+/* ---- ioctl interface (/dev/ilumos-<bus>-<addr>) ------------------------- */
+
+/**
+ * struct ilumos_reg_op - ioctl payload for 32-bit register read/write
+ * @addr: register address
+ * @val:  value written (WRITE_REG) or value returned (READ_REG)
+ */
+struct ilumos_reg_op {
+   __u32 addr;
+   __u32 val;
+};
+
+/**
+ * struct ilumos_str_op - ioctl payload for string read
+ * @addr: register address of the string
+ * @len:  number of bytes to read (clamped to ILUMOS_STR_MAX)
+ * @buf:  buffer filled with the string data on return
+ */
+struct ilumos_str_op {
+   __u32 addr;
+   __u32 len;
+   __u8  buf[ILUMOS_STR_MAX];
+};
+
+#define ILUMOS_IOCTL_MAGIC    'I'
+#define ILUMOS_IOCTL_READ_REG  _IOWR(ILUMOS_IOCTL_MAGIC, 1, struct ilumos_reg_op)
+#define ILUMOS_IOCTL_WRITE_REG _IOW (ILUMOS_IOCTL_MAGIC, 2, struct ilumos_reg_op)
+#define ILUMOS_IOCTL_READ_STR  _IOWR(ILUMOS_IOCTL_MAGIC, 3, struct ilumos_str_op)
 
 static const struct of_device_id ilumos_of_match[] = {
    { .compatible = "exosens,ilumos", },
@@ -32,6 +83,10 @@ MODULE_DEVICE_TABLE(of, ilumos_of_match);
 enum {
    ILUMOS_MODE_2048x2048_RAW16,
    ILUMOS_MODE_2048x1088_RAW16,
+   ILUMOS_MODE_1280x1024_RAW16,
+   ILUMOS_MODE_2048x2048_RAW14,
+   ILUMOS_MODE_2048x1088_RAW14,
+   ILUMOS_MODE_1280x1024_RAW14,
 };
 
 static const int ilumos_60fps[] = {
@@ -45,6 +100,10 @@ static const int ilumos_60fps[] = {
 static const struct camera_common_frmfmt ilumos_frmfmt[] = {
    {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16},
    {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16},
+   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW16},
+   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW14},
+   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW14},
+   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW14},
 };
 
 static int ilumos_find_frmfmt(u32 width, u32 height)
@@ -80,11 +139,16 @@ struct ilumos {
    char        model[64];
    char        serial_number[64];
    char        firmware_version[64];
-   u32            native_width;
-   u32            native_height;
+   char        pixel_format[64];
+   u32         native_width;
+   u32         native_height;
+
+   /* chardev — /dev/ilumos-<bus>-<addr> */
+   struct miscdevice miscdev;
+   char              miscdev_name[32];
 };
 
-static int ilumos_i2c_read(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
+static int ilumos_i2c_read_register(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
 {
    struct i2c_msg msgs[2];
    u8 tx_data[6];
@@ -135,7 +199,7 @@ static int ilumos_i2c_read(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
    return ret;
 }
 
-static int ilumos_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
+static int ilumos_i2c_write_register(struct i2c_client *client, u32 reg, u32 val)
 {
    struct i2c_msg msgs;
    u8 tx_data[10];
@@ -156,75 +220,222 @@ static int ilumos_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
 }
 
 
+static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
+                                              u32 reg, u32 *val)
+{
+   int ret;
+
+   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_ADDR, reg);
+   if (ret)
+      return ret;
+
+   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
+                                   READ_CROSSLINK);
+   if (ret)
+      return ret;
+
+   return ilumos_i2c_read_register(client, REG_CROSSLINK_DATA,
+                                   (u8 *)val, sizeof(*val));
+}
+
+static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
+                                  u8 *buf, u16 len)
+{
+   if (len > ILUMOS_STR_MAX)
+      return -EINVAL;
+   return ilumos_i2c_read_register(client, reg, buf, len);
+}
+
+/* ---- chardev file operations ------------------------------------------ */
+
+static int ilumos_cdev_open(struct inode *inode, struct file *file)
+{
+   struct ilumos *priv =
+      container_of(file->private_data, struct ilumos, miscdev);
+   file->private_data = priv;
+   return 0;
+}
+
+static int ilumos_cdev_release(struct inode *inode, struct file *file)
+{
+   return 0;
+}
+
+static long ilumos_cdev_ioctl(struct file *file, unsigned int cmd,
+                              unsigned long arg)
+{
+   struct ilumos *priv = file->private_data;
+   int ret = 0;
+
+   switch (cmd) {
+   case ILUMOS_IOCTL_READ_REG: {
+      struct ilumos_reg_op op;
+
+      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
+         ret = -EFAULT;
+         break;
+      }
+      ret = ilumos_i2c_read_register(priv->i2c_client, op.addr,
+                                     (u8 *)&op.val, sizeof(op.val));
+      if (ret == 0 && copy_to_user((void __user *)arg, &op, sizeof(op)))
+         ret = -EFAULT;
+      break;
+   }
+   case ILUMOS_IOCTL_WRITE_REG: {
+      struct ilumos_reg_op op;
+
+      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
+         ret = -EFAULT;
+         break;
+      }
+      ret = ilumos_i2c_write_register(priv->i2c_client, op.addr, op.val);
+      break;
+   }
+   case ILUMOS_IOCTL_READ_STR: {
+      struct ilumos_str_op op;
+
+      if (copy_from_user(&op, (void __user *)arg, sizeof(op))) {
+         ret = -EFAULT;
+         break;
+      }
+      op.len = min_t(u32, op.len, ILUMOS_STR_MAX);
+      ret = ilumos_i2c_read_string(priv->i2c_client, op.addr,
+                                   op.buf, op.len);
+      if (ret == 0 && copy_to_user((void __user *)arg, &op, sizeof(op)))
+         ret = -EFAULT;
+      break;
+   }
+   default:
+      ret = -ENOTTY;
+      break;
+   }
+
+   return ret;
+}
+
+static const struct file_operations ilumos_cdev_fops = {
+   .owner          = THIS_MODULE,
+   .open           = ilumos_cdev_open,
+   .release        = ilumos_cdev_release,
+   .unlocked_ioctl = ilumos_cdev_ioctl,
+};
+
 static int ilumos_sensor_check(struct ilumos *priv)
 {
    struct device *dev = &priv->i2c_client->dev;
-   int status, mode, i;
+   int i, mode;
    u8 buf[64];
+   u32 read_data;
    u32 width, height;
+   bool is_raw14 = false;
 
-   /* FPGA firmware read */
-   status = ilumos_i2c_read(priv->i2c_client, REG_FIRW_VER_R,
-         buf, sizeof(buf));
-   if (status < 0)
-   {
-      goto error_exit;
-   }
-   for (i = sizeof(buf) - 1; i >= 0 && buf[i] == (u8)0xff; i--)
-      buf[i] = '\0';
-   strncpy(priv->firmware_version, buf, sizeof(priv->firmware_version) - 1);
-   priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
-
-   status = ilumos_i2c_read(priv->i2c_client, REG_IMG_WIDTH_RW,
-         (u8 *)&width, sizeof(width));
-   if (status < 0)
-   {
-      goto error_exit;
+   /* FPGA firmware version */
+   if (ilumos_i2c_read_string(priv->i2c_client, REG_FIRW_VER_R,
+                              buf, sizeof(buf)) == 0) {
+      for (i = sizeof(buf) - 1; i >= 0 && buf[i] == (u8)0xff; i--)
+         buf[i] = '\0';
+      strncpy(priv->firmware_version, buf, sizeof(priv->firmware_version) - 1);
+      priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
+      dev_info(dev, "FPGA firmware version = %s\n", priv->firmware_version);
+   } else {
+      dev_warn(dev, "FPGA firmware read failed\n");
    }
 
-   status = ilumos_i2c_read(priv->i2c_client, REG_IMG_HEIGHT_RW,
-         (u8 *)&height, sizeof(height));
-   if (status < 0)
-   {
-      goto error_exit;
+   /* Pixel format via Crosslink */
+   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
+                                          REG_CROSSLINK_PIXEL_FORMAT,
+                                          &read_data) == 0) {
+      if (read_data == PIXEL_FORMAT_MONO14) {
+         is_raw14 = true;
+         dev_info(dev, "PIXEL_FORMAT = 0x%08x (RAW14)\n", read_data);
+      } else {
+         dev_info(dev, "PIXEL_FORMAT = 0x%08x (RAW16)\n", read_data);
+      }
+   } else {
+      dev_warn(dev, "PIXEL_FORMAT read failed, assuming RAW16\n");
    }
 
+   /* Read Width and Height via Crosslink FRAME_SIZE */
+   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
+                                          REG_CROSSLINK_FRAME_SIZE,
+                                          &read_data) != 0) {
+      dev_err(dev, "Crosslink FRAME_SIZE read failed\n");
+      
+      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
+                                   (u8 *)&width, sizeof(width)) == 0) {
+         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
+                                      (u8 *)&height, sizeof(height)) == 0) {
+         } else {
+            dev_warn(dev, "failed to read height\n");
+            goto error_exit;
+         }
+      } else {
+         dev_warn(dev, "failed to read width\n");
+         goto error_exit;
+      }
+   }
+   else
+   {
+      width = read_data & 0xFFFF;
+      height = read_data >> 16;
+   }
+   dev_info(dev, "Frame width = %u px\n", width);
+   dev_info(dev, "Frame height = %u px\n", height);
+
+
+   /* ilumos_frmfmt: indices 0-2 = RAW16, indices 3-5 = RAW14 (same resolutions) */
    mode = ilumos_find_frmfmt(width, height);
    if (mode < 0) {
+      dev_err(dev, "unsupported resolution %ux%u\n", width, height);
       goto error_exit;
    }
+   if (is_raw14)
+      mode += 3;
 
-   priv->native_width = width;
+   priv->tc_dev->s_data->sensor_mode_id = mode;
+   priv->tc_dev->s_data->def_mode       = mode;
+
+   if (is_raw14)
+      strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
+              sizeof(priv->pixel_format) - 1);
+   else
+      strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
+              sizeof(priv->pixel_format) - 1);
+   priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
+
+   dev_info(dev, "mode=%d  pixel_format=%s\n", mode, priv->pixel_format);
+
+   priv->native_width  = width;
    priv->native_height = height;
 
-   /* Read model name */
-   status = ilumos_i2c_read(priv->i2c_client, REG_MODEL_NAME_R,
-         (u8 *)priv->model, sizeof(priv->model));
-   if (status < 0) {
-      priv->model[0] = '\0';
-      dev_warn(dev, "failed to read model name\n");
-   } else {
+   /* Model name */
+   if (ilumos_i2c_read_string(priv->i2c_client, REG_MODEL_NAME_R,
+                                (u8 *)priv->model, sizeof(priv->model)) == 0) {
       for (i = sizeof(priv->model) - 1; i >= 0 &&
             (priv->model[i] == (char)0xff || priv->model[i] == '\0'); i--)
          priv->model[i] = '\0';
+   } else {
+      priv->model[0] = '\0';
+      dev_warn(dev, "failed to read model name\n");
    }
 
-   /* Read serial number */
-   status = ilumos_i2c_read(priv->i2c_client, REG_SERIAL_R,
-         (u8 *)priv->serial_number, sizeof(priv->serial_number));
-   if (status < 0) {
+   /* Serial number */
+   if (ilumos_i2c_read_string(priv->i2c_client, REG_SERIAL_R,
+                                (u8 *)priv->serial_number,
+                                sizeof(priv->serial_number)) == 0) {
+      for (i = sizeof(priv->serial_number) - 1; i >= 0 &&
+            (priv->serial_number[i] == (char)0xff ||
+             priv->serial_number[i] == '\0'); i--)
+         priv->serial_number[i] = '\0';
+   } else {
       priv->serial_number[0] = '\0';
       dev_warn(dev, "failed to read serial number\n");
-   } else {
-      for (i = sizeof(priv->serial_number) - 1; i >= 0 &&
-            (priv->serial_number[i] == (char)0xff || priv->serial_number[i] == '\0'); i--)
-         priv->serial_number[i] = '\0';
    }
 
    return 0;
 
 error_exit:
-   dev_err(dev, "Probing failed");
+   dev_err(dev, "Probing failed\n");
    return -EIO;
 }
 
@@ -337,11 +548,11 @@ static int ilumos_start_streaming(struct tegracam_device *tc_dev)
 
    dev_dbg(tc_dev->dev, "%s\n", __func__);
 
-   status = ilumos_i2c_read(priv->i2c_client, REG_ACQ_STATUS_R,
+   status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
          (u8 *)&read_data, sizeof(read_data));
    if (status == 0) {
       if (read_data != 0x1) {
-         status = ilumos_i2c_write32(priv->i2c_client, REG_ACQ_START_W, 1);
+         status = ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 1);
       }
    } else {
       dev_err(tc_dev->dev, "%s : Register read failed\n", __func__);
@@ -405,7 +616,10 @@ static DEVICE_ATTR_RO(resolution);
 static ssize_t pixel_format_show(struct device *dev,
       struct device_attribute *attr, char *buf)
 {
-   return scnprintf(buf, PAGE_SIZE, "'Y16 ' (16-bit Greyscale)\n");
+   struct camera_common_data *s_data = to_camera_common_data(dev);
+   struct ilumos *priv = (struct ilumos *)s_data->priv;
+
+   return scnprintf(buf, PAGE_SIZE, "%s\n", priv->pixel_format);
 }
 static DEVICE_ATTR_RO(pixel_format);
 
@@ -490,6 +704,18 @@ static int ilumos_probe(struct i2c_client *client,
    device_create_file(dev, &dev_attr_pixel_format);
    device_create_file(dev, &dev_attr_firmware_version);
 
+   /* Register chardev for userspace register access */
+   snprintf(priv->miscdev_name, sizeof(priv->miscdev_name),
+            "ilumos-%d-%04x", client->adapter->nr, client->addr);
+   priv->miscdev.minor  = MISC_DYNAMIC_MINOR;
+   priv->miscdev.name   = priv->miscdev_name;
+   priv->miscdev.fops   = &ilumos_cdev_fops;
+   priv->miscdev.parent = dev;
+   if (misc_register(&priv->miscdev))
+      dev_warn(dev, "failed to register chardev; ilumosCtrl will not work\n");
+   else
+      dev_info(dev, "chardev registered at /dev/%s\n", priv->miscdev_name);
+
    return 0;
 }
 
@@ -502,6 +728,8 @@ static void ilumos_remove(struct i2c_client *client)
    struct device *dev = &client->dev;
    struct camera_common_data *s_data = to_camera_common_data(&client->dev);
    struct ilumos *priv = (struct ilumos *)s_data->priv;
+
+   misc_deregister(&priv->miscdev);
 
    device_remove_file(dev, &dev_attr_firmware_version);
    device_remove_file(dev, &dev_attr_pixel_format);
