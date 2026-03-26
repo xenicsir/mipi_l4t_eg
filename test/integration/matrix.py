@@ -100,7 +100,7 @@ for _ver in ("32.7.1", "32.7.4", "32.7.5", "32.7.6"):
 #     ))
 
 # ── 35.x  Xavier NX (p3509 carrier, tegra194) ───────────────────────────────
-for _ver in ("35.1", "35.3.1", "35.4.1", "35.5.0", "35.6.0", "35.6.1", "35.6.2"):
+for _ver in ("35.1", "35.3.1", "35.4.1", "35.5.0", "35.6.0", "35.6.1", "35.6.2", "35.6.4"):
     MATRIX.append(_entry(
         _ver, "nvidia-p3509", "35x",
         "tegra194-p3668-0001-p3509-0000.dtb",
@@ -109,7 +109,7 @@ for _ver in ("35.1", "35.3.1", "35.4.1", "35.5.0", "35.6.0", "35.6.1", "35.6.2")
     ))
 
 # ── 35.x  AGX Orin (p3737 carrier, tegra234) ────────────────────────────────
-for _ver in ("35.3.1", "35.4.1", "35.5.0", "35.6.0", "35.6.1", "35.6.2"):
+for _ver in ("35.3.1", "35.4.1", "35.5.0", "35.6.0", "35.6.1", "35.6.2", "35.6.4"):
     MATRIX.append(_entry(
         _ver, "nvidia-p3737", "35x",
         "tegra234-p3701-0004-p3737-0000.dtb",
@@ -128,7 +128,7 @@ for _ver in ("35.3.1", "35.4.1", "35.5.0"):
         base_dtb_dir="versioned_kernel_dtb",
     ))
 # From 35.6.0: base DTB is in rootfs/boot/ (SoM variant p3767-0000).
-for _ver in ("35.6.0", "35.6.1", "35.6.2"):
+for _ver in ("35.6.0", "35.6.1", "35.6.2", "35.6.4"):
     MATRIX.append(_entry(
         _ver, "nvidia-p3768", "35x",
         "tegra234-p3767-0000-p3768-0000-a0.dtb",
@@ -148,7 +148,7 @@ for _ver in ("35.3.1", "35.4.1", "35.5.0"):
         2, True, "nvidia,tegra234",
         base_dtb_dir="versioned_kernel_dtb",
     ))
-for _ver in ("35.6.0", "35.6.1", "35.6.2"):
+for _ver in ("35.6.0", "35.6.1", "35.6.2", "35.6.4"):
     MATRIX.append(_entry(
         _ver, "dsboard-ornxs", "35x",
         "tegra234-p3767-0000-p3768-0000-a0.dtb",
@@ -158,7 +158,7 @@ for _ver in ("35.6.0", "35.6.1", "35.6.2"):
     ))
 
 # ── 36.x  AGX Orin (p3737 carrier) ──────────────────────────────────────────
-for _ver in ("36.4", "36.4.3", "36.4.4"):
+for _ver in ("36.4", "36.4.3", "36.4.4", "36.5.0"):
     MATRIX.append(_entry(
         _ver, "nvidia-p3737", "36x",
         "tegra234-p3737-0000+p3701-0004-nv.dtb",
@@ -167,7 +167,7 @@ for _ver in ("36.4", "36.4.3", "36.4.4"):
     ))
 
 # ── 36.x  Orin NX (p3768 carrier) ───────────────────────────────────────────
-for _ver in ("36.4", "36.4.3", "36.4.4"):
+for _ver in ("36.4", "36.4.3", "36.4.4", "36.5.0"):
     MATRIX.append(_entry(
         _ver, "nvidia-p3768", "36x",
         "tegra234-p3768-0000+p3767-0000-nv.dtb",
@@ -177,7 +177,7 @@ for _ver in ("36.4", "36.4.3", "36.4.4"):
 
 # ── 36.x  Forecr DSBOARD-ORNXS (p3768 carrier, Forecr board) ────────────────
 # Base DTBO is ornxs-specific; lane DTBOs are shared with p3768.
-for _ver in ("36.4", "36.4.3", "36.4.4"):
+for _ver in ("36.4", "36.4.3", "36.4.4", "36.5.0"):
     MATRIX.append(_entry(
         _ver, "dsboard-ornxs", "36x",
         "tegra234-p3768-0000+p3767-0000-nv.dtb",

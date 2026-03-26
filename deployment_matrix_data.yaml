@@ -132,11 +132,15 @@ l4t_versions:
     git_branch: "2.0"
   35.6.2:
     git_branch: "2.0"
+  35.6.4:
+    git_branch: "2.0"
   36.4:
     git_branch: "2.0"
   36.4.3:
     git_branch: "2.0"
   36.4.4:
+    git_branch: "2.0"
+  36.5.0:
     git_branch: "2.0"
 
 # Deployment matrix: platform x camera x l4t_version
@@ -187,6 +191,7 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|dione-xnx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|dione-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|dione-xnx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|dione-xnx-l4t-35.6.4.deb"
       microcube640:
         32.7.1: "tested|l4t-32.7.1|"
         32.7.4: "tested|l4t-32.7.4|microcube640-xnx-l4t-32.7.4.deb"
@@ -198,6 +203,7 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|microcube640-xnx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|microcube640-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|microcube640-xnx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microcube640-xnx-l4t-35.6.4.deb"
       crius1280:
         32.7.1: "tested|l4t-32.7.1|"
         32.7.4: "tested|l4t-32.7.4|crius1280-xnx-l4t-32.7.4.deb"
@@ -209,6 +215,7 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|crius1280-xnx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|crius1280-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|crius1280-xnx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|crius1280-xnx-l4t-35.6.4.deb"
       smartir640:
         32.7.1: "tested|l4t-32.7.1|"
         32.7.4: "tested|l4t-32.7.4|smartir640-xnx-l4t-32.7.4.deb"
@@ -220,6 +227,7 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|smartir640-xnx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|smartir640-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|smartir640-xnx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|smartir640-xnx-l4t-35.6.4.deb"
       ilumos:
         35.3.1: "tested|l4t-35.3.1|ilumos-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|ilumos-xnx-l4t-35.4.1.deb"
@@ -227,6 +235,7 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|ilumos-xnx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|ilumos-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|ilumos-xnx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|ilumos-xnx-l4t-35.6.4.deb"
       microlynx:
         35.3.1: "tested|l4t-35.3.1|microlynx-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microlynx-xnx-l4t-35.4.1.deb"
@@ -234,6 +243,7 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|microlynx-xnx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|microlynx-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|microlynx-xnx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microlynx-xnx-l4t-35.6.4.deb"
 
   # ========== AGX Orin devkit ==========
   - platform: agx_orin_devkit
@@ -245,9 +255,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|dione-orin-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|dione-orin-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|dione-orin-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|dione-orin-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|dione-orin-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|dione-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-orin-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|dione-orin-l4t-36.5.0.deb"
       microcube640:
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube640-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microcube640-orin-l4t-35.4.1.deb"
@@ -255,9 +267,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|microcube640-orin-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|microcube640-orin-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|microcube640-orin-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microcube640-orin-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|microcube640-orin-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|microcube640-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube640-orin-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microcube640-orin-l4t-36.5.0.deb"
       crius1280:
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-orin-l4t-35.4.1.deb"
@@ -265,9 +279,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|crius1280-orin-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|crius1280-orin-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|crius1280-orin-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|crius1280-orin-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|crius1280-orin-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-orin-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-orin-l4t-36.5.0.deb"
       smartir640:
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-orin-l4t-35.4.1.deb"
@@ -275,9 +291,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|smartir640-orin-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|smartir640-orin-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|smartir640-orin-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|smartir640-orin-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|smartir640-orin-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-orin-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-orin-l4t-36.5.0.deb"
       ilumos:
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-orin-l4t-35.4.1.deb"
@@ -285,9 +303,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|ilumos-orin-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|ilumos-orin-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|ilumos-orin-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|ilumos-orin-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|ilumos-orin-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-orin-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-orin-l4t-36.5.0.deb"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-orin-l4t-35.4.1.deb"
@@ -295,9 +315,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|microlynx-orin-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|microlynx-orin-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|microlynx-orin-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microlynx-orin-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|microlynx-orin-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-orin-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-orin-l4t-36.5.0.deb"
 
   # ========== AGX Orin Auvidea X230D ==========
   - platform: agx_orin_x230d
@@ -373,9 +395,11 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|dione-ornx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|dione-ornx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|dione-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|dione-ornx-l4t-35.6.4.deb"
         36.4: "tested|l4t-36.4|dione-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|dione-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|dione-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|dione-ornx-l4t-36.5.0.deb"
       microcube640:
         35.3.1: "tested|l4t-35.3.1|microcube640-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microcube640-ornx-l4t-35.4.1.deb"
@@ -383,9 +407,11 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|microcube640-ornx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|microcube640-ornx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|microcube640-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microcube640-ornx-l4t-35.6.4.deb"
         36.4: "tested|l4t-36.4|microcube640-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|microcube640-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|microcube640-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microcube640-ornx-l4t-36.5.0.deb"
       crius1280:
         35.3.1: "tested|l4t-35.3.1|crius1280-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|crius1280-ornx-l4t-35.4.1.deb"
@@ -393,9 +419,11 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|crius1280-ornx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|crius1280-ornx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|crius1280-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|crius1280-ornx-l4t-35.6.4.deb"
         36.4: "tested|l4t-36.4|crius1280-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|crius1280-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|crius1280-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-ornx-l4t-36.5.0.deb"
       smartir640:
         35.3.1: "tested|l4t-35.3.1|smartir640-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|smartir640-ornx-l4t-35.4.1.deb"
@@ -403,9 +431,11 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|smartir640-ornx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|smartir640-ornx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|smartir640-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|smartir640-ornx-l4t-35.6.4.deb"
         36.4: "tested|l4t-36.4|smartir640-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|smartir640-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|smartir640-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-ornx-l4t-36.5.0.deb"
       ilumos:
         35.3.1: "tested|l4t-35.3.1|ilumos-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|ilumos-ornx-l4t-35.4.1.deb"
@@ -413,9 +443,11 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|ilumos-ornx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|ilumos-ornx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|ilumos-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|ilumos-ornx-l4t-35.6.4.deb"
         36.4: "tested|l4t-36.4|ilumos-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|ilumos-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-ornx-l4t-36.5.0.deb"
       microlynx:
         35.3.1: "tested|l4t-35.3.1|microlynx-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microlynx-ornx-l4t-35.4.1.deb"
@@ -423,9 +455,11 @@ deployment_matrix:
         35.6.0: "tested|l4t-35.6.0|microlynx-ornx-l4t-35.6.0.deb"
         35.6.1: "tested|l4t-35.6.1|microlynx-ornx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|microlynx-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microlynx-ornx-l4t-35.6.4.deb"
         36.4: "tested|l4t-36.4|microlynx-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|microlynx-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|microlynx-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-ornx-l4t-36.5.0.deb"
 
   # ========== Forecr DSBOARD ORNXS ==========
   - platform: forecr_ornxs
@@ -437,9 +471,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|dione-forecr-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|dione-forecr-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|dione-forecr-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|dione-forecr-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|dione-forecr-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|dione-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-forecr-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|dione-forecr-l4t-36.5.0.deb"
       microcube640:
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube640-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microcube640-forecr-l4t-35.4.1.deb"
@@ -447,9 +483,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|microcube640-forecr-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|microcube640-forecr-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|microcube640-forecr-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microcube640-forecr-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|microcube640-forecr-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|microcube640-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube640-forecr-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microcube640-forecr-l4t-36.5.0.deb"
       crius1280:
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-forecr-l4t-35.4.1.deb"
@@ -457,9 +495,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|crius1280-forecr-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|crius1280-forecr-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|crius1280-forecr-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|crius1280-forecr-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|crius1280-forecr-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-forecr-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-forecr-l4t-36.5.0.deb"
       smartir640:
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-forecr-l4t-35.4.1.deb"
@@ -467,9 +507,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|smartir640-forecr-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|smartir640-forecr-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|smartir640-forecr-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|smartir640-forecr-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|smartir640-forecr-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-forecr-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-forecr-l4t-36.5.0.deb"
       ilumos:
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-forecr-l4t-35.4.1.deb"
@@ -477,9 +519,11 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|ilumos-forecr-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|ilumos-forecr-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|ilumos-forecr-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|ilumos-forecr-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|ilumos-forecr-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-forecr-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-forecr-l4t-36.5.0.deb"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-forecr-l4t-35.4.1.deb"
@@ -487,6 +531,8 @@ deployment_matrix:
         35.6.0: "theoretically_supported|l4t-35.6.0|microlynx-forecr-l4t-35.6.0.deb"
         35.6.1: "theoretically_supported|l4t-35.6.1|microlynx-forecr-l4t-35.6.1.deb"
         35.6.2: "theoretically_supported|l4t-35.6.2|microlynx-forecr-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microlynx-forecr-l4t-35.6.4.deb"
         36.4: "theoretically_supported|l4t-36.4|microlynx-forecr-l4t-36.4.deb"
         36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-forecr-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-forecr-l4t-36.5.0.deb"

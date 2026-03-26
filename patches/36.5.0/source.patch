@@ -1,0 +1,77 @@
+diff --git a/source/Makefile b/source/Makefile
+index c09cfb3..2be449d 100644
+--- a/source/Makefile
++++ b/source/Makefile
+@@ -1,4 +1,4 @@
+-# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: BSD-3-Clause
+ 
+ KERNEL_HEADERS ?= /lib/modules/$(shell uname -r)/build
+@@ -7,7 +7,6 @@ KERNEL_OUTPUT ?= ${KERNEL_HEADERS}
+ MAKEFILE_DIR := $(abspath $(shell dirname $(lastword $(MAKEFILE_LIST))))
+ NVIDIA_HEADERS ?= ${MAKEFILE_DIR}/out/nvidia-linux-header
+ NVIDIA_CONFTEST ?= ${MAKEFILE_DIR}/out/nvidia-conftest
+-NVIDIA_DTS_BUILD_SCRIPTS ?= $(realpath ${MAKEFILE_DIR}/kernel-devicetree)
+ 
+ ifneq ($(words $(subst :, ,$(MAKEFILE_DIR))), 1)
+ $(error source directory cannot contain spaces or colons)
+@@ -124,14 +123,14 @@ endef
+ 
+ nvidia-headers: nvidia-oot
+ 	mkdir -p $(NVIDIA_HEADERS)
+-	cp -LR $(KERNEL_HEADERS)/* $(NVIDIA_HEADERS)
++	rsync -ak $(KERNEL_HEADERS)/* $(NVIDIA_HEADERS)
+ 	if [ "$(KERNEL_HEADERS)" != "$(KERNEL_OUTPUT)" ] ; then \
+-		cp -LR $(KERNEL_OUTPUT)/include/* $(NVIDIA_HEADERS)/include/ ; \
+-		cp -LR $(KERNEL_OUTPUT)/arch/arm64/include/* $(NVIDIA_HEADERS)/arch/arm64/include/ ; \
+-		cp -LR $(KERNEL_OUTPUT)/scripts/* $(NVIDIA_HEADERS)/scripts/ ; \
++		rsync -ak $(KERNEL_OUTPUT)/include/* $(NVIDIA_HEADERS)/include/ ; \
++		rsync -ak $(KERNEL_OUTPUT)/arch/arm64/include/* $(NVIDIA_HEADERS)/arch/arm64/include/ ; \
++		rsync -ak $(KERNEL_OUTPUT)/scripts/* $(NVIDIA_HEADERS)/scripts/ ; \
+ 		cp $(KERNEL_OUTPUT)/System.map $(NVIDIA_HEADERS)/ || true ; \
+ 	fi
+-	cp -LR $(MAKEFILE_DIR)/nvidia-oot/include/* $(NVIDIA_HEADERS)/include/
++	rsync -ak $(MAKEFILE_DIR)/nvidia-oot/include/* $(NVIDIA_HEADERS)/include/
+ 	cat $(KERNEL_OUTPUT)/Module.symvers $(MAKEFILE_DIR)/nvidia-oot/Module.symvers > \
+ 		$(NVIDIA_HEADERS)/Module.symvers
+ 
+@@ -154,7 +153,7 @@ nvidia-display-install:
+ 	@echo   "================================================================================"
+ 	@echo   "make $(MAKECMDGOALS) - nvidia-display ..."
+ 	@echo   "================================================================================"
+-	$(MAKE) -C $(NVIDIA_HEADERS) INSTALL_MOD_DIR=updates/opensrc-disp \
++	$(MAKE) -C $(NVIDIA_HEADERS) \
+ 		M=$(MAKEFILE_DIR)/nvdisplay/kernel-open modules_install
+ 
+ nvidia-display-clean:
+@@ -167,7 +166,7 @@ nvidia-display-clean:
+ 	fi
+ 
+ nvidia-dtbs:
+-	@if [ ! -d "$(NVIDIA_DTS_BUILD_SCRIPTS)" ] ; then \
++	@if [ ! -d "$(MAKEFILE_DIR)/kernel-devicetree" ] ; then \
+ 		echo "Directory kernel-devicetree is not found, exiting.."; \
+ 		false; \
+ 	fi
+@@ -177,10 +176,10 @@ nvidia-dtbs:
+ 	TEGRA_TOP=$(MAKEFILE_DIR) \
+ 	srctree=$(KERNEL_HEADERS) \
+ 	objtree=$(KERNEL_OUTPUT) \
+-	oottree=$(NVIDIA_DTS_BUILD_SCRIPTS) \
++	oottree=$(MAKEFILE_DIR)/kernel-devicetree \
+ 	HOSTCC=gcc \
+-	$(MAKE) -f $(NVIDIA_DTS_BUILD_SCRIPTS)/scripts/Makefile.build \
+-		obj=$(NVIDIA_DTS_BUILD_SCRIPTS)/generic-dts \
++	$(MAKE) -f $(MAKEFILE_DIR)/kernel-devicetree/scripts/Makefile.build \
++		obj=$(MAKEFILE_DIR)/kernel-devicetree/generic-dts \
+ 		dtbs
+ 	@echo   "================================================================================"
+ 	@echo   "DTBs compiled successfully."
+@@ -190,5 +189,5 @@ nvidia-dtbs-clean:
+ 	@echo   "================================================================================"
+ 	@echo   "make $(MAKECMDGOALS) - nvidia-dtbs ..."
+ 	@echo   "================================================================================"
+-	rm -fr $(NVIDIA_DTS_BUILD_SCRIPTS)/generic-dts/dtbs
++	rm -fr $(MAKEFILE_DIR)/kernel-devicetree/generic-dts/dtbs
+ 

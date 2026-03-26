@@ -253,6 +253,29 @@
         "prefix": "bin/aarch64-buildroot-linux-gnu-"
       }
     },
+    "35.6.4": {
+      "vendors": ["generic", "forecr"],
+      "sources": {
+        "public": {
+          "filename": "public_sources.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.4/sources/public_sources.tbz2"
+        },
+        "release": {
+          "filename": "jetson_linux_r35.6.4_aarch64.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.4/release/jetson_linux_r35.6.4_aarch64.tbz2"
+        },
+        "sample_fs": {
+          "filename": "tegra_linux_sample-root-filesystem_r35.6.4_aarch64.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.4/release/tegra_linux_sample-root-filesystem_r35.6.4_aarch64.tbz2"
+        }
+      },
+      "toolchain": {
+        "archive": "aarch64--glibc--stable-final.tar.gz",
+        "url": "https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93",
+        "dir": "l4t-gcc",
+        "prefix": "bin/aarch64-buildroot-linux-gnu-"
+      }
+    },
     "36.4": {
       "vendors": ["generic", "forecr"],
       "standalone": {
@@ -325,6 +348,33 @@
         "sample_fs": {
           "filename": "tegra_linux_sample-root-filesystem_r36.4.4_aarch64.tbz2",
           "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/release/tegra_linux_sample-root-filesystem_r36.4.4_aarch64.tbz2"
+        }
+      },
+      "toolchain": {
+        "archive": "aarch64--glibc--stable-2022.08-1.tar.bz2",
+        "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2",
+        "dir": "aarch64--glibc--stable-2022.08-1",
+        "prefix": "aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-"
+      }
+    },
+    "36.5.0": {
+      "vendors": ["generic", "forecr"],
+      "standalone": {
+        "forecr": {"dsboard_ornx": true},
+        "generic": {"generic": true}
+      },
+      "sources": {
+        "public": {
+          "filename": "public_sources.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/sources/public_sources.tbz2"
+        },
+        "release": {
+          "filename": "jetson_linux_r36.5.0_aarch64.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/jetson_linux_r36.5.0_aarch64.tbz2"
+        },
+        "sample_fs": {
+          "filename": "tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2",
+          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2"
         }
       },
       "toolchain": {
