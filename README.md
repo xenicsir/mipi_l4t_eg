@@ -40,11 +40,21 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
 
 **Recommended OS:** Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. Ubuntu 22.04 LTS is currently used.
 
+**Git configuration:** A name and email must be set (used when generating package version strings):
+
+```bash
+git config user.email your@email.com
+git config user.name "Your Name"
+```
+
 **Required packages:**
 
 ```bash
 # For standalone builds (L4T 36.x): ARM64 emulation for initramfs generation
 sudo apt install qemu-user-static binfmt-support
+
+# For kernel/device tree build (parser generators)
+sudo apt install flex bison
 
 # For faster archive extraction (highly recommended)
 sudo apt install lbzip2 pigz pbzip2
@@ -55,6 +65,9 @@ sudo gem install fpm
 
 # For JSON configuration processing
 sudo apt install jq
+
+# For kernel module build (OpenSSL headers)
+sudo apt install libssl-dev
 ```
 
 ---
