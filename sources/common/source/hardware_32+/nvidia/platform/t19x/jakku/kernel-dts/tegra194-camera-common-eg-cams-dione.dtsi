@@ -373,7 +373,7 @@
 									port-index = <0>;
 									bus-width = <2>;
 									remote-endpoint = <&rbpcv2_imx219_csi_in0>;
-									link-frequencies = /bits/ 64 <120000000 497000000>;
+									link-frequencies = /bits/ 64 <120000000 498000000>;
 								};
 							};
 						};
@@ -689,7 +689,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "85000000";
+							pix_clk_hz = "51000000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -861,25 +861,7 @@
 						use_sensor_mode_id = "true";
 						line-height = <128>;
 
-						mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
-							num_lanes = "2";
-							lane_polarity = "6";
-							tegra_sinterface = "serial_a";
-							phy_mode = "DPHY";
-							discontinuous_clk = "no";
-							dpcm_enable = "false";
-							cil_settletime = "0";
-							active_w = "1024";
-							active_h = "128";
-							line_length = "1024";
-							mode_type = "raw";
-							pixel_phase = "grey_be";
-							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "112500000";
-							embedded_metadata_height = "0";
-						};
-
-						mode1 { // MICROLYNX_MODE_1024x128_RAW16
+						mode0 { // MICROLYNX_MODE_1024x128_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
@@ -893,11 +875,11 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "112500000";
+							pix_clk_hz = "87500000";
 							embedded_metadata_height = "0";
 						};
 
-						mode2 { // MICROLYNX_MODE_1024x128_RAW14
+						mode1 { // MICROLYNX_MODE_1024x128_RAW14
 							num_lanes = "2";
 							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
@@ -1140,7 +1122,7 @@
 									port-index = <2>;
 									bus-width = <2>;
 									remote-endpoint = <&rbpcv2_imx219_csi_in1>;
-									link-frequencies = /bits/ 64 <120000000 497000000>;
+									link-frequencies = /bits/ 64 <120000000 498000000>;
 								};
 							};
 						};
@@ -1373,7 +1355,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "85000000";
+							pix_clk_hz = "51000000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1545,25 +1527,7 @@
 						use_sensor_mode_id = "true";
 						line-height = <128>;
 
-						mode0 { // MICROLYNX_MODE_1024x128_RAW16_BE
-							num_lanes = "2";
-							lane_polarity = "6";
-							tegra_sinterface = "serial_c";
-							phy_mode = "DPHY";
-							discontinuous_clk = "no";
-							dpcm_enable = "false";
-							cil_settletime = "0";
-							active_w = "1024";
-							active_h = "128";
-							line_length = "1024";
-							mode_type = "raw";
-							pixel_phase = "grey_be";
-							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "112500000";
-							embedded_metadata_height = "0";
-						};
-
-						mode1 { // MICROLYNX_MODE_1024x128_RAW16
+						mode0 { // MICROLYNX_MODE_1024x128_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
@@ -1577,11 +1541,11 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "112500000";
+							pix_clk_hz = "87500000";
 							embedded_metadata_height = "0";
 						};
 
-						mode2 { // MICROLYNX_MODE_1024x128_RAW14
+						mode1 { // MICROLYNX_MODE_1024x128_RAW14
 							num_lanes = "2";
 							lane_polarity = "6";
 							tegra_sinterface = "serial_c";

@@ -28,16 +28,8 @@
 # Script directory and configuration file
 #******************************************************************************
 L4T_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-L4T_CONFIG_FILE="${L4T_CONFIG_FILE:-$L4T_ENV_DIR/l4t_versions.json}"
-
-#******************************************************************************
-# Check dependencies
-#******************************************************************************
-if ! command -v jq >/dev/null 2>&1; then
-    echo "Error: jq is required but not installed."
-    echo "Install with: sudo apt-get install jq"
-    exit 1
-fi
+L4T_CONFIG_FILE="${L4T_CONFIG_FILE:-$L4T_ENV_DIR/eg_config.yaml}"
+_EGCFG="python3 $L4T_ENV_DIR/tools/egcfg.py"
 
 if [[ ! -f "$L4T_CONFIG_FILE" ]]; then
     echo "Error: Configuration file not found: $L4T_CONFIG_FILE"
@@ -50,7 +42,7 @@ fi
 
 # Get all supported L4T versions (sorted)
 get_all_versions() {
-    jq -r '.versions | keys[]' "$L4T_CONFIG_FILE" | sort -V | tr '\n' ' ' | sed 's/ $//'
+    $_EGCFG versions "$L4T_CONFIG_FILE"
 }
 
 # Cache for performance (avoid repeated jq calls)
@@ -64,29 +56,29 @@ _l4t_ensure_versions_cache() {
 # Get vendors supported for a specific version
 get_vendors_for_version() {
     local version="$1"
-    jq -r ".versions[\"$version\"].vendors[]?" "$L4T_CONFIG_FILE" 2>/dev/null | tr '\n' ' ' | sed 's/ $//'
+    $_EGCFG "version.$version.vendors" "$L4T_CONFIG_FILE" 2>/dev/null
 }
 
 # Get all defined vendors
 get_all_vendors() {
-    jq -r '.vendors | keys[]' "$L4T_CONFIG_FILE" | tr '\n' ' ' | sed 's/ $//'
+    $_EGCFG vendors "$L4T_CONFIG_FILE"
 }
 
 # Get carriers for a specific vendor
 get_carriers_for_vendor() {
     local vendor="$1"
-    jq -r ".vendors[\"$vendor\"].carriers[]?" "$L4T_CONFIG_FILE" 2>/dev/null | tr '\n' ' ' | sed 's/ $//'
+    $_EGCFG "vendor.$vendor.carriers" "$L4T_CONFIG_FILE" 2>/dev/null
 }
 
 # Get all defined carriers
 get_all_carriers() {
-    jq -r '.carriers | keys[]' "$L4T_CONFIG_FILE" | tr '\n' ' ' | sed 's/ $//'
+    $_EGCFG carriers "$L4T_CONFIG_FILE"
 }
 
 # Get default carrier for a vendor
 get_default_carrier() {
     local vendor="$1"
-    jq -r ".vendors[\"$vendor\"].default_carrier // empty" "$L4T_CONFIG_FILE"
+    $_EGCFG "vendor.$vendor.default_carrier" "$L4T_CONFIG_FILE"
 }
 
 # Check if configuration requires standalone build
@@ -98,20 +90,20 @@ config_requires_standalone() {
     local carrier="$3"
 
     # Check version-specific standalone config: versions.$version.standalone.$vendor.$carrier
-    local standalone=$(jq -r ".versions[\"$version\"].standalone[\"$vendor\"][\"$carrier\"] // false" "$L4T_CONFIG_FILE")
+    local standalone=$($_EGCFG "version.$version.standalone.$vendor.$carrier" "$L4T_CONFIG_FILE" 2>/dev/null)
     [[ "$standalone" == "true" ]]
 }
 
 # Get kernel defconfig for a carrier
 get_carrier_defconfig() {
     local carrier="$1"
-    jq -r ".carriers[\"$carrier\"].defconfig // empty" "$L4T_CONFIG_FILE"
+    $_EGCFG "carrier.$carrier.defconfig" "$L4T_CONFIG_FILE"
 }
 
 # Get directory suffix for a carrier
 get_carrier_dir_suffix() {
     local carrier="$1"
-    jq -r ".carriers[\"$carrier\"].dir_suffix // empty" "$L4T_CONFIG_FILE"
+    $_EGCFG "carrier.$carrier.dir_suffix" "$L4T_CONFIG_FILE"
 }
 
 #******************************************************************************
@@ -368,7 +360,7 @@ Optional:
   -c, --carrier-board BOARD      Carrier board (default depends on vendor)
   -p, --package-version VERSION  Package version for delivery package
   -s, --standalone               Build standalone kernel with -eg suffix
-                                   (auto per l4t_versions.json)
+                                   (auto per eg_config.yaml)
   --archive-dir DIR              Archive directory relative to ROOT_DIR
                                    (default: archives)
   --delivery-dir DIR             Delivery directory relative to ROOT_DIR
@@ -396,6 +388,7 @@ parse_l4t_args() {
     STANDALONE_BUILD=0
     ARCHIVE_DIR_ARG=""
     DELIVERY_DIR_ARG=""
+    NO_VERIFY_DTSI=0
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -427,6 +420,10 @@ parse_l4t_args() {
             --delivery-dir)
                 DELIVERY_DIR_ARG="$2"
                 shift 2
+                ;;
+            --no-verify-dtsi)
+                NO_VERIFY_DTSI=1
+                shift
                 ;;
             -h|--help)
                 show_l4t_help
@@ -507,20 +504,20 @@ load_version_config() {
     local version="$1"
 
     # Source packages
-    JETSON_PUBLIC_SOURCES=$(jq -r ".versions[\"$version\"].sources.public.filename" "$L4T_CONFIG_FILE")
-    JETSON_PUBLIC_SOURCES_URL=$(jq -r ".versions[\"$version\"].sources.public.url" "$L4T_CONFIG_FILE")
+    JETSON_PUBLIC_SOURCES=$($_EGCFG "version.$version.sources.public.filename" "$L4T_CONFIG_FILE")
+    JETSON_PUBLIC_SOURCES_URL=$($_EGCFG "version.$version.sources.public.url" "$L4T_CONFIG_FILE")
 
-    L4T_RELEASE_PACKAGE=$(jq -r ".versions[\"$version\"].sources.release.filename" "$L4T_CONFIG_FILE")
-    L4T_RELEASE_PACKAGE_URL=$(jq -r ".versions[\"$version\"].sources.release.url" "$L4T_CONFIG_FILE")
+    L4T_RELEASE_PACKAGE=$($_EGCFG "version.$version.sources.release.filename" "$L4T_CONFIG_FILE")
+    L4T_RELEASE_PACKAGE_URL=$($_EGCFG "version.$version.sources.release.url" "$L4T_CONFIG_FILE")
 
-    SAMPLE_FS_PACKAGE=$(jq -r ".versions[\"$version\"].sources.sample_fs.filename" "$L4T_CONFIG_FILE")
-    SAMPLE_FS_PACKAGE_URL=$(jq -r ".versions[\"$version\"].sources.sample_fs.url" "$L4T_CONFIG_FILE")
+    SAMPLE_FS_PACKAGE=$($_EGCFG "version.$version.sources.sample_fs.filename" "$L4T_CONFIG_FILE")
+    SAMPLE_FS_PACKAGE_URL=$($_EGCFG "version.$version.sources.sample_fs.url" "$L4T_CONFIG_FILE")
 
     # Toolchain
-    JETSON_TOOLCHAIN_ARCHIVE=$(jq -r ".versions[\"$version\"].toolchain.archive" "$L4T_CONFIG_FILE")
-    JETSON_TOOLCHAIN_ARCHIVE_URL=$(jq -r ".versions[\"$version\"].toolchain.url" "$L4T_CONFIG_FILE")
-    TOOLCHAIN_DIR=$(jq -r ".versions[\"$version\"].toolchain.dir" "$L4T_CONFIG_FILE")
-    local toolchain_prefix=$(jq -r ".versions[\"$version\"].toolchain.prefix" "$L4T_CONFIG_FILE")
+    JETSON_TOOLCHAIN_ARCHIVE=$($_EGCFG "version.$version.toolchain.archive" "$L4T_CONFIG_FILE")
+    JETSON_TOOLCHAIN_ARCHIVE_URL=$($_EGCFG "version.$version.toolchain.url" "$L4T_CONFIG_FILE")
+    TOOLCHAIN_DIR=$($_EGCFG "version.$version.toolchain.dir" "$L4T_CONFIG_FILE")
+    local toolchain_prefix=$($_EGCFG "version.$version.toolchain.prefix" "$L4T_CONFIG_FILE")
 
     # Build full toolchain prefix path
     TOOLCHAIN_PREFIX="$JETSON_DIR/$TOOLCHAIN_DIR/$toolchain_prefix"

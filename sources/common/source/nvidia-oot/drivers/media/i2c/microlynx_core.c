@@ -95,7 +95,6 @@ static const struct of_device_id microlynx_of_match[] = {
 MODULE_DEVICE_TABLE(of, microlynx_of_match);
 
 enum {
-   MICROLYNX_MODE_1024x128_RAW16_BE,
    MICROLYNX_MODE_1024x128_RAW16,
    MICROLYNX_MODE_1024x128_RAW14,
 };
@@ -109,7 +108,6 @@ static const int microlynx_351fps[] = {
  * device tree!
  */
 static const struct camera_common_frmfmt microlynx_frmfmt[] = {
-   {{1024, 128},  microlynx_351fps,  1, 0, MICROLYNX_MODE_1024x128_RAW16_BE},
    {{1024, 128},  microlynx_351fps,  1, 0, MICROLYNX_MODE_1024x128_RAW16},
    {{1024, 128},  microlynx_351fps, 1, 0, MICROLYNX_MODE_1024x128_RAW14},
 };
@@ -248,25 +246,8 @@ static int microlynx_sensor_check(struct microlynx *priv)
                sizeof(priv->pixel_format) - 1);
          PRINT_INFO("Pixel format: Y14\n");
       } else {
-         /* Determine pixel format and sensor mode from camera endianness register.
-          * REG_PIX_ENDIAN_R = 1 → pixels are BE on the CSI bus → Y16_BE on Tegra
-          * REG_PIX_ENDIAN_R = 0 → pixels are LE on the CSI bus → Y16 on Tegra
-          */
-         status = GENCPCLIENT_ReadRegister(REG_PIX_ENDIAN_R, &read_data);
-         if (status == 0) {
-            if (read_data == 1) {
-               priv->tc_dev->s_data->sensor_mode_id = MICROLYNX_MODE_1024x128_RAW16_BE;
-               priv->tc_dev->s_data->def_mode       = MICROLYNX_MODE_1024x128_RAW16_BE;
-               strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
-                     sizeof(priv->pixel_format) - 1);
-               PRINT_INFO("Pixel format: Y16_BE (CSI big-endian)\n");
-            } else {
-               PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
-            }
-         } else {
-            PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
-         }
-       }
+         PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
+      }
    }
    
    priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';

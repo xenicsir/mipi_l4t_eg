@@ -54,6 +54,11 @@ class DeploymentMatrixGenerator:
         self.github_repo = self.data.get('github_repo', '')
         self.package_repo_base = self.data.get('package_repo_base', '')
 
+        # Load camera technical details from eg_config.yaml
+        camera_db_path = Path(yaml_file).parent / 'eg_config.yaml'
+        with open(camera_db_path, 'r') as f:
+            self.camera_db = yaml.safe_load(f)
+
     def parse_entry(self, entry_str):
         """Parse 'status|git_branch|deb_package' format"""
         if not entry_str or isinstance(entry_str, dict):
@@ -67,26 +72,44 @@ class DeploymentMatrixGenerator:
         return status, git_branch, deb_package
 
     def get_status(self, platform_id, camera_id, l4t_version):
-        """Get full entry for a platform/camera/L4T combination"""
+        """Get full entry for a platform/camera/L4T combination.
+
+        Priority:
+          1. Explicit entry in deployment_matrix_data.yaml
+          2. Auto-generated theoretically_supported from eg_config.yaml platform_ids
+          3. Empty (None, None, None)
+        """
         l4t_version = str(l4t_version)
+
+        # 1. Explicit entry
         for entry in self.matrix_data:
             if entry['platform'] == platform_id:
                 if camera_id in entry['cameras']:
                     versions = entry['cameras'][camera_id]
-                    # Try to find the version in the dict (keys might be strings or floats)
                     for key, value in versions.items():
                         if str(key) == l4t_version:
                             return self.parse_entry(value)
-                    return None, None, None
+                    # Platform/camera block exists but version not listed — fall through
+                    break
+
+        # 2. Auto-generate from eg_config.yaml platform_ids
+        version_cfg = self.camera_db.get('versions', {}).get(l4t_version, {})
+        if platform_id in version_cfg.get('platform_ids', []):
+            return 'theoretically_supported', None, None
+
         return None, None, None
 
     def get_all_l4t_versions(self):
-        """Get all unique L4T versions across all entries"""
+        """Get all unique L4T versions: union of eg_config.yaml and deployment_matrix_data.yaml."""
         versions = set()
+        # From eg_config.yaml (authoritative list of supported versions)
+        versions.update(self.camera_db.get('versions', {}).keys())
+        # From deployment_matrix_data.yaml (may include historical versions not in eg_config)
         for entry in self.matrix_data:
             for camera_id, version_dict in entry['cameras'].items():
                 versions.update(str(v) for v in version_dict.keys())
-        return sorted(versions, key=lambda x: tuple(map(int, str(x).split('.'))))
+        return sorted(versions, key=lambda x: tuple(int(p) if p.isdigit() else p
+                                                     for p in str(x).split('.')))
 
     def generate_markdown(self, output_file):
         """Generate Markdown table"""
@@ -159,12 +182,19 @@ class DeploymentMatrixGenerator:
             f.write("## Camera Details\n\n")
             for cam_id in camera_ids:
                 cam = self.data['cameras'][cam_id]
+                db_cam = self.camera_db['cameras'].get(cam_id, {})
                 f.write(f"### {cam['name']}\n")
-                f.write(f"- **Type**: {cam.get('type', 'N/A')}\n")
-                f.write(f"- **CSI Lanes**: {cam.get('csi_lanes', 'N/A')}\n")
-                f.write(f"- **I2C Address**: {cam.get('i2c_addr', 'N/A')}\n")
                 if 'notes' in cam:
                     f.write(f"- **Notes**: {cam['notes']}\n")
+                for res_entry in db_cam.get('resolutions', []):
+                    lanes = res_entry['data_lanes']
+                    f.write(f"\n**{res_entry['res']}** — {lanes} CSI lane(s)\n\n")
+                    f.write("| Pixel Format | Pixel Clock | CSI Clock |\n")
+                    f.write("| --- | --- | --- |\n")
+                    for mode in res_entry['modes']:
+                        pix_mhz = mode['pix_clk_hz'] / 1e6
+                        pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
+                        f.write(f"| {mode['pixel_format']} | {pix_str} MHz | {mode['csi_clock_mhz']} MHz |\n")
                 f.write("\n")
 
         print(f"✅ Markdown matrix generated: {output_file}")
@@ -330,6 +360,32 @@ class DeploymentMatrixGenerator:
             font-size: 0.9em;
         }}
 
+        .camera-card table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0 10px 0;
+            font-size: 0.85em;
+        }}
+
+        .camera-card th, .camera-card td {{
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }}
+
+        .camera-card th {{
+            background: #ecf0f1;
+            color: #2c3e50;
+            font-size: 0.85em;
+        }}
+
+        .res-title {{
+            font-weight: 600;
+            margin: 10px 0 4px 0;
+            font-size: 0.9em;
+            color: #34495e;
+        }}
+
         .icon {{
             font-size: 1.2em;
             margin-right: 5px;
@@ -448,14 +504,24 @@ class DeploymentMatrixGenerator:
 
         for cam_id in camera_ids:
             cam = self.data['cameras'][cam_id]
+            db_cam = self.camera_db['cameras'].get(cam_id, {})
             notes_html = f"<p><strong>Notes:</strong> {cam.get('notes', 'N/A')}</p>" if 'notes' in cam else ""
+
+            resolutions_html = ""
+            for res_entry in db_cam.get('resolutions', []):
+                lanes = res_entry['data_lanes']
+                resolutions_html += f'<p class="res-title">{res_entry["res"]} — {lanes} CSI lane(s)</p>\n'
+                resolutions_html += '<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>\n'
+                for mode in res_entry['modes']:
+                    pix_mhz = mode['pix_clk_hz'] / 1e6
+                    pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
+                    resolutions_html += f'<tr><td>{mode["pixel_format"]}</td><td>{pix_str} MHz</td><td>{mode["csi_clock_mhz"]} MHz</td></tr>\n'
+                resolutions_html += '</tbody></table>\n'
 
             html_content += f"""            <div class="camera-card">
                 <h4>{cam['name']}</h4>
-                <p><strong>Type:</strong> {cam.get('type', 'N/A')}</p>
-                <p><strong>CSI Lanes:</strong> {cam.get('csi_lanes', 'N/A')}</p>
-                <p><strong>I2C Address:</strong> <code>{cam.get('i2c_addr', 'N/A')}</code></p>
                 {notes_html}
+                {resolutions_html}
             </div>
 """
 

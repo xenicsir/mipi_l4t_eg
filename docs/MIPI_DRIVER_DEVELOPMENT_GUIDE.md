@@ -50,6 +50,26 @@ When Layer 2 and Layer 3 both modify the same file (e.g., a Makefile), a **3-way
 - **You only need to modify files in `Linux_for_Tegra/` (generic)**. Vendor-specific Makefiles will automatically inherit additions via the merge.
 - Only add files to `Linux_for_Tegra_<vendor>/` when the vendor needs **different** content (e.g., vendor-specific defconfigs, device trees).
 
+### eg_config.yaml structure
+
+`eg_config.yaml` is the single source of truth for the build system. It contains the following top-level sections:
+
+| Section | Purpose |
+|---------|---------|
+| `versions` | L4T version registry: BSP download URLs, toolchain, vendor list, `platform_ids` |
+| `vendors` | Vendor definitions: list of carriers, default carrier |
+| `carriers` | Carrier board definitions: defconfig name, directory suffix |
+| `pixel_format_map` | Maps pixel format names (`Y16`, `RGB888`, …) to DT field values (`mode_type`, `pixel_phase`, `csi_pixel_bit_depth`) |
+| `platform_restrictions` | Per-platform unsupported formats (e.g. `nano_t210` cannot do `Y16`) |
+| `dtsi_platforms` | DTSI files to verify: path relative to `sources/common/source/`, `num_cams`, associated `platform_ids`, EC overlay pattern |
+| `cameras` | Camera specifications: resolutions, data lanes, modes, DT timing fields (`line_length`, `pix_clk_hz`, …) |
+
+The last four sections feed `tools/verify_dtsi_structure.py`, which cross-checks every DTSI file against the expected modes and DT field values on every build.
+
+`pixel_format_map` and `platform_restrictions` are global and version-independent. `dtsi_platforms` and `cameras` are also global — they describe the shared DTSI files in `sources/common/source/`, not per-version files.
+
+After any scenario that adds or validates camera support, update `deployment_matrix_data.yaml` to record `tested` entries for the verified (platform, camera, L4T version) combinations. Until then, the deployment matrix shows ⚠️ `theoretically_supported` for combinations derived from `platform_ids`.
+
 ### Device tree file conventions
 
 | Element | L4T 32.x/35.x | L4T 36.x |
@@ -223,12 +243,53 @@ Add to `CAMERA_DATABASE`:
 *<Camera>*|*<camera>*) cam_type="<Camera>" ;;
 ```
 
-### Step 8: Regenerate patches
+### Step 8: Update eg_config.yaml
+
+The DTSI verification tool (`verify_dtsi_structure.py`) and the deployment matrix both derive their data from `eg_config.yaml`. Three sections may need updating:
+
+**`pixel_format_map`** — only if the camera uses a pixel format not already listed (e.g., a new raw depth). Add an entry mapping the format name to its DT fields:
+
+```yaml
+pixel_format_map:
+  <FORMAT>: {mode_type: "raw", pixel_phase: "<phase>", csi_pixel_bit_depth: <N>}
+```
+
+**`cameras`** — add a complete entry describing every resolution and mode the camera exposes:
+
+```yaml
+cameras:
+  <camera_id>:
+    name: "<Display Name>"
+    dt_node_label_prefix: "<camera>_cam"   # matches label in DTSI: <camera>_cam0, _cam1, …
+    resolutions:
+      - res: "<W>x<H>"
+        active_w: <W>
+        active_h: <H>
+        data_lanes: <N>
+        discontinuous_clk: "no"            # or "yes"
+        modes:
+          - pixel_format: "<FORMAT>"       # must exist in pixel_format_map
+            line_length: <value>
+            pix_clk_hz: <value>
+            csi_clock_mhz: <value>
+```
+
+For EC-based cameras (EngineCore), also add:
+```yaml
+    ec_overlay_variant: "1-lane"           # or "2-lanes"
+    ec_dtsi_mode_labels: [EC_MODE_WxH_FORMAT, …]   # comment labels in the eg_ec node
+```
+
+**`dtsi_platforms`** — only if a new DTSI file was created for a new hardware family (Scenario C). For an existing platform, no change is needed here.
+
+Once updated, the next build will run `verify_dtsi_structure.py` automatically and report any mismatch between the DTSI and `eg_config.yaml`. Use `--no-verify-dtsi` to skip this check during active DT development.
+
+### Step 9: Build
 
 ```bash
-./l4t_copy_sources.sh -v <version>
-# Repeat for each supported version
+./l4t_make.sh -v <BSP version>
 ```
+
 
 ---
 
@@ -333,11 +394,13 @@ Also add to all vendor defconfigs in `Linux_for_Tegra_<vendor>/source/public/ker
 CONFIG_VIDEO_<CAMERA>=m
 ```
 
-### Step 7: Regenerate patches
+### Step 7: Build
 
 ```bash
-./l4t_copy_sources.sh -v <target_version>
+./l4t_make.sh -v <BSP version>
 ```
+
+Note: `eg_config.yaml` does not need to be modified for this scenario — the camera is already in `cameras:`, the target DTSI platform is already in `dtsi_platforms:`, and the target version's `platform_ids` already lists the relevant platforms.
 
 ---
 
@@ -416,36 +479,50 @@ dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dtbo
 
 2. **For vendor boards**: add vendor-specific defconfigs if kernel config differs
 
-3. **Update `l4t_versions.json`** to register the new vendor/carrier board:
+3. **Update `eg_config.yaml`** to register the new vendor/carrier board and its DTSI:
 
-```json
-{
-  "vendors": {
-    "<vendor>": {
-      "carriers": ["<carrier_board>"],
-      "default_carrier": "<carrier_board>"
-    }
-  },
-  "carriers": {
-    "<carrier_board>": {
-      "defconfig": "<vendor>_defconfig",
-      "dir_suffix": "<carrier_board>"
-    }
-  }
-}
+```yaml
+vendors:
+  <vendor>:
+    carriers: [<carrier_board>]
+    default_carrier: <carrier_board>
+
+carriers:
+  <carrier_board>:
+    defconfig: <vendor>_defconfig
+    dir_suffix: <carrier_board>
 ```
+
+Add the new platform to `dtsi_platforms` so that `verify_dtsi_structure.py` checks the new DTSI on every build:
+
+```yaml
+dtsi_platforms:
+  <platform_key>:
+    dtsi: "hardware_36+/nvidia/t23x/nv-public/overlay/<common-dtsi-file>.dtsi"
+    num_cams: <N>                             # number of camera ports
+    platform_ids: [<platform_id>, …]          # links to versions.*.platform_ids
+    ec_overlay_cam0_pattern: "hardware_36+/.../tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-{variant}.dts"
+```
+
+If the new hardware has format restrictions (e.g., no Y16 support), add an entry to `platform_restrictions`:
+
+```yaml
+platform_restrictions:
+  <platform_id>:
+    unsupported_formats: [Y16]
+```
+
+Finally, add the new `platform_id` to the `platform_ids` list of each supported L4T version in `versions:`. This automatically populates `theoretically_supported` cells in the deployment matrix for all cameras on this platform.
 
 ### Step 4: Update target scripts
 
 - **`eg_dt_camera_config_set.sh`**: If the board uses different x4 lane constraints, update the validation logic
 - **`eg_dt_camera_config_get.sh`**: No change needed (camera database is board-independent)
 
-### Step 5: Regenerate patches
+### Step 5: Build
 
 ```bash
-./l4t_copy_sources.sh -v <version>
-# Repeat for vendor builds:
-./l4t_copy_sources.sh -v <version> -V <vendor>
+./l4t_make.sh
 ```
 
 ---
@@ -454,44 +531,38 @@ dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dtbo
 
 This covers adding support for an entirely new L4T version (e.g., 36.5.0) that is not yet in the build system.
 
-### Step 1: Update l4t_versions.json
+### Step 1: Update eg_config.yaml
 
-Add the new version entry with BSP download URLs, toolchain info, and vendor list:
+Add the new version entry with BSP download URLs, toolchain info, vendor list, and supported platforms:
 
-```json
-{
-  "versions": {
-    "36.5.0": {
-      "vendors": ["generic", "forecr"],
-      "sources": {
-        "public": {
-          "filename": "public_sources.tbz2",
-          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/sources/public_sources.tbz2"
-        },
-        "release": {
-          "filename": "jetson_linux_r36.5.0_aarch64.tbz2",
-          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/jetson_linux_r36.5.0_aarch64.tbz2"
-        },
-        "sample_fs": {
-          "filename": "tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2",
-          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2"
-        }
-      },
-      "toolchain": {
-        "archive": "aarch64--glibc--stable-2022.08-1.tar.bz2",
-        "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2",
-        "dir": "aarch64--glibc--stable-2022.08-1",
-        "prefix": "aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-"
-      },
-      "standalone": {
-        "forecr": {
-          "dsboard_ornx": true
-        }
-      }
-    }
-  }
-}
+```yaml
+versions:
+  "36.5.0":
+    platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]  # platforms supported by this version
+    vendors: [generic, forecr]
+    standalone:
+      forecr: {dsboard_ornx: true}
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r36.5.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/jetson_linux_r36.5.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-2022.08-1.tar.bz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2
+      dir: aarch64--glibc--stable-2022.08-1
+      prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
 ```
+
+Once `platform_ids` is set, `generate_deployment_matrix.py` automatically populates `theoretically_supported` cells for all cameras on those platforms.
+
+No changes are needed to `dtsi_platforms`, `cameras`, `pixel_format_map`, or `platform_restrictions` — those sections describe the shared DTSI files in `sources/common/source/`, which are version-independent.
 
 Download URLs can be found on the [NVIDIA L4T Archive](https://developer.nvidia.com/embedded/jetson-linux-archive).
 
@@ -537,12 +608,10 @@ Fix any compilation errors. Common issues:
 - Device tree binding changes (new required properties)
 - Makefile structure changes (new directories, renamed targets)
 
-### Step 5: Regenerate patches
+### Step 5: Build
 
 ```bash
-./l4t_copy_sources.sh -v <new_version>
-# Repeat for vendor builds:
-./l4t_copy_sources.sh -v <new_version> -V <vendor>
+./l4t_make.sh -v <BSP version>
 ```
 
 ---

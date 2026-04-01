@@ -154,6 +154,32 @@
             font-size: 0.9em;
         }
 
+        .camera-card table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0 10px 0;
+            font-size: 0.85em;
+        }
+
+        .camera-card th, .camera-card td {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .camera-card th {
+            background: #ecf0f1;
+            color: #2c3e50;
+            font-size: 0.85em;
+        }
+
+        .res-title {
+            font-weight: 600;
+            margin: 10px 0 4px 0;
+            font-size: 0.9em;
+            color: #34495e;
+        }
+
         .icon {
             font-size: 1.2em;
             margin-right: 5px;
@@ -162,7 +188,7 @@
 </head>
 <body>
     <h1>🎥 MIPI Camera Deployment Matrix</h1>
-    <div class="timestamp">Generated: 2026-03-03 09:56:23</div>
+    <div class="timestamp">Generated: 2026-04-01 14:26:14</div>
 
     <div class="legend">
         <h3>Legend</h3>
@@ -175,6 +201,7 @@
     <div class="platform-section">
         <h2 class="platform-name">Jetson Nano (T210)</h2>
         <p><strong>Jetson Nano developer kit</strong></p>
+        <div class="platform-notes">📌 <strong>Note:</strong> ⚠️ Y16 pixel format is not supported on this platform (T210 / Tegra X1 hardware limitation).</div>
         <p style="color: #666; font-size: 0.9em;">
             <strong>L4T Series:</strong> 32.x |
             <strong>SoM:</strong> Tegra X1 |
@@ -184,8 +211,8 @@
             <thead>
                 <tr>
                     <th>L4T Version</th>
-                    <th colspan='3'>Dione IR</th>
-                    <th colspan='3'>MicroCube640</th>
+                    <th colspan='3'>Dione</th>
+                    <th colspan='3'>MicroCube</th>
                     <th colspan='3'>Crius1280</th>
                     <th colspan='3'>SmartIR640</th>
                     <th colspan='3'>iLumos</th>
@@ -243,15 +270,19 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-nano-l4t-32.7.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-l4t-32.7.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-l4t-32.7.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-l4t-32.7.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-l4t-32.7.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">32.7.4</td>
@@ -260,15 +291,19 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-nano-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">32.7.5</td>
@@ -277,15 +312,19 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-nano-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.5" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.5" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.5" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">32.7.6</td>
@@ -294,15 +333,19 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-nano-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.6" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.6" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.6" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">35.1</td>
@@ -368,6 +411,15 @@
                     <td class="status-empty" colspan="3">—</td>
                 </tr>
                 <tr>
+                    <td class="version-cell">35.6.4</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                </tr>
+                <tr>
                     <td class="version-cell">36.4</td>
                     <td class="status-empty" colspan="3">—</td>
                     <td class="status-empty" colspan="3">—</td>
@@ -394,12 +446,21 @@
                     <td class="status-empty" colspan="3">—</td>
                     <td class="status-empty" colspan="3">—</td>
                 </tr>
+                <tr>
+                    <td class="version-cell">36.5.0</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                </tr>
             </tbody>
         </table>
     </div>
 
     <div class="platform-section">
-        <h2 class="platform-name">Xavier NX</h2>
+        <h2 class="platform-name">Xavier NX (T194)</h2>
         <p><strong>Jetson Xavier NX developer kit</strong></p>
         <p style="color: #666; font-size: 0.9em;">
             <strong>L4T Series:</strong> 32.x, 35.x |
@@ -410,8 +471,8 @@
             <thead>
                 <tr>
                     <th>L4T Version</th>
-                    <th colspan='3'>Dione IR</th>
-                    <th colspan='3'>MicroCube640</th>
+                    <th colspan='3'>Dione</th>
+                    <th colspan='3'>MicroCube</th>
                     <th colspan='3'>Crius1280</th>
                     <th colspan='3'>SmartIR640</th>
                     <th colspan='3'>iLumos</th>
@@ -476,8 +537,12 @@
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell">—</td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">32.7.4</td>
@@ -486,15 +551,19 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-xnx-l4t-32.7.4.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">32.7.5</td>
@@ -503,15 +572,19 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.5" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.5" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.5" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-xnx-l4t-32.7.5.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">32.7.6</td>
@@ -520,26 +593,40 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.6" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.6" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-32.7.6" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-xnx-l4t-32.7.6.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">35.1</td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
-                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell">—</td>
+                    <td class="link-cell">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">35.3.1</td>
@@ -548,7 +635,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -569,7 +656,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -590,7 +677,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -611,7 +698,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -632,7 +719,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -653,7 +740,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-xnx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
@@ -666,6 +753,27 @@
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-xnx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
+                    <td class="version-cell">35.6.4</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-xnx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-xnx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-xnx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-xnx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-xnx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-xnx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
                 <tr>
                     <td class="version-cell">36.4</td>
@@ -694,6 +802,15 @@
                     <td class="status-empty" colspan="3">—</td>
                     <td class="status-empty" colspan="3">—</td>
                 </tr>
+                <tr>
+                    <td class="version-cell">36.5.0</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -711,8 +828,8 @@
             <thead>
                 <tr>
                     <th>L4T Version</th>
-                    <th colspan='3'>Dione IR</th>
-                    <th colspan='3'>MicroCube640</th>
+                    <th colspan='3'>Dione</th>
+                    <th colspan='3'>MicroCube</th>
                     <th colspan='3'>Crius1280</th>
                     <th colspan='3'>SmartIR640</th>
                     <th colspan='3'>iLumos</th>
@@ -811,7 +928,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -832,7 +949,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -853,7 +970,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -874,7 +991,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -895,7 +1012,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -916,7 +1033,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
@@ -931,13 +1048,34 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-orin-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
                 <tr>
+                    <td class="version-cell">35.6.4</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-orin-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-orin-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-orin-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
                     <td class="version-cell">36.4</td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -958,7 +1096,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
@@ -979,7 +1117,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-orin-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -992,6 +1130,27 @@
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-orin-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
+                    <td class="version-cell">36.5.0</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-orin-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-orin-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-orin-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-orin-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-orin-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-orin-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
             </tbody>
         </table>
@@ -1010,8 +1169,8 @@
             <thead>
                 <tr>
                     <th>L4T Version</th>
-                    <th colspan='3'>Dione IR</th>
-                    <th colspan='3'>MicroCube640</th>
+                    <th colspan='3'>Dione</th>
+                    <th colspan='3'>MicroCube</th>
                     <th colspan='3'>Crius1280</th>
                     <th colspan='3'>SmartIR640</th>
                     <th colspan='3'>iLumos</th>
@@ -1110,7 +1269,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-auvidea-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1131,7 +1290,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-auvidea-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1147,87 +1306,48 @@
                 </tr>
                 <tr>
                     <td class="version-cell">35.5.0</td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-auvidea-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-auvidea-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-auvidea-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">35.6.0</td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-auvidea-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-auvidea-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-auvidea-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">35.6.1</td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-auvidea-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-auvidea-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-auvidea-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">35.6.2</td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-auvidea-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-auvidea-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
-                    <td class="status-tested"><span class="icon">✅</span> Tested</td>
-                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-auvidea-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                </tr>
+                <tr>
+                    <td class="version-cell">35.6.4</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
                 </tr>
                 <tr>
                     <td class="version-cell">36.4</td>
@@ -1236,7 +1356,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-auvidea-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -1257,7 +1377,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-auvidea-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
@@ -1278,7 +1398,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-auvidea-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-auvidea-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-auvidea-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-auvidea-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -1291,6 +1411,15 @@
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-auvidea-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
+                    <td class="version-cell">36.5.0</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
+                    <td class="status-empty" colspan="3">—</td>
                 </tr>
             </tbody>
         </table>
@@ -1308,8 +1437,8 @@
             <thead>
                 <tr>
                     <th>L4T Version</th>
-                    <th colspan='3'>Dione IR</th>
-                    <th colspan='3'>MicroCube640</th>
+                    <th colspan='3'>Dione</th>
+                    <th colspan='3'>MicroCube</th>
                     <th colspan='3'>Crius1280</th>
                     <th colspan='3'>SmartIR640</th>
                     <th colspan='3'>iLumos</th>
@@ -1408,7 +1537,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1429,7 +1558,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1450,7 +1579,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -1471,7 +1600,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -1492,7 +1621,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1513,7 +1642,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
@@ -1528,13 +1657,34 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-ornx-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
                 <tr>
+                    <td class="version-cell">35.6.4</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-ornx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-ornx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-ornx-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
                     <td class="version-cell">36.4</td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -1555,7 +1705,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
@@ -1576,7 +1726,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-ornx-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -1589,6 +1739,27 @@
                     <td class="status-tested"><span class="icon">✅</span> Tested</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-ornx-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
+                    <td class="version-cell">36.5.0</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-ornx-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-ornx-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-ornx-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-ornx-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-ornx-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-ornx-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
             </tbody>
         </table>
@@ -1607,8 +1778,8 @@
             <thead>
                 <tr>
                     <th>L4T Version</th>
-                    <th colspan='3'>Dione IR</th>
-                    <th colspan='3'>MicroCube640</th>
+                    <th colspan='3'>Dione</th>
+                    <th colspan='3'>MicroCube</th>
                     <th colspan='3'>Crius1280</th>
                     <th colspan='3'>SmartIR640</th>
                     <th colspan='3'>iLumos</th>
@@ -1707,7 +1878,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.3.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.3.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1728,7 +1899,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.4.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.4.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1749,7 +1920,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.5.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.5.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -1770,7 +1941,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.0" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.6.0.deb" target="_blank" title="Download package">📦</a></td>
@@ -1791,7 +1962,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.1" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.6.1.deb" target="_blank" title="Download package">📦</a></td>
@@ -1812,7 +1983,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.2" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
@@ -1827,13 +1998,34 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-forecr-l4t-35.6.2.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
                 <tr>
+                    <td class="version-cell">35.6.4</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-forecr-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-forecr-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-35.6.4" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-forecr-l4t-35.6.4.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
+                <tr>
                     <td class="version-cell">36.4</td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-36.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -1854,7 +2046,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.3" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-36.4.3.deb" target="_blank" title="Download package">📦</a></td>
@@ -1875,7 +2067,7 @@
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
-                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube640-forecr-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                     <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
@@ -1889,6 +2081,27 @@
                     <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.4.4" target="_blank" title="Git branch">🔗</a></td>
                     <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-forecr-l4t-36.4.4.deb" target="_blank" title="Download package">📦</a></td>
                 </tr>
+                <tr>
+                    <td class="version-cell">36.5.0</td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/dione-forecr-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microcube-forecr-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/crius1280-forecr-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/smartir640-forecr-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/ilumos-forecr-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                    <td class="status-theoretical"><span class="icon">⚠️</span> Theoretically Supported</td>
+                    <td class="link-cell"><a href="https://github.com/xenicsir/mipi_l4t_eg/tree/l4t-36.5.0" target="_blank" title="Git branch">🔗</a></td>
+                    <td class="link-cell"><a href="https://releases.example.com/mipi-drivers/microlynx-forecr-l4t-36.5.0.deb" target="_blank" title="Download package">📦</a></td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -1897,46 +2110,88 @@
         <h2>📸 Camera Details</h2>
         <div class="camera-details">
             <div class="camera-card">
-                <h4>Dione IR</h4>
-                <p><strong>Type:</strong> Thermal IR Camera</p>
-                <p><strong>CSI Lanes:</strong> 2</p>
-                <p><strong>I2C Address:</strong> <code>0x40</code></p>
+                <h4>Dione</h4>
                 
+                <p class="res-title">640x480 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>RGB888</td><td>20 MHz</td><td>120 MHz</td></tr>
+</tbody></table>
+<p class="res-title">1280x1024 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>RGB888</td><td>83 MHz</td><td>498 MHz</td></tr>
+</tbody></table>
+<p class="res-title">320x240 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>RGB888</td><td>20 MHz</td><td>120 MHz</td></tr>
+</tbody></table>
+<p class="res-title">1024x768 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>RGB888</td><td>83 MHz</td><td>498 MHz</td></tr>
+</tbody></table>
+
             </div>
             <div class="camera-card">
-                <h4>MicroCube640</h4>
-                <p><strong>Type:</strong> VGA Thermal</p>
-                <p><strong>CSI Lanes:</strong> 2</p>
-                <p><strong>I2C Address:</strong> <code>0x51</code></p>
+                <h4>MicroCube</h4>
                 
+                <p class="res-title">640x480 — 1 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>20 MHz</td><td>160 MHz</td></tr>
+<tr><td>RGB888</td><td>20 MHz</td><td>240 MHz</td></tr>
+<tr><td>YUYV</td><td>20 MHz</td><td>160 MHz</td></tr>
+</tbody></table>
+
             </div>
             <div class="camera-card">
                 <h4>Crius1280</h4>
-                <p><strong>Type:</strong> LWIR</p>
-                <p><strong>CSI Lanes:</strong> 2</p>
-                <p><strong>I2C Address:</strong> <code>0x52</code></p>
                 
+                <p class="res-title">1280x1024 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>100 MHz</td><td>400 MHz</td></tr>
+<tr><td>RGB888</td><td>133.3 MHz</td><td>800 MHz</td></tr>
+<tr><td>YUYV</td><td>100 MHz</td><td>400 MHz</td></tr>
+</tbody></table>
+
             </div>
             <div class="camera-card">
                 <h4>SmartIR640</h4>
-                <p><strong>Type:</strong> Thermal IR</p>
-                <p><strong>CSI Lanes:</strong> 2</p>
-                <p><strong>I2C Address:</strong> <code>0x53</code></p>
                 
+                <p class="res-title">640x480 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>100 MHz</td><td>400 MHz</td></tr>
+<tr><td>RGB888</td><td>100 MHz</td><td>600 MHz</td></tr>
+<tr><td>YUYV</td><td>100 MHz</td><td>400 MHz</td></tr>
+</tbody></table>
+
             </div>
             <div class="camera-card">
                 <h4>iLumos</h4>
-                <p><strong>Type:</strong> Multi-Object Thermal</p>
-                <p><strong>CSI Lanes:</strong> 2</p>
-                <p><strong>I2C Address:</strong> <code>0x30</code></p>
-                <p><strong>Notes:</strong> Core + GenCP multi-object</p>
+                
+                <p class="res-title">2048x2048 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>100 MHz</td><td>450 MHz</td></tr>
+<tr><td>Y14</td><td>100 MHz</td><td>450 MHz</td></tr>
+</tbody></table>
+<p class="res-title">2048x1088 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>100 MHz</td><td>450 MHz</td></tr>
+<tr><td>Y14</td><td>100 MHz</td><td>450 MHz</td></tr>
+</tbody></table>
+<p class="res-title">1280x1024 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>51 MHz</td><td>149.5 MHz</td></tr>
+<tr><td>Y14</td><td>100 MHz</td><td>450 MHz</td></tr>
+</tbody></table>
+
             </div>
             <div class="camera-card">
                 <h4>Microlynx</h4>
-                <p><strong>Type:</strong> Thermal</p>
-                <p><strong>CSI Lanes:</strong> 2</p>
-                <p><strong>I2C Address:</strong> <code>0x51</code></p>
-                <p><strong>Notes:</strong> Core + GenCP multi-object</p>
+                
+                <p class="res-title">1024x128 — 2 CSI lane(s)</p>
+<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>
+<tr><td>Y16</td><td>87.5 MHz</td><td>350 MHz</td></tr>
+<tr><td>Y14</td><td>100 MHz</td><td>350 MHz</td></tr>
+</tbody></table>
+
             </div>
         </div>
     </div>

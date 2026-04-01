@@ -1,0 +1,623 @@
+# eg_config.yaml — EG MIPI camera project unified configuration
+#
+# This file merges two former files:
+#   - l4t_versions.json  (L4T build system: versions, vendors, carriers)
+#   - camera_db.yaml     (camera technical database: formats, DTSIs, modes)
+#
+# Sections:
+#   versions, vendors, carriers  — L4T BSP build configuration
+#   pixel_format_map             — pixel format → DT field mapping
+#   platform_restrictions        — per-platform format restrictions
+#   dtsi_platforms               — DTSI file locations and EC overlay patterns
+#   cameras                      — per-camera resolutions, modes, clocks
+#
+# Consumed by:
+#   tools/egcfg.py               — CLI query helper for bash scripts
+#   l4t_environment.sh           — via egcfg.py
+#   tools/l4t_completion.bash    — via egcfg.py
+#   tools/verify_dtsi_structure.py
+#   generate_deployment_matrix.py
+
+# ---------------------------------------------------------------------------
+# L4T versions
+#
+# platform_ids: deployment platforms supported by this version
+#   nano_t210          Jetson Nano (T210 / 32.x only)
+#   xavier_nx          Jetson Xavier NX (32.x, 35.x)
+#   agx_orin_devkit    AGX Orin developer kit (35.3.1+, 36.x)
+#   agx_orin_x230d     Auvidea X230D AGX Orin (35.3.1+, 36.x)
+#   orin_nx_nano_devkit Orin NX / Nano devkit (35.3.1+, 36.x)
+#   forecr_ornxs       Forecr DSBOARD ORNXS (35.3.1+, 36.x)
+# ---------------------------------------------------------------------------
+versions:
+  "32.7.1":
+    platform_ids: [nano_t210, xavier_nx]
+    vendors: [generic]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.1/sources/t210/public_sources.tbz2
+      release:
+        filename: jetson-210_linux_r32.7.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.1/t210/jetson-210_linux_r32.7.1_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r32.7.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.1/t210/tegra_linux_sample-root-filesystem_r32.7.1_aarch64.tbz2
+    toolchain:
+      archive: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+      url: https://developer.nvidia.com/embedded/dlc/l4t-gcc-7-3-1-toolchain-64-bit
+      dir: l4t-gcc
+      prefix: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+
+  "32.7.4":
+    platform_ids: [nano_t210, xavier_nx]
+    vendors: [generic]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.4/sources/t210/public_sources.tbz2
+      release:
+        filename: jetson-210_linux_r32.7.4_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.4/t210/jetson-210_linux_r32.7.4_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r32.7.4_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.4/t210/tegra_linux_sample-root-filesystem_r32.7.4_aarch64.tbz2
+    toolchain:
+      archive: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+      url: https://developer.nvidia.com/embedded/dlc/l4t-gcc-7-3-1-toolchain-64-bit
+      dir: l4t-gcc
+      prefix: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+
+  "32.7.5":
+    platform_ids: [nano_t210, xavier_nx]
+    vendors: [generic]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.5/sources/t210/public_sources.tbz2
+      release:
+        filename: jetson-210_linux_r32.7.5_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.5/t210/jetson-210_linux_r32.7.5_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r32.7.5_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.5/t210/tegra_linux_sample-root-filesystem_r32.7.5_aarch64.tbz2
+    toolchain:
+      archive: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+      url: https://developer.nvidia.com/embedded/dlc/l4t-gcc-7-3-1-toolchain-64-bit
+      dir: l4t-gcc
+      prefix: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+
+  "32.7.6":
+    platform_ids: [nano_t210, xavier_nx]
+    vendors: [generic]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.6/sources/t210/public_sources.tbz2
+      release:
+        filename: jetson-210_linux_r32.7.6_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.6/t210/jetson-210_linux_r32.7.6_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r32.7.6_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r32_release_v7.6/t210/tegra_linux_sample-root-filesystem_r32.7.6_aarch64.tbz2
+    toolchain:
+      archive: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
+      url: https://developer.nvidia.com/embedded/dlc/l4t-gcc-7-3-1-toolchain-64-bit
+      dir: l4t-gcc
+      prefix: gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+
+  "35.1":
+    platform_ids: [xavier_nx]
+    vendors: [generic]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.1.0_aarch64.tbz2
+        url: https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/release/jetson_linux_r35.1.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.1.0_aarch64.tbz2
+        url: https://developer.nvidia.com/embedded/l4t/r35_release_v1.0/release/tegra_linux_sample-root-filesystem_r35.1.0_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.3.1":
+    platform_ids: [xavier_nx, agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.3.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/release/jetson_linux_r35.3.1_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.3.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v3.1/release/tegra_linux_sample-root-filesystem_r35.3.1_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.4.1":
+    platform_ids: [xavier_nx, agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.4.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/release/jetson_linux_r35.4.1_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.4.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v4.1/release/tegra_linux_sample-root-filesystem_r35.4.1_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.5.0":
+    platform_ids: [xavier_nx, agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.5.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/release/jetson_linux_r35.5.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.5.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v5.0/release/tegra_linux_sample-root-filesystem_r35.5.0_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.6.0":
+    platform_ids: [xavier_nx, agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.6.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.0/release/jetson_linux_r35.6.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.6.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.0/release/tegra_linux_sample-root-filesystem_r35.6.0_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.6.1":
+    platform_ids: [xavier_nx, agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.1/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.6.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.1/release/jetson_linux_r35.6.1_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.6.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.1/tegra_linux_sample-root-filesystem_r35.6.1_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.6.2":
+    platform_ids: [xavier_nx, agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.2/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.6.2_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.2/release/jetson_linux_r35.6.2_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.6.2_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.2/tegra_linux_sample-root-filesystem_r35.6.2_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "35.6.4":
+    platform_ids: [xavier_nx, agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.4/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r35.6.4_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.4/release/jetson_linux_r35.6.4_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r35.6.4_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r35_release_v6.4/release/tegra_linux_sample-root-filesystem_r35.6.4_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-final.tar.gz
+      url: https://developer.nvidia.com/embedded/jetson-linux/bootlin-toolchain-gcc-93
+      dir: l4t-gcc
+      prefix: bin/aarch64-buildroot-linux-gnu-
+
+  "36.4":
+    platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    standalone:
+      forecr: {dsboard_ornx: true}
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r36.4.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/release/jetson_linux_r36.4.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r36.4.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.0/release/tegra_linux_sample-root-filesystem_r36.4.0_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-2022.08-1.tar.bz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2
+      dir: aarch64--glibc--stable-2022.08-1
+      prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
+
+  "36.4.3":
+    platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    standalone:
+      forecr: {dsboard_ornx: true}
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r36.4.3_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/release/jetson_linux_r36.4.3_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r36.4.3_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.3/release/tegra_linux_sample-root-filesystem_r36.4.3_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-2022.08-1.tar.bz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2
+      dir: aarch64--glibc--stable-2022.08-1
+      prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
+
+  "36.4.4":
+    platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    standalone:
+      forecr: {dsboard_ornx: true}
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r36.4.4_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/release/jetson_linux_r36.4.4_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r36.4.4_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v4.4/release/tegra_linux_sample-root-filesystem_r36.4.4_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-2022.08-1.tar.bz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2
+      dir: aarch64--glibc--stable-2022.08-1
+      prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
+
+  "36.5.0":
+    platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]
+    vendors: [generic, forecr]
+    standalone:
+      forecr: {dsboard_ornx: true}
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r36.5.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/jetson_linux_r36.5.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-2022.08-1.tar.bz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2
+      dir: aarch64--glibc--stable-2022.08-1
+      prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
+
+# ---------------------------------------------------------------------------
+# Vendors and carriers
+# ---------------------------------------------------------------------------
+vendors:
+  generic:
+    carriers: [generic]
+    default_carrier: generic
+  forecr:
+    carriers: [dsboard_ornx]
+    default_carrier: dsboard_ornx
+
+carriers:
+  generic:
+    defconfig: tegra_defconfig
+    dir_suffix: ""
+  dsboard_ornx:
+    defconfig: dsboard_ornx_defconfig
+    dir_suffix: dsboard_ornx
+
+# ---------------------------------------------------------------------------
+# Pixel format → DT field mapping
+# ---------------------------------------------------------------------------
+pixel_format_map:
+  Y16:    {mode_type: "raw", pixel_phase: "grey",   csi_pixel_bit_depth: 16}
+  Y14:    {mode_type: "raw", pixel_phase: "grey",   csi_pixel_bit_depth: 14}
+  RGB888: {mode_type: "rgb", pixel_phase: "rgb888", csi_pixel_bit_depth: 24}
+  YUYV:   {mode_type: "yuv", pixel_phase: "yuyv",   csi_pixel_bit_depth: 16}
+
+# ---------------------------------------------------------------------------
+# Platform restrictions
+# ---------------------------------------------------------------------------
+platform_restrictions:
+  nano_t210:
+    unsupported_formats: [Y16]   # Y14 est supporté sur T210
+
+# ---------------------------------------------------------------------------
+# DTSI platforms
+# Paths are relative to sources/common/source/
+# ec_overlay_cam0_pattern: use {variant} → "1-lane" or "2-lanes"
+# ---------------------------------------------------------------------------
+dtsi_platforms:
+  porg:
+    dtsi: "hardware_32+/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi"
+    num_cams: 2
+    platform_ids: [nano_t210]
+    ec_overlay_cam0_pattern: "hardware_32+/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-eg-cam0-ec-{variant}.dts"
+
+  jakku:
+    dtsi: "hardware_32+/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi"
+    num_cams: 2
+    platform_ids: [xavier_nx]
+    ec_overlay_cam0_pattern: "hardware_32+/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-eg-cam0-ec-{variant}.dts"
+
+  concord:
+    dtsi: "hardware_32+/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi"
+    num_cams: 4
+    platform_ids: [agx_orin_devkit, agx_orin_x230d]
+    ec_overlay_cam0_pattern: "hardware_32+/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-eg-cam0-ec-{variant}.dts"
+
+  p3768:
+    dtsi: "hardware_32+/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi"
+    num_cams: 2
+    platform_ids: [orin_nx_nano_devkit, forecr_ornxs]
+    ec_overlay_cam0_pattern: "hardware_32+/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-p3768-eg-cam0-ec-{variant}.dts"
+
+  p3737-36:
+    dtsi: "hardware_36+/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi"
+    num_cams: 4
+    platform_ids: [agx_orin_devkit, agx_orin_x230d]
+    ec_overlay_cam0_pattern: "hardware_36+/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-eg-cam0-ec-{variant}.dts"
+
+  p3767-36:
+    dtsi: "hardware_36+/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi"
+    num_cams: 2
+    platform_ids: [orin_nx_nano_devkit, forecr_ornxs]
+    ec_overlay_cam0_pattern: "hardware_36+/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-{variant}.dts"
+
+# ---------------------------------------------------------------------------
+# Cameras
+#
+# dt_node_label_prefix: label prefix in DTSI (e.g. "microlynx_cam" → microlynx_cam0)
+# ec_overlay_variant: for EC-based cameras only — "1-lane" or "2-lanes"
+# ec_dtsi_mode_labels: expected comment labels in the eg_ec node (to match modes)
+# resolutions: list of resolutions, each with:
+#   - data_lanes: physical lane count (from overlay bus-width for EC cameras)
+#   - discontinuous_clk: from DTSI
+#   - modes: list of pixel formats with DT fields + display metadata
+# ---------------------------------------------------------------------------
+cameras:
+  dione_ir:
+    name: "Dione"
+    dt_node_label_prefix: "dione_ir_cam"
+    resolutions:
+      - res: "640x480"
+        active_w: 640
+        active_h: 480
+        data_lanes: 2
+        discontinuous_clk: "no"
+        modes:
+          - pixel_format: "RGB888"
+            line_length: 694
+            pix_clk_hz: 20000000
+            csi_clock_mhz: 120
+      - res: "1280x1024"
+        active_w: 1280
+        active_h: 1024
+        data_lanes: 2
+        discontinuous_clk: "no"
+        modes:
+          - pixel_format: "RGB888"
+            line_length: 1334
+            pix_clk_hz: 83000000
+            csi_clock_mhz: 498
+      - res: "320x240"
+        active_w: 320
+        active_h: 240
+        data_lanes: 2
+        discontinuous_clk: "no"
+        modes:
+          - pixel_format: "RGB888"
+            line_length: 1404
+            pix_clk_hz: 20000000
+            csi_clock_mhz: 120
+      - res: "1024x768"
+        active_w: 1024
+        active_h: 768
+        data_lanes: 2
+        discontinuous_clk: "no"
+        modes:
+          - pixel_format: "RGB888"
+            line_length: 1079
+            pix_clk_hz: 83000000
+            csi_clock_mhz: 498
+
+  microcube:
+    name: "MicroCube"
+    dt_node_label_prefix: "eg_ec_cam"
+    ec_overlay_variant: "1-lane"
+    # Which EC_MODE labels in the DTSI belong to this camera
+    ec_dtsi_mode_labels: [EC_MODE_640x480_RAW16, EC_MODE_640x480_RGB888, EC_MODE_640x480_YUYV]
+    resolutions:
+      - res: "640x480"
+        active_w: 640
+        active_h: 480
+        data_lanes: 1    # from overlay bus-width (ec-1-lane)
+        discontinuous_clk: "yes"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 640
+            pix_clk_hz: 20000000    # overridden by ec-1-lane overlay (DTSI has 100MHz)
+            csi_clock_mhz: 160
+          - pixel_format: "RGB888"
+            line_length: 640
+            pix_clk_hz: 20000000    # overridden by ec-1-lane overlay
+            csi_clock_mhz: 240
+          - pixel_format: "YUYV"
+            line_length: 640
+            pix_clk_hz: 20000000    # overridden by ec-1-lane overlay
+            csi_clock_mhz: 160
+
+  smartir640:
+    name: "SmartIR640"
+    dt_node_label_prefix: "eg_ec_cam"
+    ec_overlay_variant: "2-lanes"
+    ec_dtsi_mode_labels: [EC_MODE_640x480_RAW16, EC_MODE_640x480_RGB888, EC_MODE_640x480_YUYV]
+    resolutions:
+      - res: "640x480"
+        active_w: 640
+        active_h: 480
+        data_lanes: 2
+        discontinuous_clk: "yes"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 640
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 400
+          - pixel_format: "RGB888"
+            line_length: 640
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 600
+          - pixel_format: "YUYV"
+            line_length: 640
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 400
+
+  crius1280:
+    name: "Crius1280"
+    dt_node_label_prefix: "eg_ec_cam"
+    ec_overlay_variant: "2-lanes"
+    ec_dtsi_mode_labels: [EC_MODE_1280x1024_RAW16, EC_MODE_1280x1024_RGB888, EC_MODE_1280x1024_YUYV]
+    resolutions:
+      - res: "1280x1024"
+        active_w: 1280
+        active_h: 1024
+        data_lanes: 2
+        discontinuous_clk: "yes"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 1280
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 400
+          - pixel_format: "RGB888"
+            line_length: 1280
+            pix_clk_hz: 133333336
+            csi_clock_mhz: 800
+          - pixel_format: "YUYV"
+            line_length: 1280
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 400
+
+  ilumos:
+    name: "iLumos"
+    dt_node_label_prefix: "ilumos_cam"
+    resolutions:
+      - res: "2048x2048"
+        active_w: 2048
+        active_h: 2048
+        data_lanes: 2
+        discontinuous_clk: "yes"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 2048
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 450
+          - pixel_format: "Y14"
+            line_length: 2048
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 450
+      - res: "2048x1088"
+        active_w: 2048
+        active_h: 1088
+        data_lanes: 2
+        discontinuous_clk: "yes"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 2048
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 450
+          - pixel_format: "Y14"
+            line_length: 2048
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 450
+      - res: "1280x1024"
+        active_w: 1280
+        active_h: 1024
+        data_lanes: 2
+        discontinuous_clk: "yes"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 1280
+            pix_clk_hz: 51000000
+            csi_clock_mhz: 149.5
+          - pixel_format: "Y14"
+            line_length: 1280
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 450
+
+  microlynx:
+    name: "Microlynx"
+    dt_node_label_prefix: "microlynx_cam"
+    resolutions:
+      - res: "1024x128"
+        active_w: 1024
+        active_h: 128
+        data_lanes: 2
+        discontinuous_clk: "no"
+        modes:
+          - pixel_format: "Y16"
+            line_length: 1024
+            pix_clk_hz: 87500000    # 87.5 MHz → 350 MHz CSI / (2 lanes × 2 DDR / 16 bits)
+            csi_clock_mhz: 350
+          - pixel_format: "Y14"
+            line_length: 1024
+            pix_clk_hz: 100000000
+            csi_clock_mhz: 350

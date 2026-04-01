@@ -504,12 +504,12 @@ This appendix provides a summary of the integration scenarios. For detailed step
 1. Gather hardware info from schematics: CSI port mapping, I2C bus, GPIO, lane polarity
 2. Create common DTSI and per-camera overlay DTS files adapted from an existing platform
 3. Add dtbo targets to version-specific Makefiles
-4. Register the new vendor/carrier board in `l4t_versions.json`
+4. Register the new vendor/carrier board in `eg_config.yaml`
 5. Regenerate patches with `./l4t_copy_sources.sh`
 
 ### Scenario D: Adding support for a new Nvidia BSP version
 
-1. Add the new version to `l4t_versions.json` (BSP URLs, toolchain, vendors)
+1. Add the new version to `eg_config.yaml` (BSP URLs, toolchain, vendors)
 2. Copy the version-specific directory from the closest existing version
 3. Adapt Makefiles, Kconfig, defconfig, and device tree bindings as needed
 4. Build and fix compilation errors: `./l4t_make.sh -v <new_version> --prepare --copy-sources --build`

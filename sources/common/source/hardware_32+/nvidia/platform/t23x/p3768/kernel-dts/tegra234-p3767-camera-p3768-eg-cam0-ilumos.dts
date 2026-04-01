@@ -44,8 +44,8 @@
 	fragment@6 {
 		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
 		__overlay__ {
-			devname = "ilumos 8-0030";
-			proc-device-tree = "/proc/device-tree/i2c@31e0000/ilumos_b@30";
+			devname = "ilumos 9-0030";
+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/ilumos_b@30";
 		};
 	};
 

@@ -186,13 +186,13 @@ A blank cell means:
 - No data has been collected
 - **It does NOT mean "not supported"**
 
-Use `theoretically_supported` status if you want to explicitly indicate support without testing.
+`theoretically_supported` cells are **automatically generated** by `generate_deployment_matrix.py` for any (platform, camera, version) combination where the version's `platform_ids` in `eg_config.yaml` includes that platform. You only need to add explicit entries to `deployment_matrix_data.yaml` for `tested` results (or `not_supported` exceptions).
 
 ### Hardware Constraints
 
 Some combinations are impossible:
 
-- **T210 (Nano) cannot support iLumos/Microlynx** — Y16 pixel format not available
+- **T210 (Nano) cannot support Y16** — but Y14 works, so iLumos and Microlynx appear as theoretically supported (Y14 modes only)
 - **32.x L4T cannot support 36.x cameras** — Different driver architecture (in-tree vs out-of-tree)
 
 These are marked as empty cells (no data) rather than `not_supported`.
@@ -207,27 +207,24 @@ These are marked as empty cells (no data) rather than `not_supported`.
 
 When you add a new camera (e.g., "iLumos"):
 
-1. **Start with "empty" cells** (no data)
+1. **Add the version's `platform_ids`** in `eg_config.yaml` — all compatible platforms appear automatically as ⚠️
 2. **Test on primary platforms** (e.g., Auvidea X230D, Orin NX devkit)
-3. **Mark as ✅ Tested** on those platforms
-4. **Mark as ⚠️ Theoretically Supported** on architecturally compatible platforms you haven't tested
-5. **Update documentation** as you test more combinations
+3. **Add `tested` entries** in `deployment_matrix_data.yaml` for tested combinations
 
 Example progression:
 
 ```yaml
-# Day 1 - Just ported
-ilumos:
-  36.4.3: tested          # ← Only tested here
-  36.4.4: tested
+# eg_config.yaml — controls which platforms appear in the matrix
+"36.4.3":
+  platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs]
+  # → all cameras on all these platforms appear as ⚠️ automatically
 
-# Week 2 - Expanded testing
-ilumos:
-  35.6.2: tested          # ← Added 35.x support
-  35.6.1: tested
-  36.4: theoretically_supported  # ← Architecturally compatible, not tested
-  36.4.3: tested
-  36.4.4: tested
+# deployment_matrix_data.yaml — only tested results to add explicitly
+- platform: orin_nx_nano_devkit
+  cameras:
+    ilumos:
+      36.4.3: "tested|l4t-36.4.3|ilumos-ornx-l4t-36.4.3.deb"
+      36.4.4: "tested|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
 ```
 
 ## 🎯 For Clients

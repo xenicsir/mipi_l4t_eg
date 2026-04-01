@@ -10,7 +10,7 @@
 #   -V, --vendor VENDOR            Vendor: generic (default), forecr
 #   -c, --carrier-board BOARD      Carrier board (default depends on vendor)
 #   -s, --standalone               Build standalone kernel with -eg suffix
-#                                  (auto-enabled per l4t_versions.json config)
+#                                  (auto-enabled per eg_config.yaml config)
 #
 # The --standalone option creates a separate kernel version (e.g., 5.15.148-tegra-eg)
 # that won't conflict with the original kernel. This is required for Forecr boards
@@ -26,6 +26,21 @@
 # Source environment (parses all arguments including --standalone)
 . l4t_environment.sh
 l4t_init "$@"
+
+#******************************************************************************
+# Static verification of source DTSIs (eg_config.yaml)
+#******************************************************************************
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${NO_VERIFY_DTSI:-0}" -eq 1 ]]; then
+    echo "=== Skipping DTSI verification (--no-verify-dtsi) ==="
+else
+    echo "=== Verifying DTSI structure ==="
+    if ! python3 "$SCRIPT_DIR/tools/verify_dtsi_structure.py" --quiet; then
+        echo "ERROR: DTSI structure verification failed. Fix errors above before building." >&2
+        exit 1
+    fi
+    echo "DTSI structure OK"
+fi
 
 #******************************************************************************
 # Helper: run a build command and abort on failure
