@@ -393,7 +393,7 @@ class DeploymentMatrixGenerator:
     </style>
 </head>
 <body>
-    <h1>🎥 MIPI Camera Deployment Matrix</h1>
+    <h1>MIPI Camera Deployment Matrix</h1>
     <div class="timestamp">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
 
     <div class="legend">
@@ -536,15 +536,159 @@ class DeploymentMatrixGenerator:
 
         print(f"✅ HTML matrix generated: {output_file}")
 
+    def _generate_pdf_html(self):
+        """Generate a compact HTML string optimised for PDF rendering.
+
+        Differences from the web HTML:
+        - A4 landscape, 1 cm margins
+        - Status column only (no Git / Package links)
+        - Icon + short label to save horizontal space
+        - Tighter font and padding
+        - One table per platform (platform name as caption)
+        """
+        l4t_versions = self.get_all_l4t_versions()
+        camera_ids   = list(self.data['cameras'].keys())
+
+        SHORT_LABEL = {
+            "tested":                 "Tested",
+            "theoretically_supported":"Theoretical",
+            "not_supported":          "N/A",
+        }
+
+        css = """
+        @page {
+            size: A4 landscape;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 7.5pt;
+            color: #222;
+            margin: 0;
+            padding: 0;
+        }
+        h1 { font-size: 13pt; margin: 0 0 4px 0; }
+        .meta { font-size: 7pt; color: #666; margin-bottom: 10px; }
+        .legend { font-size: 7pt; margin-bottom: 10px; }
+        .legend span { margin-right: 14px; }
+        .platform-block { margin-bottom: 16px; page-break-inside: avoid; }
+        h2 { font-size: 9pt; margin: 0 0 4px 0; color: #1a3a5c;
+             border-bottom: 1px solid #3498db; padding-bottom: 2px; }
+        .plat-meta { font-size: 7pt; color: #555; margin-bottom: 4px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #bbb; padding: 2px 4px; text-align: center; }
+        th { background: #2c3e50; color: white; font-size: 7pt; }
+        th.ver-col { width: 52px; }
+        td.ver { font-family: monospace; font-size: 7pt; text-align: left;
+                 color: #1a3a5c; white-space: nowrap; }
+        .tested       { background: #d4edda; color: #155724; }
+        .theoretical  { background: #fff3cd; color: #856404; }
+        .unsupported  { background: #f8d7da; color: #721c24; }
+        .empty        { background: #f4f4f4; color: #bbb; }
+        """
+
+        lines = [
+            "<!DOCTYPE html><html><head><meta charset='UTF-8'>",
+            f"<style>{css}</style></head><body>",
+            "<h1>MIPI Camera Deployment Matrix</h1>",
+            f"<div class='meta'>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>",
+            "<div class='legend'>",
+            "<span>✅ Tested</span>",
+            "<span>⚠️ Theoretical (not yet tested)</span>",
+            "<span>❌ Not supported</span>",
+            "<span>— No data</span>",
+            "</div>",
+        ]
+
+        for platform in self.data['platforms']:
+            pid  = platform['id']
+            lines.append("<div class='platform-block'>")
+            lines.append(f"<h2>{platform['name']}</h2>")
+            meta = []
+            if 'som' in platform:         meta.append(f"SoM: {platform['som']}")
+            if 'l4t_series' in platform:  meta.append(f"L4T: {platform['l4t_series']}")
+            if 'csi_lanes' in platform:   meta.append(f"CSI lanes: {platform['csi_lanes']}")
+            if meta:
+                lines.append(f"<div class='plat-meta'>{' | '.join(meta)}</div>")
+
+            lines.append("<table><thead><tr>")
+            lines.append("<th class='ver-col'>L4T</th>")
+            for cam_id in camera_ids:
+                cam_name = self.data['cameras'][cam_id]['name']
+                lines.append(f"<th>{cam_name}</th>")
+            lines.append("</tr></thead><tbody>")
+
+            for version in l4t_versions:
+                row_has_data = any(
+                    self.get_status(pid, cid, version)[0] is not None
+                    for cid in camera_ids
+                )
+                if not row_has_data:
+                    continue
+
+                lines.append(f"<tr><td class='ver'>{version}</td>")
+                for cam_id in camera_ids:
+                    status, _, _ = self.get_status(pid, cam_id, version)
+                    if status == 'tested':
+                        lines.append(f"<td class='tested'>✅ {SHORT_LABEL['tested']}</td>")
+                    elif status == 'theoretically_supported':
+                        lines.append(f"<td class='theoretical'>⚠️ {SHORT_LABEL['theoretically_supported']}</td>")
+                    elif status == 'not_supported':
+                        lines.append(f"<td class='unsupported'>❌</td>")
+                    else:
+                        lines.append("<td class='empty'>—</td>")
+                lines.append("</tr>")
+
+            lines.append("</tbody></table></div>")
+
+        # Camera details
+        lines.append("<div style='page-break-before: always;'>")
+        lines.append("<h1 style='font-size:11pt; margin-bottom:8px;'>Camera Details</h1>")
+        lines.append("<div style='display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px;'>")
+
+        for cam_id in camera_ids:
+            cam    = self.data['cameras'][cam_id]
+            db_cam = self.camera_db['cameras'].get(cam_id, {})
+
+            lines.append("<div style='border:1px solid #bbb; border-left:3px solid #3498db; padding:6px; border-radius:3px;'>")
+            lines.append(f"<div style='font-weight:bold; font-size:8.5pt; color:#1a3a5c; margin-bottom:4px;'>{cam['name']}</div>")
+
+            if 'notes' in cam:
+                lines.append(f"<div style='font-size:7pt; color:#555; margin-bottom:4px;'>{cam['notes']}</div>")
+
+            for res_entry in db_cam.get('resolutions', []):
+                lanes = res_entry['data_lanes']
+                lines.append(f"<div style='font-size:7pt; font-weight:bold; margin-top:5px; color:#34495e;'>{res_entry['res']} — {lanes} lane(s)</div>")
+                lines.append("<table style='width:100%; margin-top:2px;'>")
+                lines.append("<thead><tr>")
+                lines.append("<th style='font-size:6.5pt;'>Format</th>")
+                lines.append("<th style='font-size:6.5pt;'>Pix clock</th>")
+                lines.append("<th style='font-size:6.5pt;'>CSI clock</th>")
+                lines.append("</tr></thead><tbody>")
+                for mode in res_entry['modes']:
+                    pix_mhz = mode['pix_clk_hz'] / 1e6
+                    pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
+                    lines.append(f"<tr><td style='font-size:6.5pt;'>{mode['pixel_format']}</td>"
+                                 f"<td style='font-size:6.5pt;'>{pix_str} MHz</td>"
+                                 f"<td style='font-size:6.5pt;'>{mode['csi_clock_mhz']} MHz</td></tr>")
+                lines.append("</tbody></table>")
+
+            lines.append("</div>")
+
+        lines.append("</div></div>")
+        lines.append("</body></html>")
+        return "\n".join(lines)
+
     def generate_pdf(self, html_file, pdf_file):
-        """Generate PDF from HTML"""
+        """Generate PDF from a compact landscape HTML (no Git/Package columns)."""
         if not WEASYPRINT_AVAILABLE:
             print(f"⚠️  WeasyPrint not available - skipping PDF generation")
             print(f"   Install with: pip3 install weasyprint")
             return False
 
         try:
-            HTML(html_file).write_pdf(pdf_file)
+            pdf_html = self._generate_pdf_html()
+            HTML(string=pdf_html, base_url=str(Path(html_file).parent)).write_pdf(pdf_file)
             print(f"✅ PDF matrix generated: {pdf_file}")
             return True
         except Exception as e:
