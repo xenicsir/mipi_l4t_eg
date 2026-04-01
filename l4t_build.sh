@@ -10,7 +10,7 @@
 #   -V, --vendor VENDOR            Vendor: generic (default), forecr
 #   -c, --carrier-board BOARD      Carrier board (default depends on vendor)
 #   -s, --standalone               Build standalone kernel with -eg suffix
-#                                  (auto-enabled per l4t_versions.json config)
+#                                  (auto-enabled per eg_config.yaml config)
 #
 # The --standalone option creates a separate kernel version (e.g., 5.15.148-tegra-eg)
 # that won't conflict with the original kernel. This is required for Forecr boards
@@ -26,6 +26,39 @@
 # Source environment (parses all arguments including --standalone)
 . l4t_environment.sh
 l4t_init "$@"
+
+#******************************************************************************
+# Static verification of source DTSIs (eg_config.yaml)
+#******************************************************************************
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${NO_VERIFY_DTSI:-0}" -eq 1 ]]; then
+    echo "=== Skipping DTSI verification (--no-verify-dtsi) ==="
+else
+    echo "=== Verifying DTSI structure ==="
+    if ! python3 "$SCRIPT_DIR/tools/verify_dtsi_structure.py" --quiet; then
+        echo "ERROR: DTSI structure verification failed. Fix errors above before building." >&2
+        exit 1
+    fi
+    echo "DTSI structure OK"
+fi
+
+#******************************************************************************
+# Helper: run a build command and abort on failure
+# Usage: run_build_step "description" command args...
+#******************************************************************************
+run_build_step() {
+   local description="$1"
+   shift
+   update_status "$description"
+   if ! "$@"; then
+      echo ""
+      echo "============================================"
+      echo "ERROR: $description FAILED"
+      echo "  Command: $*"
+      echo "============================================"
+      exit 1
+   fi
+}
 
 if [[ ! -d $L4T_SRC ]]; then
    echo "Error : $L4T_SRC folder doesn't exist"
@@ -58,16 +91,16 @@ if [[ $L4T_VERSION_MAJOR -lt 36 ]]; then
 	fi
 
 	pushd $L4T_SRC
-	update_status "Configuring kernel..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
-	update_status "Building kernel Image..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
-	update_status "Building device trees..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
-	update_status "Building kernel modules..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
-	update_status "Installing modules..."
-	make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT modules_install INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
+	run_build_step "Configuring kernel..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} $KERNEL_DEFCONFIG
+	run_build_step "Building kernel Image..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 Image
+	run_build_step "Building device trees..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 dtbs
+	run_build_step "Building kernel modules..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT LOCALVERSION=$LOCALVERSION CROSS_COMPILE=${TOOLCHAIN_PREFIX} -j8 modules
+	run_build_step "Installing modules..." \
+		make -C $KERNEL_SOURCES ARCH=arm64 O=$TEGRA_KERNEL_OUT modules_install INSTALL_MOD_PATH=$KERNEL_MODULES_OUT
 	popd
 
 	# Copy device tree to destination dir
@@ -108,17 +141,24 @@ else
 		fi
 	fi
 
-	update_status "Building kernel..."
-	make -C kernel
-	update_status "Installing kernel..."
-	sudo -E make install -C kernel
+	run_build_step "Building kernel..." \
+		make -C kernel
+	run_build_step "Installing kernel..." \
+		sudo -E make install -C kernel
 	##export IGNORE_PREEMPT_RT_PRESENCE=1
-	update_status "Building kernel modules..."
-	make modules
-	update_status "Installing modules..."
-	sudo -E make modules_install
-	update_status "Building device trees..."
-	make dtbs
+	# Fix ownership on nvidia-oot source directories before building modules.
+	# For out-of-tree builds, the compiler writes .o.d dependency files directly
+	# into the source directories. Directories created by sudo (via patch or copy)
+	# may be root-owned, causing "Permission denied" when creating .o.d files.
+	if [[ -d "$L4T_SRC/nvidia-oot" ]]; then
+		sudo chown -R "$USER:$(id -gn)" "$L4T_SRC/nvidia-oot"
+	fi
+	run_build_step "Building kernel modules..." \
+		make modules
+	run_build_step "Installing modules..." \
+		sudo -E make modules_install
+	run_build_step "Building device trees..." \
+		make dtbs
 	popd
 
 	# Copy device tree to destination dir
@@ -213,7 +253,7 @@ echo "============================================"
 echo ""
 echo "Next steps:"
 echo "  Generate the delivery package:"
-echo "  ./l4t_gen_delivery_package.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} -p <version>"
+echo "  ./l4t_gen_delivery_package.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} [-p <version>]"
 echo "============================================"
 
 #-----------------------------#

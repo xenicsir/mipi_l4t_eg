@@ -63,28 +63,60 @@ eg_dt_camera_config_get.sh [OPTIONS]
 
 ### 1. Default Mode (Human-Readable)
 
-Simple, clear output showing configured cameras and their connection status:
+Simple, clear output showing configured cameras and their connection status.
+When a camera is connected, additional details are displayed: video device, I2C device,
+model name, serial number, native resolution, and pixel format.
+
+The connection status is color-coded in terminal: **green** for connected, **red** for not connected.
+
+When the camera driver exposes a `model` sysfs attribute, the model name replaces the
+device tree type name in the output (e.g., "MicroCube" instead of "SmartIR640 or Crius1280").
 
 ```bash
 $ eg_dt_camera_config_get.sh
 === Exosens Camera Configuration ===
 
-Board: dsboard-ornxs (orin-nano, t234)
+Board: nvidia-p3509 (xavier-nx, t194)
 
 Camera ports:
-  Port 0: Dione (connected)
-  Port 1: Dione (not connected)
+  Port 0: MicroCube (connected)        # model from sysfs
+    Video device: /dev/video0
+    I2C device:   /dev/eg-ec-mipi-9-0016
+    Serial:       21971
+    Resolution:   640x480
+    Pixel format: 'Y16 ' (16-bit Greyscale)
+    Streaming:
+      v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="Y16 "
+      gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" ! videoconvert ! ximagesink sync=false
+  Port 1: Dione 1280 (connected)       # model from sysfs
+    Video device: /dev/video1
+    I2C device:   /dev/dioneir-i2c-10-000e-5b
+    Serial:       20823
+    Resolution:   1280x1024
+    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+    Streaming:
+      v4l2-ctl -d /dev/video1 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="AR24"
+      gst-launch-1.0 -v v4l2src device=/dev/video1 ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
 
 Total configured: 2 camera(s)
 ```
 
 **Connection Status Indicators**:
-- `(connected)` - Camera is physically present and detected by V4L2
-- `(not connected)` - Camera is configured in device tree but not physically connected
+- `(connected)` (green) - Camera is physically present and detected
+- `(not connected)` (red) - Camera is configured in device tree but not physically connected
+
+**Camera Details** (shown only for connected cameras):
+- **Video device**: `/dev/videoN` V4L2 device path
+- **I2C device**: `/dev/<driver>-<bus>-<addr>` character device for direct I2C communication
+- **Model**: Camera model name read from driver sysfs (if available)
+- **Serial**: Camera serial number read from driver sysfs (if available)
+- **Resolution**: Native camera resolution from driver sysfs (preferred), fallback to V4L2 current format
+- **Pixel format**: Native pixel format from driver sysfs (preferred), fallback to V4L2 current format
+- **Streaming**: Ready-to-use v4l2-ctl and GStreamer commands for the detected device, resolution, and pixel format (shown when all three are available)
 
 ### 2. Verbose Mode
 
-Includes debug information about device tree paths and V4L2 detection:
+Includes debug information about device tree paths, sysfs and V4L2 detection:
 
 ```bash
 $ eg_dt_camera_config_get.sh -v
@@ -92,30 +124,43 @@ Board Type: dsboard-ornxs
 SoM Type: orin-nano
 Tegra SoC: t234
 
-[DEBUG] Port 0 (letter: b): Dione
-[DEBUG]   Dione: /proc/device-tree/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e
-[DEBUG]   EC: /proc/device-tree/cam_i2cmux/i2c@0/eg_ec_b@16
-[DEBUG]   I2C path: /proc/device-tree/cam_i2cmux/i2c@0
-[DEBUG] Port 1 (letter: c): Dione
-[DEBUG]   Dione: /proc/device-tree/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e
-[DEBUG]   EC: /proc/device-tree/cam_i2cmux/i2c@1/eg_ec_c@16
-[DEBUG]   I2C path: /proc/device-tree/cam_i2cmux/i2c@1
-[DEBUG] Detected Dione camera: 9-000e
+[DEBUG] Scanning I2C address 0x0e...
+[DEBUG] Found device: 9-000e (bus=9, driver=dioneir)
+[DEBUG] Camera found at: /proc/device-tree/.../xenics_dione_ir_b@0e
+[DEBUG]   -> Port letter: b (Dione, bus=9, driver=dioneir)
+[DEBUG] Scanning I2C address 0x16...
+[DEBUG] Found device: 10-0016 (bus=10, driver=eg_ec_mipi)
+[DEBUG] Camera found at: /proc/device-tree/.../eg_ec_c@16
+[DEBUG]   -> Port letter: c (MicroCube640, bus=10, driver=eg_ec_mipi)
+[DEBUG] Port 0: video=/dev/video0 i2c_chardev=/dev/dioneir-i2c-9-000e-5b model=Dione 640 serial=20823 res=640x480 fmt='AR24' (32-bit BGRA 8-8-8-8)
+[DEBUG] Port 0 (letter: b): Dione connected (exact match)
+[DEBUG] Port 1: video=/dev/video1 i2c_chardev=/dev/eg-ec-mipi-10-0016 model=MicroCube serial=21971 res=640x480 fmt='Y16 ' (16-bit Greyscale)
+[DEBUG] Port 1 (letter: c): MicroCube640 connected (compatible with MicroCube640)
 
 === Exosens Camera Configuration ===
 
 Board: dsboard-ornxs (orin-nano, t234)
 
 Camera ports:
-  Port 0: Dione (connected)
-  Port 1: Dione (not connected)
+  Port 0: Dione 640 (connected)
+    Video device: /dev/video0
+    I2C device:   /dev/dioneir-i2c-9-000e-5b
+    Serial:       20823
+    Resolution:   640x480
+    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+  Port 1: MicroCube (connected)
+    Video device: /dev/video1
+    I2C device:   /dev/eg-ec-mipi-10-0016
+    Serial:       21971
+    Resolution:   640x480
+    Pixel format: 'Y16 ' (16-bit Greyscale)
 
 Total configured: 2 camera(s)
 ```
 
 ### 3. JSON Mode
 
-Machine-readable structured output with connection status:
+Machine-readable structured output with connection status and camera details:
 
 ```bash
 $ eg_dt_camera_config_get.sh --json
@@ -126,12 +171,14 @@ $ eg_dt_camera_config_get.sh --json
     "tegra": "t234"
   },
   "cameras": {
-    "port_0": {"type": "Dione", "status": "connected"},
-    "port_1": {"type": "Dione", "status": "not connected"}
+    "port_0": {"type": "Dione", "status": "connected", "video_device": "/dev/video0", "i2c_device": "/dev/dioneir-i2c-9-000e-5b", "model": "Dione 640", "serial_number": "20823", "width/height": "640x480", "pixel_format": "'AR24' (32-bit BGRA 8-8-8-8)"},
+    "port_1": {"type": "MicroCube640", "status": "not connected"}
   },
   "camera_count": 2
 }
 ```
+
+Connected cameras include additional fields: `video_device`, `i2c_device`, `model`, `serial_number`, `width/height`, and `pixel_format` (when available from driver sysfs or V4L2).
 
 ---
 
@@ -139,11 +186,14 @@ $ eg_dt_camera_config_get.sh --json
 
 ### Camera Types Detected
 
-| Camera Type | MIPI Lanes | Detection Method |
-|-------------|-----------|-----------------|
-| **Dione** | N/A | Presence of `xenics_dione_ir_*@0e` device with status "okay" |
-| **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` |
-| **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` |
+| DT Type (configured) | MIPI Lanes | Detection Method | Sysfs Models |
+|----------------------|-----------|-----------------|--------------|
+| **Dione** | N/A | Presence of `xenics_dione_ir_*@0e` device with status "okay" | Dione 640, Dione 1280 |
+| **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` | MicroCube |
+| **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` | SmartIR640, Crius640, Crius1280, Aion640 |
+| **iLumos** | 4 | Presence of `ilumos_*@30` device with status "okay" | iLumos |
+
+**Note:** The "DT Type" column shows the name from the device tree configuration. When a camera is connected, the driver reads the actual model from the camera hardware via sysfs, and the output displays the real model name instead (e.g., "MicroCube" instead of "MicroCube640").
 
 ### Device Tree Node Patterns
 
@@ -151,6 +201,7 @@ The script searches for these device patterns in `/proc/device-tree/`:
 
 - **Dione cameras**: `xenics_dione_ir_[a-h]@0e`
 - **EC cameras**: `eg_ec_[a-h]@16`
+- **iLumos cameras**: `ilumos_[a-h]@30`
 
 Port letters (a-h) are automatically mapped to port numbers (0-7).
 
@@ -165,29 +216,36 @@ Port letters (a-h) are automatically mapped to port numbers (0-7).
    ├─ Get board type, SoM type, Tegra SoC
    └─ Verify board is supported
 
-2. Auto-discover configured cameras in device tree
+2. Detect physically connected cameras via sysfs
+   ├─ Scan /sys/bus/i2c/devices/ for known I2C addresses (0x0e, 0x16, 0x30)
+   ├─ Check driver is bound (driver/ symlink exists)
+   ├─ Follow of_node symlink to get device tree path
+   └─ Extract port letter from device tree node name
+
+3. Auto-discover configured cameras in device tree
    ├─ Search known I2C bus locations (cam_i2cmux, direct i2c@*)
    ├─ Find all xenics_dione_ir_*@0e devices
    ├─ Find all eg_ec_*@16 devices
+   ├─ Find all ilumos_*@30 devices
    └─ Extract port letters (a, b, c, etc.)
 
-3. For each camera port:
+4. For each camera port:
    ├─ Check Dione device status (okay/disabled)
    ├─ If no Dione or disabled, check EC device
    ├─ Determine camera type from num_lanes
    └─ Map port letter to port number (0-7)
 
-4. Detect physically connected cameras
-   ├─ Run v4l2-ctl --list-devices
-   ├─ Parse vi-output entries (dioneir X-000e, eg_ec X-0016)
-   ├─ Count /dev/video* devices
-   └─ Match connected cameras to configured ports
+5. For each connected camera, read details:
+   ├─ Find /dev/videoN via /sys/class/video4linux/
+   ├─ Find I2C character device in /dev/
+   ├─ Read model, serial_number, resolution, pixel_format from driver sysfs
+   └─ Fallback to v4l2-ctl for resolution/pixel_format if sysfs unavailable
 
-5. Combine configuration + connection status
-   ├─ Port X: CameraType (connected)
+6. Combine configuration + connection status
+   ├─ Port X: ModelName (connected) + details
    └─ Port Y: CameraType (not connected)
 
-6. Output results in requested format
+7. Output results in requested format
 ```
 
 ### Device Tree Structure
@@ -200,10 +258,12 @@ Different Tegra SoCs have different I2C bus layouts:
 └── bus@0/cam_i2cmux/
     ├── i2c@0/
     │   ├── xenics_dione_ir_a@0e
-    │   └── eg_ec_a@16
+    │   ├── eg_ec_a@16
+    │   └── ilumos_a@30
     └── i2c@1/
         ├── xenics_dione_ir_e@0e
-        └── eg_ec_e@16
+        ├── eg_ec_e@16
+        └── ilumos_e@30
 ```
 
 **Tegra T194 (Xavier NX)**:
@@ -212,10 +272,12 @@ Different Tegra SoCs have different I2C bus layouts:
 └── bus@0/cam_i2cmux/
     ├── i2c@0/
     │   ├── xenics_dione_ir_a@0e
-    │   └── eg_ec_a@16
+    │   ├── eg_ec_a@16
+    │   └── ilumos_a@30
     └── i2c@1/
         ├── xenics_dione_ir_c@0e
-        └── eg_ec_c@16
+        ├── eg_ec_c@16
+        └── ilumos_c@30
 ```
 
 **Tegra T234 (Orin family)**:
@@ -224,46 +286,55 @@ Different Tegra SoCs have different I2C bus layouts:
 └── bus@0/
     ├── i2c@31e0000/
     │   ├── xenics_dione_ir_a@0e
-    │   └── eg_ec_a@16
+    │   ├── eg_ec_a@16
+    │   └── ilumos_a@30
     ├── i2c@c240000/
     │   ├── xenics_dione_ir_g@0e
-    │   └── eg_ec_g@16
+    │   ├── eg_ec_g@16
+    │   └── ilumos_g@30
     └── cam_i2cmux/
         ├── i2c@0/
         │   ├── xenics_dione_ir_b@0e
-        │   └── eg_ec_b@16
+        │   ├── eg_ec_b@16
+        │   └── ilumos_b@30
         └── i2c@1/
             ├── xenics_dione_ir_c@0e
-            └── eg_ec_c@16
+            ├── eg_ec_c@16
+            └── ilumos_c@30
 ```
 
 The script automatically handles all these variants by searching known I2C bus locations.
 
 ### Connection Detection
 
-The script detects physically connected cameras using the V4L2 subsystem:
+The script detects physically connected cameras using the **sysfs I2C subsystem**:
 
-**V4L2 Detection**:
+**Sysfs Detection**:
 ```bash
-$ v4l2-ctl --list-devices
-NVIDIA Tegra Video Input Device (platform:tegra-camrtc-ca):
-	/dev/media0
+# The script scans /sys/bus/i2c/devices/ for known camera I2C addresses
+$ ls /sys/bus/i2c/devices/9-000e/
+driver/  model  serial_number  firmware_version  resolution  pixel_format  of_node  ...
 
-vi-output, dioneir 9-000e (platform:tegra-capture-vi:0):
-	/dev/video0
+$ cat /sys/bus/i2c/devices/9-000e/model
+Dione 640
 ```
 
 **Detection Logic**:
-1. Parse `v4l2-ctl --list-devices` output
-2. Look for camera entries: `vi-output, dioneir <bus>-<address>` or `vi-output, eg_ec <bus>-<address>`
-3. Count number of `/dev/video*` devices created
-4. Match video device count to configured ports
-5. First N configured ports are marked as "connected"
+1. Scan `/sys/bus/i2c/devices/` for devices at known I2C addresses (0x0e for Dione, 0x16 for EngineCore, 0x30 for iLumos)
+2. Check if a driver is bound (`driver/` symlink exists)
+3. Follow `of_node` symlink to match the device tree node and extract port letter
+4. Read camera details from driver sysfs attributes:
+   - `model` - Camera model name (e.g., "MicroCube", "Dione 1280")
+   - `serial_number` - Camera serial number
+   - `firmware_version` - Firmware/FPGA version (e.g., "0x01020304")
+   - `resolution` - Native resolution (e.g., "640x480", "1280x1024")
+   - `pixel_format` - Native pixel format (e.g., "'AR24' (32-bit BGRA 8-8-8-8)")
+5. Find corresponding `/dev/videoN` and `/dev/<driver>-*` devices
+6. Fallback to `v4l2-ctl` for resolution/pixel format if sysfs attributes are not available
 
-**Example**:
-- 2 ports configured (Port 0: Dione, Port 1: Dione)
-- 1 video device found (`/dev/video0`)
-- Result: Port 0 = connected, Port 1 = not connected
+**Why sysfs over v4l2-ctl**:
+- **Sysfs resolution** shows the **native camera resolution** (read from hardware registers)
+- **v4l2-ctl resolution** shows the **currently selected V4L2 mode** (which may differ, e.g., sensor_mode=0 = 640x480 even on a 1280x1024 camera)
 
 **Why This Matters**:
 - **Configured but not connected**: Camera overlay is in device tree, but camera is not physically present or not detected
@@ -287,8 +358,16 @@ $ eg_dt_camera_config_get.sh
 Board: dsboard-ornxs (orin-nano, t234)
 
 Camera ports:
-  Port 0: Dione (connected)
-  Port 1: MicroCube640 (not connected)
+  Port 0: Dione 640 (connected)          # model from sysfs
+    Video device: /dev/video0
+    I2C device:   /dev/dioneir-i2c-9-000e-5b
+    Serial:       20823
+    Resolution:   640x480
+    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+    Streaming:
+      v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="AR24"
+      gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)BGRA, width=640, height=480" ! videoconvert ! ximagesink sync=false
+  Port 1: MicroCube640 (not connected)    # DT type (no camera connected)
 
 Total configured: 2 camera(s)
 ```
@@ -301,7 +380,7 @@ Total configured: 2 camera(s)
 # verify the configuration was applied correctly and cameras are connected
 
 echo "Configuring cameras..."
-eg_dt_camera_config_set.sh 0 Dione 1 MicroCube640
+eg_dt_camera_config_set.sh 0/Dione 1/MicroCube640
 
 echo ""
 echo "Verifying configuration..."
@@ -309,8 +388,12 @@ eg_dt_camera_config_get.sh
 
 # Expected output:
 #   Camera ports:
-#     Port 0: Dione (connected)
-#     Port 1: MicroCube640 (connected/not connected)
+#     Port 0: Dione 640 (connected)
+#       Video device: /dev/video0
+#       ...
+#     Port 1: MicroCube (connected)
+#       Video device: /dev/video1
+#       ...
 ```
 
 ### Conditional Logic Based on Camera Count
@@ -355,13 +438,13 @@ CAM_COUNT=$(echo "$CAM_JSON" | jq -r '.camera_count')
 echo "Board: $BOARD ($SOM)"
 echo "Cameras: $CAM_COUNT"
 
-# List all cameras with connection status
-echo "$CAM_JSON" | jq -r '.cameras | to_entries[] | "\(.key): \(.value.type) (\(.value.status))"'
+# List all cameras with connection status and model
+echo "$CAM_JSON" | jq -r '.cameras | to_entries[] | "\(.key): \(.value.type) (\(.value.status))\(if .value.model then " [" + .value.model + "]" else "" end)"'
 
 # Example output:
 # Board: dsboard-ornxs (orin-nano)
 # Cameras: 2
-# port_0: Dione (connected)
+# port_0: Dione (connected) [Dione 640]
 # port_1: SmartIR640 or Crius1280 (not connected)
 ```
 
@@ -483,9 +566,11 @@ if config:
     print(f"Board: {config['board']['type']}")
     print(f"Camera count: {config['camera_count']}")
 
-    for port, cam_type in config['cameras'].items():
+    for port, cam_info in config['cameras'].items():
         port_num = port.split('_')[1]
-        print(f"  Camera {port_num}: {cam_type}")
+        model = cam_info.get('model', cam_info['type'])
+        status = cam_info['status']
+        print(f"  Camera {port_num}: {model} ({status})")
 ```
 
 ### C++ Integration
@@ -522,8 +607,10 @@ int main() {
         std::cout << "Board: " << config["board"]["type"] << std::endl;
         std::cout << "Cameras: " << config["camera_count"] << std::endl;
 
-        for (auto& [port, type] : config["cameras"].items()) {
-            std::cout << "  " << port << ": " << type << std::endl;
+        for (auto& [port, info] : config["cameras"].items()) {
+            std::string model = info.value("model", info["type"].get<std::string>());
+            std::string status = info["status"];
+            std::cout << "  " << port << ": " << model << " (" << status << ")" << std::endl;
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
@@ -571,7 +658,7 @@ If the script reports "No cameras detected":
 
 2. **Search for camera devices manually**:
    ```bash
-   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" 2>/dev/null
+   find /proc/device-tree -name "xenics_dione*" -o -name "eg_ec*" -o -name "ilumos*" 2>/dev/null
    ```
 
 3. **Run in verbose mode**:
@@ -627,13 +714,13 @@ If a camera is configured but shows "not connected" status:
    sudo i2cdetect -y -r X
    ```
 
-   Dione cameras should appear at address 0x0e, EC cameras at 0x16.
+   Dione cameras should appear at address 0x0e, EC cameras at 0x16, iLumos cameras at 0x30.
 
 3. **Check kernel logs**:
    ```bash
    dmesg | grep -i camera
    dmesg | grep -i v4l2
-   dmesg | grep -i "dioneir\|eg_ec"
+   dmesg | grep -i "dioneir\|eg_ec\|ilumos"
    ```
 
    Look for errors like:
@@ -717,9 +804,7 @@ If camera types are incorrect:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 2.1 | 2026-02-03 | Added connection detection: distinguishes configured vs physically connected cameras using V4L2 |
-| 2.0 | 2026-02-03 | Complete rewrite: auto-discovery, generic board support, JSON output, uses detect_jetson_board.sh |
-| 1.0 | 2025-02-02 | Initial version with hardcoded board types |
+| 1.0 | 2026-02-26 | Initial release |
 
 ---
 

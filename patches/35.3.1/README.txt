@@ -11,13 +11,13 @@ Carrier board: generic
 Total patches: 7
 
 Patch files:
-  - rootfs_opt_eg.patch (23 files, 3082 lines)
-  - rootfs_usr_bin.patch (12 files, 2068 lines)
-  - source_public_hardware.patch (49 files, 8626 lines)
-  - source_public_kernel_nvidia_drivers_media_i2c.patch (10 files, 4777 lines)
-  - source_public_kernel_nvidia_drivers_media_platform.patch (5 files, 106 lines)
+  - rootfs_opt_eg.patch (23 files, 3457 lines)
+  - rootfs_usr_bin.patch (15 files, 4096 lines)
+  - source_public_hardware.patch (72 files, 13067 lines)
+  - source_public_kernel_nvidia_drivers_media_i2c.patch (24 files, 8375 lines)
+  - source_public_kernel_nvidia_drivers_media_platform.patch (6 files, 171 lines)
   - source_public_kernel_nvidia_include_media.patch (2 files, 32 lines)
-  - source_public_kernel.patch (3 files, 72 lines)
+  - source_public_kernel.patch (3 files, 74 lines)
 
 Usage:
   To apply these patches instead of using l4t_copy_sources.sh, run:

@@ -19,7 +19,6 @@
 #   --patch-sources             Run l4t_patch_sources.sh (patches only, exclusive with --copy-sources)
 #   --build                     Run l4t_build.sh
 #   --gen-package               Run l4t_gen_delivery_package.sh
-#   --all                       Run: prepare, copy-sources, build, gen-package
 #
 # Execution Options:
 #   --from-scratch              Delete existing build directory before prepare
@@ -29,19 +28,22 @@
 #   -j, --jobs N                Run N configurations in parallel (default=0=auto)
 #   -p, --package-version VER   Package version for delivery (passed to gen-package)
 #   -s, --standalone            Force standalone build
+#   --no-verify-dtsi            Skip DTSI structure verification (useful during DT development)
+#   --archive-dir DIR           Archive directory for BSP downloads (passed to prepare)
+#   --delivery-dir DIR          Delivery directory for packages (passed to gen-package)
 #
 # Other:
 #   --list                      List all matching configurations and exit
 #   -h, --help                  Show this help message
 #
 # Examples:
-#   ./l4t_make.sh -v 36.4.3 --all                    # All steps for 36.4.3 generic
-#   ./l4t_make.sh -v "36.*" -V forecr --build       # Build all 36.x forecr versions
-#   ./l4t_make.sh --prepare --copy-sources          # Prepare and copy all versions
-#   ./l4t_make.sh -v 35.6.* --all --abort-on-error  # All 35.6.x, stop on error
-#   ./l4t_make.sh --prepare -j 4                     # Prepare all versions, 4 in parallel
-#   ./l4t_make.sh --prepare -j 0                     # Prepare all versions, auto parallelism
-#   ./l4t_make.sh --list                             # List all configurations
+#   ./l4t_make.sh -v 36.4.3                            # All steps for 36.4.3 generic
+#   ./l4t_make.sh -v "36.*" -V forecr --build          # Build all 36.x forecr versions
+#   ./l4t_make.sh --prepare --copy-sources             # Prepare and copy all versions
+#   ./l4t_make.sh -v 35.6.* --continue-on-error        # All 35.6.x, continue on error
+#   ./l4t_make.sh --prepare -j 4                       # Prepare all versions, 4 in parallel
+#   ./l4t_make.sh --prepare -j 0                       # Prepare all versions, auto parallelism
+#   ./l4t_make.sh --list                               # List all configurations
 #******************************************************************************
 
 set -e
@@ -59,6 +61,12 @@ VENDOR_FILTER=""
 CARRIER_FILTER=""
 PACKAGE_VERSION=""
 STANDALONE_OPT=""
+ARCHIVE_DIR_OPT=""
+DELIVERY_DIR_OPT=""
+NO_VERIFY_DTSI_OPT=""
+
+NO_ARGS=0
+[[ $# -eq 0 ]] && NO_ARGS=1
 
 DO_PREPARE=0
 DO_COPY_SOURCES=0
@@ -123,6 +131,18 @@ while [[ $# -gt 0 ]]; do
             STANDALONE_OPT="-s"
             shift
             ;;
+        --no-verify-dtsi)
+            NO_VERIFY_DTSI_OPT="--no-verify-dtsi"
+            shift
+            ;;
+        --archive-dir)
+            ARCHIVE_DIR_OPT="--archive-dir $2"
+            shift 2
+            ;;
+        --delivery-dir)
+            DELIVERY_DIR_OPT="--delivery-dir $2"
+            shift 2
+            ;;
         --prepare)
             DO_PREPARE=1
             shift
@@ -140,13 +160,6 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --gen-package)
-            DO_GEN_PACKAGE=1
-            shift
-            ;;
-        --all)
-            DO_PREPARE=1
-            DO_COPY_SOURCES=1
-            DO_BUILD=1
             DO_GEN_PACKAGE=1
             shift
             ;;
@@ -215,17 +228,6 @@ if [[ $FROM_SCRATCH -eq 1 && $DO_PREPARE -eq 0 ]]; then
     exit 1
 fi
 
-# Check that at least one step is selected (unless listing)
-if [[ $LIST_ONLY -eq 0 ]]; then
-    if [[ $DO_PREPARE -eq 0 && $DO_COPY_SOURCES -eq 0 && $DO_PATCH_SOURCES -eq 0 && \
-          $DO_BUILD -eq 0 && $DO_GEN_PACKAGE -eq 0 ]]; then
-        echo "Error: At least one build step must be selected"
-        echo "Use --prepare, --copy-sources, --patch-sources, --build, --gen-package, or --all"
-        echo "Use --help for usage information."
-        exit 1
-    fi
-fi
-
 # Note: package version is now fully handled by l4t_gen_delivery_package.sh
 # (auto-detects from git tag or branch if -p is not specified)
 
@@ -279,6 +281,8 @@ echo "Configurations: $config_count"
 echo "Steps: $steps"
 [[ $FROM_SCRATCH -eq 1 ]] && echo "From scratch: yes (will delete existing build directories)"
 [[ $PARALLEL_JOBS -gt 1 ]] && echo "Parallel jobs: $PARALLEL_JOBS"
+[[ -n "$ARCHIVE_DIR_OPT" ]] && echo "Archive dir: ${ARCHIVE_DIR_OPT#--archive-dir }"
+[[ -n "$DELIVERY_DIR_OPT" ]] && echo "Delivery dir: ${DELIVERY_DIR_OPT#--delivery-dir }"
 [[ $DRY_RUN -eq 1 ]] && echo -e "${YELLOW}Mode: DRY RUN (no commands executed)${NC}"
 echo ""
 
@@ -310,7 +314,7 @@ run_config() {
     fi
 
     parse_config "$config"
-    local base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT")
+    local base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT $NO_VERIFY_DTSI_OPT)
     local config_failed=0
 
     # Handle --from-scratch
@@ -396,6 +400,7 @@ run_config() {
 #******************************************************************************
 display_status() {
     local num_jobs=${#job_configs[@]}
+    local i
 
     # Move cursor up to overwrite previous status lines
     if [[ $DISPLAY_INITIALIZED -eq 1 ]]; then
@@ -449,159 +454,176 @@ display_status() {
 }
 
 #******************************************************************************
-# Sequential execution (PARALLEL_JOBS=1)
+# Execute builds (unified: handles both sequential and parallel)
 #******************************************************************************
-if [[ $PARALLEL_JOBS -eq 1 ]]; then
-    config_index=0
+echo -e "${CYAN}Starting execution ($PARALLEL_JOBS parallel job(s))...${NC}"
+echo ""
+
+if [[ $DRY_RUN -eq 1 ]]; then
     for config in $configs; do
-        config_index=$((config_index + 1))
         parse_config "$config"
-
-        echo "----------------------------------------"
-        echo -e "${CYAN}[$config_index/$config_count]${NC} Version: $CFG_VERSION, Vendor: $CFG_VENDOR, Carrier: $CFG_CARRIER"
-        echo "----------------------------------------"
-
-        if [[ $DRY_RUN -eq 1 ]]; then
-            base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT")
-            [[ $DO_PREPARE -eq 1 ]] && echo -e "    ${BLUE}[prepare]${NC} l4t_prepare.sh $base_args"
-            [[ $DO_COPY_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[copy-sources]${NC} l4t_copy_sources.sh $base_args"
-            [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"
-            [[ $DO_BUILD -eq 1 ]] && echo -e "    ${BLUE}[build]${NC} l4t_build.sh $base_args"
-            if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
-                local dry_pkg_args="$base_args"
-                [[ -n "$PACKAGE_VERSION" ]] && dry_pkg_args="$dry_pkg_args -p $PACKAGE_VERSION"
-                echo -e "    ${BLUE}[gen-package]${NC} l4t_gen_delivery_package.sh $dry_pkg_args"
-            fi
-            echo -e "    ${GREEN}[SUCCESS]${NC}"
-            total_success=$((total_success + 1))
-        else
-            log_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.log"
-            status_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.status"
-            if run_config "$config" "$log_file" "$status_file" 2>&1 | tee "$log_file"; then
-                total_success=$((total_success + 1))
-            else
-                total_failed=$((total_failed + 1))
-                failed_configs+=("$CFG_VERSION:$CFG_VENDOR:$CFG_CARRIER")
-                if [[ $CONTINUE_ON_ERROR -eq 0 ]]; then
-                    echo -e "${RED}Aborting due to error${NC}"
-                    exit 1
-                fi
-            fi
+        base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT $NO_VERIFY_DTSI_OPT)
+        echo -e "${CYAN}$CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER:${NC}"
+        [[ $DO_PREPARE -eq 1 ]] && echo -e "    ${BLUE}[prepare]${NC} l4t_prepare.sh $base_args"
+        [[ $DO_COPY_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[copy-sources]${NC} l4t_copy_sources.sh $base_args"
+        [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"
+        [[ $DO_BUILD -eq 1 ]] && echo -e "    ${BLUE}[build]${NC} l4t_build.sh $base_args"
+        if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
+            dry_pkg_args="$base_args"
+            [[ -n "$PACKAGE_VERSION" ]] && dry_pkg_args="$dry_pkg_args -p $PACKAGE_VERSION"
+            echo -e "    ${BLUE}[gen-package]${NC} l4t_gen_delivery_package.sh $dry_pkg_args"
         fi
-        echo ""
+    done
+    total_success=$config_count
+else
+    # Arrays to track jobs (used by display_status as globals)
+    declare -a job_pids=()
+    declare -a job_configs=()
+    declare -a job_logs=()
+    declare -a job_status=()
+
+    DISPLAY_INITIALIZED=0
+
+    # First pass: register all configs and create status files
+    for config in $configs; do
+        parse_config "$config"
+        log_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.log"
+        status_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.status"
+
+        job_configs+=("$config")
+        job_logs+=("$log_file")
+        job_status+=("$status_file")
+        job_pids+=("")  # Empty pid = not started yet
     done
 
-#******************************************************************************
-# Parallel execution (PARALLEL_JOBS > 1)
-#******************************************************************************
-else
-    echo -e "${CYAN}Starting parallel execution with $PARALLEL_JOBS jobs...${NC}"
-    echo ""
+    # Print initial status lines (header + one per job)
+    echo "Jobs status:"
+    printf "  %-10s %-12s %-10s %-20s %s\n" "STATUS" "VERSION" "VENDOR" "CARRIER" "STEP"
+    for config in "${job_configs[@]}"; do
+        echo ""  # Placeholder line for each job
+    done
+    DISPLAY_INITIALIZED=1
 
-    if [[ $DRY_RUN -eq 1 ]]; then
-        for config in $configs; do
-            parse_config "$config"
-            base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT")
-            echo "Would run: $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
-        done
-        total_success=$config_count
-    else
-        # Arrays to track jobs (used by display_status as globals)
-        declare -a job_pids=()
-        declare -a job_configs=()
-        declare -a job_logs=()
-        declare -a job_status=()
+    # Initial display
+    display_status
 
-        DISPLAY_INITIALIZED=0
-        config_index=0
+    # Start jobs (respecting PARALLEL_JOBS limit)
+    aborted=0
+    for i in "${!job_configs[@]}"; do
+        config="${job_configs[$i]}"
+        log_file="${job_logs[$i]}"
+        status_file="${job_status[$i]}"
 
-        # First pass: register all configs and create status files
-        for config in $configs; do
-            parse_config "$config"
-            log_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.log"
-            status_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.status"
-
-            job_configs+=("$config")
-            job_logs+=("$log_file")
-            job_status+=("$status_file")
-            job_pids+=("")  # Empty pid = not started yet
-        done
-
-        # Print initial status lines (header + one per job)
-        echo "Jobs status:"
-        printf "  %-10s %-12s %-10s %-20s %s\n" "STATUS" "VERSION" "VENDOR" "CARRIER" "STEP"
-        for config in "${job_configs[@]}"; do
-            echo ""  # Placeholder line for each job
-        done
-        DISPLAY_INITIALIZED=1
-
-        # Initial display
-        display_status
-
-        # Start jobs (respecting PARALLEL_JOBS limit)
-        for i in "${!job_configs[@]}"; do
-            config="${job_configs[$i]}"
-            log_file="${job_logs[$i]}"
-            status_file="${job_status[$i]}"
-
-            # Wait if we've reached max parallel jobs
-            while true; do
-                running=0
-                for pid in "${job_pids[@]}"; do
-                    [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && running=$((running + 1))
-                done
-                [[ $running -lt $PARALLEL_JOBS ]] && break
-                display_status
-                sleep 0.5
-            done
-
-            # Start new job in background
-            (
-                run_config "$config" "$log_file" "$status_file" > "$log_file" 2>&1
-                exit $?
-            ) &
-            job_pids[$i]=$!
-        done
-
-        # Monitor jobs with live status display
+        # Wait if we've reached max parallel jobs
         while true; do
-            # Check if any jobs are still running
             running=0
             for pid in "${job_pids[@]}"; do
                 [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && running=$((running + 1))
             done
-
-            # Display current status
+            [[ $running -lt $PARALLEL_JOBS ]] && break
             display_status
-
-            # Exit loop when all jobs are done
-            [[ $running -eq 0 ]] && break
-
-            sleep 1
+            sleep 0.5
         done
 
-        # Final display
-        echo ""
+        # Check for failures before starting next job (abort-on-error)
+        if [[ $CONTINUE_ON_ERROR -eq 0 ]]; then
+            for j in "${!job_pids[@]}"; do
+                if [[ -n "${job_pids[$j]}" ]] && ! kill -0 "${job_pids[$j]}" 2>/dev/null; then
+                    if grep -q "\[FAILED\]" "${job_logs[$j]}" 2>/dev/null; then
+                        aborted=1
+                        break 2
+                    fi
+                fi
+            done
+        fi
 
-        # Wait for all jobs to fully complete
-        wait
+        # Start new job in background
+        (
+            run_config "$config" "$log_file" "$status_file" > "$log_file" 2>&1
+            exit $?
+        ) &
+        job_pids[$i]=$!
+    done
 
-        # Check results
-        echo ""
-        echo "Results:"
-        for i in "${!job_configs[@]}"; do
-            parse_config "${job_configs[$i]}"
-            log_file="${job_logs[$i]}"
-
-            if grep -q "\[SUCCESS\]" "$log_file" 2>/dev/null; then
-                echo -e "  ${GREEN}[OK]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
-                total_success=$((total_success + 1))
-            else
-                echo -e "  ${RED}[FAILED]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
-                total_failed=$((total_failed + 1))
-                failed_configs+=("$CFG_VERSION:$CFG_VENDOR:$CFG_CARRIER")
-            fi
+    # Monitor jobs with live status display
+    while [[ $aborted -eq 0 ]]; do
+        # Check if any jobs are still running
+        running=0
+        for pid in "${job_pids[@]}"; do
+            [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && running=$((running + 1))
         done
+
+        # Display current status
+        display_status
+
+        # Exit loop when all jobs are done
+        [[ $running -eq 0 ]] && break
+
+        # Check for failures during monitoring (abort-on-error)
+        if [[ $CONTINUE_ON_ERROR -eq 0 ]]; then
+            for j in "${!job_pids[@]}"; do
+                if [[ -n "${job_pids[$j]}" ]] && ! kill -0 "${job_pids[$j]}" 2>/dev/null; then
+                    if grep -q "\[FAILED\]" "${job_logs[$j]}" 2>/dev/null; then
+                        aborted=1
+                        break
+                    fi
+                fi
+            done
+        fi
+
+        sleep 1
+    done
+
+    # If aborted, kill remaining running jobs
+    if [[ $aborted -eq 1 ]]; then
+        for pid in "${job_pids[@]}"; do
+            [[ -n "$pid" ]] && kill "$pid" 2>/dev/null
+        done
+    fi
+
+    # Wait for all jobs to fully complete
+    wait 2>/dev/null
+
+    # Final display
+    display_status
+    echo ""
+
+    # Check results
+    echo ""
+    echo "Results:"
+    for i in "${!job_configs[@]}"; do
+        parse_config "${job_configs[$i]}"
+        log_file="${job_logs[$i]}"
+
+        if grep -q "\[SUCCESS\]" "$log_file" 2>/dev/null; then
+            echo -e "  ${GREEN}[OK]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
+            total_success=$((total_success + 1))
+        elif [[ -z "${job_pids[$i]}" ]]; then
+            # Job was never started (aborted before reaching it)
+            echo -e "  ${YELLOW}[Skipped]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
+        else
+            echo -e "  ${RED}[FAILED]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
+            total_failed=$((total_failed + 1))
+            failed_configs+=("$CFG_VERSION:$CFG_VENDOR:$CFG_CARRIER")
+        fi
+    done
+fi
+
+#******************************************************************************
+# Run integration tests (only in "do all" mode, after successful build)
+#******************************************************************************
+if [[ $NO_ARGS -eq 1 && $total_failed -eq 0 ]]; then
+    echo ""
+    echo "============================================"
+    echo -e "${CYAN}Running integration tests...${NC}"
+    echo "============================================"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        echo -e "    ${BLUE}[test]${NC} bash test/run_all.sh"
+    else
+        if ! bash "$SCRIPT_DIR/test/run_all.sh"; then
+            echo -e "${RED}Integration tests FAILED${NC}"
+            exit 1
+        fi
     fi
 fi
 
@@ -623,8 +645,8 @@ if [[ $total_failed -gt 0 ]]; then
         echo "  - $fc"
     done
 
-    # Show logs for failed jobs in parallel mode
-    if [[ $PARALLEL_JOBS -gt 1 && ${#failed_configs[@]} -gt 0 ]]; then
+    # Show logs for failed jobs
+    if [[ ${#failed_configs[@]} -gt 0 ]]; then
         echo ""
         echo "============================================"
         echo -e "${RED}Error logs:${NC}"

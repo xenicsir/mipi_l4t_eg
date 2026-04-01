@@ -126,15 +126,17 @@ index 0000000..43950d1
 +temp1_max_alarm		Maximum die temperature alarm
 +======================= =======================================================
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
-index bda2dff..a8c01b2 100644
+index bda2dff..7fe7139 100644
 --- a/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
-@@ -894,6 +894,8 @@ CONFIG_NV_VIDEO_OV5693=m
+@@ -894,6 +894,10 @@ CONFIG_NV_VIDEO_OV5693=m
  CONFIG_NV_VIDEO_OV9281=m
  CONFIG_NV_VIDEO_OV10823=m
  CONFIG_NV_VIDEO_OV23850=m
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
  CONFIG_I2C_IOEXPANDER_PCA9570=m
  CONFIG_VIDEO_TC358840=m
  CONFIG_VIDEO_LT6911UXC=m
@@ -1526,10 +1528,10 @@ index 0000000..bda2dff
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_agx_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_agx_defconfig
 new file mode 100644
-index 0000000..7af1b68
+index 0000000..fc11e20
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_agx_defconfig
-@@ -0,0 +1,1386 @@
+@@ -0,0 +1,1388 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -2916,12 +2918,14 @@ index 0000000..7af1b68
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_nx2_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_nx2_defconfig
 new file mode 100644
-index 0000000..f2b7da6
+index 0000000..4ad155d
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_nx2_defconfig
-@@ -0,0 +1,1394 @@
+@@ -0,0 +1,1396 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -4316,12 +4320,14 @@ index 0000000..f2b7da6
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_ornx_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_ornx_defconfig
 new file mode 100644
-index 0000000..0e7bb20
+index 0000000..1c8b0fd
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_ornx_defconfig
-@@ -0,0 +1,1394 @@
+@@ -0,0 +1,1396 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -5716,12 +5722,14 @@ index 0000000..0e7bb20
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_xv2_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_xv2_defconfig
 new file mode 100644
-index 0000000..7af1b68
+index 0000000..fc11e20
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/dsboard_xv2_defconfig
-@@ -0,0 +1,1386 @@
+@@ -0,0 +1,1388 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -7108,12 +7116,14 @@ index 0000000..7af1b68
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/milboard_agx_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/milboard_agx_defconfig
 new file mode 100644
-index 0000000..e208678
+index 0000000..88b2817
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/milboard_agx_defconfig
-@@ -0,0 +1,1384 @@
+@@ -0,0 +1,1386 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -8498,12 +8508,14 @@ index 0000000..e208678
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/milboard_xv_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/milboard_xv_defconfig
 new file mode 100644
-index 0000000..ec2b94a
+index 0000000..95fa887
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/milboard_xv_defconfig
-@@ -0,0 +1,1384 @@
+@@ -0,0 +1,1386 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -9888,12 +9900,14 @@ index 0000000..ec2b94a
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/raiboard_agx_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/raiboard_agx_defconfig
 new file mode 100644
-index 0000000..7af1b68
+index 0000000..fc11e20
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/raiboard_agx_defconfig
-@@ -0,0 +1,1386 @@
+@@ -0,0 +1,1388 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -11280,12 +11294,14 @@ index 0000000..7af1b68
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/raiboard_ornx_defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/raiboard_ornx_defconfig
 new file mode 100644
-index 0000000..685cfce
+index 0000000..767de14
 --- /dev/null
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/raiboard_ornx_defconfig
-@@ -0,0 +1,1395 @@
+@@ -0,0 +1,1397 @@
 +# CONFIG_LOCALVERSION_AUTO is not set
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
@@ -12681,6 +12697,8 @@ index 0000000..685cfce
 +# CONFIG_RUNTIME_TESTING_MENU is not set
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
 diff --git a/source/public/kernel/kernel-5.10/drivers/hwmon/Kconfig b/source/public/kernel/kernel-5.10/drivers/hwmon/Kconfig
 index 682137d..1adaba7 100644
 --- a/source/public/kernel/kernel-5.10/drivers/hwmon/Kconfig

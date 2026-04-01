@@ -127,17 +127,20 @@ static const struct tegra_video_format vi5_video_formats[] = {
 	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
 				RAW12, SBGGR12, "BGBG.. GRGR.."),
 
+
+	/* RAW 14: packed 14-bit (CSI-2 DT=0x2d), unpacked to 16-bit via pad0_en=1 */
+   TEGRA_VIDEO_FORMAT(RAW14, 14, FIXED, 2, 1, T_R16,
+            RAW14, Y14, "RAW14"),
+ 
 	/* RAW 16 */
         TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
                                 RAW16, Y16, "RAW16"),
+        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
+        			RAW16, Y16_BE, "RAW16_BE"),
 
 	/* RGB888 */
-// Exosens comment :
-// Nvidia changed the RGB888 TEGRA_VIDEO_FORMAT video format for L4T 35.4.1 version
-// RGBA32 instead of ABGR32
-// For compatibility with Exosens cameras, keep ABGR32 format
-// 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
-//				RGB888, RGBA32, "RGBA-8-8-8-8"),
+TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
+			RGB888, RGBA32, "RGBA-8-8-8-8"),
 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
 				RGB888, ABGR32, "BGRA-8-8-8-8"),
 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X32_PADHI, 4, 1, T_A8B8G8R8,

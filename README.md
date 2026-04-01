@@ -23,14 +23,14 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
     - [Package installation](#package-installation)
     - [Configuring camera ports](#configuring-camera-ports)
   - [Quick start - Testing the camera](#quick-start---testing-the-camera)
+- [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
 - [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
   - [Linux boot configuration](#linux-boot-configuration)
-  - [Orin NX/Nano devkit devicetree issue](#orin-nxnano-devkit-devicetree-issue)
+  - [Orin NX/Nano CSI lanes issues](#orin-nxnano-csi-lanes-issues)
 - [Shell completion](#shell-completion)
-- [Hints to help integrating the drivers on other L4T versions and carrier boards](#hints-to-help-integrating-the-drivers-on-other-l4t-versions-and-carrier-boards)
-  - [Adding a new L4T version, vendor, or carrier board](#adding-a-new-l4t-version-vendor-or-carrier-board)
-  - [Creating device trees for a new SoM / carrier board](#creating-device-trees-for-a-new-som-carrier-board)
-  - [Understanding the source copy and patch generation workflow](#understanding-the-source-copy-and-patch-generation-workflow)
+- [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
+- [Appendix B: Adding a new camera type](#appendix-b-adding-a-new-camera-type)
+- [Appendix C: Supported cameras — MIPI lanes and video formats](#appendix-c-supported-cameras--mipi-lanes-and-video-formats)
 
 ---
 
@@ -40,11 +40,21 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
 
 **Recommended OS:** Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. Ubuntu 22.04 LTS is currently used.
 
+**Git configuration:** A name and email must be set (used when generating package version strings):
+
+```bash
+git config user.email your@email.com
+git config user.name "Your Name"
+```
+
 **Required packages:**
 
 ```bash
 # For standalone builds (L4T 36.x): ARM64 emulation for initramfs generation
 sudo apt install qemu-user-static binfmt-support
+
+# For kernel/device tree build (parser generators)
+sudo apt install flex bison
 
 # For faster archive extraction (highly recommended)
 sudo apt install lbzip2 pigz pbzip2
@@ -55,6 +65,9 @@ sudo gem install fpm
 
 # For JSON configuration processing
 sudo apt install jq
+
+# For kernel module build (OpenSSL headers)
+sudo apt install libssl-dev
 ```
 
 ---
@@ -82,6 +95,7 @@ The Exosens camera driver modifications are available in two formats:
 #### Building workflow
 
 The `l4t_make.sh` script orchestrates the entire build process. Use `./l4t_make.sh --help` for complete documentation.
+It uses individual scripts for build steps.
 
 **Step 1: Prepare the L4T environment**
 
@@ -90,6 +104,11 @@ Download and extract the BSP, toolchain, and sources for a specific L4T version:
 ```bash
 ./l4t_make.sh -v <l4t_version> --prepare
 ```
+or use the individual script for more logs : 
+```bash
+./l4t_prepare.sh -v <l4t_version>
+```
+
 
 To start from scratch (delete existing build directory):
 
@@ -109,6 +128,10 @@ Copy Exosens sources to the build environment and generate distribution patches:
 ```bash
 ./l4t_make.sh -v <l4t_version> --copy-sources
 ```
+or use the individual script for more logs : 
+```bash
+./l4t_copy_sources.sh -v <l4t_version>
+```
 
 This step:
 - Copies source files from `sources/` to the build environment
@@ -121,6 +144,10 @@ Compile the kernel, device trees, and kernel modules:
 
 ```bash
 ./l4t_make.sh -v <l4t_version> --build
+```
+or use the individual script for more logs : 
+```bash
+./l4t_build.sh -v <l4t_version>
 ```
 
 This step:
@@ -135,6 +162,10 @@ Create the deliverable `.deb` package:
 
 ```bash
 ./l4t_make.sh -v <l4t_version> --gen-package [-p <debian_version>]
+```
+or use the individual script for more logs : 
+```bash
+./l4t_gen_delivery_package.sh -v <l4t_version> [-p <debian_version>]
 ```
 
 The `-p` option is optional. The package version is determined as follows:
@@ -155,10 +186,16 @@ The generated package: `jetson-l4t-<l4t_version>-eg-cams_<debian_version>_arm64.
 **Running all steps at once:**
 
 ```bash
-./l4t_make.sh -v <l4t_version> --all
+./l4t_make.sh -v <l4t_version>
 ```
 
 This runs all four steps (prepare, copy-sources, build, gen-package) sequentially.
+
+```bash
+./l4t_make.sh
+```
+
+This runs all four steps (prepare, copy-sources, build, gen-package) sequentially for all L4T versions.
 
 **Parallel execution:**
 
@@ -166,13 +203,13 @@ To build multiple L4T versions simultaneously:
 
 ```bash
 # Auto-detect number of CPU cores (default)
-./l4t_make.sh --all
+./l4t_make.sh
 
 # Specify number of parallel jobs
-./l4t_make.sh --all -j 4
+./l4t_make.sh -j 4
 
 # Build specific versions in parallel
-./l4t_make.sh -v "36.*" --all -j 8
+./l4t_make.sh -v "36.*" -j 8
 ```
 
 The parallel mode displays live status for each configuration showing version, vendor, carrier board, and current build step.
@@ -183,7 +220,7 @@ Because for Nvidia SDK version from L4T 36.x some kernel modules are built "out 
 - The kernel version becomes `X.Y.Z-tegra-eg` instead of `X.Y.Z-tegra`
 - ALL kernel modules are included in the package (not just camera modules)
 - A dedicated initramfs (`/boot/eg/initrd-eg`) is generated
-- The Debian package is larger (~150MB) due to all modules being included
+- The Debian package is larger (~150MB) due to all modules and initramfs being included
 
 #### Client workflow (patches only)
 
@@ -207,13 +244,20 @@ Some carrier boards require specific device trees and/or kernel configurations. 
 
 ```bash
 # Build all steps for forecr/dsboard_ornx
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --all
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx
 
 # Or step by step:
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --prepare
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --copy-sources
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --build
 ./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --gen-package
+
+# Or step by step with individual scripts :
+./l4t_prepare.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_copy_sources.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_build.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_gen_delivery_package.sh -v <l4t_version> -V forecr -c dsboard_ornx
+
 ```
 
 This generates: `jetson-l4t-<l4t_version>-forecr-dsboard-ornx-eg-cams_<debian_version>_arm64.deb`
@@ -237,9 +281,9 @@ The package was either delivered (see [MIPI_deployment](https://github.com/xenic
 #### Configuring camera ports
 
 **Note on port numbers:**
-- Jetson boards typically have 2 camera ports: "cam0" and "cam1"
-- For the AGX Orin Auvidea X230D board, port 0 is "CD" and port 1 is "AB" on the PCB
-- The `/dev/videoX` device number is NOT the camera port number, but the registration order
+- Jetson carrier boards typically include 2 camera ports: "CAM0" and "CAM1"
+- For the AGX Orin Auvidea X230D carrier board, port 0 is "CD" and port 1 is "AB" on the PCB
+- The `/dev/videoX` device number is NOT the camera port number, but the registration order. Carefully check with the eg_dt_camera_config_get script.
 
 **Default configuration:**
 
@@ -248,21 +292,21 @@ After first installation, both ports are configured for Dione cameras.
 **Changing the configuration:**
 
 ```bash
-eg_dt_camera_config_set.sh <port> <cam_type> <port> <cam_type>
+eg_dt_camera_config_set.sh <port>/<cam_type> [<port>/<cam_type>] ...
 ```
 
 Where:
 - `<port>` = `0` or `1` (camera port number)
-- `<cam_type>` = `Dione`, `MicroCube640`, `SmartIR640`, or `Crius1280`
+- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, `Crius1280`, `iLumos`, or `Microlynx`
 
-Example : 
+Example :
 ```bash
-eg_dt_camera_config_set.sh 1 SmartIR640 0 Dione
+eg_dt_camera_config_set.sh 1/SmartIR640 0/Dione
 ```
 
 **Note:** Ports not specified in the command are configured for Dione by default. So the above command is equivalent to this one :
 ```bash
-eg_dt_camera_config_set.sh 1 SmartIR640
+eg_dt_camera_config_set.sh 1/SmartIR640
 ```
 
 **After changing configuration, reboot is required:**
@@ -281,7 +325,7 @@ eg_dt_camera_config_get.sh
 
 This displays:
 - **Board:** The detected board, SoM and SoC
-- **Camera ports:** For each port, the configured camera type, connection status, video device and I2C device
+- **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format
 - **Total configured:** Number of configured cameras
 
 **Example output:**
@@ -291,12 +335,18 @@ This displays:
 Board: nvidia-devkit (orin-nx, t234)
 
 Camera ports:
-  Port 0: SmartIR640 or Crius1280 (connected)
+  Port 0: SmartIR640 (connected)
     Video device: /dev/video0
     I2C device:   /dev/eg-ec-mipi-10-0016
-  Port 1: Dione (connected)
+    Serial:       21456
+    Resolution:   640x480
+    Pixel format: 'Y16 ' (16-bit Greyscale)
+  Port 1: Dione 640 (connected)
     Video device: /dev/video1
     I2C device:   /dev/dioneir-i2c-9-000e-5a
+    Serial:       20823
+    Resolution:   640x480
+    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
 
 Total configured: 2 camera(s)
 ```
@@ -340,6 +390,13 @@ v4l2-ctl -d /dev/video0 --stream-mmap \
 v4l2-ctl -d /dev/video0 --stream-mmap \
   --set-fmt-video=width=640,height=480,pixelformat="AR24" \
   --stream-count=1 --stream-to=frame.raw
+```
+
+- **iLumos** (RAW16 format, 2048x2048):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=2048,height=2048,pixelformat="RG16" \
+  --set-ctrl=sensor_mode=0 --stream-count=1 --stream-to=frame.raw
 ```
 
 For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.
@@ -394,18 +451,10 @@ Customers can add their own kernel patches in:
 
 Consult the support team for assistance with custom modifications.
 
-### Orin NX/Nano devkit devicetree issue
+### Orin NX/Nano CSI lanes issues
 
-There is a CSI differential pair swap on Jetson Orin Nano devkit:
-https://nvidia-jetson.piveral.com/jetson-orin-nano/csi-diff-pair-polarity-swap-on-nvidia-jetson-orin-nano-dev-board/
-
-The following workaround is applied in `tegra234-p3767-camera-common-eg-cams-dione.dtsi`:
-
-```c
-lane_polarity = "6";
-```
-
-**Important:** When porting device trees to a custom carrier board embedding Orin NX/Nano, this lane polarity parameter may need to be removed if the custom board doesn't have the same swap issue.
+The Orin SoM has a CSI differential pair swap issue, and the Orin NX/Nano devkit carrier board has a CSI data lane swap issue. 
+More information is avalaible in the docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md document.
 
 ---
 
@@ -424,279 +473,172 @@ sudo cp tools/l4t_completion.bash /etc/bash_completion.d/l4t_make
 ```
 
 This provides tab-completion for:
-- Command options (`--prepare`, `--build`, `--all`, etc.)
+- Command options (`--prepare`, `--build`, etc.)
 - L4T versions (`-v 36.4.4`)
 - Vendors (`-V forecr`)
 - Carrier boards (`-c dsboard_ornx`)
 
 ---
 
-## Hints to help integrating the drivers on other L4T versions and carrier boards
+## Camera Format Performance Benchmark
 
-This section provides guidance for creating MIPI drivers for new L4T versions, vendors, and carrier boards.
+For applications requiring specific video format support or optimization, refer to the **[Camera Format Performance Benchmark](tools/camera-format-benchmark/)** for comprehensive performance analysis and automation scripts.
 
-### Adding a new L4T version, vendor, or carrier board
+This benchmark compares three camera formats (YUYV, Y16, AR24) across real-time display and H.264 encoding scenarios on NVIDIA Jetson Orin NX with JetPack 6.2.1 (L4T 36.4.4). It includes:
 
-The build system uses `l4t_versions.json` to define supported configurations.
+- **Performance metrics:** CPU load, GPU utilization, power consumption
+- **Use case recommendations:** Display-only, recording, simultaneous display+recording
+- **GStreamer command examples** for each scenario
+- **Technical analysis** of format selection trade-offs
 
-**Step 1: Update l4t_versions.json**
+The benchmark provides objective performance data to guide format selection based on your specific application requirements.
 
-Add configuration for the new L4T version:
+---
 
-```json
-{
-  "versions": {
-    "36.5.0": {
-      "vendors": ["generic", "forecr"],
-      "sources": {
-        "public": {
-          "filename": "public_sources.tbz2",
-          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/sources/public_sources.tbz2"
-        },
-        "release": {
-          "filename": "jetson_linux_r36.5.0_aarch64.tbz2",
-          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/jetson_linux_r36.5.0_aarch64.tbz2"
-        },
-        "sample_fs": {
-          "filename": "tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2",
-          "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2"
-        }
-      },
-      "toolchain": {
-        "archive": "aarch64--glibc--stable-2022.08-1.tar.bz2",
-        "url": "https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2",
-        "dir": "aarch64--glibc--stable-2022.08-1",
-        "prefix": "aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-"
-      },
-      "standalone": {
-        "forecr": {
-          "dsboard_ornx": true
-        }
-      }
-    }
-  },
-  "vendors": {
-    "generic": {
-      "carriers": ["generic"],
-      "default_carrier": "generic"
-    },
-    "forecr": {
-      "carriers": ["dsboard_ornx"],
-      "default_carrier": "dsboard_ornx"
-    }
-  },
-  "carriers": {
-    "generic": {},
-    "dsboard_ornx": {
-      "defconfig": "forecr_defconfig",
-      "dir_suffix": "dsboard_ornx"
-    }
-  }
-}
-```
+## Appendix A: Integrating drivers on other L4T versions and carrier boards
 
-**Step 2: Create source directory structure**
+This appendix provides a summary of the integration scenarios. For detailed step-by-step procedures with exact file paths, device tree format differences, and code examples, see the **[MIPI Driver Development Guide](docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md)**.
 
-Create the source directory for the new L4T version:
+### Scenario C: Porting to a new hardware platform (SoM / carrier board)
 
-```bash
-# For generic (Nvidia) boards
-mkdir -p sources/<l4t_version>_NEW/Linux_for_Tegra/
+1. Gather hardware info from schematics: CSI port mapping, I2C bus, GPIO, lane polarity
+2. Create common DTSI and per-camera overlay DTS files adapted from an existing platform
+3. Add dtbo targets to version-specific Makefiles
+4. Register the new vendor/carrier board in `eg_config.yaml`
+5. Regenerate patches with `./l4t_copy_sources.sh`
 
-# For vendor-specific boards (if applicable)
-mkdir -p sources/<l4t_version>_NEW/Linux_for_Tegra_<vendor_new>/
-```
+### Scenario D: Adding support for a new Nvidia BSP version
 
-**Step 3: Port source files**
-
-Copy and adapt source files from a similar L4T version:
-
-```bash
-# Start with the closest L4T version as a template
-cp -r sources/<l4t_version>_SIMILAR/Linux_for_Tegra/* \
-      sources/<l4t_version>_NEW/Linux_for_Tegra/
-
-# Review and adapt:
-# - Kernel defconfig files
-# - Device tree overlays
-# - Scripts in rootfs/opt/eg/ and rootfs/usr/bin/
-# - Any version-specific patches
-```
-
-**Step 4: Create device trees**
-
-See next section for detailed device tree creation.
-
-**Step 5: Test the build**
-
-```bash
-./l4t_make.sh -v <l4t_version>_NEW --all
-```
-
-### Creating device trees for a new SoM / carrier board
-
-Device tree source files location depends on L4T version:
-- **L4T 36.x:** `sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay/`
-- **L4T 32.x/35.x:** `sources/common/source/hardware_32+/nvidia/soc/t19x/kernel-dts/`
-
-**Steps for creating device trees (example for Orin with tegra234-pXXXX SoM ID):**
-
-1. **Create common base device tree:**
-
-```bash
-cd sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay/
-
-# Create the common camera definitions
-# Based on Nvidia's native tegra234-pXXXX-camera files and existing examples
-cp tegra234-p3767-camera-common-eg-cams-dione.dtsi \
-   tegra234-pXXXX-camera-common-eg-cams-dione.dtsi
-
-# Edit to match your hardware:
-# - CSI port mappings
-# - I2C bus numbers
-# - GPIO assignments
-# - Clock configurations
-```
-
-2. **Create overlay files for each camera configuration:**
-
-```bash
-# Dione camera overlay (base)
-cp tegra234-p3767-camera-p3768-eg-cams-dione.dts \
-   tegra234-pXXXX-camera-pYYYY-eg-cams-dione.dts
-
-# Port 0 overlays (1-lane and 2-lanes EngineCore)
-cp tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts \
-   tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-1-lane.dts
-
-cp tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts \
-   tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-2-lanes.dts
-
-# Port 1 overlays
-cp tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts \
-   tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-1-lane.dts
-
-cp tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts \
-   tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dts
-```
-
-3. **Update the Makefile to build the new overlays:**
-
-```makefile
-# In sources/<l4t_version>/Linux_for_Tegra/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-# (for L4T 36.x)
-
-dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cams-dione.dtbo
-dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-1-lane.dtbo
-dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-2-lanes.dtbo
-dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-1-lane.dtbo
-dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dtbo
-```
-
-4. **For vendor-specific carrier boards with special requirements:**
-
-If the carrier board has hardware differences (e.g., different GPIO for cam_i2c_mux), create a vendor-specific variant:
-
-```bash
-# Example for a Forecr board with special configuration
-cp tegra234-p3767-camera-common-eg-cams-dione.dtsi \
-   tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
-
-# Modify for the specific board's hardware
-```
+1. Add the new version to `eg_config.yaml` (BSP URLs, toolchain, vendors)
+2. Copy the version-specific directory from the closest existing version
+3. Adapt Makefiles, Kconfig, defconfig, and device tree bindings as needed
+4. Build and fix compilation errors: `./l4t_make.sh -v <new_version> --prepare --copy-sources --build`
+5. Regenerate patches with `./l4t_copy_sources.sh`
 
 ### Understanding the source copy and patch generation workflow
 
-The build system uses a two-phase approach for managing source modifications:
+The build system uses a layered source organization with 3-way merging for vendor integration. See the [MIPI Driver Development Guide — Architecture Overview](docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md#architecture-overview) for details.
 
-**Phase 1: Source Organization**
+When running `./l4t_copy_sources.sh -v <version> [-V <vendor>]`, sources are copied in layers:
 
-Source files are organized in `sources/` directory:
+1. `sources/common/` — shared Exosens files (drivers, DT, scripts)
+2. `sources/<version>/Linux_for_Tegra/` — version-specific generic files
+3. *(vendor only)* `sources/<version>/Linux_for_Tegra_<vendor>/` — vendor-specific files
 
-```
-sources/
-├── common/                         # Files common to all L4T versions
-│   ├── Linux_for_Tegra/           # Scripts, tools, documentation
-│   │   ├── rootfs/opt/eg/         # Exosens tools and scripts
-│   │   └── rootfs/usr/bin/        # System utilities
-│   └── source/                    # Common source code
-│       ├── hardware_36+/          # Hardware definitions for L4T 36.x+
-│       ├── hardware_32+/          # Hardware definitions for L4T 32.x-35.x
-│       └── nvidia-oot/            # Out-of-tree driver modules
-│
-├── 35.6.2/                        # L4T version-specific files
-│   └── Linux_for_Tegra/
-│       ├── rootfs/                # Version-specific scripts
-│       └── source/                # Version-specific kernel patches
-│
-└── 36.4.4/                        # Another L4T version
-    ├── Linux_for_Tegra/           # Generic (Nvidia) boards
-    └── Linux_for_Tegra_forecr/    # Vendor-specific (Forecr) additions
-```
+When Layers 2 and 3 both modify the same file (e.g., a Makefile), a **3-way merge** is performed using the original Nvidia BSP as the common ancestor. This means you only need to modify files in `Linux_for_Tegra/` (generic); vendor Makefiles will automatically inherit additions.
 
-**Phase 2: Copy and Patch Generation**
+---
 
-When running `./l4t_make.sh --copy-sources`:
+## Appendix B: Adding a new camera type
 
-1. **Initialize git repository** in the build directory
-   - Creates `.gitignore` to track only modified files
-   - Commits the original Nvidia BSP state
+This appendix provides a summary of the files involved. For detailed step-by-step procedures with code examples and device tree format differences, see the **[MIPI Driver Development Guide — Scenario A](docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md#scenario-a-adding-a-new-camera-to-an-existing-bsp-version)**.
 
-2. **Copy sources with priority:**
-   - First: `sources/common/` (common files)
-   - Second: `sources/<l4t_version>/` (version-specific files, overrides common)
-   - Third: `sources/<l4t_version>/Linux_for_Tegra_<vendor>/` (vendor-specific, overrides all)
+### Summary of files to create or modify
 
-3. **Track modifications:**
-   - Git detects all changes vs original Nvidia BSP
-   - Modifications include: new files, modified files, deleted files
+| Step | Files | Purpose |
+|------|-------|---------|
+| Kernel driver | `sources/common/source/nvidia-oot/drivers/media/i2c/<camera>.c` | V4L2 sensor driver |
+| Kconfig/Makefile | `sources/<version>/.../drivers/media/i2c/{Kconfig,Makefile}` | Build integration |
+| DT common | `sources/common/source/hardware_*/.../*-camera-common-eg-cams-dione.dtsi` | Camera nodes per SoC |
+| DT overlays | `sources/common/source/hardware_*/.../*-eg-cam<N>-<camera>.dts` | Per-port MIPI config |
+| DT Makefiles | `sources/<version>/.../<platform>/kernel-dts/Makefile` | Build dtbo targets |
+| config_set.sh | `sources/common/.../rootfs/usr/bin/eg_dt_camera_config_set.sh` | CAMERA_LANES entry |
+| config_get.sh | `sources/common/.../rootfs/usr/bin/eg_dt_camera_config_get.sh` | CAMERA_DATABASE entry |
+| postinst | `l4t_gen_delivery_package.sh` | Camera type normalization |
 
-4. **Generate patches automatically:**
-   - Creates patch files in `patches/<l4t_version>/`
-   - Patches are organized by directory (e.g., `source_kernel.patch`, `rootfs_opt_eg.patch`)
-   - Each patch contains all changes for that component
-   - Generates `README.txt` with patch summary
+The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
 
-5. **Verify patches:**
-   - Applies generated patches to clean state
-   - Confirms patches recreate the exact source tree
-   - Reports any discrepancies
+After modifying all files, regenerate patches with `./l4t_copy_sources.sh` for each supported version.
 
-**Benefits of this approach:**
+---
 
-- **Developer workflow:** Work with full sources, easy to modify and test
-- **Client workflow:** Lightweight distribution with patches only
-- **Version control:** Git-based tracking of all modifications
-- **Traceability:** Clear patches show exactly what changed vs Nvidia BSP
-- **Flexibility:** Easy to port changes to new L4T versions by applying patches
+## Appendix C: Supported cameras — MIPI lanes and video formats
 
-**Example: Integrating vendor-specific files**
+### Summary table
 
-Some vendors (like Forecr) provide their own kernel patches and device trees. To integrate:
+| Camera | Driver | MIPI Lanes 
+|--------|--------|:----------:|
+| EngineCore (EC) | `eg-ec-mipi` | 1 or 2 |
+| Dione IR | `dioneir` | 2 |
+| iLumos | `ilumos` | 4 |
+| Microlynx | `microlynx` | 2 |
 
-1. Download vendor sources (e.g., from Forecr GitHub)
-2. Create vendor directory: `sources/<l4t_version>/Linux_for_Tegra_<vendor>/`
-3. Extract relevant files (defconfig, device trees, patches)
-4. Run `--copy-sources` to merge vendor files with Exosens modifications
-5. Generated patches combine both vendor and Exosens changes
+---
 
-**Example: Forecr integration**
+### EngineCore (EC)
 
-```bash
-# Forecr provides kernel patches and device trees
-# Their sources are imported to:
-sources/36.4.3/Linux_for_Tegra_forecr/
+**Driver:** `eg-ec-mipi`
+**Compatible models:** MicroCube, SmartIR640, Crius1280
 
-# When building:
-./l4t_make.sh -v 36.4.3 -V forecr --copy-sources
+**MIPI CSI-2 lanes:**
 
-# This copies in order:
-# 1. sources/common/                          (Exosens common)
-# 2. sources/36.4.3/Linux_for_Tegra/          (Exosens for 36.4.3)
-# 3. sources/36.4.3/Linux_for_Tegra_forecr/   (Forecr + Exosens for 36.4.3)
+| Model | Lanes |
+|-------|:-----:|
+| MicroCube | 1 |
+| SmartIR640, Crius1280 | 2 |
 
-# Result: Combined Nvidia + Forecr + Exosens sources
-```
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 640 × 480 | 16-bit raw greyscale | `Y16` |
+| 640 × 480 | 32-bit BGRA | `AR24` |
+| 640 × 480 | YUV 4:2:2 | `YUYV` |
+| 1280 × 1024 | 16-bit raw greyscale | `Y16` |
+| 1280 × 1024 | 32-bit BGRA | `AR24` |
+| 1280 × 1024 | YUV 4:2:2 | `YUYV` |
+
+The `Y16` format requires L4T kernel 5.0 or later (L4T 35.x+).
+
+---
+
+### Dione IR
+
+**Driver:** `dioneir`
+**Bridge chip:** Toshiba TC358746 (parallel-to-CSI-2)
+
+**MIPI CSI-2 lanes:** 2
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 320 × 240 | 32-bit BGRA | `AR24` |
+| 640 × 480 | 32-bit BGRA | `AR24` |
+| 1024 × 768 | 32-bit BGRA | `AR24` |
+| 1280 × 1024 | 32-bit BGRA | `AR24` |
+
+The active resolution depends on the camera model. The TC358746 bridge handles the parallel-to-MIPI conversion; the pixel format is fixed to 32-bit BGRA as delivered over CSI-2.
+
+---
+
+### iLumos
+
+**Driver:** `ilumos`
+
+**MIPI CSI-2 lanes:** 4
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 2048 × 2048 | 16-bit raw greyscale | `Y16` |
+| 2048 × 1088 | 16-bit raw greyscale | `Y16` |
+
+---
+
+### Microlynx
+
+**Driver:** `microlynx`
+
+**MIPI CSI-2 lanes:** 2
+
+**Video modes:**
+
+| Resolution | Pixel format | V4L2 format |
+|------------|--------------|-------------|
+| 1024 × 128 | 16-bit raw greyscale | `Y16` |
+
 
 ---
 

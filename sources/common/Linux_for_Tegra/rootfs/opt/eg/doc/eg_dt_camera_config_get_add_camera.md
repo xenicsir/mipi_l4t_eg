@@ -31,6 +31,7 @@ CAMERA_DATABASE=(
     "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
     "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
     "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
+    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
 )
 ```
 
@@ -62,7 +63,22 @@ CAMERA_DATABASE=(
 )
 ```
 
-### Example 2: Adding a Variant of Existing Camera
+### Example 2: Real-World Example - iLumos Camera
+
+The iLumos camera was added with its own I2C address (0x30) and 4 MIPI lanes:
+
+```bash
+CAMERA_DATABASE=(
+    "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
+    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
+    "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
+    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
+)
+```
+
+**Note**: Since iLumos uses a unique I2C address (0x30), no MIPI lane disambiguation is needed.
+
+### Example 3: Adding a Variant of Existing Camera
 
 Let's add an EC camera with 4 MIPI lanes:
 
@@ -77,7 +93,7 @@ CAMERA_DATABASE=(
 
 **Note**: This camera shares the same I2C address and device tree pattern as other EC cameras. The script will differentiate them by checking the `mode0/num_lanes` value in the device tree.
 
-### Example 3: Camera with Different Port Naming
+### Example 4: Camera with Different Port Naming
 
 If your camera uses a different naming convention (e.g., `mycam_port_X@1a`):
 
@@ -220,6 +236,7 @@ CAMERA_DATABASE=(
     "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
     "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
     "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
+    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
 
     # New VisionCam family
     # - All use I2C address 0x25

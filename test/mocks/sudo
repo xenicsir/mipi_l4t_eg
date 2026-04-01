@@ -1,0 +1,12 @@
+#!/bin/bash
+# Sudo passthrough for root in test container.
+# Strips sudo-specific flags and executes the remaining command directly.
+while [[ "$1" == -* ]]; do
+    case "$1" in
+        -S|-n|-E|-k|-K|-v|-l) shift ;;   # flags that take no argument
+        -u|-g|-p|-C|-r|-t|-T) shift 2 ;; # flags that take an argument
+        --) shift; break ;;
+        *) break ;;
+    esac
+done
+exec "$@"

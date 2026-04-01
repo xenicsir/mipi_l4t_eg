@@ -11,13 +11,13 @@ Carrier board: dsboard_ornx
 Total patches: 7
 
 Patch files:
-  - rootfs_opt_eg.patch (23 files, 3082 lines)
-  - rootfs_usr_bin.patch (12 files, 2068 lines)
-  - source_public_hardware.patch (175 files, 36194 lines)
-  - source_public_kernel_nvidia_drivers_media_i2c.patch (12 files, 5809 lines)
-  - source_public_kernel_nvidia_drivers_media_platform.patch (5 files, 106 lines)
+  - rootfs_opt_eg.patch (23 files, 3457 lines)
+  - rootfs_usr_bin.patch (15 files, 4096 lines)
+  - source_public_hardware.patch (198 files, 40635 lines)
+  - source_public_kernel_nvidia_drivers_media_i2c.patch (26 files, 9407 lines)
+  - source_public_kernel_nvidia_drivers_media_platform.patch (6 files, 171 lines)
   - source_public_kernel_nvidia_include_media.patch (3 files, 91 lines)
-  - source_public_kernel.patch (39 files, 18095 lines)
+  - source_public_kernel.patch (39 files, 18113 lines)
 
 Usage:
   To apply these patches instead of using l4t_copy_sources.sh, run:

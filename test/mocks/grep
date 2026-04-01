@@ -1,0 +1,10 @@
+#!/bin/bash
+# Redirect /proc/device-tree → $TEST_PROC_DT (set by test runner)
+if [[ -n "$TEST_PROC_DT" ]]; then
+    args=()
+    for arg in "$@"; do
+        args+=("${arg//\/proc\/device-tree/$TEST_PROC_DT}")
+    done
+    exec /usr/bin/grep "${args[@]}"
+fi
+exec /usr/bin/grep "$@"

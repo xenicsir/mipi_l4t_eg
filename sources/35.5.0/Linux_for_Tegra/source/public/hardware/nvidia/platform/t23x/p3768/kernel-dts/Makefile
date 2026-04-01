@@ -43,6 +43,7 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-overlay.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3768-overlay.dtbo
 
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cams-dione.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo
@@ -53,6 +54,10 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
 
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))

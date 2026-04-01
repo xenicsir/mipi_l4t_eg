@@ -1,10 +1,10 @@
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 old mode 100644
 new mode 100755
-index 010c996..969acc8
+index 010c996..496c95c
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
-@@ -129,6 +129,11 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
+@@ -129,6 +129,21 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
  		V4L2_COLORSPACE_SRGB,
  		V4L2_PIX_FMT_VYUY,
  	},
@@ -13,21 +13,35 @@ index 010c996..969acc8
 +		V4L2_COLORSPACE_RAW,
 +		V4L2_PIX_FMT_Y16,
 +	},
++	{
++		MEDIA_BUS_FMT_FIXED,
++		V4L2_COLORSPACE_RAW,
++		V4L2_PIX_FMT_Y16_BE,
++	},
++	{
++		MEDIA_BUS_FMT_FIXED,
++		V4L2_COLORSPACE_RAW,
++		V4L2_PIX_FMT_Y14,
++	},
  };
  
  struct camera_common_csi_io_pad_ctx {
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
 old mode 100644
 new mode 100755
-index 92cc2fd..20cb661
+index 92cc2fd..6c3398f
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
-@@ -267,8 +267,10 @@ static int extract_pixel_format(
+@@ -267,8 +267,14 @@ static int extract_pixel_format(
  		*format = V4L2_PIX_FMT_UYVY;
  	else if (strncmp(pixel_t, "yuv_vyuy16", size) == 0)
  		*format = V4L2_PIX_FMT_VYUY;
 +	else if (strncmp(pixel_t, "raw_grey16", size) == 0)
 +		*format = V4L2_PIX_FMT_Y16;
++	else if (strncmp(pixel_t, "raw_grey_be16", size) == 0)
++		*format = V4L2_PIX_FMT_Y16_BE;
++	else if (strncmp(pixel_t, "raw_grey14", size) == 0)
++		*format = V4L2_PIX_FMT_Y14;
  	else {
 -		pr_err("%s: Need to extend format%s\n", __func__, pixel_t);
 +		pr_err("%s: Need to extend format %s\n", __func__, pixel_t);
@@ -61,10 +75,54 @@ index 142e53d..e5bdae8
  	}
  
  	if (!tc_dev->sensor_ops) {
+diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c
+index 6f98c64..6f38f30 100644
+--- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c
++++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/channel.c
+@@ -1914,7 +1914,38 @@ static void tegra_channel_populate_dev_info(struct tegra_camera_dev_info *cdev,
+ 		cdev->pixel_rate = pixelclock * (max_num_lanes / NUM_LANES_PER_BRICK);
+ 	else
+ 		cdev->pixel_rate = pixelclock;
+-	cdev->pixel_bit_depth = chan->fmtinfo->width;
++	/*
++	 * Bug: using chan->fmtinfo->width for pixel_bit_depth is incorrect for
++	 * MEDIA_BUS_FMT_FIXED sensors (multiple pixel depths, e.g. RAW14/RAW16/RGB888).
++	 * The bind-time fmtinfo is determined by vi5_video_formats[] entry ordering,
++	 * not by the sensor's actual CSI depth.  For such sensors, derive the max
++	 * csi_pixel_bit_depth from DT signal properties:
++	 *   D-PHY: mipi_clock = pix_clk * depth / (2 * num_lanes)
++	 *       => depth = mipi_clock * 2 * num_lanes / pix_clk
++	 * For standard sensors the formula yields the same value as fmtinfo->width.
++	 */
++	if (s_data != NULL) {
++		u32 max_depth = 0;
++		int i;
++
++		for (i = 0; i < s_data->sensor_props.num_modes; i++) {
++			struct sensor_mode_properties *sm =
++				&s_data->sensor_props.sensor_modes[i];
++			u64 pclk  = sm->signal_properties.pixel_clock.val;
++			u64 mclock = sm->signal_properties.mipi_clock.val;
++			u32 lanes = sm->signal_properties.num_lanes;
++			u32 depth;
++
++			if (pclk == 0 || mclock == 0 || lanes == 0)
++				continue;
++			depth = (u32)div64_u64(mclock * 2 * lanes, pclk);
++			if (depth > max_depth)
++				max_depth = depth;
++		}
++		cdev->pixel_bit_depth = max_depth > 0 ? max_depth : chan->fmtinfo->width;
++	} else {
++		cdev->pixel_bit_depth = chan->fmtinfo->width;
++	}
+ 	cdev->bpp = chan->fmtinfo->bpp.numerator;
+ 	/* BW in kBps */
+ 	cdev->bw = cdev->pixel_rate * cdev->bpp / 1024;
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 old mode 100644
 new mode 100755
-index 1d0c113..b48de43
+index 1d0c113..639b0bc
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 @@ -2,7 +2,13 @@
@@ -82,21 +140,24 @@ index 1d0c113..b48de43
   */
  
  #ifndef __VI5_FORMATS_H_
-@@ -111,9 +117,19 @@ static const struct tegra_video_format vi5_video_formats[] = {
+@@ -111,9 +117,22 @@ static const struct tegra_video_format vi5_video_formats[] = {
  	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
  				RAW12, SBGGR12, "BGBG.. GRGR.."),
  
++
++	/* RAW 14: packed 14-bit (CSI-2 DT=0x2d), unpacked to 16-bit via pad0_en=1 */
++   TEGRA_VIDEO_FORMAT(RAW14, 14, FIXED, 2, 1, T_R16,
++            RAW14, Y14, "RAW14"),
++ 
 +	/* RAW 16 */
 +        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
 +                                RAW16, Y16, "RAW16"),
++        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
++        			RAW16, Y16_BE, "RAW16_BE"),
 +
  	/* RGB888 */
-+// Exosens comment :
-+// Nvidia changed the RGB888 TEGRA_VIDEO_FORMAT video format for L4T 35.4.1 version
-+// RGBA32 instead of ABGR32
-+// For compatibility with Exosens cameras, keep ABGR32 format
-+// 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
-+//				RGB888, RGBA32, "RGBA-8-8-8-8"),
++TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
++			RGB888, RGBA32, "RGBA-8-8-8-8"),
  	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
 -				RGB888, RGBA32, "RGBA-8-8-8-8"),
 +				RGB888, ABGR32, "BGRA-8-8-8-8"),

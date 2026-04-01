@@ -1,0 +1,33 @@
+// Base DTB — two IMX219 nodes, already DISABLED in the base DTB
+/dts-v1/;
+/ {
+	compatible = "nvidia,tegra234";
+	model = "Test Jetson Board";
+
+	cam_i2cmux {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		i2c@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			rbpcv2_imx219_a@10 {
+				compatible = "sony,imx219";
+				reg = <0x10>;
+				status = "disabled";
+			};
+		};
+
+		i2c@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			rbpcv2_imx219_c@10 {
+				compatible = "sony,imx219";
+				reg = <0x10>;
+				status = "disabled";
+			};
+		};
+	};
+};

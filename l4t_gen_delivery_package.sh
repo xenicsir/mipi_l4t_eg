@@ -235,39 +235,209 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
    else
       echo "  Warning: No modules found in $MODULES_SRC"
    fi
-elif [[ $L4T_VERSION_MAJOR -ge 36 ]]; then
-   # L4T 36.x+ standard build: Copy only Exosens camera modules (OOT)
-   I2C_DRIVER_DIR="updates/drivers/media/i2c"
-
-   copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
-   copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
-   copy_module "updates/drivers/video/tegra/camera" "tegra_camera_platform.ko"
-   copy_module "updates/drivers/media/platform/tegra/camera" "tegra-camera.ko"
-   copy_module "updates/drivers/video/tegra/host/nvcsi" "nvhost-nvcsi-t194.ko"
 else
-   # L4T 35.x and earlier standard build: Copy only Exosens camera modules (in-tree)
+   # L4T 35.x and earlier standard build: auto-detect Exosens camera modules
    I2C_DRIVER_DIR="kernel/drivers/media/i2c"
+   I2C_PATCH_FILE="$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}/source_public_kernel_nvidia_drivers_media_i2c.patch"
+   EG_MODULES=()
 
-   copy_module "$I2C_DRIVER_DIR" "dione_ir.ko"
-   copy_module "$I2C_DRIVER_DIR" "eg-ec-mipi.ko"
+   # Detect new modules from patch file (works with both l4t_copy_sources.sh and l4t_patch_sources.sh)
+   if [[ -f "$I2C_PATCH_FILE" ]]; then
+      while IFS= read -r mod_name; do
+         [[ -z "$mod_name" ]] && continue
+         EG_MODULES+=("${mod_name}.ko")
+      done < <(grep '^+obj-' "$I2C_PATCH_FILE" | sed 's/.*+=//' | tr -d '[:blank:]' | sed 's/\.o$//' | sort -u)
+   else
+      echo "  WARNING: Patch file not found: $I2C_PATCH_FILE"
+   fi
+
+   if [[ ${#EG_MODULES[@]} -gt 0 ]]; then
+      echo "  Auto-detected Exosens modules: ${EG_MODULES[*]}"
+      for module in "${EG_MODULES[@]}"; do
+         copy_module "$I2C_DRIVER_DIR" "$module"
+      done
+   else
+      echo "  WARNING: Could not auto-detect modules from patch file"
+   fi
 fi
 
 #******************************************************************************
-# Step 6: Create post-install script
+# Step 6: Create pre-install script
 #******************************************************************************
 update_status "Creating install scripts..."
-cat > /tmp/postinst << 'EOT'
+
+# Use build-specific temp file names to avoid collisions when multiple
+# builds run in parallel (e.g. generic and forecr for the same L4T version).
+_BUILD_ID="${L4T_VERSION_EXTENDED}_${CARRIER_BOARD:-generic}"
+_PREINST="/tmp/preinst_${_BUILD_ID}"
+_POSTINST="/tmp/postinst_${_BUILD_ID}"
+_POSTRM="/tmp/postrm_${_BUILD_ID}"
+
+# The package's /etc/version_eg_cams is not yet on disk when preinst runs
+# (dpkg unpacks files only after preinst succeeds), so we embed its content
+# verbatim here at build time. The L4T version is then extracted from it to
+# compare against the running system's /etc/nv_tegra_release.
+cat > "$_PREINST" << 'EOT'
+#!/bin/bash
+set -e
+EOT
+
+# Embed the exact same string that Step 3 writes to /etc/version_eg_cams
+cat >> "$_PREINST" << EOT
+PACKAGE_VERSION_LINE="jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT_COMMIT})"
+EOT
+
+cat >> "$_PREINST" << 'EOT'
+
+case "$1" in
+    install|upgrade)
+        # Extract the L4T version and vendor from the embedded version_eg_cams string:
+        # Generic:  "jetson-l4t-35.6.2_eg ..." -> L4T=35.6.2, VENDOR=generic
+        # Forecr:   "jetson-l4t-35.6.2_forecr_eg ..." -> L4T=35.6.2, VENDOR=forecr
+
+        # Extract version_extended (35.6.2 or 35.6.2_forecr)
+        EXPECTED_VERSION_EXTENDED=$(echo "$PACKAGE_VERSION_LINE" | sed 's/^jetson-l4t-\([^_]*\(_[^_]*\)\?\)_eg.*/\1/')
+
+        # Extract L4T version (first part before vendor suffix)
+        EXPECTED_L4T=$(echo "$EXPECTED_VERSION_EXTENDED" | sed 's/_.*$//')
+
+        # Determine expected vendor: if version_extended contains underscore, it's forecr or other vendor
+        if [[ "$EXPECTED_VERSION_EXTENDED" =~ _forecr$ ]]; then
+            EXPECTED_VENDOR="forecr"
+        else
+            EXPECTED_VENDOR="generic"
+        fi
+
+        # Check /etc/nv_tegra_release
+        if [[ ! -f /etc/nv_tegra_release ]]; then
+            echo "Error: /etc/nv_tegra_release not found." >&2
+            echo "This package requires NVIDIA Jetson Linux (L4T) ${EXPECTED_L4T}." >&2
+            exit 1
+        fi
+
+        # Extract L4T version from running system
+        NV_MAJOR=$(sed -n 's/.*# R\([0-9]*\) .*/\1/p' /etc/nv_tegra_release | head -1)
+        NV_REVISION=$(sed -n 's/.*REVISION: \([0-9.]*\).*/\1/p' /etc/nv_tegra_release | head -1)
+
+        if [[ -z "$NV_MAJOR" || -z "$NV_REVISION" ]]; then
+            echo "Error: Could not parse L4T version from /etc/nv_tegra_release." >&2
+            exit 1
+        fi
+
+        RUNNING_L4T="${NV_MAJOR}.${NV_REVISION}"
+
+        # Check L4T version match (allow only .0 patch variants: 36.4 == 36.4.0, but NOT 36.4 == 36.4.3)
+        # Normalize by replacing .0 with nothing for both versions
+        EXPECTED_NORMALIZED=$(echo "$EXPECTED_L4T" | sed 's/\.0$//')
+        RUNNING_NORMALIZED=$(echo "$RUNNING_L4T" | sed 's/\.0$//')
+
+        if [[ "$EXPECTED_NORMALIZED" != "$RUNNING_NORMALIZED" ]]; then
+            echo "Error: Incompatible L4T version." >&2
+            echo "  This package was built for L4T ${EXPECTED_L4T}." >&2
+            echo "  Running system: L4T ${RUNNING_L4T}" >&2
+            echo "  Install the package matching your L4T version." >&2
+            exit 1
+        fi
+
+        # Detect running system's board vendor (generic NVIDIA vs Forecr/others)
+        RUNNING_VENDOR="generic"
+        if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
+            DTB=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
+            # Forecr boards have DTB names containing dsboard, milboard, raiboard
+            if [[ "$DTB" =~ (dsboard|milboard|raiboard) ]]; then
+                RUNNING_VENDOR="forecr"
+            fi
+        fi
+
+        # Check board vendor match
+        if [[ "$RUNNING_VENDOR" != "$EXPECTED_VENDOR" ]]; then
+            echo "Error: Board vendor mismatch." >&2
+            echo "  This package was built for: $EXPECTED_VENDOR" >&2
+            echo "  Running system: $RUNNING_VENDOR" >&2
+            echo "  Install the package matching your board type." >&2
+            exit 1
+        fi
+        ;;
+esac
+EOT
+
+#******************************************************************************
+# Step 7: Create post-install script
+#******************************************************************************
+cat > "$_POSTINST" << 'EOT'
 #!/bin/bash
 depmod
 EOT
 
-# Add Exosens camera overlay configuration
-cat >> /tmp/postinst << 'EOT'
+# Inject L4T version into postinst (unquoted EOT for variable expansion)
+cat >> "$_POSTINST" << EOT
+
+L4T_VERSION_MAJOR=$L4T_VERSION_MAJOR
+EOT
+
+# Add Exosens camera overlay configuration (quoted EOT, no expansion)
+cat >> "$_POSTINST" << 'EOT'
 
 # Configure Exosens camera overlay if not already done
 if ! grep -q "JetsonIO" /boot/extlinux/extlinux.conf 2>/dev/null; then
-   eg_dt_camera_config_set.sh 0 Dione 1 Dione
+   # Fresh install: configure all ports with default camera (Dione)
+   eg_dt_camera_config_set.sh
 else
+   # Upgrade: JetsonIO already configured
+
+   # Re-apply camera configuration after package upgrade
+   echo "Reading current camera configuration..."
+   CONFIG_OUTPUT=$(eg_dt_camera_config_get.sh 2>/dev/null)
+
+   if [[ -n "$CONFIG_OUTPUT" ]]; then
+      CAMERA_ARGS=""
+      while IFS= read -r line; do
+         port=""
+         cam_type=""
+
+         # Old format: "Camera port 0 configuration : Dione"
+         #             "Camera port 1 configuration : SmartIR640 and Crius1280"
+         if [[ "$line" =~ Camera\ port\ ([0-9]+)\ configuration\ :\ (.+) ]]; then
+            port="${BASH_REMATCH[1]}"
+            cam_type="${BASH_REMATCH[2]}"
+
+         # New format: "  Port 0: Dione (connected)"
+         #             "  Port 1: SmartIR640 or Crius1280 (not connected)"
+         elif [[ "$line" =~ Port\ ([0-9]+):\ ([^\(]+) ]]; then
+            port="${BASH_REMATCH[1]}"
+            cam_type="${BASH_REMATCH[2]}"
+            cam_type="${cam_type% }"
+         fi
+
+         [[ -z "$port" ]] && continue
+
+         # Normalize camera type names
+         case "$cam_type" in
+            *SmartIR640*)    cam_type="SmartIR640" ;;
+            *Crius1280*)     cam_type="Crius1280" ;;
+            *MicroCube640*)  cam_type="MicroCube640" ;;
+            *MicroCube*)     cam_type="MicroCube640" ;;
+            *iLumos*|*ilumos*) cam_type="iLumos" ;;
+            *Microlynx*|*microlynx*) cam_type="Microlynx" ;;
+            *Dione*)         cam_type="Dione" ;;
+            *)               continue ;;
+         esac
+
+         CAMERA_ARGS="$CAMERA_ARGS $port/$cam_type"
+      done <<< "$CONFIG_OUTPUT"
+
+      if [[ -n "$CAMERA_ARGS" ]]; then
+         echo "Re-applying camera configuration:$CAMERA_ARGS"
+         eg_dt_camera_config_set.sh $CAMERA_ARGS
+      else
+         echo "No camera configuration found, applying defaults"
+         eg_dt_camera_config_set.sh
+      fi
+   else
+      echo "Could not read camera configuration, applying defaults"
+      eg_dt_camera_config_set.sh
+   fi
+
    # Check if /boot/eg/Image is a standalone kernel (version ends with -eg)
    if [[ -f /boot/eg/Image ]]; then
       KERNEL_VERSION=$(strings /boot/eg/Image | grep "Linux version" | head -1 | awk '{print $3}')
@@ -295,15 +465,15 @@ fi
 EOT
 
 #******************************************************************************
-# Step 7: Create post-remove script
+# Step 8: Create post-remove script
 #******************************************************************************
-cat > /tmp/postrm << 'EOT'
+cat > "$_POSTRM" << 'EOT'
 #!/bin/bash
 depmod
 EOT
 
 #******************************************************************************
-# Step 8: Build Debian package with fpm
+# Step 9: Build Debian package with fpm
 #******************************************************************************
 update_status "Building Debian package..."
 
@@ -330,8 +500,9 @@ fpm -v ${DEB_VERSION} \
    -s dir \
    -t deb \
    -n ${PACKAGE_NAME} \
-   --after-install /tmp/postinst \
-   --after-remove /tmp/postrm \
+   --before-install "$_PREINST" \
+   --after-install "$_POSTINST" \
+   --after-remove "$_POSTRM" \
    --description "Exosens MIPI camera drivers for NVIDIA Jetson (L4T ${L4T_VERSION_EXTENDED})" \
    .
 
@@ -341,14 +512,11 @@ if [[ $? -eq 0 ]]; then
    echo "Package generated: ${DEB_PACKAGE}"
    echo "============================================"
 
-   # Copy to delivery directory if it exists
-   DELIVERY_DIR="$ROOT_DIR/delivery"
-   if [[ -d "$DELIVERY_DIR" ]]; then
-      DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${DEB_VERSION}"
-      mkdir -p "$DELIVERY_SUBDIR"
-      cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
-      echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"
-   fi
+   # Copy to delivery directory
+   DELIVERY_SUBDIR="$DELIVERY_DIR/jetson-l4t-eg-${DEB_VERSION}"
+   mkdir -p "$DELIVERY_SUBDIR"
+   cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
+   echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"
 else
    echo ""
    echo "Error: Package generation failed"
@@ -356,7 +524,7 @@ else
 fi
 
 #******************************************************************************
-# Step 9: Verify generated package
+# Step 10: Verify generated package
 #******************************************************************************
 update_status "Verifying package..."
 

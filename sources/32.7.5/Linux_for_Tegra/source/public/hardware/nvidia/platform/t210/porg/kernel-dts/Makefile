@@ -42,6 +42,10 @@ dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam0-imx219.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam0-imx477.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam1-ec-1-lane.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam1-ec-2-lanes.dtbo
+dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam0-ilumos.dtbo
+dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam1-ilumos.dtbo
+dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam0-microlynx.dtbo
+dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam1-microlynx.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam1-imx219.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_210_SOC) += tegra210-camera-eg-cam1-imx477.dtbo
 

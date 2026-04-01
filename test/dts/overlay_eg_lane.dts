@@ -1,0 +1,14 @@
+// Generic lane/camera overlay (EC_1_lane, EC_2_lanes, iLumos, Microlynx, etc.)
+// For testing purposes, all lane overlays share the same minimal content.
+/dts-v1/;
+/plugin/;
+/ {
+	compatible = "nvidia,tegra234";
+
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			eg-lane-test { status = "okay"; };
+		};
+	};
+};

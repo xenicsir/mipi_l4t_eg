@@ -193,6 +193,29 @@ echo "Directories to process: ${SUBDIRS[*]}"
 echo ""
 
 #******************************************************************************
+# Reset BSP to clean Nvidia state (undo any l4t_copy_sources.sh modifications)
+#******************************************************************************
+
+if [[ -d "$NVIDIA_BSP_DIR/.git" ]]; then
+    echo -e "${BLUE}Resetting BSP to clean Nvidia state...${NC}"
+
+    # Add safe.directory for git
+    git config --global --add safe.directory "$NVIDIA_BSP_DIR" 2>/dev/null || true
+    sudo git config --global --add safe.directory "$NVIDIA_BSP_DIR" 2>/dev/null || true
+
+    # Find "Initial state" commit
+    INITIAL_COMMIT=$(sudo git -C "$NVIDIA_BSP_DIR" log --oneline | grep "Initial state - Nvidia L4T" | head -1 | cut -d' ' -f1)
+    if [[ -n "$INITIAL_COMMIT" ]]; then
+        sudo git -C "$NVIDIA_BSP_DIR" reset --hard "$INITIAL_COMMIT"
+        sudo git -C "$NVIDIA_BSP_DIR" clean -fd 2>/dev/null || true
+        echo "  BSP reset to: $INITIAL_COMMIT"
+    else
+        echo -e "${YELLOW}  WARNING: No 'Initial state' commit found, using BSP as-is${NC}"
+    fi
+    echo ""
+fi
+
+#******************************************************************************
 # Create destination directory
 #******************************************************************************
 
@@ -321,41 +344,9 @@ copy_modified_files() {
             continue
         fi
 
-        # Determine path to Exosens generic file
-        if [[ $L4T_MAJOR -ge 36 ]]; then
-            exosens_file="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/$rel_path"
-        else
-            exosens_file="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/$rel_path"
-        fi
-
-        # Use Nvidia Forecr BSP file as base (since file is modified in Forecr)
-        nvidia_bsp_file="$NVIDIA_SRC/$rel_path"
-
         mkdir -p "$(dirname "$dest_file")"
 
-        # Check if this file also has Exosens modifications
-        if [[ -f "$exosens_file" ]] && [[ -f "$nvidia_bsp_file" ]]; then
-            # Check if Exosens file differs from Nvidia Forecr BSP (has Exosens modifications)
-            if ! diff -q "$exosens_file" "$nvidia_bsp_file" &>/dev/null; then
-                # 3-way merge needed: Base=Nvidia Forecr BSP, Ours=Exosens, Theirs=Forecr kernel
-                echo "    MERGED: $rel_path (Exosens + Forecr)"
-
-                # Use git merge-file for 3-way merge
-                cp "$exosens_file" "$dest_file"
-                if git merge-file -q "$dest_file" "$nvidia_bsp_file" "$src_file" 2>/dev/null; then
-                    # Merge succeeded without conflicts
-                    :
-                else
-                    # Merge had conflicts - keep merged file with conflict markers
-                    echo "      WARNING: Merge conflicts detected, review $dest_file"
-                fi
-                count=$((count + 1))
-                TOTAL_MODIFIED=$((TOTAL_MODIFIED + 1))
-                continue
-            fi
-        fi
-
-        # No merge needed, just copy Forecr file
+        # Copy Forecr-only modifications (merge with Exosens sources is handled by l4t_copy_sources.sh)
         cp "$src_file" "$dest_file"
         echo "    MODIFIED: $rel_path"
         count=$((count + 1))

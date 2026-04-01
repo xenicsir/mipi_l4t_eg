@@ -11,12 +11,12 @@ Carrier board: generic
 Total patches: 8
 
 Patch files:
-  - rootfs_opt_eg.patch (23 files, 3106 lines)
-  - rootfs_usr_bin.patch (12 files, 2068 lines)
-  - source_hardware.patch (27 files, 6711 lines)
+  - rootfs_opt_eg.patch (23 files, 3481 lines)
+  - rootfs_usr_bin.patch (15 files, 4096 lines)
+  - source_hardware.patch (41 files, 9617 lines)
   - source_kernel.patch (2 files, 59 lines)
-  - source_nvidia-oot_drivers_media_i2c.patch (9 files, 4750 lines)
-  - source_nvidia-oot_drivers_media_platform.patch (4 files, 105 lines)
+  - source_nvidia-oot_drivers_media_i2c.patch (23 files, 8324 lines)
+  - source_nvidia-oot_drivers_media_platform.patch (5 files, 166 lines)
   - source_nvidia-oot_include_media.patch (2 files, 36 lines)
   - source.patch (1 files, 24 lines)
 

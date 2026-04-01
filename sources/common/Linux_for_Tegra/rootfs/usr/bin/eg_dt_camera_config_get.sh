@@ -34,8 +34,10 @@
 #
 CAMERA_DATABASE=(
     "dione:0e:xenics_dione_ir_([a-h])@0e:Dione:0"
-    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube640:1"
+    "ec_1lane:16:eg_ec_([a-h])@16:MicroCube:1"
     "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
+    "ilumos:30:ilumos_([a-h])@30:iLumos:4"
+    "microlynx:51:microlynx_([a-h])@51:Microlynx:2"
 )
 
 # Output mode
@@ -211,7 +213,38 @@ check_camera_connected() {
         camera_video_dev[$port_num]=$(find_video_device "$conn_i2c_bus" "$conn_i2c_addr")
         camera_i2c_chardev[$port_num]=$(find_i2c_chardev "$conn_i2c_bus" "$conn_i2c_addr" "$conn_driver")
 
-        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]}" >&2
+        # Read camera details from sysfs and V4L2
+        local sysfs_path="/sys/bus/i2c/devices/${conn_i2c_bus}-00${conn_i2c_addr}"
+        camera_sysfs_paths[$port_num]="$sysfs_path"
+        camera_model[$port_num]=$(cat "$sysfs_path/model" 2>/dev/null | tr -d '\n')
+        camera_serial[$port_num]=$(cat "$sysfs_path/serial_number" 2>/dev/null | tr -d '\n')
+        camera_fwver[$port_num]=$(cat "$sysfs_path/firmware_version" 2>/dev/null | tr -d '\n')
+
+        # Read native resolution and pixel format from sysfs (preferred)
+        camera_resolution[$port_num]=$(cat "$sysfs_path/resolution" 2>/dev/null | tr -d '\n')
+        camera_pixfmt[$port_num]=$(cat "$sysfs_path/pixel_format" 2>/dev/null | tr -d '\n')
+
+        # Fallback to V4L2 for resolution and pixel format
+        if [[ -z "${camera_resolution[$port_num]}" ]] || [[ -z "${camera_pixfmt[$port_num]}" ]]; then
+            if [[ -n "${camera_video_dev[$port_num]}" ]] && command -v v4l2-ctl &>/dev/null; then
+                local v4l2_fmt
+                v4l2_fmt=$(v4l2-ctl --device "${camera_video_dev[$port_num]}" --get-fmt-video 2>/dev/null)
+                if [[ -n "$v4l2_fmt" ]]; then
+                    if [[ -z "${camera_resolution[$port_num]}" ]]; then
+                        local wh
+                        wh=$(echo "$v4l2_fmt" | grep -oP 'Width/Height\s*:\s*\K[0-9]+/[0-9]+')
+                        if [[ -n "$wh" ]]; then
+                            camera_resolution[$port_num]="${wh}"
+                        fi
+                    fi
+                    if [[ -z "${camera_pixfmt[$port_num]}" ]]; then
+                        camera_pixfmt[$port_num]=$(echo "$v4l2_fmt" | grep -oP "Pixel Format\s*:\s*'\K[^']+")
+                    fi
+                fi
+            fi
+        fi
+
+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num: video=${camera_video_dev[$port_num]} i2c_chardev=${camera_i2c_chardev[$port_num]} model=${camera_model[$port_num]} serial=${camera_serial[$port_num]} res=${camera_resolution[$port_num]} fmt=${camera_pixfmt[$port_num]} fw=${camera_fwver[$port_num]}" >&2
 
         # Match the configured camera type with the connected camera
         # Check if the display name matches OR if they're in the same category
@@ -247,6 +280,11 @@ check_camera_connected() {
     camera_connected[$port_num]="not connected"
     camera_video_dev[$port_num]=""
     camera_i2c_chardev[$port_num]=""
+    camera_model[$port_num]=""
+    camera_serial[$port_num]=""
+    camera_fwver[$port_num]=""
+    camera_resolution[$port_num]=""
+    camera_pixfmt[$port_num]=""
     [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Port $port_num (letter: $port_letter): not connected" >&2
     return 1
 }
@@ -306,24 +344,6 @@ get_camera_type_from_node() {
 }
 
 #******************************************************************************
-# Function: Map port letter to port number
-#******************************************************************************
-letter_to_port() {
-    local letter="$1"
-    case "$letter" in
-        a) echo 0 ;;
-        b) echo 0 ;;  # On Orin boards, 'b' is port 0
-        c) echo 1 ;;
-        d) echo 1 ;;
-        e) echo 2 ;;
-        f) echo 3 ;;
-        g) echo 4 ;;
-        h) echo 5 ;;
-        *) echo -1 ;;
-    esac
-}
-
-#******************************************************************************
 # Function: Discover cameras in specific device tree locations
 #******************************************************************************
 discover_cameras() {
@@ -332,24 +352,28 @@ discover_cameras() {
     declare -gA camera_i2c_paths
     declare -gA camera_letters
 
-    # Search locations for camera devices (ordered by likelihood)
+    # Search locations for camera devices
+    # Format: "port_number:path"
+    # Port numbers are physical port indices for each carrier board.
+    # For cam_i2cmux boards, port number = i2c@N index.
+    # For AGX Orin direct I2C, port numbers follow the hardware mapping.
     local search_paths=(
-        "$dt_base/cam_i2cmux/i2c@0"
-        "$dt_base/cam_i2cmux/i2c@1"
-        "$dt_base/cam_i2cmux/i2c@2"
-        "$dt_base/cam_i2cmux/i2c@3"
-        "$dt_base/bus@0/cam_i2cmux/i2c@0"
-        "$dt_base/bus@0/cam_i2cmux/i2c@1"
-        "$dt_base/bus@0/cam_i2cmux/i2c@2"
-        "$dt_base/bus@0/cam_i2cmux/i2c@3"
-        "$dt_base/bus@0/i2c@31e0000"
-        "$dt_base/bus@0/i2c@c240000"
-        "$dt_base/bus@0/i2c@c250000"
-        "$dt_base/bus@0/i2c@3180000"
-        "$dt_base/i2c@31e0000"
-        "$dt_base/i2c@c240000"
-        "$dt_base/i2c@c250000"
-        "$dt_base/i2c@3180000"
+        "0:$dt_base/cam_i2cmux/i2c@0"
+        "1:$dt_base/cam_i2cmux/i2c@1"
+        "2:$dt_base/cam_i2cmux/i2c@2"
+        "3:$dt_base/cam_i2cmux/i2c@3"
+        "0:$dt_base/bus@0/cam_i2cmux/i2c@0"
+        "1:$dt_base/bus@0/cam_i2cmux/i2c@1"
+        "2:$dt_base/bus@0/cam_i2cmux/i2c@2"
+        "3:$dt_base/bus@0/cam_i2cmux/i2c@3"
+        "0:$dt_base/bus@0/i2c@31e0000"
+        "1:$dt_base/bus@0/i2c@c240000"
+        "2:$dt_base/bus@0/i2c@c250000"
+        "3:$dt_base/bus@0/i2c@3180000"
+        "0:$dt_base/i2c@31e0000"
+        "1:$dt_base/i2c@c240000"
+        "2:$dt_base/i2c@c250000"
+        "3:$dt_base/i2c@3180000"
     )
 
     # Build list of unique glob patterns from camera database
@@ -365,12 +389,22 @@ discover_cameras() {
     done
 
     # Process each search path
-    for search_path in "${search_paths[@]}"; do
+    for search_entry in "${search_paths[@]}"; do
+        # Extract port number and path from "port_num:path" format
+        local port_num="${search_entry%%:*}"
+        local search_path="${search_entry#*:}"
+
         if [[ ! -d "$search_path" ]]; then
             continue
         fi
 
-        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Searching in: $search_path" >&2
+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Searching in: $search_path (port $port_num)" >&2
+
+        # Skip if this port is already configured
+        if [[ -n "${camera_configs[$port_num]}" ]]; then
+            [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]   Port $port_num already configured, skipping" >&2
+            continue
+        fi
 
         # Look for all camera device nodes using patterns from database
         for pattern_info in "${glob_patterns[@]}"; do
@@ -392,7 +426,7 @@ discover_cameras() {
 
                 [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]     Found device: $dev_node" >&2
 
-                # Extract port letter using regex
+                # Extract port letter using regex (for connection detection)
                 local node_name=$(basename "$dev_node")
                 if [[ "$node_name" =~ $regex_pattern ]]; then
                     local port_letter="${BASH_REMATCH[1]}"
@@ -401,29 +435,24 @@ discover_cameras() {
                         continue
                     fi
 
-                    # Map letter to port number
-                    local port_num=$(letter_to_port "$port_letter")
-
                     [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]       Port letter: $port_letter -> Port num: $port_num" >&2
 
-                    # Only process if port hasn't been configured yet
-                    if [[ $port_num -ge 0 ]] && [[ -z "${camera_configs[$port_num]}" ]]; then
-                        # Get camera type from this device node
-                        local cam_type=$(get_camera_type_from_node "$dev_node")
+                    # Get camera type from this device node
+                    local cam_type=$(get_camera_type_from_node "$dev_node")
 
-                        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]       Camera type: $cam_type" >&2
+                    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG]       Camera type: $cam_type" >&2
 
-                        if [[ "$cam_type" != "None" ]]; then
-                            camera_configs[$port_num]="$cam_type"
-                            camera_i2c_paths[$port_num]="$search_path"
-                            camera_letters[$port_num]="$port_letter"
+                    if [[ "$cam_type" != "None" ]]; then
+                        camera_configs[$port_num]="$cam_type"
+                        camera_i2c_paths[$port_num]="$search_path"
+                        camera_letters[$port_num]="$port_letter"
 
-                            if [[ $VERBOSE -eq 1 ]]; then
-                                echo "[DEBUG] Port $port_num (letter: $port_letter): $cam_type" >&2
-                                echo "[DEBUG]   Device: $dev_node" >&2
-                                echo "[DEBUG]   I2C path: $search_path" >&2
-                            fi
+                        if [[ $VERBOSE -eq 1 ]]; then
+                            echo "[DEBUG] Port $port_num (letter: $port_letter): $cam_type" >&2
+                            echo "[DEBUG]   Device: $dev_node" >&2
+                            echo "[DEBUG]   I2C path: $search_path" >&2
                         fi
+                        break 2  # Found camera for this port, move to next search_entry
                     fi
                 fi
             done
@@ -476,6 +505,12 @@ detect_connected_cameras
 declare -A camera_connected
 declare -A camera_video_dev
 declare -A camera_i2c_chardev
+declare -A camera_model
+declare -A camera_serial
+declare -A camera_fwver
+declare -A camera_resolution
+declare -A camera_pixfmt
+declare -A camera_sysfs_paths
 for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
     cam_type="${camera_configs[$port]}"
     port_letter="${camera_letters[$port]}"
@@ -502,6 +537,11 @@ if [[ $JSON_OUTPUT -eq 1 ]]; then
         conn_status="${camera_connected[$port]}"
         video_dev="${camera_video_dev[$port]}"
         i2c_dev="${camera_i2c_chardev[$port]}"
+        model="${camera_model[$port]}"
+        serial="${camera_serial[$port]}"
+        fwver="${camera_fwver[$port]}"
+        resolution="${camera_resolution[$port]}"
+        pixfmt="${camera_pixfmt[$port]}"
 
         echo -n "    \"port_$port\": {"
         echo -n "\"type\": \"$cam_type\", "
@@ -511,6 +551,21 @@ if [[ $JSON_OUTPUT -eq 1 ]]; then
         fi
         if [[ -n "$i2c_dev" ]]; then
             echo -n ", \"i2c_device\": \"$i2c_dev\""
+        fi
+        if [[ -n "$model" ]]; then
+            echo -n ", \"model\": \"$model\""
+        fi
+        if [[ -n "$serial" ]]; then
+            echo -n ", \"serial_number\": \"$serial\""
+        fi
+        if [[ -n "$fwver" ]]; then
+            echo -n ", \"firmware_version\": \"$fwver\""
+        fi
+        if [[ -n "$resolution" ]]; then
+            echo -n ", \"width/height\": \"$resolution\""
+        fi
+        if [[ -n "$pixfmt" ]]; then
+            echo -n ", \"pixel_format\": \"$pixfmt\""
         fi
         echo -n "}"
     done
@@ -529,17 +584,80 @@ else
     if [[ ${#camera_configs[@]} -eq 0 ]]; then
         echo "No cameras configured in device tree"
     else
-        echo "Camera ports:"
+        echo "Camera ports configuration:"
         for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
             cam_type="${camera_configs[$port]}"
             conn_status="${camera_connected[$port]}"
             video_dev="${camera_video_dev[$port]}"
             i2c_dev="${camera_i2c_chardev[$port]}"
+            model="${camera_model[$port]}"
+            serial="${camera_serial[$port]}"
+            fwver="${camera_fwver[$port]}"
+            resolution="${camera_resolution[$port]}"
+            pixfmt="${camera_pixfmt[$port]}"
+            sysfs_path="${camera_sysfs_paths[$port]}"
 
-            echo "  Port $port: $cam_type ($conn_status)"
+            display_name="$cam_type"
+            if [[ "$conn_status" == "connected" ]] && [[ -n "$model" ]]; then
+                display_name="$model"
+            fi
+            echo ""
+            if [[ "$conn_status" == "connected" ]]; then
+                echo "  Port $port: $display_name ("$'\033[32m'"$conn_status"$'\033[0m'")"
+            else
+                echo "  Port $port: $display_name ("$'\033[31m'"$conn_status"$'\033[0m'")"
+            fi
             if [[ "$conn_status" == "connected" ]]; then
                 [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
                 [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
+                [[ -n "$sysfs_path" ]] && echo "    Sysfs:        $sysfs_path"
+                [[ -n "$serial" ]] && echo "    Serial:       $serial"
+                [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
+                [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
+                [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
+                if [[ -n "$video_dev" ]] && [[ -n "$resolution" ]] && [[ -n "$pixfmt" ]]; then
+                    _w="${resolution%%[x/]*}"
+                    _h="${resolution##*[x/]}"
+                    # Extract fourcc code between the two single-quotes:
+                    # sysfs gives "'Y16 ' (desc)" or "'Y16 -BE' (desc)", V4L2 gives "Y16"
+                    _raw="${pixfmt#\'}"        # strip leading '
+                    _code="${_raw%%\'*}"       # take everything up to next '
+                    _v4l2fmt="" ; _gstfmt=""
+                    case "$_code" in
+                        "Y14 "|"Y14") _v4l2fmt='"Y14 "' ; _gstfmt="GRAY14_LE" ;;
+                        "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
+                        "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
+                        "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
+                        "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
+                    esac
+                    if [[ -n "$_gstfmt" ]]; then
+                        if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_gstfmt" == GRAY16* ]]; then
+                            echo "    Warning: 16-bit greyscale is not supported on Jetson Nano (t210). Use AR24 or YUYV."
+                        else
+                            echo "    Streaming:"
+                            if [[ -n "$_v4l2fmt" ]]; then
+                                echo "      v4l2-ctl -d $video_dev \\"
+                                echo "        --stream-mmap \\"
+                                echo "        --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            fi
+                            echo "      gst-launch-1.0 -v \\"
+                            echo "        v4l2src device=$video_dev \\"
+                            echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
+                            echo "        ! videoconvert \\"
+                            echo "        ! ximagesink sync=false"
+                            if [[ "$cam_type" == "Microlynx" ]]; then
+                                echo "      # Single line (first):"
+                                echo "      gst-launch-1.0 -v \\"
+                                echo "        v4l2src device=$video_dev \\"
+                                echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
+                                echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
+                                echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
+                                echo "        ! videoconvert \\"
+                                echo "        ! ximagesink sync=false"
+                            fi
+                        fi
+                    fi
+                fi
             fi
         done
         echo ""

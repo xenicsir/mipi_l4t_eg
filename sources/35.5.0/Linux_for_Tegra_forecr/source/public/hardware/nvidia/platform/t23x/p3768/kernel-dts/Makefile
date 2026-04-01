@@ -104,18 +104,6 @@ dtb-$(BUILD_ENABLE) += tegra234-p3767-0004-p3768-0000-a0-milboard-ornx-base.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3767-0004-p3768-0000-a0-raiboard-ornx.dtb
 dtb-$(BUILD_ENABLE) += tegra234-p3767-0004-p3768-0000-a0-raiboard-ornx-base.dtb
 
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cams-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-imx219.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
-dtbo-$(BUILD_ENABLE) += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
-
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))
 endif

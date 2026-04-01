@@ -31,6 +31,7 @@ NC='\033[0m'
 VERBOSE=0
 JSON_OUTPUT=0
 SHORT_NAME=0
+CAMERA_PORTS_ONLY=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -38,19 +39,22 @@ while [[ $# -gt 0 ]]; do
         -v|--verbose) VERBOSE=1; shift ;;
         --json) JSON_OUTPUT=1; shift ;;
         --short) SHORT_NAME=1; shift ;;
+        --camera-ports) CAMERA_PORTS_ONLY=1; shift ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Detects Jetson board type including SoM and carrier board."
             echo ""
             echo "Options:"
-            echo "  -v, --verbose    Print detailed information"
-            echo "  --json          Output in JSON format"
-            echo "  --short         Print short board name only"
-            echo "  -h, --help      Show this help"
+            echo "  -v, --verbose       Print detailed information"
+            echo "  --json              Output in JSON format"
+            echo "  --short             Print short board name only"
+            echo "  --camera-ports      Print number of camera ports only"
+            echo "  -h, --help          Show this help"
             echo ""
             echo "Examples:"
             echo "  BOARD=\$(./detect_board.sh --short)"
+            echo "  PORTS=\$(./detect_board.sh --camera-ports)"
             echo "  ./detect_board.sh --json | jq '.module'"
             exit 0
             ;;
@@ -229,7 +233,7 @@ detect_carrier() {
     elif [[ "$model" =~ "Orbitty" ]]; then
         vendor="connecttech"; carrier="orbitty"; carrier_pn="Orbitty (TX2/TX1 compact)"
     # Auvidea carrier boards
-    elif [[ "$model" =~ "X230D" ]] || [[ "$dtb" =~ "x230d" ]]; then
+    elif [[ "$model" =~ "X230" ]] || [[ "$dtb" =~ [Aa]uvidea.*[Xx]230 ]] || [[ "$dtb" =~ [Xx]230[Dd] ]]; then
         vendor="auvidea"; carrier="x230d"; carrier_pn="X230D (AGX Orin)"
     elif [[ "$model" =~ "JN30D" ]] || [[ "$dtb" =~ "jn30d" ]]; then
         vendor="auvidea"; carrier="jn30d"; carrier_pn="JN30D (Nano/TX2 NX compact)"
@@ -260,6 +264,76 @@ detect_carrier() {
 }
 
 #******************************************************************************
+# Detect number of camera ports from device tree
+#******************************************************************************
+detect_camera_ports() {
+    local dt_base="/proc/device-tree"
+    local port_count=0
+
+    # NVCSI paths vary by Tegra SoC generation
+    local nvcsi_paths=(
+        "$dt_base/host1x@13e00000/nvcsi@15a00000"          # T234 (Orin)
+        "$dt_base/bus@0/host1x@13e00000/nvcsi@15a00000"    # T234 (Orin, 36.x with bus@0)
+        "$dt_base/host1x@13e00000/nvcsi@14a00000"          # T194 (Xavier)
+        "$dt_base/host1x/nvcsi"                             # Fallback generic
+    )
+
+    local vi_paths=(
+        "$dt_base/tegra-capture-vi"
+        "$dt_base/bus@0/tegra-capture-vi"
+    )
+
+    # Method 1: Read num-channels property from nvcsi node (most reliable)
+    for nvcsi_path in "${nvcsi_paths[@]}"; do
+        if [[ -f "$nvcsi_path/num-channels" ]]; then
+            local hex_bytes
+            hex_bytes=$(xxd -p "$nvcsi_path/num-channels" 2>/dev/null)
+            if [[ -n "$hex_bytes" ]]; then
+                port_count=$((16#${hex_bytes:0:8}))
+                if [[ $port_count -gt 0 ]]; then
+                    [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Camera ports from $nvcsi_path/num-channels: $port_count" >&2
+                    echo "$port_count"
+                    return 0
+                fi
+            fi
+        fi
+    done
+
+    # Method 2: Count channel@* directories in nvcsi node
+    for nvcsi_path in "${nvcsi_paths[@]}"; do
+        if [[ -d "$nvcsi_path" ]]; then
+            port_count=0
+            for ch_dir in "$nvcsi_path"/channel@*; do
+                [[ -d "$ch_dir" ]] && (( port_count++ ))
+            done
+            if [[ $port_count -gt 0 ]]; then
+                [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Camera ports from $nvcsi_path/channel@* count: $port_count" >&2
+                echo "$port_count"
+                return 0
+            fi
+        fi
+    done
+
+    # Method 3: Count port@* directories in tegra-capture-vi/ports
+    for vi_path in "${vi_paths[@]}"; do
+        if [[ -d "$vi_path/ports" ]]; then
+            port_count=0
+            for port_dir in "$vi_path/ports"/port@*; do
+                [[ -d "$port_dir" ]] && (( port_count++ ))
+            done
+            if [[ $port_count -gt 0 ]]; then
+                [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Camera ports from $vi_path/ports/port@* count: $port_count" >&2
+                echo "$port_count"
+                return 0
+            fi
+        fi
+    done
+
+    echo "0"
+    return 1
+}
+
+#******************************************************************************
 # Main detection function
 #******************************************************************************
 detect_board_type() {
@@ -274,6 +348,11 @@ detect_board_type() {
 
     if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
         dtb=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
+    fi
+
+    # Fallback: parse extlinux.conf FDT line if nvidia,dtsfilename not available
+    if [[ -z "$dtb" ]] && [[ -f /boot/extlinux/extlinux.conf ]]; then
+        dtb=$(grep -oP '^\s*FDT\s+\K\S+' /boot/extlinux/extlinux.conf | head -1)
     fi
 
     if [[ -f /proc/device-tree/compatible ]]; then
@@ -302,6 +381,10 @@ detect_board_type() {
         board_type="unknown"
     fi
 
+    # Detect camera ports
+    local camera_ports
+    camera_ports=$(detect_camera_ports)
+
     # Export for output
     export DETECTED_MODEL="$model"
     export DETECTED_DTB="$dtb"
@@ -313,6 +396,7 @@ detect_board_type() {
     export DETECTED_CARRIER="$carrier"
     export DETECTED_CARRIER_PN="$carrier_pn"
     export DETECTED_BOARD_TYPE="$board_type"
+    export DETECTED_CAMERA_PORTS="$camera_ports"
 
     [[ "$board_type" != "unknown" ]] && return 0 || return 1
 }
@@ -321,7 +405,9 @@ detect_board_type() {
 # Output functions
 #******************************************************************************
 print_board_info() {
-    if [[ $JSON_OUTPUT -eq 1 ]]; then
+    if [[ $CAMERA_PORTS_ONLY -eq 1 ]]; then
+        echo "$DETECTED_CAMERA_PORTS"
+    elif [[ $JSON_OUTPUT -eq 1 ]]; then
         cat <<EOF
 {
   "board_type": "$DETECTED_BOARD_TYPE",
@@ -335,6 +421,7 @@ print_board_info() {
     "type": "$DETECTED_CARRIER",
     "description": "$DETECTED_CARRIER_PN"
   },
+  "camera_ports": $DETECTED_CAMERA_PORTS,
   "model": "$DETECTED_MODEL",
   "dtb": "$DETECTED_DTB"
 }
@@ -355,6 +442,9 @@ EOF
         echo "  Vendor: $DETECTED_VENDOR"
         echo "  Type:   $DETECTED_CARRIER"
         echo "  Desc:   $DETECTED_CARRIER_PN"
+        echo ""
+        echo -e "${GREEN}Camera:${NC}"
+        echo "  Ports: $DETECTED_CAMERA_PORTS"
         echo ""
         echo -e "${GREEN}Device Tree:${NC}"
         echo "  Model: $DETECTED_MODEL"

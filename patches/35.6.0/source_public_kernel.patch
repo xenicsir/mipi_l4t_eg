@@ -1,15 +1,17 @@
 diff --git a/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig b/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
 old mode 100644
 new mode 100755
-index f214bc7..f9a1194
+index f214bc7..998861d
 --- a/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
 +++ b/source/public/kernel/kernel-5.10/arch/arm64/configs/defconfig
-@@ -895,6 +895,8 @@ CONFIG_NV_VIDEO_OV5693=m
+@@ -895,6 +895,10 @@ CONFIG_NV_VIDEO_OV5693=m
  CONFIG_NV_VIDEO_OV9281=m
  CONFIG_NV_VIDEO_OV10823=m
  CONFIG_NV_VIDEO_OV23850=m
 +CONFIG_VIDEO_DIONE_IR=m
 +CONFIG_VIDEO_EG_EC_MIPI=m
++CONFIG_VIDEO_ILUMOS=m
++CONFIG_VIDEO_MICROLYNX=m
  CONFIG_I2C_IOEXPANDER_PCA9570=m
  CONFIG_VIDEO_TC358840=m
  CONFIG_VIDEO_LT6911UXC=m

@@ -1,0 +1,16 @@
+// Overlay that disables the two IMX477 nodes present in base_imx477_active.dts
+/dts-v1/;
+/plugin/;
+/ {
+	compatible = "nvidia,tegra234";
+
+	fragment@0 {
+		target-path = "/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
+		__overlay__ { status = "disabled"; };
+	};
+
+	fragment@1 {
+		target-path = "/cam_i2cmux/i2c@1/rbpcv3_imx477_c@1a";
+		__overlay__ { status = "disabled"; };
+	};
+};

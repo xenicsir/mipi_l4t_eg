@@ -8,12 +8,12 @@
 #define I2C_DELAY_ENABLE
 #define I2C_DELAY 10000
 
-#define CRC8_POLYNOMIAL 	0x38
+#define CRC8_POLYNOMIAL    0x38
 #define CRC8_INIT_VALUE    0xFF
 #define CRC8_TABLE_SIZE    256
 
-#define FRAME_SIZE_MAX	240
-#define NB_RETRY_MAX	5
+#define FRAME_SIZE_MAX  240
+#define NB_RETRY_MAX 5
 
 #define STATUS_INT_ERR -128
 #define STATUS_FIFO_EMPTY 1
@@ -158,8 +158,8 @@ int __ecctrl_i2c_write_reg(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
       do
       {
          error = 0;
-         frame_size = args->data_size + 5; 	// size of the frame without CRC = op code (1) + register address (4) + data (size)
-         buffer_size = frame_size + 2; 		// buffer includes frame size byte (1) + frame (frame_size) + CRC (1)
+         frame_size = args->data_size + 5;   // size of the frame without CRC = op code (1) + register address (4) + data (size)
+         buffer_size = frame_size + 2;       // buffer includes frame size byte (1) + frame (frame_size) + CRC (1)
          if (args->deviceType == ECCTRL_UVC_TYPE)  // I2C timeout is added at the beginning of the frame
          {
             buffer_size ++;
@@ -177,13 +177,13 @@ int __ecctrl_i2c_write_reg(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                buffer_start = 1;
             }
             buffer_i2c[buffer_index++] = frame_size;
-            buffer_i2c[buffer_index++] = CMD_WRITE;												      // OP code
-            buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF); 					// Register addr byte 0
-            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF); 			// Register addr byte 1
-            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF); 		// Register addr byte 2
-            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF); 		// Register addr byte 3
-            memcpy(&buffer_i2c[buffer_index++], args->data, args->data_size); 					// Register values
-            buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);	// CRC
+            buffer_i2c[buffer_index++] = CMD_WRITE;                                          // OP code
+            buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF);               // Register addr byte 0
+            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF);        // Register addr byte 1
+            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF);       // Register addr byte 2
+            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF);       // Register addr byte 3
+            memcpy(&buffer_i2c[buffer_index++], args->data, args->data_size);                // Register values
+            buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);   // CRC
             ret = _ecctrl_i2c_write(file, buffer_i2c, buffer_size, args->i2c_timeout);
             if (ret <= 0)
             {
@@ -192,7 +192,7 @@ int __ecctrl_i2c_write_reg(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                goto continue_write_reg;
             }
 #ifdef I2C_DELAY_ENABLE
-            if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+            if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
             {
                __ecctrl_i2c_usleep(I2C_DELAY);
             }
@@ -259,7 +259,7 @@ continue_write_reg:
             return STATUS_INT_ERR;
          }
 #ifdef I2C_DELAY_ENABLE
-         if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+         if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
          {
             __ecctrl_i2c_usleep(I2C_DELAY);
          }
@@ -324,8 +324,8 @@ int __ecctrl_i2c_read_reg(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
       {
          error = 0;
          /************** Send Read register request *****************/
-         frame_size = 6; 				// size of the frame without CRC = op code (1) + register address (4) + register size (1)
-         buffer_size = frame_size + 2; 	// buffer includes frame size byte (1) + frame (frame_size) + CRC (1)
+         frame_size = 6;            // size of the frame without CRC = op code (1) + register address (4) + register size (1)
+         buffer_size = frame_size + 2;    // buffer includes frame size byte (1) + frame (frame_size) + CRC (1)
          if (args->deviceType == ECCTRL_UVC_TYPE)  // I2C timeout is added at the beginning of the frame
          {
             buffer_size ++;
@@ -343,13 +343,13 @@ int __ecctrl_i2c_read_reg(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                buffer_start = 1;
             }
             buffer_i2c[buffer_index++] = frame_size;
-            buffer_i2c[buffer_index++] = CMD_READ;												         // OP code
-            buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF); 					// Register addr byte 0
-            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF); 			// Register addr byte 1
-            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF); 		// Register addr byte 2
-            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF); 		// Register addr byte 3
-            buffer_i2c[buffer_index++] = args->data_size;										// Register size
-            buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);	// CRC
+            buffer_i2c[buffer_index++] = CMD_READ;                                           // OP code
+            buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF);               // Register addr byte 0
+            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF);        // Register addr byte 1
+            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF);       // Register addr byte 2
+            buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF);       // Register addr byte 3
+            buffer_i2c[buffer_index++] = args->data_size;                              // Register size
+            buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);   // CRC
 
             ret = _ecctrl_i2c_write(file, buffer_i2c, buffer_size, args->i2c_timeout);
             if (ret <= 0)
@@ -368,14 +368,14 @@ int __ecctrl_i2c_read_reg(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
             return STATUS_INT_ERR;
          }
 #ifdef I2C_DELAY_ENABLE
-         if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+         if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
          {
             __ecctrl_i2c_usleep(I2C_DELAY);
          }
 #endif
 
          /************** Read data *****************/
-         buffer_size = args->data_size + 7; 	// buffer includes frame size byte (1) + ACK (1) + status (4) + data (size) + CRC (1)
+         buffer_size = args->data_size + 7;  // buffer includes frame size byte (1) + ACK (1) + status (4) + data (size) + CRC (1)
          buffer_i2c =  __ecctrl_i2c_malloc(buffer_size);
          if (buffer_i2c)
          {
@@ -458,7 +458,7 @@ continue_read_reg:
             return STATUS_INT_ERR;
          }
 #ifdef I2C_DELAY_ENABLE
-         if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+         if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
          {
             __ecctrl_i2c_usleep(I2C_DELAY);
          }
@@ -551,9 +551,9 @@ int __ecctrl_i2c_write_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
             do
             {
                error = 0;
-               payload_size = packet_size_max - control_size - header_size;	// actual transmited data size = max packet size - control bytes size - header size
-               payload_size = payload_size/4*4;	// payload_size better be a multiple of 4 for memory access
-               if (size < payload_size)			// last packet
+               payload_size = packet_size_max - control_size - header_size;   // actual transmited data size = max packet size - control bytes size - header size
+               payload_size = payload_size/4*4; // payload_size better be a multiple of 4 for memory access
+               if (size < payload_size)         // last packet
                {
                   payload_size = size;
                   if (args->fifo_flags & FIFO_FLAG_END)
@@ -562,7 +562,7 @@ int __ecctrl_i2c_write_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                   }
                }
                frame_size = payload_size + header_size;
-               buffer_size = frame_size + control_size; 	// buffer includes frame size byte (1) + control bytes size
+               buffer_size = frame_size + control_size;  // buffer includes frame size byte (1) + control bytes size
                __ecctrl_i2c_print(LOG_DBG, "%s : Send Data Write FIFO request index %d, size %d (packet size %d)\n", __func__, data_index, payload_size, buffer_size);
                buffer_index = 0;
                buffer_start = 0;
@@ -572,14 +572,14 @@ int __ecctrl_i2c_write_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                   buffer_start = 1;
                }
                buffer_i2c[buffer_index++] = frame_size;
-               buffer_i2c[buffer_index++] = CMD_WRITE_FIFO;										      // OP code
-               buffer_i2c[buffer_index++] = fifoOp;					 							      // FIFO OP
-               buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF); 				// FIFO addr byte 0
-               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF); 		// FIFO addr byte 1
-               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF); 	// FIFO addr byte 2
-               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF); 	// FIFO addr byte 3
-               memcpy(&buffer_i2c[buffer_index++], args->data + data_index, payload_size); 	// Data values
-               buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);	// CRC
+               buffer_i2c[buffer_index++] = CMD_WRITE_FIFO;                                  // OP code
+               buffer_i2c[buffer_index++] = fifoOp;                                          // FIFO OP
+               buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF);            // FIFO addr byte 0
+               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF);     // FIFO addr byte 1
+               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF);    // FIFO addr byte 2
+               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF);    // FIFO addr byte 3
+               memcpy(&buffer_i2c[buffer_index++], args->data + data_index, payload_size);   // Data values
+               buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);   // CRC
                ret = _ecctrl_i2c_write(file, buffer_i2c, buffer_size, args->i2c_timeout);
                if (ret <= 0)
                {
@@ -588,7 +588,7 @@ int __ecctrl_i2c_write_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                   goto continue_write_fifo;
                }
 #ifdef I2C_DELAY_ENABLE
-               if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+               if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
                {
                   __ecctrl_i2c_usleep(I2C_DELAY);
                }
@@ -655,7 +655,7 @@ continue_write_fifo:
                   }
                }
 #ifdef I2C_DELAY_ENABLE
-               if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+               if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
                {
                   __ecctrl_i2c_usleep(I2C_DELAY);
                }
@@ -685,7 +685,7 @@ continue_write_fifo:
                args->cb();
             }
 #ifdef I2C_DELAY_ENABLE
-            if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+            if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
             {
                __ecctrl_i2c_usleep(I2C_DELAY);
             }
@@ -749,7 +749,7 @@ int __ecctrl_i2c_read_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
       }
 
       /************** Send data Read FIFO requests *****************/
-      buffer_size_max = FRAME_SIZE_MAX + control_size; 	// FRAME_SIZE_MAX + control bytes
+      buffer_size_max = FRAME_SIZE_MAX + control_size;   // FRAME_SIZE_MAX + control bytes
       buffer_i2c =  __ecctrl_i2c_malloc(buffer_size_max); // allocate the buffer with size for the received packet, which is bigger than the transmitted packet
       if (buffer_i2c)
       {
@@ -766,14 +766,14 @@ int __ecctrl_i2c_read_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
             {
                error = 0;
                /************** Send data Read FIFO OP code *****************/
-               frame_size = 7;  					// frame_size = OP code(1) + fifo op(1) + fifo addr(4) + expected data size to be received (1)
-               payload_size = buffer_size_max - overhead_rx;	// actual transmited data size = buffer size max - overhead rx size
-               // if (args->deviceType == ECCTRL_UVC_TYPE)  // I2C timeout is added at the beginning of the frame
-               // {
-                  // payload_size --;
-               // }
-               payload_size = payload_size/4*4;	// payload_size'd better be a multiple of 4 for memory access
-               if (size < payload_size)			// last packet
+               frame_size = 7;               // frame_size = OP code(1) + fifo op(1) + fifo addr(4) + expected data size to be received (1)
+               payload_size = buffer_size_max - overhead_rx;   // actual transmited data size = buffer size max - overhead rx size
+                                                               // if (args->deviceType == ECCTRL_UVC_TYPE)  // I2C timeout is added at the beginning of the frame
+                                                               // {
+                                                               // payload_size --;
+                                                               // }
+               payload_size = payload_size/4*4; // payload_size'd better be a multiple of 4 for memory access
+               if (size < payload_size)         // last packet
                {
                   payload_size = size;
                   if (args->fifo_flags & FIFO_FLAG_END)
@@ -781,7 +781,7 @@ int __ecctrl_i2c_read_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                      fifoOp |= FIFO_OP_END;
                   }
                }
-               buffer_size = frame_size + control_size; 	// buffer includes frame (frame_size) + control bytes
+               buffer_size = frame_size + control_size;  // buffer includes frame (frame_size) + control bytes
                if (args->deviceType == ECCTRL_UVC_TYPE)  // I2C timeout is added at the beginning of the frame
                {
                   buffer_size ++;
@@ -795,14 +795,14 @@ int __ecctrl_i2c_read_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                   buffer_start = 1;
                }
                buffer_i2c[buffer_index++] = frame_size;
-               buffer_i2c[buffer_index++] = CMD_READ_FIFO;											      // OP code
-               buffer_i2c[buffer_index++] = fifoOp;					 							         // FIFO OP
-               buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF); 					// FIFO addr byte 0
-               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF); 			// FIFO addr byte 1
-               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF); 		// FIFO addr byte 2
-               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF); 		// FIFO addr byte 3
-               buffer_i2c[buffer_index++] = payload_size;											      // expected data size to be received
-               buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);	// CRC
+               buffer_i2c[buffer_index++] = CMD_READ_FIFO;                                      // OP code
+               buffer_i2c[buffer_index++] = fifoOp;                                             // FIFO OP
+               buffer_i2c[buffer_index++] = (uint8_t)(args->data_address & 0xFF);               // FIFO addr byte 0
+               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 8) & 0xFF);        // FIFO addr byte 1
+               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 16) & 0xFF);       // FIFO addr byte 2
+               buffer_i2c[buffer_index++] = (uint8_t)((args->data_address >> 24) & 0xFF);       // FIFO addr byte 3
+               buffer_i2c[buffer_index++] = payload_size;                                       // expected data size to be received
+               buffer_i2c[buffer_size - 1] = fct_crc8(buffer_i2c + buffer_start, buffer_size-1-buffer_start, CRC8_INIT_VALUE);   // CRC
                ret = _ecctrl_i2c_write(file, buffer_i2c, buffer_size, args->i2c_timeout);
                if (ret <= 0)
                {
@@ -811,7 +811,7 @@ int __ecctrl_i2c_read_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                   goto continue_read_fifo;
                }
 #ifdef I2C_DELAY_ENABLE
-               if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+               if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
                {
                   __ecctrl_i2c_usleep(I2C_DELAY);
                }
@@ -866,7 +866,7 @@ int __ecctrl_i2c_read_fifo(__ecctrl_i2c_file_t file, ecctrl_i2c_t *args)
                if (args->data)
                {
                   memcpy(args->data+data_index, &buffer_i2c[7], payload_size);
-                  if (payload_size == 0 || status == STATUS_FIFO_EMPTY)	// FIFO not empty
+                  if (payload_size == 0 || status == STATUS_FIFO_EMPTY) // FIFO not empty
                   {
                      // FIFO empty. Stop.
                      size = 0;
@@ -906,7 +906,7 @@ continue_read_fifo:
                   }
                }
 #ifdef I2C_DELAY_ENABLE
-               if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+               if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
                {
                   __ecctrl_i2c_usleep(I2C_DELAY);
                }
@@ -941,7 +941,7 @@ continue_read_fifo:
             }
             size -= payload_size;
 #ifdef I2C_DELAY_ENABLE
-            if (args->i2c_tries_max >= 0)	// if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
+            if (args->i2c_tries_max >= 0) // if i2c_tries_max < 0, disable sleep between i2c request. It allows to go faster (in updrade mode)
             {
                __ecctrl_i2c_usleep(I2C_DELAY);
             }

@@ -34,6 +34,10 @@ dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ec-1-lane.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ec-2-lanes.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx219.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-imx477.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-microlynx.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-microlynx.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam0-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra194-camera-eg-cam1-ilumos.dtbo
 
 
 ifneq ($(dtb-y),)

@@ -278,6 +278,87 @@ check_files_exist() {
     fi
 }
 
+# Auto-detect Exosens camera modules from patch files
+# Args: version, vendor, [carrier]
+# Outputs module names (without .ko) to stdout, one per line
+# When carrier is specified, filters out built-in modules (CONFIG_*=y)
+# that don't produce .ko files
+get_eg_modules_from_patch() {
+    local version="$1"
+    local vendor="$2"
+    local carrier="${3:-}"
+    local version_major=$(echo "$version" | awk -F '.' '{print $1}')
+
+    # Compute extended version (same logic as l4t_environment.sh)
+    local version_extended="$version"
+    if [[ "$vendor" != "generic" ]]; then
+        version_extended="${version}_${vendor}"
+    fi
+
+    # Determine patch filename based on L4T major version
+    local patch_file
+    if [[ $version_major -ge 36 ]]; then
+        patch_file="$SCRIPT_DIR/patches/${version_extended}/source_nvidia-oot_drivers_media_i2c.patch"
+    else
+        patch_file="$SCRIPT_DIR/patches/${version_extended}/source_public_kernel_nvidia_drivers_media_i2c.patch"
+    fi
+
+    if [[ ! -f "$patch_file" ]]; then
+        return
+    fi
+
+    # For L4T >= 36, obj-m is used directly (always a loadable module)
+    if [[ $version_major -ge 36 ]]; then
+        grep '^+obj-' "$patch_file" | sed 's/.*+=//' | tr -d '[:blank:]' | sed 's/\.o$//' | sort -u
+        return
+    fi
+
+    # For L4T < 36, lines use obj-$(CONFIG_*) - need to check config value
+    # to distinguish loadable modules (=m) from built-in (=y)
+    # Format: +obj-$(CONFIG_FOO) += module_name.o
+    local config_module_pairs
+    config_module_pairs=$(grep '^+obj-' "$patch_file" | \
+        sed -E 's/^\+obj-\$\(([^)]+)\)[[:space:]]*\+=[[:space:]]*/\1 /' | \
+        sed -E 's/\.o[[:space:]]*$//')
+
+    if [[ -z "$config_module_pairs" ]]; then
+        return
+    fi
+
+    # Try to find defconfig to filter out built-in modules
+    local defconfig_file=""
+    if [[ -n "$carrier" ]]; then
+        local defconfig_name=$(get_carrier_defconfig "$carrier")
+        if [[ -n "$defconfig_name" ]]; then
+            # Compute source directory path
+            local carrier_suffix=$(get_carrier_dir_suffix "$carrier")
+            local lft_dir
+            if [[ "$vendor" == "generic" ]]; then
+                lft_dir="Linux_for_Tegra"
+            elif [[ -n "$carrier_suffix" ]]; then
+                lft_dir="Linux_for_Tegra_${vendor}_${carrier_suffix}"
+            else
+                lft_dir="Linux_for_Tegra_${vendor}"
+            fi
+            # Look for defconfig in kernel source tree
+            defconfig_file=$(ls "$SCRIPT_DIR/$version/$lft_dir"/source/public/kernel/kernel-*/arch/arm64/configs/"$defconfig_name" 2>/dev/null | head -1)
+        fi
+    fi
+
+    # Output modules, filtering out built-in (=y) when defconfig is available
+    while IFS=' ' read -r config_var mod_name; do
+        [[ -z "$mod_name" ]] && continue
+        if [[ -n "$defconfig_file" ]]; then
+            local config_val=$(grep "^${config_var}=" "$defconfig_file" 2>/dev/null | head -1)
+            if [[ "$config_val" == *"=y" ]]; then
+                # Built-in module (linked into kernel Image), no .ko produced
+                continue
+            fi
+        fi
+        echo "$mod_name"
+    done <<< "$config_module_pairs" | sort -u
+}
+
 #******************************************************************************
 # Verify a single package
 #******************************************************************************
@@ -412,24 +493,50 @@ verify_package() {
 
     local modules_dir="$package_dir/lib/modules"
 
+    # Auto-detect Exosens camera modules from patch files
+    # Pass carrier to filter out built-in modules (CONFIG_*=y) that have no .ko
+    local eg_modules
+    eg_modules=$(get_eg_modules_from_patch "$version" "$vendor" "$carrier")
+
     if [[ $standalone_build -eq 1 ]]; then
         check_dir "$modules_dir/$kernel_version" "Kernel modules directory"
         if [[ -d "$modules_dir/$kernel_version" ]]; then
-            check_files_exist "$modules_dir/$kernel_version" "dione_ir.ko" "Dione IR camera module"
-            check_files_exist "$modules_dir/$kernel_version" "eg-ec-mipi.ko" "EG EC MIPI module"
+            if [[ -n "$eg_modules" ]]; then
+                while IFS= read -r mod_name; do
+                    [[ -z "$mod_name" ]] && continue
+                    check_files_exist "$modules_dir/$kernel_version" "${mod_name}.ko" "Exosens module ${mod_name}"
+                done <<< "$eg_modules"
+            else
+                echo -e "  ${YELLOW}[WARN]${NC} Could not auto-detect modules from patch file"
+                PKG_WARNINGS=$((PKG_WARNINGS + 1))
+            fi
         fi
     else
         if [[ $version_major -ge 36 ]]; then
             local i2c_dir="$modules_dir/$kernel_version/updates/drivers/media/i2c"
-            check_file "$i2c_dir/dione_ir.ko" "Dione IR camera module"
-            check_file "$i2c_dir/eg-ec-mipi.ko" "EG EC MIPI module"
+            if [[ -n "$eg_modules" ]]; then
+                while IFS= read -r mod_name; do
+                    [[ -z "$mod_name" ]] && continue
+                    check_file "$i2c_dir/${mod_name}.ko" "Exosens module ${mod_name}"
+                done <<< "$eg_modules"
+            else
+                echo -e "  ${YELLOW}[WARN]${NC} Could not auto-detect modules from patch file"
+                PKG_WARNINGS=$((PKG_WARNINGS + 1))
+            fi
             check_file "$modules_dir/$kernel_version/updates/drivers/video/tegra/camera/tegra_camera_platform.ko" "Tegra camera platform module" 0
             check_file "$modules_dir/$kernel_version/updates/drivers/media/platform/tegra/camera/tegra-camera.ko" "Tegra camera module" 0
             check_file "$modules_dir/$kernel_version/updates/drivers/video/tegra/host/nvcsi/nvhost-nvcsi-t194.ko" "NVCSI module" 0
         else
             local i2c_dir="$modules_dir/$kernel_version/kernel/drivers/media/i2c"
-            check_file "$i2c_dir/dione_ir.ko" "Dione IR camera module"
-            check_file "$i2c_dir/eg-ec-mipi.ko" "EG EC MIPI module"
+            if [[ -n "$eg_modules" ]]; then
+                while IFS= read -r mod_name; do
+                    [[ -z "$mod_name" ]] && continue
+                    check_file "$i2c_dir/${mod_name}.ko" "Exosens module ${mod_name}"
+                done <<< "$eg_modules"
+            else
+                echo -e "  ${YELLOW}[WARN]${NC} Could not auto-detect modules from patch file"
+                PKG_WARNINGS=$((PKG_WARNINGS + 1))
+            fi
         fi
     fi
 

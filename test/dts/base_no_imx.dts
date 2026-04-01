@@ -1,0 +1,6 @@
+// Base DTB — no IMX219 or IMX477 nodes
+/dts-v1/;
+/ {
+	compatible = "nvidia,tegra234";
+	model = "Test Jetson Board";
+};

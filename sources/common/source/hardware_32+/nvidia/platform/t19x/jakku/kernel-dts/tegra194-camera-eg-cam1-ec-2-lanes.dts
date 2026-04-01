@@ -64,21 +64,21 @@
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
 		__overlay__ {
          num_lanes = "2";
-         pix_clk_hz = "133333336";
+         pix_clk_hz = "100000000";
 		};
 	};
 	fragment@18 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
 		__overlay__ {
          num_lanes = "2";
-         pix_clk_hz = "100000000";
+         pix_clk_hz = "133333336";
 		};
 	};
 	fragment@19 {
 		target-path = "/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
 		__overlay__ {
          num_lanes = "2";
-         pix_clk_hz = "133333336";
+         pix_clk_hz = "100000000";
 		};
 	};
 	fragment@20 {
