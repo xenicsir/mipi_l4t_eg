@@ -63,11 +63,11 @@ sudo apt install lbzip2 pigz pbzip2
 sudo apt install ruby ruby-dev
 sudo gem install fpm
 
-# For JSON configuration processing
-sudo apt install jq
-
 # For kernel module build (OpenSSL headers)
 sudo apt install libssl-dev
+
+# For PDF generation of the deployment matrix (optional)
+sudo apt install weasyprint
 ```
 
 ---
