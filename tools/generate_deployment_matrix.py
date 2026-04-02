@@ -10,6 +10,7 @@ Usage:
 import yaml
 import sys
 import re
+import base64
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote
@@ -24,6 +25,50 @@ except ImportError:
 
 class DeploymentMatrixGenerator:
     """Generate deployment matrix in multiple formats"""
+
+    FLEX_CABLE_DATA = {
+        "cable_types": [
+            {"label": "A", "desc": "22-pin → 15-pin, connectors on same side, not shielded."},
+            {"label": "B", "desc": "15-pin → 15-pin, connectors on opposite sides, not shielded."},
+            {"label": "C", "desc": "22-pin → 22-pin, connectors on opposite sides, not shielded."},
+            {"label": "D", "desc": "22-pin → 22-pin, connectors on same side, not shielded."},
+            {
+                "label": "E",
+                "desc": "Auvidea 38237 adapter (22-pin → 15-pin)",
+                "warning": (
+                    "Bare pads are exposed on both sides of the adapter. "
+                    "Pay close attention to the equipment connected on each side — "
+                    "risk of short circuit."
+                ),
+                "img": "tools/images/auvidea_38237.png",
+            },
+            {
+                "label": "F",
+                "desc": "22-pin → 15-pin, connectors on opposite sides, shielded. Reference : Vision Components EK003261.",
+                "note": (
+                    'Shielded cable — connect with "CPU Side" facing the host board '
+                    'and "MIPI Module Side" facing the camera.'
+                ),
+                "img": "tools/images/flex_cable_opposite-side_shielded_22-15_F.png",
+            },
+            {
+                "label": "G",
+                "desc": "22-pin → 22-pin, connectors on same side, shielded. Reference : Vision Components EK003260.",
+                "note": (
+                    'Shielded cable — connect with "CPU Side" facing the host board '
+                    'and "MIPI Module Side" facing the camera.'
+                ),
+                "img": "tools/images/flex_cable_same-side_shielded_22-22_G.png",
+            },
+        ],
+        "table": [
+            {"board": "Jetson Nano devkit",              "csi": "15-pin", "dione": "A", "microcube": "B", "ilumos": "F"},
+            {"board": "Jetson Xavier NX devkit",         "csi": "15-pin", "dione": "A", "microcube": "B", "ilumos": "F"},
+            {"board": "Jetson AGX Orin / Auvidea X230D", "csi": "22-pin", "dione": "C", "microcube": "A", "ilumos": "D or G"},
+            {"board": "Jetson Orin NX devkit",           "csi": "22-pin", "dione": "C", "microcube": "A", "ilumos": "D or G"},
+        ],
+        "img_cables": "tools/images/flex_cables.png",
+    }
 
     STATUS_ICONS = {
         "tested": "✅",
@@ -55,7 +100,7 @@ class DeploymentMatrixGenerator:
         self.package_repo_base = self.data.get('package_repo_base', '')
 
         # Load camera technical details from eg_config.yaml
-        camera_db_path = Path(yaml_file).parent / 'eg_config.yaml'
+        camera_db_path = Path(yaml_file).parent.parent / 'eg_config.yaml'
         with open(camera_db_path, 'r') as f:
             self.camera_db = yaml.safe_load(f)
 
@@ -110,6 +155,116 @@ class DeploymentMatrixGenerator:
                 versions.update(str(v) for v in version_dict.keys())
         return sorted(versions, key=lambda x: tuple(int(p) if p.isdigit() else p
                                                      for p in str(x).split('.')))
+
+    # ------------------------------------------------------------------ #
+    # Flex cable appendix helpers
+    # ------------------------------------------------------------------ #
+
+    def _img_data_uri(self, rel_path):
+        """Return a base64 data URI for an image file (relative to repo root)."""
+        img_path = Path(__file__).parent.parent / rel_path
+        data = base64.b64encode(img_path.read_bytes()).decode('ascii')
+        suffix = img_path.suffix.lower().lstrip('.')
+        mime = "image/jpeg" if suffix in ("jpg", "jpeg") else f"image/{suffix}"
+        return f"data:{mime};base64,{data}"
+
+    def _flex_cable_appendix_md(self):
+        """Return Markdown string for the CSI flex cable appendix."""
+        d = self.FLEX_CABLE_DATA
+        lines = [
+            "## Appendix — CSI Flex Cable Selection Guide\n",
+            "Select the correct flex cable based on the Jetson board's CSI connector pitch "
+            "and the camera connector pitch.\n",
+            "| Board | CSI connector | Dione (22-pin) | MicroCube / Crius1280 / SmartIR640 / Microlynx (15-pin) | iLumos (22-pin) |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for row in d["table"]:
+            lines.append(
+                f"| {row['board']} | {row['csi']} | **{row['dione']}** "
+                f"| **{row['microcube']}** | **{row['ilumos']}** |"
+            )
+        lines.append("")
+        cables_uri = self._img_data_uri(d['img_cables'])
+        lines.append(f"![CSI flex cables A–D]({cables_uri})\n")
+        lines.append("**Cable types:**\n")
+        for ct in d["cable_types"]:
+            lines.append(f"- **{ct['label']}**: {ct['desc']}")
+            if "warning" in ct:
+                lines.append(f"\n  > ⚠️ **WARNING:** {ct['warning']}\n")
+            if "note" in ct:
+                lines.append(f"\n  > ℹ️ {ct['note']}\n")
+            if "img" in ct:
+                uri = self._img_data_uri(ct['img'])
+                lines.append(f"\n  ![Cable {ct['label']}]({uri})\n")
+        return "\n".join(lines)
+
+    def _flex_cable_appendix_html(self):
+        """Return an HTML <div> string for the CSI flex cable appendix."""
+        d = self.FLEX_CABLE_DATA
+
+        rows_html = ""
+        for row in d["table"]:
+            rows_html += (
+                f"<tr><td>{row['board']}</td><td>{row['csi']}</td>"
+                f"<td><strong>{row['dione']}</strong></td>"
+                f"<td><strong>{row['microcube']}</strong></td>"
+                f"<td><strong>{row['ilumos']}</strong></td></tr>\n"
+            )
+
+        cable_types_html = ""
+        for ct in d["cable_types"]:
+            extras = ""
+            if "warning" in ct:
+                extras += (
+                    f'<div style="background:#fff3cd;border:1px solid #ffc107;'
+                    f'border-left:4px solid #e65c00;border-radius:4px;padding:8px 12px;'
+                    f'margin:6px 0;font-size:0.9em;">'
+                    f'⚠️ <strong>WARNING:</strong> {ct["warning"]}</div>'
+                )
+            if "note" in ct:
+                extras += (
+                    f'<div style="background:#e8f4fd;border-left:4px solid #3498db;'
+                    f'padding:6px 10px;margin:6px 0;font-size:0.9em;">'
+                    f'ℹ️ {ct["note"]}</div>'
+                )
+            if "img" in ct:
+                uri = self._img_data_uri(ct["img"])
+                extras += (
+                    f'<div style="margin:6px 0;">'
+                    f'<img src="{uri}" alt="Cable {ct["label"]}" '
+                    f'style="max-height:80px;border:1px solid #ddd;border-radius:4px;"></div>'
+                )
+            cable_types_html += (
+                f'<li style="margin-bottom:8px;">'
+                f'<strong>{ct["label"]}</strong>: {ct["desc"]}'
+                f'{extras}</li>\n'
+            )
+
+        cables_uri = self._img_data_uri(d['img_cables'])
+        return f"""    <div class="platform-section">
+        <h2>🔌 CSI Flex Cable Selection Guide</h2>
+        <p>Select the correct flex cable based on the Jetson board's CSI connector pitch and the camera connector pitch.</p>
+        <table>
+            <thead><tr>
+                <th>Board</th>
+                <th>CSI connector</th>
+                <th>Dione (22-pin)</th>
+                <th>MicroCube / Crius1280 / SmartIR640 / Microlynx (15-pin)</th>
+                <th>iLumos (22-pin)</th>
+            </tr></thead>
+            <tbody>
+{rows_html}            </tbody>
+        </table>
+        <div style="margin-top:16px;">
+            <img src="{cables_uri}" alt="CSI flex cables A–D"
+                 style="max-height:220px; border:1px solid #ddd; border-radius:4px;">
+            <p style="font-size:0.85em;color:#666;margin-top:4px;">Cables A–D</p>
+        </div>
+        <p><strong>Cable types:</strong></p>
+        <ul style="list-style:none;padding-left:0;">
+{cable_types_html}        </ul>
+    </div>
+"""
 
     def generate_markdown(self, output_file):
         """Generate Markdown table"""
@@ -196,6 +351,9 @@ class DeploymentMatrixGenerator:
                         pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
                         f.write(f"| {mode['pixel_format']} | {pix_str} MHz | {mode['csi_clock_mhz']} MHz |\n")
                 f.write("\n")
+
+            # Flex cable appendix
+            f.write(self._flex_cable_appendix_md())
 
         print(f"✅ Markdown matrix generated: {output_file}")
 
@@ -527,9 +685,9 @@ class DeploymentMatrixGenerator:
 
         html_content += """        </div>
     </div>
-</body>
-</html>
 """
+        html_content += self._flex_cable_appendix_html()
+        html_content += "</body>\n</html>\n"
 
         with open(output_file, 'w') as f:
             f.write(html_content)
@@ -676,6 +834,60 @@ class DeploymentMatrixGenerator:
             lines.append("</div>")
 
         lines.append("</div></div>")
+
+        # Flex cable appendix
+        d = self.FLEX_CABLE_DATA
+        rows_html = "".join(
+            f"<tr><td>{r['board']}</td><td>{r['csi']}</td>"
+            f"<td style='text-align:center;font-weight:bold'>{r['dione']}</td>"
+            f"<td style='text-align:center;font-weight:bold'>{r['microcube']}</td>"
+            f"<td style='text-align:center;font-weight:bold'>{r['ilumos']}</td></tr>"
+            for r in d["table"]
+        )
+        cable_list_html = ""
+        for ct in d["cable_types"]:
+            extras = ""
+            if "warning" in ct:
+                extras += (
+                    f"<span style='display:block;background:#fff3cd;border-left:3px solid #e65c00;"
+                    f"padding:2px 5px;margin:2px 0;font-size:6.5pt;'>"
+                    f"⚠️ <b>WARNING:</b> {ct['warning']}</span>"
+                )
+            if "note" in ct:
+                extras += (
+                    f"<span style='display:block;background:#e8f4fd;border-left:3px solid #3498db;"
+                    f"padding:2px 5px;margin:2px 0;font-size:6.5pt;'>"
+                    f"ℹ️ {ct['note']}</span>"
+                )
+            if "img" in ct:
+                uri = self._img_data_uri(ct['img'])
+                extras += (
+                    f"<img src='{uri}' alt='Cable {ct['label']}' "
+                    f"style='max-height:55px;display:block;margin:3px 0;'>"
+                )
+            cable_list_html += (
+                f"<li style='margin-bottom:4px;'>"
+                f"<b>{ct['label']}</b>: {ct['desc']}{extras}</li>"
+            )
+
+        cables_uri = self._img_data_uri(d['img_cables'])
+        lines.append("<div style='page-break-before: always;'>")
+        lines.append("<h1 style='font-size:11pt; margin-bottom:8px;'>CSI Flex Cable Selection Guide</h1>")
+        lines.append("<p style='font-size:7.5pt; margin-bottom:6px;'>"
+                     "Select the correct flex cable based on the Jetson board's CSI connector pitch "
+                     "and the camera connector pitch.</p>")
+        lines.append("<table style='width:auto; margin-bottom:10px;'><thead><tr>")
+        lines.append("<th>Board</th><th>CSI connector</th>"
+                     "<th>Dione (22-pin)</th>"
+                     "<th>MicroCube / Crius1280 / SmartIR640 / Microlynx (15-pin)</th>"
+                     "<th>iLumos (22-pin)</th>")
+        lines.append(f"</tr></thead><tbody>{rows_html}</tbody></table>")
+        lines.append(f"<div style='margin-bottom:8px;'>"
+                     f"<img src='{cables_uri}' alt='CSI flex cables A–D' style='max-height:120px;'>"
+                     f"<p style='font-size:6.5pt;color:#666;margin:2px 0;'>Cables A–D</p></div>")
+        lines.append(f"<ul style='list-style:none;padding:0;margin:0;font-size:7pt;'>"
+                     f"{cable_list_html}</ul>")
+        lines.append("</div>")
         lines.append("</body></html>")
         return "\n".join(lines)
 
@@ -698,11 +910,12 @@ class DeploymentMatrixGenerator:
 
 def main():
     """Main entry point"""
-    docs_dir = Path(__file__).parent
-    yaml_file = docs_dir / 'deployment_matrix_data.yaml'
-    markdown_file = docs_dir / 'MIPI_DEPLOYMENT_MATRIX.md'
-    html_file = docs_dir / 'MIPI_DEPLOYMENT_MATRIX.html'
-    pdf_file = docs_dir / 'MIPI_DEPLOYMENT_MATRIX.pdf'
+    tools_dir = Path(__file__).parent
+    root_dir = tools_dir.parent
+    yaml_file = tools_dir / 'deployment_matrix_data.yaml'
+    markdown_file = root_dir / 'MIPI_DEPLOYMENT_MATRIX.md'
+    html_file = root_dir / 'MIPI_DEPLOYMENT_MATRIX.html'
+    pdf_file = root_dir / 'MIPI_DEPLOYMENT_MATRIX.pdf'
 
     if not yaml_file.exists():
         print(f"❌ Error: {yaml_file} not found")
