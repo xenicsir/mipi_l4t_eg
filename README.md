@@ -17,8 +17,7 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
   - [Building the L4T environment](#building-the-l4t-environment)
     - [Source code organization](#source-code-organization)
     - [Building workflow](#building-workflow)
-    - [Client workflow (patches only)](#client-workflow-patches-only)
-  - [Building MIPI drivers for specific carrier boards](#building-mipi-drivers-for-specific-carrier-boards)
+  - [Building MIPI drivers for specific SoMs or carrier boards](#building-mipi-drivers-for-specific-soms-or-carrier-boards)
   - [Installing and configuring the MIPI drivers on the board](#installing-and-configuring-the-mipi-drivers-on-the-board)
     - [Package installation](#package-installation)
     - [Configuring camera ports](#configuring-camera-ports)
@@ -88,9 +87,8 @@ This section describes the build process using the unified `l4t_make.sh` orchest
 
 #### Source code organization
 
-The Exosens camera driver modifications are available in two formats:
+The Exosens camera driver modifications are organized in:
 - **sources/**: Complete source files organized by L4T version and vendor
-- **patches/**: Automatically generated patch files for distribution
 
 #### Building workflow
 
@@ -121,9 +119,9 @@ This step:
 - Extracts archives using parallel decompression when available
 - Prepares the Linux_for_Tegra directory structure
 
-**Step 2: Copy sources and generate patches**
+**Step 2: Copy sources**
 
-Copy Exosens sources to the build environment and generate distribution patches:
+Copy Exosens sources to the build environment:
 
 ```bash
 ./l4t_make.sh -v <l4t_version> --copy-sources
@@ -136,7 +134,6 @@ or use the individual script for more logs :
 This step:
 - Copies source files from `sources/` to the build environment
 - Creates a git repository to track modifications
-- Generates patch files in `patches/<l4t_version>/` for distribution
 
 **Step 3: Build kernel and drivers**
 
@@ -222,23 +219,36 @@ Because for Nvidia SDK version from L4T 36.x some kernel modules are built "out 
 - A dedicated initramfs (`/boot/eg/initrd-eg`) is generated
 - The Debian package is larger (~150MB) due to all modules and initramfs being included
 
-#### Client workflow (patches only)
+### Building MIPI drivers for specific SoMs or carrier boards
 
-If you are a client who only needs to rebuild without modifying the code, you can use the patch-based workflow.
+Some hardware variants require a `-s/--som` or `-V/--vendor` flag to select the correct BSP and device trees.
 
-The patches are available in the `patches/` directory and can be applied to a clean L4T environment using the `l4t_patch_sources.sh` script as a reference:
+**Building for Jetson TX2 (t186 SoM) — L4T 32.x only:**
 
 ```bash
-./l4t_make.sh -v <l4t_version> --prepare
-# Apply patches manually (refer to l4t_patch_sources.sh for the method)
-./l4t_make.sh -v <l4t_version> --build --gen-package
+# Build all steps for t186
+./l4t_make.sh -v 32.7.1 -s t186
+
+# Or step by step:
+./l4t_make.sh -v 32.7.1 -s t186 --prepare
+./l4t_make.sh -v 32.7.1 -s t186 --copy-sources
+./l4t_make.sh -v 32.7.1 -s t186 --build
+./l4t_make.sh -v 32.7.1 -s t186 --gen-package
 ```
 
-The `l4t_patch_sources.sh` script demonstrates how to apply patches to your own Linux_for_Tegra environment. Clients can adapt this script to their specific needs.
+This generates: `jetson-l4t-32.7.1-jp4.6.1-t186-eg-cams_<debian_version>_arm64.deb`
 
-### Building MIPI drivers for specific carrier boards
+**Building for Jetson Nano/porg (t210 SoM) — L4T 32.x only:**
 
-Some carrier boards require specific device trees and/or kernel configurations. The boards needing specific builds are tagged "Specific build" in the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet.
+```bash
+./l4t_make.sh -v 32.7.1 -s t210
+```
+
+This generates: `jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams_<debian_version>_arm64.deb`
+
+**Note:** For L4T 35.x and 36.x, the `-s/--som` flag is not needed — those versions target Orin-family SoMs and the SoM is implicit.
+
+Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi, ilumos, microlynx) and device tree overlays (`tegra186-camera-eg-*` / `tegra210-camera-eg-*`).
 
 **Example: Building for Forecr carrier board with dsboard_ornx:**
 
@@ -260,7 +270,7 @@ Some carrier boards require specific device trees and/or kernel configurations. 
 
 ```
 
-This generates: `jetson-l4t-<l4t_version>-forecr-dsboard-ornx-eg-cams_<debian_version>_arm64.deb`
+This generates: `jetson-l4t-<l4t_version>-jp<jp_version>-forecr-dsboard-ornx-eg-cams_<debian_version>_arm64.deb`
 
 ### Installing and configuring the MIPI drivers on the board
 
@@ -447,7 +457,6 @@ The package post-install script automatically updates this when installing on a 
 
 Customers can add their own kernel patches in:
 - `sources/<l4t_version>/Linux_for_Tegra/` (full sources)
-- `patches/<l4t_version>/` (patch files)
 
 Consult the support team for assistance with custom modifications.
 
@@ -475,6 +484,7 @@ sudo cp tools/l4t_completion.bash /etc/bash_completion.d/l4t_make
 This provides tab-completion for:
 - Command options (`--prepare`, `--build`, etc.)
 - L4T versions (`-v 36.4.4`)
+- SoMs (`-s t186`, `-s t210`) — 32.x builds only
 - Vendors (`-V forecr`)
 - Carrier boards (`-c dsboard_ornx`)
 
@@ -505,7 +515,6 @@ This appendix provides a summary of the integration scenarios. For detailed step
 2. Create common DTSI and per-camera overlay DTS files adapted from an existing platform
 3. Add dtbo targets to version-specific Makefiles
 4. Register the new vendor/carrier board in `eg_config.yaml`
-5. Regenerate patches with `./l4t_copy_sources.sh`
 
 ### Scenario D: Adding support for a new Nvidia BSP version
 
@@ -513,19 +522,19 @@ This appendix provides a summary of the integration scenarios. For detailed step
 2. Copy the version-specific directory from the closest existing version
 3. Adapt Makefiles, Kconfig, defconfig, and device tree bindings as needed
 4. Build and fix compilation errors: `./l4t_make.sh -v <new_version> --prepare --copy-sources --build`
-5. Regenerate patches with `./l4t_copy_sources.sh`
 
-### Understanding the source copy and patch generation workflow
+### Understanding the source copy workflow
 
 The build system uses a layered source organization with 3-way merging for vendor integration. See the [MIPI Driver Development Guide — Architecture Overview](docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md#architecture-overview) for details.
 
-When running `./l4t_copy_sources.sh -v <version> [-V <vendor>]`, sources are copied in layers:
+When running `./l4t_copy_sources.sh -v <version> [-s <som>] [-V <vendor>]`, sources are copied in layers:
 
 1. `sources/common/` — shared Exosens files (drivers, DT, scripts)
 2. `sources/<version>/Linux_for_Tegra/` — version-specific generic files
-3. *(vendor only)* `sources/<version>/Linux_for_Tegra_<vendor>/` — vendor-specific files
+3. *(32.x only, when `-s <som>` is given)* `sources/<version>/Linux_for_Tegra_<som>/` — SoM-specific files (e.g., `Linux_for_Tegra_t186/`)
+4. *(vendor only)* `sources/<version>/Linux_for_Tegra_<vendor>/` — vendor-specific files
 
-When Layers 2 and 3 both modify the same file (e.g., a Makefile), a **3-way merge** is performed using the original Nvidia BSP as the common ancestor. This means you only need to modify files in `Linux_for_Tegra/` (generic); vendor Makefiles will automatically inherit additions.
+When Layers 2, 3, and 4 modify the same file (e.g., a Makefile), a **3-way merge** is performed using the original Nvidia BSP as the common ancestor. This means you only need to modify files in `Linux_for_Tegra/` (generic); SoM- and vendor-specific Makefiles will automatically inherit additions.
 
 ---
 
@@ -548,7 +557,7 @@ This appendix provides a summary of the files involved. For detailed step-by-ste
 
 The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
 
-After modifying all files, regenerate patches with `./l4t_copy_sources.sh` for each supported version.
+After modifying all files, run `./l4t_copy_sources.sh` for each supported version to apply the changes to the build environment.
 
 ---
 

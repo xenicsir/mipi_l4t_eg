@@ -19,12 +19,23 @@ It is project-independent and reusable on any Jetson platform.
 ## Step 1: Compile the DTBO (host)
 
 ```bash
-# Compile the DT sources
+# Compile the DT sources (35.x / 36.x)
 ./l4t_make.sh -v <version> --copy-sources --build -V generic
 
-# Locate the produced DTBO
-ls -lh ./<version>/Linux_for_Tegra/rootfs/boot/<overlay>.dtbo
+# For 32.x (t210 SoM — Jetson Nano/porg):
+./l4t_make.sh -v <version> -s t210 --copy-sources --build
+
+# For 32.x (t186 SoM — TX2 / TX2i / TX2 NX):
+./l4t_make.sh -v <version> -s t186 --copy-sources --build
+
+# Locate the produced DTBO — path depends on SoM:
+ls -lh ./<version>/Linux_for_Tegra/rootfs/boot/<overlay>.dtbo          # 35.x/36.x
+ls -lh ./<version>/Linux_for_Tegra_t210/rootfs/boot/<overlay>.dtbo     # 32.x t210
+ls -lh ./<version>/Linux_for_Tegra_t186/rootfs/boot/<overlay>.dtbo     # 32.x t186
 ```
+
+**t186 overlay naming:** `tegra186-camera-eg-cams-dione.dtbo`, `tegra186-camera-eg-cam0-*.dtbo`, etc.
+Compatible boards: TX2 (`p2597-0000+p3310-1000`), TX2i (`p2597-0000+p3489-0000/0888`), TX2 NX (`p3509-0000+p3636-0001`).
 
 **Expected size:** a complete camera DTBO is typically 15-40 KB.
 If the size is abnormally small (<5 KB) or large (>100 KB), check

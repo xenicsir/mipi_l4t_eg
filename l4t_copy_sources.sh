@@ -49,7 +49,7 @@ trap "rm -f $DEST_PATHS_FILE" EXIT
 #******************************************************************************
 # Function: Copy source files with automatic 3-way merge for overlapping files
 #
-# Sources are copied in layers (common → version-specific → vendor).
+# Sources are copied in layers (common → version-specific → SoM → vendor → carrier).
 # When a file already exists in the destination AND was modified by a previous
 # layer (differs from the original BSP), this function performs a 3-way merge
 # using the original Nvidia BSP file (from git) as the common ancestor.
@@ -139,6 +139,7 @@ update_status "Analyzing sources..."
 echo "============================================"
 echo "Analyzing Exosens sources for L4T ${L4T_VERSION_EXTENDED}"
 echo "  Vendor: $VENDOR"
+[[ -n "$SOM_BOARD" ]] && echo "  SoM: $SOM_BOARD"
 echo "  Carrier board: $CARRIER_BOARD"
 echo "============================================"
 
@@ -171,13 +172,26 @@ if [[ $L4T_VERSION_MAJOR -ge 36 ]]; then
    analyze_copy "$ROOT_DIR/sources/common/source/hardware_36+" "source/hardware"
    analyze_copy "$ROOT_DIR/sources/common/source/nvidia-oot" "source/nvidia-oot"
 else
-   analyze_copy "$ROOT_DIR/sources/common/source/hardware_32+" "source/public/hardware"
+   # hardware_32+/ contains DT overlays for all 32.x/35.x platforms (porg, jakku, concord,
+   # p3768, t18x/quill). SoM selection does not change the hardware source directory.
+   HW_COMMON_DIR="hardware_32+"
+   analyze_copy "$ROOT_DIR/sources/common/source/$HW_COMMON_DIR" "source/public/hardware"
    analyze_copy "$ROOT_DIR/sources/common/source/nvidia-oot/drivers" "source/public/kernel/nvidia/drivers"
+fi
+
+# SoM-specific sources
+if [[ -n "$SOM_SOURCE_DIR" ]]; then
+   analyze_copy "$ROOT_DIR/sources/${L4T_VERSION}/$SOM_SOURCE_DIR" ""
 fi
 
 # Vendor-specific sources
 if [[ -n "$VENDOR_SOURCE_DIR" ]]; then
    analyze_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" ""
+fi
+
+# Carrier-specific sources
+if [[ -n "$CARRIER_SOURCE_DIR" ]]; then
+   analyze_copy "$ROOT_DIR/sources/${L4T_VERSION}/$CARRIER_SOURCE_DIR" ""
 fi
 
 FILE_COUNT=$(wc -l < "$DEST_PATHS_FILE" 2>/dev/null || echo 0)
@@ -247,7 +261,7 @@ copy_exosens_sources() {
    # Layer 1: Common Exosens files (shared across all L4T versions)
    merge_copy "$ROOT_DIR/sources/common/Linux_for_Tegra" "$L4T_DIR" "" "$verbose"
 
-   # Layer 2: Version-specific Exosens files
+   # Layer 2: Version-specific generic files
    merge_copy "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" "$L4T_DIR" "" "$verbose"
 
    # Layer 3: Common source files (drivers, device trees)
@@ -256,14 +270,26 @@ copy_exosens_sources() {
       merge_copy "$ROOT_DIR/sources/common/source/hardware_36+" "$L4T_DIR/source/hardware" "source/hardware" "$verbose"
       merge_copy "$ROOT_DIR/sources/common/source/nvidia-oot" "$L4T_DIR/source/nvidia-oot" "source/nvidia-oot" "$verbose"
    else
-      # L4T 32.x/35.x structure
-      merge_copy "$ROOT_DIR/sources/common/source/hardware_32+" "$L4T_DIR/source/public/hardware" "source/public/hardware" "$verbose"
+      # L4T 32.x/35.x structure.
+      # hardware_32+/ covers all platforms (porg, jakku, concord, p3768, t18x/quill).
+      # HW_COMMON_DIR was set to "hardware_32+" in the analyze phase above.
+      merge_copy "$ROOT_DIR/sources/common/source/$HW_COMMON_DIR" "$L4T_DIR/source/public/hardware" "source/public/hardware" "$verbose"
       merge_copy "$ROOT_DIR/sources/common/source/nvidia-oot/drivers" "$L4T_DIR/source/public/kernel/nvidia/drivers" "source/public/kernel/nvidia/drivers" "$verbose"
    fi
 
-   # Layer 4: Vendor-specific files (3-way merge for overlapping files)
+   # Layer 4: SoM-specific files (e.g. sources/32.7.1/Linux_for_Tegra_t210)
+   if [[ -n "$SOM_SOURCE_DIR" ]]; then
+      merge_copy "$ROOT_DIR/sources/${L4T_VERSION}/$SOM_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
+   fi
+
+   # Layer 5: Vendor-specific files (e.g. sources/35.6.2/Linux_for_Tegra_forecr)
    if [[ -n "$VENDOR_SOURCE_DIR" ]]; then
       merge_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
+   fi
+
+   # Layer 6: Carrier-specific files (e.g. sources/35.6.2/Linux_for_Tegra_dsboard_ornx)
+   if [[ -n "$CARRIER_SOURCE_DIR" ]]; then
+      merge_copy "$ROOT_DIR/sources/${L4T_VERSION}/$CARRIER_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
    fi
 }
 
@@ -442,243 +468,246 @@ copy_exosens_sources "1"
 echo ""
 echo "  Copy complete"
 
-#******************************************************************************
-# Step 5: Generate patches dynamically based on modified directories
-#******************************************************************************
-
-PATCH_DIR=$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}
-mkdir -p $PATCH_DIR
-
-# Clean old patches
-rm -f $PATCH_DIR/*.patch
-
-update_status "Generating patches..."
-echo ""
-echo "============================================"
-echo "Generating patches in $PATCH_DIR"
-echo "============================================"
-
-cd "$L4T_DIR"
-
-# Stage all changes
-sudo git add -A
-
-# Get list of all modified files
-MODIFIED_FILES=$(sudo git diff --cached --name-only HEAD 2>/dev/null)
-
-if [[ -z "$MODIFIED_FILES" ]]; then
-   echo "No modifications detected."
-   sudo git reset --quiet HEAD 2>/dev/null || true
-   exit 0
-fi
-
-echo ""
-echo "Modified components:"
-TOTAL_PATCHES=0
-
-# Function to generate patch for files matching a pattern
-generate_patch() {
-   local patch_name=$1
-   local pattern=$2
-   local patch_file="$PATCH_DIR/${patch_name}.patch"
-
-   local files=$(echo "$MODIFIED_FILES" | grep -E "$pattern" || true)
-
-   if [[ -n "$files" ]]; then
-      echo "$files" | sudo xargs git diff --cached --no-color HEAD -- > "$patch_file" 2>/dev/null
-
-      if [[ -s "$patch_file" ]]; then
-         local lines=$(wc -l < "$patch_file")
-         local file_count=$(echo "$files" | wc -l)
-         echo "  [OK] ${patch_name}.patch ($file_count files, $lines lines)"
-         ((TOTAL_PATCHES++))
-         # Remove matched files from MODIFIED_FILES to avoid duplicates
-         MODIFIED_FILES=$(echo "$MODIFIED_FILES" | grep -v -E "$pattern" || true)
-         return 0
-      else
-         rm -f "$patch_file"
-      fi
-   fi
-   return 1
-}
-
-# Generate patches with patterns ordered by specificity (most specific first)
-# Each pattern is tried in order; files matching earlier patterns are removed
-
-# Source: nvidia-oot deep paths (L4T 36.x)
-generate_patch "source_nvidia-oot_drivers_media_i2c" "^source/nvidia-oot/drivers/media/i2c/"
-generate_patch "source_nvidia-oot_drivers_media_platform" "^source/nvidia-oot/drivers/media/platform/"
-generate_patch "source_nvidia-oot_include_media" "^source/nvidia-oot/include/media/"
-generate_patch "source_nvidia-oot" "^source/nvidia-oot/"
-
-# Source: public deep paths (L4T 32.x/35.x)
-generate_patch "source_public_kernel_nvidia_drivers_media_i2c" "^source/public/kernel/nvidia/drivers/media/i2c/"
-generate_patch "source_public_kernel_nvidia_drivers_media_platform" "^source/public/kernel/nvidia/drivers/media/platform/"
-generate_patch "source_public_kernel_nvidia_include_media" "^source/public/kernel/nvidia/include/media/"
-generate_patch "source_public_kernel" "^source/public/kernel/"
-generate_patch "source_public_hardware" "^source/public/hardware/"
-
-# Source: other directories
-generate_patch "source_hardware" "^source/hardware/"
-generate_patch "source_kernel" "^source/kernel/"
-
-# Rootfs paths
-generate_patch "rootfs_opt_eg" "^rootfs/opt/eg/"
-generate_patch "rootfs_opt_nvidia" "^rootfs/opt/nvidia/"
-generate_patch "rootfs_usr_bin" "^rootfs/usr/bin/"
-generate_patch "rootfs_usr" "^rootfs/usr/"
-generate_patch "rootfs_opt" "^rootfs/opt/"
-generate_patch "rootfs" "^rootfs/"
-
-# Source root files (like source/Makefile)
-generate_patch "source" "^source/[^/]+$"
-
-# Catch-all for any remaining source/* directories not matched above
-for subdir in $(echo "$MODIFIED_FILES" | grep "^source/" | cut -d'/' -f1-2 | sort -u); do
-   [[ -z "$subdir" ]] && continue
-   patch_name=$(echo "$subdir" | tr '/' '_')
-   generate_patch "$patch_name" "^${subdir}/"
-done
-
-# Catch-all for any remaining top-level directories
-for toplevel in $(echo "$MODIFIED_FILES" | cut -d'/' -f1 | sort -u); do
-   [[ -z "$toplevel" ]] && continue
-   [[ "$toplevel" == "source" || "$toplevel" == "rootfs" ]] && continue
-   generate_patch "$toplevel" "^${toplevel}/"
-done
-
-# Reset staging area
-sudo git reset --quiet HEAD 2>/dev/null || true
-
-# Generate README
-cat > $PATCH_DIR/README.txt << EOF
-Exosens MIPI Camera Patches for L4T ${L4T_VERSION_EXTENDED}
-============================================================
-
-These patches were automatically generated by l4t_copy_sources.sh.
-They represent all modifications made to the original Nvidia L4T $L4T_VERSION BSP
-to add support for Exosens cameras.
-
-Vendor: $VENDOR
-Carrier board: $CARRIER_BOARD
-
-Total patches: $TOTAL_PATCHES
-
-Patch files:
-EOF
-
-for patch_file in $PATCH_DIR/*.patch; do
-   if [[ -f "$patch_file" ]]; then
-      filename=$(basename "$patch_file")
-      lines=$(wc -l < "$patch_file")
-      file_count=$(grep -c "^diff --git" "$patch_file" || echo 0)
-      echo "  - $filename ($file_count files, $lines lines)" >> $PATCH_DIR/README.txt
-   fi
-done
-
-cat >> $PATCH_DIR/README.txt << EOF
-
-Usage:
-  To apply these patches instead of using l4t_copy_sources.sh, run:
-  ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}
-
-  The patches are applied to the L4T environment prepared by l4t_prepare.sh.
-EOF
-
-echo ""
-echo "============================================"
-echo "Generated $TOTAL_PATCHES patches in $PATCH_DIR"
-echo "============================================"
-ls -la $PATCH_DIR/
-
-#******************************************************************************
-# Step 6: Verify patches by applying them to a clean state
-#******************************************************************************
-
-update_status "Verifying patches..."
-echo ""
-echo "============================================"
-echo "Verifying patches..."
-echo "============================================"
-
-# Re-read modified files for verification (we consumed them during patch generation)
-cd "$L4T_DIR"
-sudo git add -A
-EXPECTED_FILES=$(sudo git diff --cached --name-only HEAD 2>/dev/null | sort)
-sudo git reset --quiet HEAD 2>/dev/null || true
-
-# Reset to clean state
-echo "Resetting git to clean state..."
-sudo git checkout -- . 2>/dev/null || true
-sudo git clean -fd 2>/dev/null || true
-
-# Apply patches using l4t_patch_sources.sh
-echo ""
-echo "Applying patches with l4t_patch_sources.sh..."
-cd "$ROOT_DIR"
-
-# Build the argument list for l4t_patch_sources.sh (same as original call)
-PATCH_ARGS="-v $L4T_VERSION"
-[[ "$VENDOR" != "generic" ]] && PATCH_ARGS="$PATCH_ARGS -V $VENDOR"
-[[ "$CARRIER_BOARD" != "generic" ]] && PATCH_ARGS="$PATCH_ARGS -c $CARRIER_BOARD"
-
-if ! "$ROOT_DIR/l4t_patch_sources.sh" $PATCH_ARGS; then
-   echo ""
-   echo -e "${RED}ERROR: l4t_patch_sources.sh failed!${NC}"
-   echo "Patches were generated but could not be applied."
-   exit 1
-fi
-
-# Verify the result
-echo ""
-echo "Verifying patch coverage..."
-cd "$L4T_DIR"
-
-sudo git add -A
-ACTUAL_FILES=$(sudo git diff --cached --name-only HEAD 2>/dev/null | sort)
-sudo git reset --quiet HEAD 2>/dev/null || true
-
-# Compare expected vs actual
-MISSING=$(comm -23 <(echo "$EXPECTED_FILES") <(echo "$ACTUAL_FILES") | grep -v "^$" || true)
-EXTRA=$(comm -13 <(echo "$EXPECTED_FILES") <(echo "$ACTUAL_FILES") | grep -v "^$" || true)
-
-ERRORS=0
-
-if [[ -n "$MISSING" ]]; then
-   missing_count=$(echo "$MISSING" | grep -c "." 2>/dev/null || echo 0)
-   echo -e "${RED}Files expected but NOT applied by patches ($missing_count):${NC}"
-   echo "$MISSING" | head -10 | while read f; do
-      [[ -n "$f" ]] && echo "  - $f"
-   done
-   [[ $missing_count -gt 10 ]] && echo "  ... and $((missing_count - 10)) more"
-   ERRORS=$((ERRORS + missing_count))
-fi
-
-if [[ -n "$EXTRA" ]]; then
-   extra_count=$(echo "$EXTRA" | grep -c "." 2>/dev/null || echo 0)
-   echo -e "${YELLOW}Extra files applied by patches but not in sources ($extra_count):${NC}"
-   echo "$EXTRA" | head -10 | while read f; do
-      [[ -n "$f" ]] && echo "  - $f"
-   done
-   [[ $extra_count -gt 10 ]] && echo "  ... and $((extra_count - 10)) more"
-fi
-
-echo ""
-echo "============================================"
-if [[ $ERRORS -eq 0 ]]; then
-   echo -e "${GREEN}SUCCESS: All patches verified!${NC}"
-   echo ""
-   echo "  Patches generated: $TOTAL_PATCHES"
-   echo "  Files covered:     $(echo "$EXPECTED_FILES" | grep -c "." 2>/dev/null || echo 0)"
-else
-   echo -e "${RED}VERIFICATION FAILED!${NC}"
-   echo ""
-   echo "  Errors: $ERRORS files not covered by patches"
-   echo ""
-   echo "This indicates a bug in patch generation."
-   exit 1
-fi
-echo "============================================"
+# NOTE: Steps 5 & 6 (patch generation and verification) are disabled.
+# The patches/ directory has been removed. Patch support will be redesigned later.
+#
+# #******************************************************************************
+# # Step 5: Generate patches dynamically based on modified directories
+# #******************************************************************************
+#
+# PATCH_DIR=$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}
+# mkdir -p $PATCH_DIR
+#
+# # Clean old patches
+# rm -f $PATCH_DIR/*.patch
+#
+# update_status "Generating patches..."
+# echo ""
+# echo "============================================"
+# echo "Generating patches in $PATCH_DIR"
+# echo "============================================"
+#
+# cd "$L4T_DIR"
+#
+# # Stage all changes
+# sudo git add -A
+#
+# # Get list of all modified files
+# MODIFIED_FILES=$(sudo git diff --cached --name-only HEAD 2>/dev/null)
+#
+# if [[ -z "$MODIFIED_FILES" ]]; then
+#    echo "No modifications detected."
+#    sudo git reset --quiet HEAD 2>/dev/null || true
+#    exit 0
+# fi
+#
+# echo ""
+# echo "Modified components:"
+# TOTAL_PATCHES=0
+#
+# # Function to generate patch for files matching a pattern
+# generate_patch() {
+#    local patch_name=$1
+#    local pattern=$2
+#    local patch_file="$PATCH_DIR/${patch_name}.patch"
+#
+#    local files=$(echo "$MODIFIED_FILES" | grep -E "$pattern" || true)
+#
+#    if [[ -n "$files" ]]; then
+#       echo "$files" | sudo xargs git diff --cached --no-color HEAD -- > "$patch_file" 2>/dev/null
+#
+#       if [[ -s "$patch_file" ]]; then
+#          local lines=$(wc -l < "$patch_file")
+#          local file_count=$(echo "$files" | wc -l)
+#          echo "  [OK] ${patch_name}.patch ($file_count files, $lines lines)"
+#          ((TOTAL_PATCHES++))
+#          # Remove matched files from MODIFIED_FILES to avoid duplicates
+#          MODIFIED_FILES=$(echo "$MODIFIED_FILES" | grep -v -E "$pattern" || true)
+#          return 0
+#       else
+#          rm -f "$patch_file"
+#       fi
+#    fi
+#    return 1
+# }
+#
+# # Generate patches with patterns ordered by specificity (most specific first)
+# # Each pattern is tried in order; files matching earlier patterns are removed
+#
+# # Source: nvidia-oot deep paths (L4T 36.x)
+# generate_patch "source_nvidia-oot_drivers_media_i2c" "^source/nvidia-oot/drivers/media/i2c/"
+# generate_patch "source_nvidia-oot_drivers_media_platform" "^source/nvidia-oot/drivers/media/platform/"
+# generate_patch "source_nvidia-oot_include_media" "^source/nvidia-oot/include/media/"
+# generate_patch "source_nvidia-oot" "^source/nvidia-oot/"
+#
+# # Source: public deep paths (L4T 32.x/35.x)
+# generate_patch "source_public_kernel_nvidia_drivers_media_i2c" "^source/public/kernel/nvidia/drivers/media/i2c/"
+# generate_patch "source_public_kernel_nvidia_drivers_media_platform" "^source/public/kernel/nvidia/drivers/media/platform/"
+# generate_patch "source_public_kernel_nvidia_include_media" "^source/public/kernel/nvidia/include/media/"
+# generate_patch "source_public_kernel" "^source/public/kernel/"
+# generate_patch "source_public_hardware" "^source/public/hardware/"
+#
+# # Source: other directories
+# generate_patch "source_hardware" "^source/hardware/"
+# generate_patch "source_kernel" "^source/kernel/"
+#
+# # Rootfs paths
+# generate_patch "rootfs_opt_eg" "^rootfs/opt/eg/"
+# generate_patch "rootfs_opt_nvidia" "^rootfs/opt/nvidia/"
+# generate_patch "rootfs_usr_bin" "^rootfs/usr/bin/"
+# generate_patch "rootfs_usr" "^rootfs/usr/"
+# generate_patch "rootfs_opt" "^rootfs/opt/"
+# generate_patch "rootfs" "^rootfs/"
+#
+# # Source root files (like source/Makefile)
+# generate_patch "source" "^source/[^/]+$"
+#
+# # Catch-all for any remaining source/* directories not matched above
+# for subdir in $(echo "$MODIFIED_FILES" | grep "^source/" | cut -d'/' -f1-2 | sort -u); do
+#    [[ -z "$subdir" ]] && continue
+#    patch_name=$(echo "$subdir" | tr '/' '_')
+#    generate_patch "$patch_name" "^${subdir}/"
+# done
+#
+# # Catch-all for any remaining top-level directories
+# for toplevel in $(echo "$MODIFIED_FILES" | cut -d'/' -f1 | sort -u); do
+#    [[ -z "$toplevel" ]] && continue
+#    [[ "$toplevel" == "source" || "$toplevel" == "rootfs" ]] && continue
+#    generate_patch "$toplevel" "^${toplevel}/"
+# done
+#
+# # Reset staging area
+# sudo git reset --quiet HEAD 2>/dev/null || true
+#
+# # Generate README
+# cat > $PATCH_DIR/README.txt << EOF
+# Exosens MIPI Camera Patches for L4T ${L4T_VERSION_EXTENDED}
+# ============================================================
+#
+# These patches were automatically generated by l4t_copy_sources.sh.
+# They represent all modifications made to the original Nvidia L4T $L4T_VERSION BSP
+# to add support for Exosens cameras.
+#
+# Vendor: $VENDOR
+# Carrier board: $CARRIER_BOARD
+#
+# Total patches: $TOTAL_PATCHES
+#
+# Patch files:
+# EOF
+#
+# for patch_file in $PATCH_DIR/*.patch; do
+#    if [[ -f "$patch_file" ]]; then
+#       filename=$(basename "$patch_file")
+#       lines=$(wc -l < "$patch_file")
+#       file_count=$(grep -c "^diff --git" "$patch_file" || echo 0)
+#       echo "  - $filename ($file_count files, $lines lines)" >> $PATCH_DIR/README.txt
+#    fi
+# done
+#
+# cat >> $PATCH_DIR/README.txt << EOF
+#
+# Usage:
+#   To apply these patches instead of using l4t_copy_sources.sh, run:
+#   ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}
+#
+#   The patches are applied to the L4T environment prepared by l4t_prepare.sh.
+# EOF
+#
+# echo ""
+# echo "============================================"
+# echo "Generated $TOTAL_PATCHES patches in $PATCH_DIR"
+# echo "============================================"
+# ls -la $PATCH_DIR/
+#
+# #******************************************************************************
+# # Step 6: Verify patches by applying them to a clean state
+# #******************************************************************************
+#
+# update_status "Verifying patches..."
+# echo ""
+# echo "============================================"
+# echo "Verifying patches..."
+# echo "============================================"
+#
+# # Re-read modified files for verification (we consumed them during patch generation)
+# cd "$L4T_DIR"
+# sudo git add -A
+# EXPECTED_FILES=$(sudo git diff --cached --name-only HEAD 2>/dev/null | sort)
+# sudo git reset --quiet HEAD 2>/dev/null || true
+#
+# # Reset to clean state
+# echo "Resetting git to clean state..."
+# sudo git checkout -- . 2>/dev/null || true
+# sudo git clean -fd 2>/dev/null || true
+#
+# # Apply patches using l4t_patch_sources.sh
+# echo ""
+# echo "Applying patches with l4t_patch_sources.sh..."
+# cd "$ROOT_DIR"
+#
+# # Build the argument list for l4t_patch_sources.sh (same as original call)
+# PATCH_ARGS="-v $L4T_VERSION"
+# [[ "$VENDOR" != "generic" ]] && PATCH_ARGS="$PATCH_ARGS -V $VENDOR"
+# [[ "$CARRIER_BOARD" != "generic" ]] && PATCH_ARGS="$PATCH_ARGS -c $CARRIER_BOARD"
+#
+# if ! "$ROOT_DIR/l4t_patch_sources.sh" $PATCH_ARGS; then
+#    echo ""
+#    echo -e "${RED}ERROR: l4t_patch_sources.sh failed!${NC}"
+#    echo "Patches were generated but could not be applied."
+#    exit 1
+# fi
+#
+# # Verify the result
+# echo ""
+# echo "Verifying patch coverage..."
+# cd "$L4T_DIR"
+#
+# sudo git add -A
+# ACTUAL_FILES=$(sudo git diff --cached --name-only HEAD 2>/dev/null | sort)
+# sudo git reset --quiet HEAD 2>/dev/null || true
+#
+# # Compare expected vs actual
+# MISSING=$(comm -23 <(echo "$EXPECTED_FILES") <(echo "$ACTUAL_FILES") | grep -v "^$" || true)
+# EXTRA=$(comm -13 <(echo "$EXPECTED_FILES") <(echo "$ACTUAL_FILES") | grep -v "^$" || true)
+#
+# ERRORS=0
+#
+# if [[ -n "$MISSING" ]]; then
+#    missing_count=$(echo "$MISSING" | grep -c "." 2>/dev/null || echo 0)
+#    echo -e "${RED}Files expected but NOT applied by patches ($missing_count):${NC}"
+#    echo "$MISSING" | head -10 | while read f; do
+#       [[ -n "$f" ]] && echo "  - $f"
+#    done
+#    [[ $missing_count -gt 10 ]] && echo "  ... and $((missing_count - 10)) more"
+#    ERRORS=$((ERRORS + missing_count))
+# fi
+#
+# if [[ -n "$EXTRA" ]]; then
+#    extra_count=$(echo "$EXTRA" | grep -c "." 2>/dev/null || echo 0)
+#    echo -e "${YELLOW}Extra files applied by patches but not in sources ($extra_count):${NC}"
+#    echo "$EXTRA" | head -10 | while read f; do
+#       [[ -n "$f" ]] && echo "  - $f"
+#    done
+#    [[ $extra_count -gt 10 ]] && echo "  ... and $((extra_count - 10)) more"
+# fi
+#
+# echo ""
+# echo "============================================"
+# if [[ $ERRORS -eq 0 ]]; then
+#    echo -e "${GREEN}SUCCESS: All patches verified!${NC}"
+#    echo ""
+#    echo "  Patches generated: $TOTAL_PATCHES"
+#    echo "  Files covered:     $(echo "$EXPECTED_FILES" | grep -c "." 2>/dev/null || echo 0)"
+# else
+#    echo -e "${RED}VERIFICATION FAILED!${NC}"
+#    echo ""
+#    echo "  Errors: $ERRORS files not covered by patches"
+#    echo ""
+#    echo "This indicates a bug in patch generation."
+#    exit 1
+# fi
+# echo "============================================"
 
 #******************************************************************************
 # Step 7: Show summary of Exosens modifications

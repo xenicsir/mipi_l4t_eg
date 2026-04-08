@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-FileCopyrightText: Copyright (c) 2025, Exosens. All rights reserved.
+
+/dts-v1/;
+/plugin/;
+
+#include "tegra186-camera-common-eg-cams-dione.dtsi"
+
+/ {
+	overlay-name = "Exosens Cameras";
+	jetson-header-name = "Jetson TX2 CSI Connector";
+	compatible = "nvidia,p2597-0000+p3310-1000",  /* TX2  (quill) */
+	             "nvidia,p2597-0000+p3489-0000",  /* TX2i (quill) */
+	             "nvidia,p2597-0000+p3489-0888",  /* TX2i 8GB (quill) */
+	             "nvidia,p3509-0000+p3636-0001";  /* TX2 NX (lanai) */
+};

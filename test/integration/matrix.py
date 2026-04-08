@@ -70,23 +70,37 @@ TEST_CAMERAS = list(CAMERA_LANE_SUFFIX.keys())
 
 def _entry(version, board_short, l4t_mode, base_dtb,
            dtbo_base_prefix, dtbo_lane_prefix,
-           ports, is_forecr, compatible, base_dtb_dir="versioned"):
+           ports, is_forecr, compatible, base_dtb_dir="versioned", som=None):
     return dict(
         version=version, board_short=board_short, l4t_mode=l4t_mode,
         base_dtb=base_dtb, base_dtb_dir=base_dtb_dir,
         dtbo_base_prefix=dtbo_base_prefix, dtbo_lane_prefix=dtbo_lane_prefix,
         ports=ports, is_forecr=is_forecr, compatible=compatible,
+        som=som,
     )
 
 MATRIX = []
 
-# ── 32.x  Nano porg (tegra210) ──────────────────────────────────────────────
+# ── 32.x  Nano porg (tegra210, SoM t210) ────────────────────────────────────
 for _ver in ("32.7.1", "32.7.4", "32.7.5", "32.7.6"):
     MATRIX.append(_entry(
         _ver, "nvidia-p3449", "32x",
         "tegra210-p3448-0000-p3449-0000-b00.dtb",
         "tegra210-camera-eg", "tegra210-camera-eg",
         2, False, "nvidia,tegra210",
+        som="t210",
+    ))
+
+# ── 32.x  TX2 / TX2i / TX2 NX (quill/lanai, SoM t186) ──────────────────────
+# DTBOs are built but tests SKIP until a t186 base DTB is available here.
+# (No standard quill/lanai base DTB is shipped in the repo test/dts/ yet.)
+for _ver in ("32.7.1", "32.7.4", "32.7.5", "32.7.6"):
+    MATRIX.append(_entry(
+        _ver, "nvidia-quill", "32x",
+        "tegra186-quill-p3310-1000-c03-00-base.dtb",
+        "tegra186-camera-eg", "tegra186-camera-eg",
+        2, False, "nvidia,p2597-0000+p3310-1000",
+        som="t186",
     ))
 
 # ── 35.x  Xavier AGX (p2822 carrier, tegra194) ──────────────────────────────
@@ -208,15 +222,23 @@ for _ver, _brd, _mode, _dtb in _AUVIDEA:
 # Path helpers
 # ---------------------------------------------------------------------------
 
+def _lft_dir(entry):
+    """Return the Linux_for_Tegra_* directory name for this entry."""
+    som = entry.get("som")
+    if som:
+        return f"Linux_for_Tegra_{som}"
+    return "Linux_for_Tegra"
+
+
 def dtbo_boot_dir(entry):
-    return f"{REPO_ROOT}/{entry['version']}/Linux_for_Tegra/rootfs/boot"
+    return f"{REPO_ROOT}/{entry['version']}/{_lft_dir(entry)}/rootfs/boot"
 
 
 def base_dtb_path(entry):
     if entry["base_dtb_dir"] == "auvidea":
         return f"{AUVIDEA_DIR}/{entry['base_dtb']}"
     if entry["base_dtb_dir"] == "versioned_kernel_dtb":
-        return f"{REPO_ROOT}/{entry['version']}/Linux_for_Tegra/kernel/dtb/{entry['base_dtb']}"
+        return f"{REPO_ROOT}/{entry['version']}/{_lft_dir(entry)}/kernel/dtb/{entry['base_dtb']}"
     return f"{dtbo_boot_dir(entry)}/{entry['base_dtb']}"
 
 
@@ -455,7 +477,8 @@ def main():
             skip_count += 1
             continue
 
-        print(f"\n{BOLD}{CYAN}=== L4T {version} | {board} ==={NC}")
+        som_label = f" | SoM {entry['som']}" if entry.get("som") else ""
+        print(f"\n{BOLD}{CYAN}=== L4T {version}{som_label} | {board} ==={NC}")
 
         # ── Set up /proc/device-tree simulation (once per board/version) ────
         setup_proc_dt(entry, dtb)

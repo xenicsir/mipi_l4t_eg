@@ -11,6 +11,7 @@
 // Memory allocation calls
 #ifdef __KERNEL__ // automatically defined when building kernel modules
     #include <linux/timer.h>
+    #include <linux/version.h>
 #else
     #include <string.h>
     #define timer_setup(...) ((void)0) //ignore the timer setup function from kernel target
@@ -24,13 +25,24 @@ struct timer_def *_timer_array_ptr;
 size_t _timer_array_len;
 
 #ifdef __KERNEL__
-static void _timer_callback (struct timer_list *t){
-    struct timer_def *timer_ptr = from_timer(timer_ptr, t, timer); // similar to container_of macro
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+static void _timer_callback(struct timer_list *t)
+{
+    struct timer_def *timer_ptr = from_timer(timer_ptr, t, timer);
     timer_ptr->done = 1;
     timer_ptr->active = 0;
     PRINT_DEBUG("Timer_triggered #%d\n", timer_ptr->id);
-
 }
+#else
+/* Kernel < 4.15: old-style timer callback with unsigned long data */
+static void _timer_callback(unsigned long data)
+{
+    struct timer_def *timer_ptr = (struct timer_def *)data;
+    timer_ptr->done = 1;
+    timer_ptr->active = 0;
+    PRINT_DEBUG("Timer_triggered #%d\n", timer_ptr->id);
+}
+#endif
 #endif
 
 int nb_timers_init(int num_timers) {
@@ -48,7 +60,12 @@ int nb_timers_init(int num_timers) {
 
     for(i=0; i<num_timers; i++){
         _timer_array_ptr[i].id = i;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
         timer_setup(&_timer_array_ptr[i].timer, _timer_callback, 0);
+#else
+        setup_timer(&_timer_array_ptr[i].timer, _timer_callback,
+                    (unsigned long)&_timer_array_ptr[i]);
+#endif
     }
     return 0;
 }

@@ -106,6 +106,34 @@ get_carrier_dir_suffix() {
     $_EGCFG "carrier.$carrier.dir_suffix" "$L4T_CONFIG_FILE"
 }
 
+# Get all defined SoMs
+get_all_soms() {
+    $_EGCFG soms "$L4T_CONFIG_FILE" 2>/dev/null || echo ""
+}
+
+# Get directory suffix for a SoM
+get_som_dir_suffix() {
+    local som="$1"
+    [[ -z "$som" ]] && echo "" && return
+    $_EGCFG "som.$som.dir_suffix" "$L4T_CONFIG_FILE" 2>/dev/null || echo ""
+}
+
+# Get defconfig for a SoM
+get_som_defconfig() {
+    local som="$1"
+    [[ -z "$som" ]] && echo "" && return
+    $_EGCFG "som.$som.defconfig" "$L4T_CONFIG_FILE" 2>/dev/null || echo ""
+}
+
+# Get SoMs for a specific version+vendor combination.
+# If the version defines vendor_soms.<vendor>, returns that list.
+# Otherwise returns empty string (no SoM for this version+vendor).
+get_soms_for_version_vendor() {
+    local version="$1"
+    local vendor="$2"
+    $_EGCFG "version.$version.vendor_soms.$vendor" "$L4T_CONFIG_FILE" 2>/dev/null || echo ""
+}
+
 #******************************************************************************
 # SECTION 2: Version Matching and Enumeration Functions
 #******************************************************************************
@@ -159,12 +187,14 @@ is_valid_vendor_carrier() {
 }
 
 # Enumerate all valid configurations
-# Args: version_filter vendor_filter carrier_filter
-# Returns: List of "version:vendor:carrier" configurations, one per line
+# Args: version_filter vendor_filter som_filter carrier_filter
+# Returns: List of "version:vendor:som:carrier" configurations, one per line
+#          (som is empty for versions without vendor_soms)
 enumerate_configs() {
     local version_filter="$1"
     local vendor_filter="$2"
-    local carrier_filter="$3"
+    local som_filter="$3"
+    local carrier_filter="$4"
 
     _l4t_ensure_versions_cache
 
@@ -190,61 +220,94 @@ enumerate_configs() {
             if [[ " $vendors " =~ " $vendor_filter " ]]; then
                 vendors="$vendor_filter"
             else
-                # Skip this version if vendor filter doesn't match
                 continue
             fi
         fi
 
         for vendor in $vendors; do
-            # Get carriers for this vendor
-            local carriers=$(get_carriers_for_vendor "$vendor")
+            # Check if this version+vendor has SoM variants
+            local soms=$(get_soms_for_version_vendor "$version" "$vendor")
 
-            # Apply carrier filter
-            if [[ -n "$carrier_filter" ]]; then
-                if [[ " $carriers " =~ " $carrier_filter " ]]; then
-                    carriers="$carrier_filter"
-                else
-                    # Skip this vendor if carrier filter doesn't match
-                    continue
+            if [[ -n "$soms" ]]; then
+                # Version+vendor has SoM variants — enumerate by SoM
+                if [[ -n "$som_filter" ]]; then
+                    if [[ " $soms " =~ " $som_filter " ]]; then
+                        soms="$som_filter"
+                    else
+                        continue
+                    fi
                 fi
-            fi
 
-            for carrier in $carriers; do
-                echo "${version}:${vendor}:${carrier}"
-            done
+                for som in $soms; do
+                    local carriers=$(get_carriers_for_vendor "$vendor")
+                    if [[ -n "$carrier_filter" ]]; then
+                        if [[ " $carriers " =~ " $carrier_filter " ]]; then
+                            carriers="$carrier_filter"
+                        else
+                            continue
+                        fi
+                    fi
+                    for carrier in $carriers; do
+                        echo "${version}:${vendor}:${som}:${carrier}"
+                    done
+                done
+            else
+                # No SoM for this version+vendor
+                if [[ -n "$som_filter" ]]; then
+                    continue  # Skip: this version doesn't have SoMs
+                fi
+
+                local carriers=$(get_carriers_for_vendor "$vendor")
+                if [[ -n "$carrier_filter" ]]; then
+                    if [[ " $carriers " =~ " $carrier_filter " ]]; then
+                        carriers="$carrier_filter"
+                    else
+                        continue
+                    fi
+                fi
+                for carrier in $carriers; do
+                    echo "${version}:${vendor}::${carrier}"
+                done
+            fi
         done
     done
 }
 
-# Parse a configuration string "version:vendor:carrier"
+# Parse a configuration string "version:vendor:som:carrier"
 # Args: config_string var_prefix
-# Sets: ${var_prefix}_VERSION, ${var_prefix}_VENDOR, ${var_prefix}_CARRIER
+# Sets: ${var_prefix}_VERSION, ${var_prefix}_VENDOR, ${var_prefix}_SOM, ${var_prefix}_CARRIER
 parse_config() {
     local config="$1"
     local prefix="${2:-CFG}"
 
-    local version vendor carrier
-    IFS=':' read -r version vendor carrier <<< "$config"
+    local version vendor som carrier
+    IFS=':' read -r version vendor som carrier <<< "$config"
 
     eval "${prefix}_VERSION='$version'"
     eval "${prefix}_VENDOR='$vendor'"
+    eval "${prefix}_SOM='$som'"
     eval "${prefix}_CARRIER='$carrier'"
 }
 
 # Build command-line arguments from configuration
-# Args: version vendor carrier [extra_args...]
+# Args: version vendor som carrier [extra_args...]
 # Returns: String of arguments for l4t_* scripts
 build_args() {
     local version="$1"
     local vendor="$2"
-    local carrier="$3"
-    shift 3
+    local som="$3"
+    local carrier="$4"
+    shift 4
     local extra_args="$*"
 
     local args="-v $version"
 
     if [[ "$vendor" != "generic" ]]; then
         args="$args -V $vendor"
+    fi
+
+    if [[ -n "$som" ]]; then
+        args="$args -s $som"
     fi
 
     if [[ "$carrier" != "generic" ]]; then
@@ -262,20 +325,23 @@ build_args() {
 count_configs() {
     local version_filter="$1"
     local vendor_filter="$2"
-    local carrier_filter="$3"
+    local som_filter="$3"
+    local carrier_filter="$4"
 
-    enumerate_configs "$version_filter" "$vendor_filter" "$carrier_filter" 2>/dev/null | wc -l
+    enumerate_configs "$version_filter" "$vendor_filter" "$som_filter" "$carrier_filter" 2>/dev/null | wc -l
 }
 
 # Validate configuration filters and report errors
 validate_filters() {
     local version_filter="$1"
     local vendor_filter="$2"
-    local carrier_filter="$3"
+    local som_filter="$3"
+    local carrier_filter="$4"
 
     local errors=0
     local all_versions=$(get_all_versions)
     local all_vendors=$(get_all_vendors)
+    local all_soms=$(get_all_soms)
     local all_carriers=$(get_all_carriers)
 
     # Check version filter produces results
@@ -297,6 +363,15 @@ validate_filters() {
         fi
     fi
 
+    # Check SoM filter is valid
+    if [[ -n "$som_filter" ]]; then
+        if [[ ! " $all_soms " =~ " $som_filter " ]]; then
+            echo "Error: Invalid SoM '$som_filter'" >&2
+            echo "Available SoMs: $all_soms" >&2
+            errors=1
+        fi
+    fi
+
     # Check carrier filter is valid
     if [[ -n "$carrier_filter" ]]; then
         if [[ ! " $all_carriers " =~ " $carrier_filter " ]]; then
@@ -308,7 +383,7 @@ validate_filters() {
 
     # Check that the combination produces at least one valid config
     if [[ $errors -eq 0 ]]; then
-        local count=$(count_configs "$version_filter" "$vendor_filter" "$carrier_filter")
+        local count=$(count_configs "$version_filter" "$vendor_filter" "$som_filter" "$carrier_filter")
         if [[ $count -eq 0 ]]; then
             echo "Error: No valid configurations for the specified filters" >&2
 
@@ -323,11 +398,14 @@ validate_filters() {
                 done
             fi
 
-            if [[ -n "$vendor_filter" && -n "$carrier_filter" ]]; then
-                local valid_carriers=$(get_carriers_for_vendor "$vendor_filter")
-                if [[ ! " $valid_carriers " =~ " $carrier_filter " ]]; then
-                    echo "  - Vendor '$vendor_filter' does not support carrier-board '$carrier_filter' (supports: $valid_carriers)" >&2
-                fi
+            if [[ -n "$version_filter" && -n "$som_filter" ]]; then
+                local matched_versions=$(match_versions "$version_filter")
+                for v in ${matched_versions:-""}; do
+                    local valid_soms=$(get_soms_for_version_vendor "$v" "${vendor_filter:-generic}")
+                    if [[ -n "$valid_soms" && ! " $valid_soms " =~ " $som_filter " ]]; then
+                        echo "  - Version $v does not support SoM '$som_filter' for vendor '${vendor_filter:-generic}' (supports: $valid_soms)" >&2
+                    fi
+                done
             fi
 
             errors=1
@@ -357,9 +435,10 @@ Required:
 
 Optional:
   -V, --vendor VENDOR            Vendor: $(echo $all_vendors | tr ' ' ', ') (default: generic)
+  -s, --som SOM                  SoM variant (e.g. t210, t186; for 32.x only)
   -c, --carrier-board BOARD      Carrier board (default depends on vendor)
   -p, --package-version VERSION  Package version for delivery package
-  -s, --standalone               Build standalone kernel with -eg suffix
+  --standalone                   Build standalone kernel with -eg suffix
                                    (auto per eg_config.yaml)
   --archive-dir DIR              Archive directory relative to ROOT_DIR
                                    (default: archives)
@@ -383,6 +462,7 @@ parse_l4t_args() {
     # Reset variables
     L4T_VERSION=""
     VENDOR="generic"
+    SOM_BOARD=""
     CARRIER_BOARD=""
     PACKAGE_VERSION=""
     STANDALONE_BUILD=0
@@ -401,6 +481,10 @@ parse_l4t_args() {
                 VENDOR="$2"
                 shift 2
                 ;;
+            -s|--som)
+                SOM_BOARD="$2"
+                shift 2
+                ;;
             -c|--carrier-board)
                 CARRIER_BOARD="$2"
                 shift 2
@@ -409,7 +493,7 @@ parse_l4t_args() {
                 PACKAGE_VERSION="$2"
                 shift 2
                 ;;
-            -s|--standalone)
+            --standalone)
                 STANDALONE_BUILD=1
                 shift
                 ;;
@@ -467,6 +551,25 @@ parse_l4t_args() {
         exit 1
     fi
 
+    # Validate SoM if provided
+    if [[ -n "$SOM_BOARD" ]]; then
+        local all_soms=$(get_all_soms)
+        if [[ ! " $all_soms " =~ " $SOM_BOARD " ]]; then
+            echo "Error: Invalid SoM '$SOM_BOARD'. Valid values: $all_soms"
+            exit 1
+        fi
+        local valid_soms=$(get_soms_for_version_vendor "$L4T_VERSION" "$VENDOR")
+        if [[ -z "$valid_soms" ]]; then
+            echo "Error: L4T $L4T_VERSION with vendor '$VENDOR' does not support SoM variants"
+            exit 1
+        fi
+        if [[ ! " $valid_soms " =~ " $SOM_BOARD " ]]; then
+            echo "Error: SoM '$SOM_BOARD' is not valid for L4T $L4T_VERSION / vendor '$VENDOR'"
+            echo "Supported SoMs: $valid_soms"
+            exit 1
+        fi
+    fi
+
     # Set default carrier-board based on vendor
     if [[ -z "$CARRIER_BOARD" ]]; then
         CARRIER_BOARD=$(get_default_carrier "$VENDOR")
@@ -480,8 +583,8 @@ parse_l4t_args() {
     fi
 
     # Validate vendor + carrier-board combination
-    if ! is_valid_vendor_carrier "$VENDOR" "$CARRIER_BOARD"; then
-        local valid_carriers=$(get_carriers_for_vendor "$VENDOR")
+    local valid_carriers=$(get_carriers_for_vendor "$VENDOR")
+    if [[ ! " $valid_carriers " =~ " $CARRIER_BOARD " ]]; then
         echo "Error: Vendor '$VENDOR' does not support carrier-board '$CARRIER_BOARD'"
         echo "Supported carrier-boards: $valid_carriers"
         exit 1
@@ -503,15 +606,32 @@ parse_l4t_args() {
 load_version_config() {
     local version="$1"
 
+    # Determine source package prefix.
+    # For versions with per-SoM BSP packages (e.g. 32.x: t210 vs t186),
+    # use sources_by_som.<som> if defined; otherwise fall back to sources.
+    local src_prefix="version.$version.sources"
+    ARCHIVE_SOM_SUBDIR=""
+    if [[ -n "$SOM_BOARD" ]]; then
+        local _sbs_test
+        _sbs_test=$($_EGCFG "version.$version.sources_by_som.$SOM_BOARD.public.filename" "$L4T_CONFIG_FILE" 2>/dev/null)
+        if [[ $? -eq 0 && -n "$_sbs_test" ]]; then
+            src_prefix="version.$version.sources_by_som.$SOM_BOARD"
+            ARCHIVE_SOM_SUBDIR="$SOM_BOARD"
+        fi
+    fi
+
+    # JetPack version
+    JETPACK_VERSION=$($_EGCFG "version.$version.jetpack" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+
     # Source packages
-    JETSON_PUBLIC_SOURCES=$($_EGCFG "version.$version.sources.public.filename" "$L4T_CONFIG_FILE")
-    JETSON_PUBLIC_SOURCES_URL=$($_EGCFG "version.$version.sources.public.url" "$L4T_CONFIG_FILE")
+    JETSON_PUBLIC_SOURCES=$($_EGCFG "$src_prefix.public.filename" "$L4T_CONFIG_FILE")
+    JETSON_PUBLIC_SOURCES_URL=$($_EGCFG "$src_prefix.public.url" "$L4T_CONFIG_FILE")
 
-    L4T_RELEASE_PACKAGE=$($_EGCFG "version.$version.sources.release.filename" "$L4T_CONFIG_FILE")
-    L4T_RELEASE_PACKAGE_URL=$($_EGCFG "version.$version.sources.release.url" "$L4T_CONFIG_FILE")
+    L4T_RELEASE_PACKAGE=$($_EGCFG "$src_prefix.release.filename" "$L4T_CONFIG_FILE")
+    L4T_RELEASE_PACKAGE_URL=$($_EGCFG "$src_prefix.release.url" "$L4T_CONFIG_FILE")
 
-    SAMPLE_FS_PACKAGE=$($_EGCFG "version.$version.sources.sample_fs.filename" "$L4T_CONFIG_FILE")
-    SAMPLE_FS_PACKAGE_URL=$($_EGCFG "version.$version.sources.sample_fs.url" "$L4T_CONFIG_FILE")
+    SAMPLE_FS_PACKAGE=$($_EGCFG "$src_prefix.sample_fs.filename" "$L4T_CONFIG_FILE")
+    SAMPLE_FS_PACKAGE_URL=$($_EGCFG "$src_prefix.sample_fs.url" "$L4T_CONFIG_FILE")
 
     # Toolchain
     JETSON_TOOLCHAIN_ARCHIVE=$($_EGCFG "version.$version.toolchain.archive" "$L4T_CONFIG_FILE")
@@ -547,13 +667,31 @@ compute_derived_vars() {
     GIT_EXACT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
     GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-    # Directory naming based on vendor/carrier-board
+    # SoM directory suffix and source layer
+    local som_suffix=$(get_som_dir_suffix "$SOM_BOARD")
+    SOM_SOURCE_DIR=""
+    if [[ -n "$som_suffix" ]]; then
+        SOM_SOURCE_DIR=Linux_for_Tegra_${som_suffix}
+    fi
+
+    # Carrier directory suffix and source layer
+    local carrier_suffix=$(get_carrier_dir_suffix "$CARRIER_BOARD")
+    CARRIER_SOURCE_DIR=""
+    if [[ -n "$carrier_suffix" ]]; then
+        CARRIER_SOURCE_DIR=Linux_for_Tegra_${carrier_suffix}
+    fi
+
+    # Directory naming based on vendor/SoM/carrier
     if [[ "$VENDOR" == "generic" ]]; then
-        LINUX_FOR_TEGRA_DIR=Linux_for_Tegra
+        if [[ -n "$som_suffix" ]]; then
+            # e.g. generic + t210 → Linux_for_Tegra_t210
+            LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${som_suffix}
+        else
+            LINUX_FOR_TEGRA_DIR=Linux_for_Tegra
+        fi
         VENDOR_SOURCE_DIR=""
         L4T_VERSION_EXTENDED=${L4T_VERSION}
     else
-        local carrier_suffix=$(get_carrier_dir_suffix "$CARRIER_BOARD")
         if [[ -n "$carrier_suffix" ]]; then
             LINUX_FOR_TEGRA_DIR=Linux_for_Tegra_${VENDOR}_${carrier_suffix}
         else
@@ -563,8 +701,11 @@ compute_derived_vars() {
         L4T_VERSION_EXTENDED=${L4T_VERSION}_${VENDOR}
     fi
 
-    # Kernel defconfig based on carrier-board
-    KERNEL_DEFCONFIG=$(get_carrier_defconfig "$CARRIER_BOARD")
+    # Kernel defconfig: SoM takes priority over carrier
+    KERNEL_DEFCONFIG=$(get_som_defconfig "$SOM_BOARD")
+    if [[ -z "$KERNEL_DEFCONFIG" ]]; then
+        KERNEL_DEFCONFIG=$(get_carrier_defconfig "$CARRIER_BOARD")
+    fi
 
     # Jetson directory
     JETSON_DIR=$ROOT_DIR/$L4T_VERSION
@@ -578,6 +719,13 @@ compute_derived_vars() {
 
     # Load version-specific configuration
     load_version_config "$L4T_VERSION"
+
+    # Package archive directory.
+    # When the version uses per-SoM BSP packages (sources_by_som), archives
+    # are stored in a SoM-specific subdir to avoid filename clashes (e.g.
+    # t210 and t186 both ship public_sources.tbz2).
+    # ARCHIVE_SOM_SUBDIR is set by load_version_config.
+    PKG_ARCHIVE_DIR="$ARCHIVE_DIR/$L4T_VERSION${ARCHIVE_SOM_SUBDIR:+/$ARCHIVE_SOM_SUBDIR}"
 }
 
 #******************************************************************************
