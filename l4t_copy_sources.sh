@@ -305,14 +305,14 @@ echo ""
 echo -e "${BLUE}Preparing git repository...${NC}"
 
 # Git config for automated commits
-git config user.email "build@exosens.com" 2>/dev/null || true
-git config user.name "Exosens Build System" 2>/dev/null || true
-sudo git config user.email "build@exosens.com" 2>/dev/null || true
-sudo git config user.name "Exosens Build System" 2>/dev/null || true
-
-# Add safe.directory
-git config --add safe.directory "$L4T_DIR" 2>/dev/null || true
-sudo git config --add safe.directory "$L4T_DIR" 2>/dev/null || true
+# NOTE: These were used to stamp patch-generation commits with a build identity.
+# They are not needed while patch generation (Steps 5 & 6) is disabled, because
+# git falls back to ~/.gitconfig / /root/.gitconfig for the bookkeeping commits.
+# Re-evaluate if patch generation is re-enabled.
+#git config user.email "build@exosens.com" 2>/dev/null || true
+#git config user.name "Exosens Build System" 2>/dev/null || true
+#sudo git config user.email "build@exosens.com" 2>/dev/null || true
+#sudo git config user.name "Exosens Build System" 2>/dev/null || true
 
 if [[ ! -d "$L4T_DIR/.git" ]]; then
    echo "  Creating new git repository..."
@@ -359,6 +359,12 @@ else
       fi
    fi
 fi
+
+# safe.directory: allow non-root git commands to operate in a root-owned repo.
+# Must be set after git init so it writes to $L4T_DIR/.git/config, not the
+# parent repo's config (which would happen if .git/ doesn't exist yet).
+git config --add safe.directory "$L4T_DIR" 2>/dev/null || true
+sudo git config --add safe.directory "$L4T_DIR" 2>/dev/null || true
 
 #******************************************************************************
 # Step 3b: Merge Exosens defconfig into vendor sources (BEFORE copying)
