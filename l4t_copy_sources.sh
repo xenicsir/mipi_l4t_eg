@@ -305,14 +305,14 @@ echo ""
 echo -e "${BLUE}Preparing git repository...${NC}"
 
 # Git config for automated commits
-git config --global user.email "build@exosens.com" 2>/dev/null || true
-git config --global user.name "Exosens Build System" 2>/dev/null || true
-sudo git config --global user.email "build@exosens.com" 2>/dev/null || true
-sudo git config --global user.name "Exosens Build System" 2>/dev/null || true
+git config user.email "build@exosens.com" 2>/dev/null || true
+git config user.name "Exosens Build System" 2>/dev/null || true
+sudo git config user.email "build@exosens.com" 2>/dev/null || true
+sudo git config user.name "Exosens Build System" 2>/dev/null || true
 
 # Add safe.directory
-git config --global --add safe.directory "$L4T_DIR" 2>/dev/null || true
-sudo git config --global --add safe.directory "$L4T_DIR" 2>/dev/null || true
+git config --add safe.directory "$L4T_DIR" 2>/dev/null || true
+sudo git config --add safe.directory "$L4T_DIR" 2>/dev/null || true
 
 if [[ ! -d "$L4T_DIR/.git" ]]; then
    echo "  Creating new git repository..."
