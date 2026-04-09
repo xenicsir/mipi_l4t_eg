@@ -36,18 +36,18 @@
 						#size-cells = <0>;
 						port@0 {
 							reg = <0>;
-							eg_cams_vi_in0: endpoint {
+							endpoint {
 								port-index = <0>;
 								bus-width = <2>;
-								remote-endpoint = <&eg_cams_csi_out0>;
+								/* remote-endpoint already wired to csi_out0 in base DTB */
 							};
 						};
 						port@1 {
 							reg = <1>;
-							eg_cams_vi_in1: endpoint {
+							endpoint {
 								port-index = <2>;
 								bus-width = <2>;
-								remote-endpoint = <&eg_cams_csi_out1>;
+								/* remote-endpoint already wired to csi_out1 in base DTB */
 							};
 						};
 					};
@@ -64,18 +64,14 @@
 							#size-cells = <0>;
 							port@0 {
 								reg = <0>;
-								eg_cams_csi_in0: endpoint@0 {
+								endpoint@0 {
 									port-index = <0>;
 									bus-width = <2>;
 									remote-endpoint = <&xenics_dione_ir_out0>;
 								};
 							};
-							port@1 {
-								reg = <1>;
-								eg_cams_csi_out0: endpoint@1 {
-									remote-endpoint = <&eg_cams_vi_in0>;
-								};
-							};
+							/* port@1 / csi_out0: remote-endpoint to vi_in0
+							 * already wired in base DTB — no override needed */
 						};
 					};
 					channel@1 {
@@ -85,18 +81,14 @@
 							#size-cells = <0>;
 							port@0 {
 								reg = <0>;
-								eg_cams_csi_in1: endpoint@2 {
+								endpoint@2 {
 									port-index = <2>;
 									bus-width = <2>;
 									remote-endpoint = <&xenics_dione_ir_out1>;
 								};
 							};
-							port@1 {
-								reg = <1>;
-								eg_cams_csi_out1: endpoint@3 {
-									remote-endpoint = <&eg_cams_vi_in1>;
-								};
-							};
+							/* port@1 / csi_out1: remote-endpoint to vi_in1
+							 * already wired in base DTB — no override needed */
 						};
 					};
 				};
@@ -287,7 +279,7 @@
 								xenics_dione_ir_out0: endpoint {
 									port-index = <0>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in0>;
+									remote-endpoint = <&csi_in0>;
 									link-frequencies = /bits/ 64 <120000000 498000000>;
 								};
 							};
@@ -406,7 +398,7 @@
 								eg_ec_out0: endpoint {
 									port-index = <0>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in0>;
+									remote-endpoint = <&csi_in0>;
 								};
 							};
 						};
@@ -631,7 +623,7 @@
 								ilumos_out0: endpoint {
 									port-index = <0>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in0>;
+									remote-endpoint = <&csi_in0>;
 								};
 							};
 						};
@@ -687,7 +679,7 @@
 								microlynx_out0: endpoint {
 									port-index = <0>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in0>;
+									remote-endpoint = <&csi_in0>;
 								};
 							};
 						};
@@ -861,7 +853,7 @@
 								xenics_dione_ir_out1: endpoint {
 									port-index = <2>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in1>;
+									remote-endpoint = <&csi_in1>;
 									link-frequencies = /bits/ 64 <120000000 498000000>;
 								};
 							};
@@ -980,7 +972,7 @@
 								eg_ec_out1: endpoint {
 									port-index = <2>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in1>;
+									remote-endpoint = <&csi_in1>;
 								};
 							};
 						};
@@ -1205,7 +1197,7 @@
 								ilumos_out1: endpoint {
 									port-index = <2>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in1>;
+									remote-endpoint = <&csi_in1>;
 								};
 							};
 						};
@@ -1261,7 +1253,7 @@
 								microlynx_out1: endpoint {
 									port-index = <2>;
 									bus-width = <2>;
-									remote-endpoint = <&eg_cams_csi_in1>;
+									remote-endpoint = <&csi_in1>;
 								};
 							};
 						};

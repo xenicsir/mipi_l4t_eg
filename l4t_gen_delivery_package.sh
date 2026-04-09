@@ -256,18 +256,14 @@ else
       EG_SRCS+=("$(basename "$f" .c)")
    done < <(find "$ROOT_DIR/sources" -path "*/drivers/media/i2c/*.c" 2>/dev/null)
 
-   # Find highest-priority i2c Makefile from sources layers (35.x and 36.x paths)
+   # The EG module list is always derived from the version-generic Makefile.
+   # SoM/vendor/carrier layers contain NVIDIA stock Makefiles (no EG modules)
+   # and must never override it.
    I2C_MAKEFILE=""
-   for src_dir in \
-         "$ROOT_DIR/sources/common/Linux_for_Tegra" \
-         "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" \
-         ${SOM_SOURCE_DIR:+"$ROOT_DIR/sources/$L4T_VERSION/$SOM_SOURCE_DIR"} \
-         ${VENDOR_SOURCE_DIR:+"$ROOT_DIR/sources/$L4T_VERSION/$VENDOR_SOURCE_DIR"} \
-         ${CARRIER_SOURCE_DIR:+"$ROOT_DIR/sources/$L4T_VERSION/$CARRIER_SOURCE_DIR"}; do
-      for rel in "source/public/kernel/nvidia/drivers/media/i2c/Makefile" \
-                 "source/nvidia-oot/drivers/media/i2c/Makefile"; do
-         [[ -f "$src_dir/$rel" ]] && I2C_MAKEFILE="$src_dir/$rel"
-      done
+   for rel in "source/public/kernel/nvidia/drivers/media/i2c/Makefile" \
+              "source/nvidia-oot/drivers/media/i2c/Makefile"; do
+      candidate="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/$rel"
+      [[ -f "$candidate" ]] && I2C_MAKEFILE="$candidate"
    done
 
    if [[ ${#EG_SRCS[@]} -gt 0 && -n "$I2C_MAKEFILE" ]]; then
@@ -603,4 +599,5 @@ else
    echo ""
    echo "Warning: Package verification found issues"
    echo "Review the errors above before distributing the package"
+   exit 1
 fi

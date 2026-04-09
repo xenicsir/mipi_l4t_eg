@@ -205,8 +205,10 @@ Each camera node must define:
 **Special case for x4 cameras on CAM0:** If the camera requires 4 MIPI lanes, the entire CAM0 node must be guarded by `#ifdef DSBOARD_ORNXS`, because the Nvidia devkit CAM0 only supports x2 (due to the CSI lane swap). See [CSI_LANE_AND_POLARITY_SWAP_P3768.md](CSI_LANE_AND_POLARITY_SWAP_P3768.md).
 
 **Endpoint remote-endpoint references:**
-- CAM0: `remote-endpoint = <&eg_cams_csi_in0>` (36.x) or `<&rbpcv2_imx219_csi_in0>` (32+/35.x)
-- CAM1: `remote-endpoint = <&eg_cams_csi_in1>` (36.x) or `<&rbpcv2_imx219_csi_in1>` (32+/35.x)
+- CAM0: `remote-endpoint = <&eg_cams_csi_in0>` (36.x) or `<&csi_in0>` (32.x t186/quill) or `<&rbpcv2_imx219_csi_in0>` (32+/35.x t210/porg)
+- CAM1: `remote-endpoint = <&eg_cams_csi_in1>` (36.x) or `<&csi_in1>` (32.x t186/quill) or `<&rbpcv2_imx219_csi_in1>` (32+/35.x t210/porg)
+
+> **Note t186 (quill):** `csi_in0`/`csi_in1` are labels already present in the base DTB `__symbols__` (see [below](#csi-endpoint-remote-endpoint-labels)). Do NOT create new labels for these existing nodes — use the base DTB labels directly.
 
 ### Step 4: Device tree — per-port overlays
 
@@ -360,7 +362,7 @@ grep "<camera>" sources/<target_version>/Linux_for_Tegra/source/.../i2c/Makefile
 Copy the camera node definitions from the source DTSI and adapt them for the target format. See the [DT differences reference](#reference-device-tree-differences-between-l4t-3235x-and-36x) for the exact changes.
 
 Key adaptations when porting from 32+/35.x to 36.x:
-- `remote-endpoint`: change from `<&rbpcv2_imx219_csi_in0>` to `<&eg_cams_csi_in0>` (CAM0) or `<&eg_cams_csi_in1>` (CAM1)
+- `remote-endpoint`: change from `<&rbpcv2_imx219_csi_in0>` (t210/porg) or `<&csi_in0>` (t186/quill) to `<&eg_cams_csi_in0>` (CAM0); same pattern for CAM1
 - The rest of the node properties (modes, lanes, polarity, etc.) remain identical
 
 Insert the new nodes in the `cam_i2cmux` block:
@@ -704,12 +706,16 @@ proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/<node>";
 
 ### CSI endpoint remote-endpoint labels
 
-| Endpoint | L4T 32+/35.x | L4T 36.x |
-|----------|-------------|----------|
-| CSI input CAM0 | `rbpcv2_imx219_csi_in0` | `eg_cams_csi_in0` |
-| CSI input CAM1 | `rbpcv2_imx219_csi_in1` | `eg_cams_csi_in1` |
+| Endpoint | L4T 32.x t186 (quill) | L4T 32+/35.x t210 (porg) | L4T 36.x |
+|----------|-----------------------|--------------------------|----------|
+| CSI input CAM0 | `csi_in0` | `rbpcv2_imx219_csi_in0` | `eg_cams_csi_in0` |
+| CSI input CAM1 | `csi_in1` | `rbpcv2_imx219_csi_in1` | `eg_cams_csi_in1` |
 
 These are the labels used in `remote-endpoint` references in the camera sensor endpoint.
+
+**Critical — t186:** `csi_in0` and `csi_in1` are labels defined in the base DTB's `__symbols__` node, pointing to the existing `nvcsi@150c0000` endpoints. Multiple stock camera overlays share these same labels (e.g., `imx390_csi_in0`, `liimx274_csi_in0` all alias the same node). When writing an overlay, reference these labels directly — do NOT define new labels for these existing nodes inside an `__overlay__` block, as this creates duplicate phandles on the same node and produces an incorrect DT graph topology.
+
+The nvcsi↔vi output connection (`csi_out0` → `vi_in0`) is already bidirectionally wired in the base DTB and must not be overridden. Only the nvcsi input side (`csi_in0.remote-endpoint` → sensor) needs to be set by the EG overlay.
 
 ### Driver Makefile
 

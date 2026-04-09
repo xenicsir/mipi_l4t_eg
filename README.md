@@ -39,6 +39,13 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
 
 **Recommended OS:** Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. Ubuntu 22.04 LTS is currently used.
 
+**sudo PTY allocation:** The build system calls `sudo` from non-interactive scripts. By default, recent versions of sudo allocate a PTY for each invocation, which can exhaust the system's PTY pool during parallel builds. Disable this for your user:
+
+```bash
+echo 'Defaults:$USER !use_pty' | sudo tee /etc/sudoers.d/$USER-notty
+sudo chmod 440 /etc/sudoers.d/$USER-notty
+```
+
 **Git configuration:** A name and email must be set (used when generating package version strings):
 
 ```bash
@@ -336,6 +343,7 @@ eg_dt_camera_config_get.sh
 This displays:
 - **Board:** The detected board, SoM and SoC
 - **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format
+  - The **I2C device** is the character device used to send read/write commands to the camera's control registers (firmware updates, configuration, diagnostics)
 - **Total configured:** Number of configured cameras
 
 **Example output:**

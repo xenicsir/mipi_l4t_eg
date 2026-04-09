@@ -502,15 +502,13 @@ verify_package() {
     # Cross-references Exosens .c sources with the i2c Makefile to find EG modules.
     local eg_modules=""
     if [[ $standalone_build -eq 0 ]]; then
+        # EG module list is always derived from the version-generic Makefile.
+        # SoM/vendor layers contain NVIDIA stock Makefiles (no EG modules).
         local i2c_makefile=""
-        for src_dir in "$SCRIPT_DIR/sources/$version/Linux_for_Tegra" \
-                       "$SCRIPT_DIR/sources/$version/${som_source_dir}" \
-                       "$SCRIPT_DIR/sources/$version/${vendor_source_dir}"; do
-            [[ -z "$src_dir" || "$src_dir" == "$SCRIPT_DIR/sources/$version/" ]] && continue
-            for rel in "source/public/kernel/nvidia/drivers/media/i2c/Makefile" \
-                       "source/nvidia-oot/drivers/media/i2c/Makefile"; do
-                [[ -f "$src_dir/$rel" ]] && i2c_makefile="$src_dir/$rel"
-            done
+        for rel in "source/public/kernel/nvidia/drivers/media/i2c/Makefile" \
+                   "source/nvidia-oot/drivers/media/i2c/Makefile"; do
+            local candidate="$SCRIPT_DIR/sources/$version/Linux_for_Tegra/$rel"
+            [[ -f "$candidate" ]] && i2c_makefile="$candidate"
         done
         if [[ -n "$i2c_makefile" ]]; then
             local eg_srcs=()

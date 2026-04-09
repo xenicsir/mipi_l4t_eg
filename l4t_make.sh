@@ -587,7 +587,7 @@ else
     # If aborted, kill remaining running jobs
     if [[ $aborted -eq 1 ]]; then
         for pid in "${job_pids[@]}"; do
-            [[ -n "$pid" ]] && kill "$pid" 2>/dev/null
+            [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
         done
     fi
 
