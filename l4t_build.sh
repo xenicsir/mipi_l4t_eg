@@ -27,6 +27,22 @@
 . l4t_environment.sh
 l4t_init "$@"
 
+# Guard variable: set to ROOTFS_DIR just before mounting, cleared after unmounting.
+# The trap uses it to clean up bind-mounts if the script is interrupted mid-chroot.
+_CHROOT_ROOTFS_DIR=""
+_cleanup_chroot() {
+    [[ -z "$_CHROOT_ROOTFS_DIR" ]] && return
+    local rdir="$_CHROOT_ROOTFS_DIR"
+    sudo umount "$rdir/dev/pts"       2>/dev/null || true
+    sudo umount "$rdir/dev/shm"       2>/dev/null || true
+    sudo umount "$rdir/dev/mqueue"    2>/dev/null || true
+    sudo umount "$rdir/dev/hugepages" 2>/dev/null || true
+    sudo umount "$rdir/dev"           2>/dev/null || true
+    sudo umount "$rdir/sys"           2>/dev/null || true
+    sudo umount "$rdir/proc"          2>/dev/null || true
+}
+trap _cleanup_chroot EXIT
+
 #******************************************************************************
 # Static verification of source DTSIs (eg_config.yaml)
 #******************************************************************************
@@ -210,6 +226,7 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
 
          # Mount required filesystems for chroot
          update_status "Mounting chroot filesystems..."
+         _CHROOT_ROOTFS_DIR="$ROOTFS_DIR"
          sudo mount --bind /proc "$ROOTFS_DIR/proc" 2>/dev/null || true
          sudo mount --bind /sys "$ROOTFS_DIR/sys" 2>/dev/null || true
          sudo mount --bind /dev "$ROOTFS_DIR/dev" 2>/dev/null || true
@@ -223,12 +240,16 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
             sudo chroot "$ROOTFS_DIR" /usr/sbin/mkinitramfs -o "/boot/initrd.img-$EG_KERNEL_VERSION" "$EG_KERNEL_VERSION" 2>/dev/null || true
          }
 
-         # Unmount filesystems
+         # Unmount filesystems (order: sub-mounts of /dev first, then /dev, sys, proc)
          update_status "Unmounting chroot filesystems..."
-         sudo umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/dev" 2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/sys" 2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/proc" 2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/dev/pts"       2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/dev/shm"       2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/dev/mqueue"    2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/dev/hugepages" 2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/dev"           2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/sys"           2>/dev/null || true
+         sudo umount "$ROOTFS_DIR/proc"          2>/dev/null || true
+         _CHROOT_ROOTFS_DIR=""
 
          # Move initramfs to boot/eg/initrd-eg
          if [[ -f "$ROOTFS_DIR/boot/initrd.img-$EG_KERNEL_VERSION" ]]; then
