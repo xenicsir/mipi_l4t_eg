@@ -19,12 +19,23 @@ It is project-independent and reusable on any Jetson platform.
 ## Step 1: Compile the DTBO (host)
 
 ```bash
-# Compile the DT sources
+# Compile the DT sources (35.x / 36.x)
 ./l4t_make.sh -v <version> --copy-sources --build -V generic
 
-# Locate the produced DTBO
-ls -lh ./<version>/Linux_for_Tegra/rootfs/boot/<overlay>.dtbo
+# For 32.x (t210 SoM — Jetson Nano/porg):
+./l4t_make.sh -v <version> -s t210 --copy-sources --build
+
+# For 32.x (t186 SoM — TX2 / TX2i / TX2 NX):
+./l4t_make.sh -v <version> -s t186 --copy-sources --build
+
+# Locate the produced DTBO — path depends on SoM:
+ls -lh ./<version>/Linux_for_Tegra/rootfs/boot/<overlay>.dtbo          # 35.x/36.x
+ls -lh ./<version>/Linux_for_Tegra_t210/rootfs/boot/<overlay>.dtbo     # 32.x t210
+ls -lh ./<version>/Linux_for_Tegra_t186/rootfs/boot/<overlay>.dtbo     # 32.x t186
 ```
+
+**t186 overlay naming:** `tegra186-camera-eg-cams-dione.dtbo`, `tegra186-camera-eg-cam0-*.dtbo`, etc.
+Compatible boards: TX2 (`p2597-0000+p3310-1000`), TX2i (`p2597-0000+p3489-0000/0888`), TX2 NX (`p3509-0000+p3636-0001`).
 
 **Expected size:** a complete camera DTBO is typically 15-40 KB.
 If the size is abnormally small (<5 KB) or large (>100 KB), check
@@ -223,6 +234,40 @@ Fragment@1: target = /
   -> NO remote-endpoint towards Fragment@0 (avoids cross-fragment refs)
   -> proc-device-tree paths = strings (not phandles)
 ```
+
+### Problem: new labels assigned to existing vi/nvcsi endpoints
+
+**Symptom:** Camera probe fails or DT graph validation errors, even though the overlay compiles and applies cleanly.
+
+**Cause:** The author created new labels (e.g., `eg_cams_csi_in0`) inside an `__overlay__` block for nodes that already exist in the base DTB (the nvcsi `endpoint@0`, vi `endpoint`, etc.). This gives the node two phandles — the original one from the base DTB and a new one from the overlay. Other nodes that already referenced the original phandle (e.g., the disabled stock camera's back-pointer to nvcsi) are not updated, creating an asymmetric graph.
+
+**Rule:** Never assign labels to nodes that already exist in the base DTB inside an `__overlay__` block. Instead:
+
+1. Check `__symbols__` in the base DTB for existing labels:
+   ```bash
+   dtc -I dtb -O dts /boot/dtb/<base>.dtb 2>/dev/null | \
+     awk '/__symbols__/{p=1} p{print} /^\t\}/{if(p)exit}' | \
+     grep -E "csi_in|csi_out|vi_in"
+   ```
+
+2. Use those existing labels directly from the overlay:
+   - In `remote-endpoint` of the sensor endpoint: `<&csi_in0>` instead of a new overlay-local label
+   - To update the nvcsi endpoint: use `target = <&csi_in0>` in a separate fragment (or modify by path in `target-path = "/"`, without assigning a new label)
+
+3. The nvcsi→vi output connection (`csi_out0 ↔ vi_in0`) is **already bidirectionally wired** in the base DTB. Do not override it — only update the nvcsi input side (`csi_in0.remote-endpoint` → sensor).
+
+**t186 (quill) label map** — these labels exist in `__symbols__` of the base DTB:
+
+| Node | `__symbols__` label |
+|------|---------------------|
+| `nvcsi@150c0000/channel@0/ports/port@0/endpoint@0` | `csi_in0` |
+| `nvcsi@150c0000/channel@0/ports/port@1/endpoint@1` | `csi_out0` |
+| `nvcsi@150c0000/channel@1/ports/port@0/endpoint@2` | `csi_in1` |
+| `nvcsi@150c0000/channel@1/ports/port@1/endpoint@3` | `csi_out1` |
+| `vi@15700000/ports/port@0/endpoint` | `vi_in0` |
+| `vi@15700000/ports/port@1/endpoint` | `vi_in1` |
+
+---
 
 ### Problem: overlay applied but no /dev/videoX
 

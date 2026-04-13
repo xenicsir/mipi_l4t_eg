@@ -28,11 +28,13 @@ _l4t_init_completion() {
         _l4t_versions=$($_EGCFG versions "$_L4T_CONFIG_FILE" 2>/dev/null)
         _l4t_vendors=$($_EGCFG vendors "$_L4T_CONFIG_FILE" 2>/dev/null)
         _l4t_carrier_boards=$($_EGCFG carriers "$_L4T_CONFIG_FILE" 2>/dev/null)
+        _l4t_soms=$($_EGCFG soms "$_L4T_CONFIG_FILE" 2>/dev/null)
     fi
     # Fallback defaults if no configuration file
     _l4t_versions="${_l4t_versions:-32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 35.6.4 36.4 36.4.3 36.4.4 36.5.0}"
     _l4t_vendors="${_l4t_vendors:-generic forecr}"
     _l4t_carrier_boards="${_l4t_carrier_boards:-generic dsboard_ornx}"
+    _l4t_soms="${_l4t_soms:-t210 t186}"
 }
 
 # Initialize on load
@@ -46,7 +48,7 @@ _l4t_common_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Base options for all l4t scripts
-    local common_opts="-v --l4t-version -V --vendor -c --carrier-board -h --help"
+    local common_opts="-v --l4t-version -V --vendor -s --som -c --carrier-board -h --help"
 
     # Script-specific options
     local script_name=$(basename "${COMP_WORDS[0]}")
@@ -54,7 +56,7 @@ _l4t_common_completion() {
 
     case "$script_name" in
         l4t_build.sh)
-            extra_opts="-s --standalone --no-verify-dtsi"
+            extra_opts="--standalone --no-verify-dtsi"
             ;;
         l4t_prepare.sh)
             extra_opts="--archive-dir"
@@ -72,7 +74,7 @@ _l4t_common_completion() {
             ;;
         l4t_make.sh)
             # l4t_make.sh master orchestration script
-            extra_opts="-p --package-version -s --standalone --no-verify-dtsi --archive-dir --delivery-dir --prepare --copy-sources --patch-sources --build --gen-package --from-scratch --abort-on-error --continue-on-error --dry-run --list"
+            extra_opts="-p --package-version --standalone --no-verify-dtsi --archive-dir --delivery-dir --prepare --copy-sources --patch-sources --build --gen-package --from-scratch --abort-on-error --continue-on-error --dry-run --list"
             ;;
     esac
 
@@ -86,6 +88,10 @@ _l4t_common_completion() {
             ;;
         -V|--vendor)
             COMPREPLY=( $(compgen -W "$_l4t_vendors" -- "$cur") )
+            return 0
+            ;;
+        -s|--som)
+            COMPREPLY=( $(compgen -W "$_l4t_soms" -- "$cur") )
             return 0
             ;;
         -c|--carrier-board)

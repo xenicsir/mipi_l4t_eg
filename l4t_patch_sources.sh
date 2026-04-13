@@ -30,13 +30,18 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 L4T_DIR="$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}"
-PATCH_DIR=$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}
+# NOTE: This script is disabled (patches/ directory removed, to be redesigned).
+echo "ERROR: l4t_patch_sources.sh is disabled — patches/ directory has been removed."
+echo "Use l4t_copy_sources.sh to apply Exosens sources."
+exit 1
 
-if [[ ! -d "$PATCH_DIR" ]]; then
-   echo "Error: Patch directory not found: $PATCH_DIR"
-   echo "Run l4t_copy_sources.sh first to generate patches."
-   exit 1
-fi
+# PATCH_DIR=$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}
+#
+# if [[ ! -d "$PATCH_DIR" ]]; then
+#    echo "Error: Patch directory not found: $PATCH_DIR"
+#    echo "Run l4t_copy_sources.sh first to generate patches."
+#    exit 1
+# fi
 
 echo "============================================"
 echo "Applying Exosens camera patches for L4T ${L4T_VERSION_EXTENDED}"

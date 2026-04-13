@@ -68,26 +68,26 @@ echo "Decompression tools: $(command -v lbzip2 >/dev/null && echo 'lbzip2' || ec
 update_status "Initializing..."
 mkdir -p $JETSON_DIR
 
-if [[ ! -d $ARCHIVE_DIR/$L4T_VERSION ]]; then
-   mkdir -p $ARCHIVE_DIR/$L4T_VERSION
-fi
+# PKG_ARCHIVE_DIR may include a SoM subdir (e.g. archives/32.7.1/t186/)
+# when the version ships separate BSP packages per SoM (sources_by_som).
+mkdir -p "$PKG_ARCHIVE_DIR"
 
 #----------------------#
 # Get the Nvidia SDK   #
 #----------------------#
 cd ${JETSON_DIR}
 
-if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE} ]]; then
+if [[ ! -f $PKG_ARCHIVE_DIR/${L4T_RELEASE_PACKAGE} ]]; then
    update_status "Downloading BSP..."
-   wget -q $L4T_RELEASE_PACKAGE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE}
+   wget -q $L4T_RELEASE_PACKAGE_URL -O $PKG_ARCHIVE_DIR/${L4T_RELEASE_PACKAGE}
 fi
-if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE} ]]; then
+if [[ ! -f $PKG_ARCHIVE_DIR/${SAMPLE_FS_PACKAGE} ]]; then
    update_status "Downloading rootfs..."
-   wget -q $SAMPLE_FS_PACKAGE_URL -O $ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}
+   wget -q $SAMPLE_FS_PACKAGE_URL -O $PKG_ARCHIVE_DIR/${SAMPLE_FS_PACKAGE}
 fi
-if [[ ! -f $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES} ]]; then
+if [[ ! -f $PKG_ARCHIVE_DIR/${JETSON_PUBLIC_SOURCES} ]]; then
    update_status "Downloading sources..."
-   wget -q $JETSON_PUBLIC_SOURCES_URL -O $ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}
+   wget -q $JETSON_PUBLIC_SOURCES_URL -O $PKG_ARCHIVE_DIR/${JETSON_PUBLIC_SOURCES}
 fi
 
 if [[ -f $JETSON_DIR/$LINUX_FOR_TEGRA_DIR/.bsp_done ]]; then
@@ -99,15 +99,15 @@ else
       mkdir $JETSON_DIR/tmp_$LINUX_FOR_TEGRA_DIR
       cd $JETSON_DIR/tmp_$LINUX_FOR_TEGRA_DIR
       update_status "Extracting BSP..."
-      fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/${L4T_RELEASE_PACKAGE}"
+      fast_tar_extract "$PKG_ARCHIVE_DIR/${L4T_RELEASE_PACKAGE}"
       sudo mv Linux_for_Tegra $JETSON_DIR/$LINUX_FOR_TEGRA_DIR
       cd $JETSON_DIR
       sudo rm -rf tmp_$LINUX_FOR_TEGRA_DIR
    fi
    cd ${JETSON_DIR}/${LINUX_FOR_TEGRA_DIR}/rootfs/
    update_status "Extracting rootfs..."
-   sudo tar -I lbzip2 -xpf "$ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}" 2>/dev/null \
-      || sudo tar -xpjf "$ARCHIVE_DIR/$L4T_VERSION/${SAMPLE_FS_PACKAGE}"
+   sudo tar -I lbzip2 -xpf "$PKG_ARCHIVE_DIR/${SAMPLE_FS_PACKAGE}" 2>/dev/null \
+      || sudo tar -xpjf "$PKG_ARCHIVE_DIR/${SAMPLE_FS_PACKAGE}"
    cd ..
    update_status "Applying binaries..."
    sudo ./apply_binaries.sh > /dev/null 2>&1
@@ -148,7 +148,7 @@ else
    mkdir tmp_$LINUX_FOR_TEGRA_DIR
    cd tmp_$LINUX_FOR_TEGRA_DIR
    update_status "Extracting public sources..."
-   fast_tar_extract "$ARCHIVE_DIR/$L4T_VERSION/${JETSON_PUBLIC_SOURCES}"
+   fast_tar_extract "$PKG_ARCHIVE_DIR/${JETSON_PUBLIC_SOURCES}"
    update_status "Copying sources..."
    rsync -aHAX Linux_for_Tegra/* ../${LINUX_FOR_TEGRA_DIR}/
    cd $JETSON_DIR
@@ -204,6 +204,7 @@ echo "Next steps:"
 echo "  1. Copy Exosens sources:"
 echo "     ./l4t_copy_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}"
 echo ""
-echo "  2. Or apply patches directly:"
-echo "     ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}"
+# NOTE: patch-sources step is disabled (patches/ directory removed).
+# echo "  2. Or apply patches directly:"
+# echo "     ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}"
 echo "============================================"

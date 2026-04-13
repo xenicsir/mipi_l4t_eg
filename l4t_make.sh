@@ -8,15 +8,16 @@
 # Usage:
 #   ./l4t_make.sh [options] [steps]
 #
-# Version/Vendor/Carrier Selection:
+# Version/Vendor/SoM/Carrier Selection:
 #   -v, --l4t-version PATTERN   Version filter (supports wildcards: 36.*, 35.6.*)
 #   -V, --vendor VENDOR         Vendor filter: generic, forecr (default: all)
+#   -s, --som SOM               SoM filter: t210, t186 (for 32.x only)
 #   -c, --carrier-board BOARD   Carrier board filter (default: all for vendor)
 #
 # Build Steps (at least one required):
 #   --prepare                   Run l4t_prepare.sh (download and extract)
-#   --copy-sources              Run l4t_copy_sources.sh (copies and patches)
-#   --patch-sources             Run l4t_patch_sources.sh (patches only, exclusive with --copy-sources)
+#   --copy-sources              Run l4t_copy_sources.sh (copies sources)
+#   # --patch-sources           DISABLED: patch support removed, to be redesigned
 #   --build                     Run l4t_build.sh
 #   --gen-package               Run l4t_gen_delivery_package.sh
 #
@@ -27,7 +28,7 @@
 #   --dry-run                   Show what would be executed without running
 #   -j, --jobs N                Run N configurations in parallel (default=0=auto)
 #   -p, --package-version VER   Package version for delivery (passed to gen-package)
-#   -s, --standalone            Force standalone build
+#   --standalone                Force standalone build
 #   --no-verify-dtsi            Skip DTSI structure verification (useful during DT development)
 #   --archive-dir DIR           Archive directory for BSP downloads (passed to prepare)
 #   --delivery-dir DIR          Delivery directory for packages (passed to gen-package)
@@ -58,6 +59,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #******************************************************************************
 VERSION_FILTER=""
 VENDOR_FILTER=""
+SOM_FILTER=""
 CARRIER_FILTER=""
 PACKAGE_VERSION=""
 STANDALONE_OPT=""
@@ -70,7 +72,7 @@ NO_ARGS=0
 
 DO_PREPARE=0
 DO_COPY_SOURCES=0
-DO_PATCH_SOURCES=0
+# DO_PATCH_SOURCES=0  # DISABLED: patch support removed, to be redesigned
 DO_BUILD=0
 DO_GEN_PACKAGE=0
 
@@ -119,6 +121,10 @@ while [[ $# -gt 0 ]]; do
             VENDOR_FILTER="$2"
             shift 2
             ;;
+        -s|--som)
+            SOM_FILTER="$2"
+            shift 2
+            ;;
         -c|--carrier-board)
             CARRIER_FILTER="$2"
             shift 2
@@ -127,8 +133,8 @@ while [[ $# -gt 0 ]]; do
             PACKAGE_VERSION="$2"
             shift 2
             ;;
-        -s|--standalone)
-            STANDALONE_OPT="-s"
+        --standalone)
+            STANDALONE_OPT="--standalone"
             shift
             ;;
         --no-verify-dtsi)
@@ -151,10 +157,10 @@ while [[ $# -gt 0 ]]; do
             DO_COPY_SOURCES=1
             shift
             ;;
-        --patch-sources)
-            DO_PATCH_SOURCES=1
-            shift
-            ;;
+        # --patch-sources)  # DISABLED: patch support removed, to be redesigned
+        #     DO_PATCH_SOURCES=1
+        #     shift
+        #     ;;
         --build)
             DO_BUILD=1
             shift
@@ -203,24 +209,19 @@ done
 # Validate inputs
 #******************************************************************************
 # Validate filters
-if ! validate_filters "$VERSION_FILTER" "$VENDOR_FILTER" "$CARRIER_FILTER"; then
+if ! validate_filters "$VERSION_FILTER" "$VENDOR_FILTER" "$SOM_FILTER" "$CARRIER_FILTER"; then
     exit 1
 fi
 
 # If no steps are selected, do all
-if [[ $DO_PREPARE -eq 0 && $DO_COPY_SOURCES -eq 0 && $DO_PATCH_SOURCES -eq 0 && $DO_BUILD -eq 0 && $DO_GEN_PACKAGE -eq 0 ]]; then
+if [[ $DO_PREPARE -eq 0 && $DO_COPY_SOURCES -eq 0 && $DO_BUILD -eq 0 && $DO_GEN_PACKAGE -eq 0 ]]; then
     DO_PREPARE=1
     DO_COPY_SOURCES=1
     DO_BUILD=1
     DO_GEN_PACKAGE=1
 fi
 
-# Check that --copy-sources and --patch-sources are mutually exclusive
-if [[ $DO_COPY_SOURCES -eq 1 && $DO_PATCH_SOURCES -eq 1 ]]; then
-    echo "Error: --copy-sources and --patch-sources are mutually exclusive"
-    echo "Use --copy-sources for fresh sources, or --patch-sources to apply patches only"
-    exit 1
-fi
+# NOTE: --patch-sources is disabled (patches/ directory removed, to be redesigned)
 
 # Check that --from-scratch requires --prepare
 if [[ $FROM_SCRATCH -eq 1 && $DO_PREPARE -eq 0 ]]; then
@@ -240,7 +241,7 @@ fi
 #******************************************************************************
 # Get configurations to process
 #******************************************************************************
-configs=$(enumerate_configs "$VERSION_FILTER" "$VENDOR_FILTER" "$CARRIER_FILTER")
+configs=$(enumerate_configs "$VERSION_FILTER" "$VENDOR_FILTER" "$SOM_FILTER" "$CARRIER_FILTER")
 config_count=$(echo "$configs" | wc -l)
 
 #******************************************************************************
@@ -249,12 +250,12 @@ config_count=$(echo "$configs" | wc -l)
 if [[ $LIST_ONLY -eq 1 ]]; then
     echo "Matching configurations ($config_count):"
     echo ""
-    printf "%-12s %-12s %-15s %s\n" "VERSION" "VENDOR" "CARRIER" "ARGUMENTS"
-    echo "---------------------------------------------------------------"
+    printf "%-12s %-12s %-8s %-15s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER" "ARGUMENTS"
+    echo "-----------------------------------------------------------------------"
     for config in $configs; do
         parse_config "$config"
-        args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER")
-        printf "%-12s %-12s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$args"
+        args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_SOM" "$CFG_CARRIER")
+        printf "%-12s %-12s %-8s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "${CFG_SOM:--}" "$CFG_CARRIER" "$args"
     done
     exit 0
 fi
@@ -265,7 +266,7 @@ fi
 steps=""
 [[ $DO_PREPARE -eq 1 ]] && steps="$steps prepare"
 [[ $DO_COPY_SOURCES -eq 1 ]] && steps="$steps copy-sources"
-[[ $DO_PATCH_SOURCES -eq 1 ]] && steps="$steps patch-sources"
+# [[ $DO_PATCH_SOURCES -eq 1 ]] && steps="$steps patch-sources"  # DISABLED
 [[ $DO_BUILD -eq 1 ]] && steps="$steps build"
 [[ $DO_GEN_PACKAGE -eq 1 ]] && steps="$steps gen-package"
 steps=$(echo "$steps" | xargs)  # Trim
@@ -314,15 +315,20 @@ run_config() {
     fi
 
     parse_config "$config"
-    local base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT $NO_VERIFY_DTSI_OPT)
+    local base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_SOM" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT $NO_VERIFY_DTSI_OPT)
     local config_failed=0
 
     # Handle --from-scratch
     if [[ $FROM_SCRATCH -eq 1 && $DO_PREPARE -eq 1 ]]; then
+        local som_suffix=$(get_som_dir_suffix "$CFG_SOM")
+        local carrier_suffix=$(get_carrier_dir_suffix "$CFG_CARRIER")
         if [[ "$CFG_VENDOR" == "generic" ]]; then
-            build_dir="$SCRIPT_DIR/$CFG_VERSION/Linux_for_Tegra"
+            if [[ -n "$som_suffix" ]]; then
+                build_dir="$SCRIPT_DIR/$CFG_VERSION/Linux_for_Tegra_${som_suffix}"
+            else
+                build_dir="$SCRIPT_DIR/$CFG_VERSION/Linux_for_Tegra"
+            fi
         else
-            local carrier_suffix=$(get_carrier_dir_suffix "$CFG_CARRIER")
             if [[ -n "$carrier_suffix" ]]; then
                 build_dir="$SCRIPT_DIR/$CFG_VERSION/Linux_for_Tegra_${CFG_VENDOR}_${carrier_suffix}"
             else
@@ -357,15 +363,16 @@ run_config() {
         fi
     fi
 
-    if [[ $DO_PATCH_SOURCES -eq 1 ]]; then
-        [[ -n "$status_file" ]] && echo "Patching sources..." > "$status_file"
-        echo "[patch-sources] l4t_patch_sources.sh $base_args"
-        if ! "$SCRIPT_DIR/l4t_patch_sources.sh" $base_args; then
-            [[ -n "$status_file" ]] && echo "FAILED" > "$status_file"
-            echo "[FAILED] l4t_patch_sources.sh"
-            return 1
-        fi
-    fi
+    # DISABLED: patch-sources step removed (patches/ directory removed, to be redesigned)
+    # if [[ $DO_PATCH_SOURCES -eq 1 ]]; then
+    #     [[ -n "$status_file" ]] && echo "Patching sources..." > "$status_file"
+    #     echo "[patch-sources] l4t_patch_sources.sh $base_args"
+    #     if ! "$SCRIPT_DIR/l4t_patch_sources.sh" $base_args; then
+    #         [[ -n "$status_file" ]] && echo "FAILED" > "$status_file"
+    #         echo "[FAILED] l4t_patch_sources.sh"
+    #         return 1
+    #     fi
+    # fi
 
     if [[ $DO_BUILD -eq 1 ]]; then
         [[ -n "$status_file" ]] && echo "Building..." > "$status_file"
@@ -415,38 +422,39 @@ display_status() {
 
         parse_config "$config"
 
-        # Format carrier board name (truncate if too long)
+        # Format SoM+carrier display (truncate if too long)
+        local som_display="${CFG_SOM:--}"
         local carrier_display="$CFG_CARRIER"
-        if [[ ${#carrier_display} -gt 20 ]]; then
-            carrier_display="${carrier_display:0:17}..."
+        if [[ ${#carrier_display} -gt 15 ]]; then
+            carrier_display="${carrier_display:0:12}..."
         fi
 
         # Check if job is still running
         if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
             local status=$(cat "$status_file" 2>/dev/null || echo "...")
-            status="${status:0:35}"
-            printf "\033[K  ${BLUE}[Running]${NC} %-12s %-10s %-20s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display" "$status"
+            status="${status:0:30}"
+            printf "\033[K  ${BLUE}[Running]${NC} %-12s %-10s %-6s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display" "$status"
         else
             # Job finished or finishing - check result
             local status=$(cat "$status_file" 2>/dev/null || echo "")
             if [[ "$status" == "Done" ]]; then
-                printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-10s %-20s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display"
+                printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
             elif [[ "$status" == "FAILED" ]]; then
-                printf "\033[K  ${RED}[Failed]${NC}  %-12s %-10s %-20s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display"
+                printf "\033[K  ${RED}[Failed]${NC}  %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
             elif [[ -z "$status" ]]; then
-                printf "\033[K  ${YELLOW}[Pending]${NC} %-12s %-10s %-20s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display"
+                printf "\033[K  ${YELLOW}[Pending]${NC} %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
             else
                 # Process died but status file has intermediate message
                 # Check log file for final result (may still be writing)
                 local log_file="${job_logs[$i]}"
                 if grep -q "\[SUCCESS\]" "$log_file" 2>/dev/null; then
-                    printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-10s %-20s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display"
+                    printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
                 elif grep -q "\[FAILED\]" "$log_file" 2>/dev/null; then
-                    printf "\033[K  ${RED}[Failed]${NC}  %-12s %-10s %-20s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display"
+                    printf "\033[K  ${RED}[Failed]${NC}  %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
                 else
                     # Still finishing, show as running with last known status
-                    status="${status:0:35}"
-                    printf "\033[K  ${BLUE}[Running]${NC} %-12s %-10s %-20s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$carrier_display" "$status"
+                    status="${status:0:30}"
+                    printf "\033[K  ${BLUE}[Running]${NC} %-12s %-10s %-6s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display" "$status"
                 fi
             fi
         fi
@@ -462,11 +470,12 @@ echo ""
 if [[ $DRY_RUN -eq 1 ]]; then
     for config in $configs; do
         parse_config "$config"
-        base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT $NO_VERIFY_DTSI_OPT)
-        echo -e "${CYAN}$CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER:${NC}"
+        base_args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_SOM" "$CFG_CARRIER" "$STANDALONE_OPT" $ARCHIVE_DIR_OPT $DELIVERY_DIR_OPT $NO_VERIFY_DTSI_OPT)
+        som_label="${CFG_SOM:+/$CFG_SOM}"
+        echo -e "${CYAN}$CFG_VERSION / $CFG_VENDOR${som_label} / $CFG_CARRIER:${NC}"
         [[ $DO_PREPARE -eq 1 ]] && echo -e "    ${BLUE}[prepare]${NC} l4t_prepare.sh $base_args"
         [[ $DO_COPY_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[copy-sources]${NC} l4t_copy_sources.sh $base_args"
-        [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"
+        # [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"  # DISABLED
         [[ $DO_BUILD -eq 1 ]] && echo -e "    ${BLUE}[build]${NC} l4t_build.sh $base_args"
         if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
             dry_pkg_args="$base_args"
@@ -487,8 +496,9 @@ else
     # First pass: register all configs and create status files
     for config in $configs; do
         parse_config "$config"
-        log_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.log"
-        status_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}_${CFG_CARRIER}.status"
+        cfg_som_part="${CFG_SOM:+_$CFG_SOM}"
+        log_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}${cfg_som_part}_${CFG_CARRIER}.log"
+        status_file="$LOG_DIR/${CFG_VERSION}_${CFG_VENDOR}${cfg_som_part}_${CFG_CARRIER}.status"
 
         job_configs+=("$config")
         job_logs+=("$log_file")
@@ -498,7 +508,7 @@ else
 
     # Print initial status lines (header + one per job)
     echo "Jobs status:"
-    printf "  %-10s %-12s %-10s %-20s %s\n" "STATUS" "VERSION" "VENDOR" "CARRIER" "STEP"
+    printf "  %-10s %-12s %-10s %-6s %-15s %s\n" "STATUS" "VERSION" "VENDOR" "SOM" "CARRIER" "STEP"
     for config in "${job_configs[@]}"; do
         echo ""  # Placeholder line for each job
     done
@@ -577,7 +587,7 @@ else
     # If aborted, kill remaining running jobs
     if [[ $aborted -eq 1 ]]; then
         for pid in "${job_pids[@]}"; do
-            [[ -n "$pid" ]] && kill "$pid" 2>/dev/null
+            [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
         done
     fi
 
@@ -594,17 +604,18 @@ else
     for i in "${!job_configs[@]}"; do
         parse_config "${job_configs[$i]}"
         log_file="${job_logs[$i]}"
+        som_label="${CFG_SOM:+/$CFG_SOM}"
 
         if grep -q "\[SUCCESS\]" "$log_file" 2>/dev/null; then
-            echo -e "  ${GREEN}[OK]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
+            echo -e "  ${GREEN}[OK]${NC} $CFG_VERSION / $CFG_VENDOR${som_label} / $CFG_CARRIER"
             total_success=$((total_success + 1))
         elif [[ -z "${job_pids[$i]}" ]]; then
             # Job was never started (aborted before reaching it)
-            echo -e "  ${YELLOW}[Skipped]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
+            echo -e "  ${YELLOW}[Skipped]${NC} $CFG_VERSION / $CFG_VENDOR${som_label} / $CFG_CARRIER"
         else
-            echo -e "  ${RED}[FAILED]${NC} $CFG_VERSION / $CFG_VENDOR / $CFG_CARRIER"
+            echo -e "  ${RED}[FAILED]${NC} $CFG_VERSION / $CFG_VENDOR${som_label} / $CFG_CARRIER"
             total_failed=$((total_failed + 1))
-            failed_configs+=("$CFG_VERSION:$CFG_VENDOR:$CFG_CARRIER")
+            failed_configs+=("${job_configs[$i]}")
         fi
     done
 fi
@@ -642,7 +653,9 @@ if [[ $total_failed -gt 0 ]]; then
     echo ""
     echo "Failed configurations:"
     for fc in "${failed_configs[@]}"; do
-        echo "  - $fc"
+        IFS=':' read -r version vendor som carrier <<< "$fc"
+        som_label="${som:+/$som}"
+        echo "  - $version / $vendor${som_label} / $carrier"
     done
 
     # Show logs for failed jobs
@@ -652,11 +665,12 @@ if [[ $total_failed -gt 0 ]]; then
         echo -e "${RED}Error logs:${NC}"
         echo "============================================"
         for fc in "${failed_configs[@]}"; do
-            IFS=':' read -r version vendor carrier <<< "$fc"
-            log_file="$LOG_DIR/${version}_${vendor}_${carrier}.log"
+            IFS=':' read -r version vendor som carrier <<< "$fc"
+            som_part="${som:+_$som}"
+            log_file="$LOG_DIR/${version}_${vendor}${som_part}_${carrier}.log"
             if [[ -f "$log_file" ]]; then
                 echo ""
-                echo -e "${YELLOW}--- $fc ---${NC}"
+                echo -e "${YELLOW}--- $version / $vendor${som:+/$som} / $carrier ---${NC}"
                 tail -50 "$log_file"
             fi
         done
