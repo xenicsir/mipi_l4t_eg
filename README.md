@@ -4,16 +4,17 @@ This document describes how to build and install the MIPI drivers for different 
 
 It also provides guidance for integrating the drivers on other L4T versions and carrier boards.
 
-The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
+The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
 
 ---
 
 ## Table of Contents
 
+- [Acronyms](#acronyms)
 - [Prerequisites for cross-compiling](#prerequisites-for-cross-compiling)
   - [Host PC requirements](#host-pc-requirements)
-- [Building and installing MIPI drivers](#building-and-installing-mipi-drivers)
-  - [Supported L4T versions, SOM and carrier boards](#supported-l4t-versions-som-and-carrier-boards)
+- [Building, installing, configuring and testing MIPI drivers](#building-installing-configuring-and-testing-mipi-drivers)
+  - [Supported L4T versions, SoMs, vendors and carrier boards](#supported-l4t-versions-soms-vendors-and-carrier-boards)
   - [Building the L4T environment](#building-the-l4t-environment)
     - [Source code organization](#source-code-organization)
     - [Building workflow](#building-workflow)
@@ -22,14 +23,43 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
     - [Package installation](#package-installation)
     - [Configuring camera ports](#configuring-camera-ports)
   - [Quick start - Testing the camera](#quick-start---testing-the-camera)
-- [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
 - [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
   - [Linux boot configuration](#linux-boot-configuration)
   - [Orin NX/Nano CSI lanes issues](#orin-nxnano-csi-lanes-issues)
 - [Shell completion](#shell-completion)
+- [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
 - [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
 - [Appendix B: Adding a new camera type](#appendix-b-adding-a-new-camera-type)
-- [Appendix C: Supported cameras — MIPI lanes and video formats](#appendix-c-supported-cameras--mipi-lanes-and-video-formats)
+
+---
+
+## Acronyms
+
+| Acronym | Full form | Description |
+|---------|-----------|-------------|
+| **AR24** | — | 32-bit BGRA pixel format code in V4L2 (Blue, Green, Red, Alpha — 8 bits each) |
+| **BSP** | Board Support Package | Nvidia's software bundle for a given hardware platform (kernel, bootloader, device trees, tools) |
+| **CSI / CSI-2** | Camera Serial Interface (version 2) | MIPI standard defining the electrical and protocol interface between image sensors and host processors |
+| **DT** | Device Tree | Hardware description mechanism used by the Linux kernel to enumerate peripherals |
+| **DTB** | Device Tree Blob | Compiled binary form of a Device Tree source file |
+| **DTBO** | Device Tree Blob Overlay | Partial DTB applied at boot to enable or configure optional hardware (e.g., a camera) |
+| **DTS** | Device Tree Source | Human-readable source file describing hardware, compiled into a DTB |
+| **DTSI** | Device Tree Source Include | Reusable device tree fragment included by one or more DTS files |
+| **FDT** | Flattened Device Tree | Binary format for device trees passed by the bootloader to the Linux kernel |
+| **GPIO** | General Purpose Input/Output | Configurable digital pin used to control or sense external hardware signals |
+| **I2C** | Inter-Integrated Circuit | Two-wire serial protocol used to communicate with camera control registers |
+| **INITRD** | Initial RAM Disk | Compressed root filesystem image loaded by the bootloader before the real root is mounted |
+| **initramfs** | Initial RAM Filesystem | Compressed archive used as an early root filesystem during kernel boot (successor to INITRD) |
+| **L4T** | Linux for Tegra | Nvidia's BSP distribution for Jetson platforms, versioned as e.g. 35.5.0 or 36.4.4 |
+| **LTS** | Long-Term Support | Ubuntu release designation with an extended security update period (5 years) |
+| **MIPI** | Mobile Industry Processor Interface | Industry consortium defining hardware interfaces including CSI-2, D-PHY, and others |
+| **PCB** | Printed Circuit Board | The physical board carrying electronic components |
+| **PTY** | Pseudo-Terminal | Software interface that emulates a hardware terminal; allocated by `sudo` for each invocation |
+| **SoC** | System on Chip | Integrated circuit combining CPU, GPU, memory controllers, and peripheral interfaces |
+| **SoM** | System on Module | Compact board embedding a SoC and memory, plugged into a carrier board |
+| **V4L2** | Video for Linux 2 | Linux kernel API for video capture and output devices (controls formats, modes, streaming) |
+| **Y16** | — | 16-bit greyscale pixel format code in V4L2; used by infrared cameras |
+| **YUYV** | — | YUV 4:2:2 packed pixel format (alternating Y, U, Y, V bytes); also written YCbCr 4:2:2 |
 
 ---
 
@@ -37,7 +67,9 @@ The [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_dep
 
 ### Host PC requirements
 
-**Recommended OS:** Ubuntu 20.04 LTS, 22.04 LTS or 24.04 LTS, depending on L4T version. Ubuntu 22.04 LTS is currently used.
+**Recommended OS:** Ubuntu 22.04 LTS. This version is used for development and compiles all supported L4T versions (32.x, 35.x, 36.x).
+
+**Disk space:** Building a single driver package requires **15–25 GB** of free disk space (L4T BSP sources, toolchain, and build artifacts). As of 2026-04-13, the repository supports 16 Nvidia SDK versions with 2 variants each (32 packages total); compiling the full matrix requires **> 600 GB** of disk space.
 
 **sudo PTY allocation:** The build system calls `sudo` from non-interactive scripts. By default, recent versions of sudo allocate a PTY for each invocation, which can exhaust the system's PTY pool during parallel builds. Disable this for your user:
 
@@ -78,14 +110,16 @@ sudo apt install weasyprint
 
 ---
 
-## Building and installing MIPI drivers
+## Building, installing, configuring and testing MIPI drivers
 
-### Supported L4T versions, SOM and carrier boards
+### Supported L4T versions, SoMs, vendors and carrier boards
 
-Refer to the [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx) sheet for the complete list of supported configurations.
+Refer to the [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) for the complete list of supported configurations.
+Also use the `l4t_make.sh --help` command to display this list.
 
 For the rest of this document:
 - `<l4t_version>` refers to the L4T version (e.g., `35.5.0`, `36.4.4`)
+- `<jp_version>` refers to the JetPack version (e.g., `5.1.3`, `6.2.1`). It is related to the L4T version, and is only mentionned for convenience in the debian package name.
 - `<vendor>` refers to the carrier board vendor (`generic` for Nvidia boards, or vendor-specific like `forecr`)
 
 ### Building the L4T environment
@@ -94,13 +128,50 @@ This section describes the build process using the unified `l4t_make.sh` orchest
 
 #### Source code organization
 
-The Exosens camera driver modifications are organized in:
-- **sources/**: Complete source files organized by L4T version and vendor
+The Exosens camera driver modifications are organized under `sources/`, split into a shared layer and per-version layers:
+
+```
+sources/
+├── common/                          # Shared across ALL L4T versions
+│   ├── Linux_for_Tegra/
+│   │   └── rootfs/usr/bin/          # Target scripts (eg_dt_camera_config_set/get, …)
+│   └── source/
+│       ├── hardware_36+/            # Device tree overlays for L4T 36.x+
+│       ├── hardware_32+/            # Device tree overlays for L4T 32.x–35.x
+│       └── nvidia-oot/drivers/media/i2c/   # V4L2 camera kernel drivers (.c, .h)
+│
+└── <version>/                       # Version-specific files (one directory per L4T version)
+    ├── Linux_for_Tegra/             # Generic (Nvidia) boards — Kconfig, Makefile, defconfig
+    ├── Linux_for_Tegra_t210/        # SoM-specific, 32.x only — Jetson Nano/porg (T210)
+    ├── Linux_for_Tegra_t186/        # SoM-specific, 32.x only — Jetson TX2 (T186)
+    └── Linux_for_Tegra_<vendor>/    # Vendor-specific additions (defconfigs, device trees)
+```
+
+When `l4t_copy_sources.sh` copies files to the build environment, it applies these layers in order: `common/` first, then version-specific generic, then SoM-specific (32.x only), then vendor-specific. When two layers modify the same file (typically a Makefile), a **3-way merge** is performed against the original Nvidia BSP, so generic changes propagate automatically to vendor variants.
 
 #### Building workflow
 
-The `l4t_make.sh` script orchestrates the entire build process. Use `./l4t_make.sh --help` for complete documentation.
-It uses individual scripts for build steps.
+The `l4t_make.sh` script orchestrates the entire build process. It uses individual scripts for each build step.
+
+**Before building, use `--help` and `--list`:**
+
+```bash
+./l4t_make.sh --help    # full option reference + table of all supported configurations
+./l4t_make.sh --list    # show every (version, vendor, SoM, carrier) combination with its exact build arguments
+```
+
+**Configuration selection (`-v`, `-V`, `-s`, `-c`):**
+
+Each argument acts as a filter. When an argument is omitted, `l4t_make.sh` iterates over **all** valid values for that dimension:
+
+| Flag | Selects | Default (omitted) |
+|------|---------|-------------------|
+| `-v / --l4t-version` | L4T version: exact (`35.5.0`), `.x` shorthand (`36.x`, `35.6.x`), or quoted wildcard (`"36.*"`) | all versions |
+| `-V / --vendor` | Vendor (`generic`, `forecr`) | all vendors for the matched versions |
+| `-s / --som` | SoM (`t210`, `t186`) — 32.x only | all SoMs for the matched version+vendor |
+| `-c / --carrier-board` | Carrier board (`dsboard_ornx`, …) | all carriers for the matched vendor |
+
+For example, `-v 35.3.1` alone would build **both** `generic` and `forecr` for that version. To target a single configuration, specify all four filters explicitly (use the arguments shown by `--list` as a safe starting point).
 
 **Step 1: Prepare the L4T environment**
 
@@ -185,7 +256,7 @@ Where `g84920ea` is the short git commit hash for traceability.
 
 Version strings are sanitized for Debian compatibility (invalid characters replaced, `0~` prefix added when the version doesn't start with a digit). The `0~` prefix ensures development builds sort before any release version.
 
-The generated package: `jetson-l4t-<l4t_version>-eg-cams_<debian_version>_arm64.deb`
+The generated package: `jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<debian_version>_arm64.deb`
 
 **Running all steps at once:**
 
@@ -257,6 +328,14 @@ This generates: `jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams_<debian_version>_arm64.d
 
 Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi, ilumos, microlynx) and device tree overlays (`tegra186-camera-eg-*` / `tegra210-camera-eg-*`).
 
+**The `-c/--carrier-board` option** selects a specific carrier board within a vendor. It has three effects compared to a generic build:
+
+- Uses the carrier's specific kernel defconfig (e.g., `dsboard_ornx_defconfig` instead of the generic `defconfig`), which enables carrier-specific hardware options
+- Applies an additional carrier-specific source layer (`sources/<version>/Linux_for_Tegra_<vendor>_<carrier>/`) on top of the vendor layer, using the same 3-way merge mechanism
+- Reflects the carrier name in the generated package filename
+
+When a vendor has a single carrier (e.g., `forecr` has only `dsboard_ornx`), that carrier is used by default and `-c` can be omitted.
+
 **Example: Building for Forecr carrier board with dsboard_ornx:**
 
 ```bash
@@ -290,10 +369,10 @@ This generates: `jetson-l4t-<l4t_version>-jp<jp_version>-forecr-dsboard-ornx-eg-
 sudo dpkg -r jetson-l4t-mipi-eg-cam  # or similar package name
 
 # Install new version
-sudo dpkg -i jetson-l4t-<l4t_version>-eg-cams_<debian_version>_arm64.deb
+sudo dpkg -i jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<debian_version>_arm64.deb
 ```
 
-The package was either delivered (see [MIPI_deployment](https://github.com/xenicsir/mipi_l4t_eg/blob/main/MIPI_deployment.xlsx)) or built locally following the previous steps.
+The package was either delivered (see [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md)) or built locally following the previous steps.
 
 #### Configuring camera ports
 
@@ -564,98 +643,6 @@ This appendix provides a summary of the files involved. For detailed step-by-ste
 | postinst | `l4t_gen_delivery_package.sh` | Camera type normalization |
 
 The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
-
-After modifying all files, run `./l4t_copy_sources.sh` for each supported version to apply the changes to the build environment.
-
----
-
-## Appendix C: Supported cameras — MIPI lanes and video formats
-
-### Summary table
-
-| Camera | Driver | MIPI Lanes 
-|--------|--------|:----------:|
-| EngineCore (EC) | `eg-ec-mipi` | 1 or 2 |
-| Dione IR | `dioneir` | 2 |
-| iLumos | `ilumos` | 4 |
-| Microlynx | `microlynx` | 2 |
-
----
-
-### EngineCore (EC)
-
-**Driver:** `eg-ec-mipi`
-**Compatible models:** MicroCube, SmartIR640, Crius1280
-
-**MIPI CSI-2 lanes:**
-
-| Model | Lanes |
-|-------|:-----:|
-| MicroCube | 1 |
-| SmartIR640, Crius1280 | 2 |
-
-**Video modes:**
-
-| Resolution | Pixel format | V4L2 format |
-|------------|--------------|-------------|
-| 640 × 480 | 16-bit raw greyscale | `Y16` |
-| 640 × 480 | 32-bit BGRA | `AR24` |
-| 640 × 480 | YUV 4:2:2 | `YUYV` |
-| 1280 × 1024 | 16-bit raw greyscale | `Y16` |
-| 1280 × 1024 | 32-bit BGRA | `AR24` |
-| 1280 × 1024 | YUV 4:2:2 | `YUYV` |
-
-The `Y16` format requires L4T kernel 5.0 or later (L4T 35.x+).
-
----
-
-### Dione IR
-
-**Driver:** `dioneir`
-**Bridge chip:** Toshiba TC358746 (parallel-to-CSI-2)
-
-**MIPI CSI-2 lanes:** 2
-
-**Video modes:**
-
-| Resolution | Pixel format | V4L2 format |
-|------------|--------------|-------------|
-| 320 × 240 | 32-bit BGRA | `AR24` |
-| 640 × 480 | 32-bit BGRA | `AR24` |
-| 1024 × 768 | 32-bit BGRA | `AR24` |
-| 1280 × 1024 | 32-bit BGRA | `AR24` |
-
-The active resolution depends on the camera model. The TC358746 bridge handles the parallel-to-MIPI conversion; the pixel format is fixed to 32-bit BGRA as delivered over CSI-2.
-
----
-
-### iLumos
-
-**Driver:** `ilumos`
-
-**MIPI CSI-2 lanes:** 4
-
-**Video modes:**
-
-| Resolution | Pixel format | V4L2 format |
-|------------|--------------|-------------|
-| 2048 × 2048 | 16-bit raw greyscale | `Y16` |
-| 2048 × 1088 | 16-bit raw greyscale | `Y16` |
-
----
-
-### Microlynx
-
-**Driver:** `microlynx`
-
-**MIPI CSI-2 lanes:** 2
-
-**Video modes:**
-
-| Resolution | Pixel format | V4L2 format |
-|------------|--------------|-------------|
-| 1024 × 128 | 16-bit raw greyscale | `Y16` |
-
 
 ---
 

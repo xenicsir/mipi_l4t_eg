@@ -9,7 +9,7 @@
 #   ./l4t_make.sh [options] [steps]
 #
 # Version/Vendor/SoM/Carrier Selection:
-#   -v, --l4t-version PATTERN   Version filter (supports wildcards: 36.*, 35.6.*)
+#   -v, --l4t-version PATTERN   Version filter: exact (35.5.0), wildcard ("36.*"), or .x shorthand (36.x, 35.6.x)
 #   -V, --vendor VENDOR         Vendor filter: generic, forecr (default: all)
 #   -s, --som SOM               SoM filter: t210, t186 (for 32.x only)
 #   -c, --carrier-board BOARD   Carrier board filter (default: all for vendor)
@@ -39,9 +39,9 @@
 #
 # Examples:
 #   ./l4t_make.sh -v 36.4.3                            # All steps for 36.4.3 generic
-#   ./l4t_make.sh -v "36.*" -V forecr --build          # Build all 36.x forecr versions
+#   ./l4t_make.sh -v 36.x -V forecr --build            # Build all 36.x forecr versions
 #   ./l4t_make.sh --prepare --copy-sources             # Prepare and copy all versions
-#   ./l4t_make.sh -v 35.6.* --continue-on-error        # All 35.6.x, continue on error
+#   ./l4t_make.sh -v 35.6.x --continue-on-error        # All 35.6.x, continue on error
 #   ./l4t_make.sh --prepare -j 4                       # Prepare all versions, 4 in parallel
 #   ./l4t_make.sh --prepare -j 0                       # Prepare all versions, auto parallelism
 #   ./l4t_make.sh --list                               # List all configurations
@@ -98,14 +98,16 @@ NC='\033[0m'
 show_help() {
     head -42 "$0" | tail -n +2 | sed 's/^#//' | sed 's/^\*//g'
     echo ""
-    local all_versions=$(get_all_versions)
-    echo "Available versions: $all_versions"
-    echo ""
-    echo "Version-vendor support:"
-    for v in $all_versions; do
-        local vendors=$(get_vendors_for_version "$v")
-        echo "  $v: $vendors"
+    echo "Supported configurations:"
+    printf "  %-12s %-10s %-8s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER"
+    echo "  ------------------------------------------------"
+    local configs=$(enumerate_configs "" "" "" "")
+    for config in $configs; do
+        parse_config "$config"
+        printf "  %-12s %-10s %-8s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "${CFG_SOM:--}" "$CFG_CARRIER"
     done
+    echo ""
+    echo "  (use --list to see the build arguments for each configuration)"
 }
 
 #******************************************************************************
