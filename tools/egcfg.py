@@ -9,14 +9,20 @@ Queries:
   versions                          space-separated list of all versions
   vendors                           space-separated list of all vendors
   carriers                          space-separated list of all carriers
+  soms                              space-separated list of all SoMs
+  version.VERS.jetpack              JetPack version for a specific L4T version
   version.VERS.vendors              vendors for a specific version
   version.VERS.standalone.V.C       "true" or "false"
   version.VERS.sources.TYPE.FIELD   e.g. version.35.6.2.sources.public.url
   version.VERS.toolchain.FIELD      e.g. version.35.6.2.toolchain.prefix
+  version.VERS.vendor_soms.VENDOR   space-separated SoMs for a version+vendor
+  version.VERS.sources_by_som.SOM.TYPE.FIELD
   vendor.NAME.carriers              carriers for a vendor
   vendor.NAME.default_carrier       default carrier for a vendor
   carrier.NAME.defconfig            defconfig for a carrier
   carrier.NAME.dir_suffix           dir_suffix for a carrier
+  som.NAME.defconfig                defconfig for a SoM
+  som.NAME.dir_suffix               dir_suffix for a SoM
 
 Exit codes: 0 = ok, 1 = key not found or error
 """
@@ -47,6 +53,10 @@ def query(cfg, q):
     if q == 'carriers':
         return ' '.join(sorted(cfg['carriers'].keys()))
 
+    # soms
+    if q == 'soms':
+        return ' '.join(sorted(cfg.get('soms', {}).keys()))
+
     # version.VERS.*
     # Version keys may contain dots (e.g. "35.6.2") — try longest match first
     if parts[0] == 'version' and len(parts) >= 3:
@@ -56,6 +66,9 @@ def query(cfg, q):
                 continue
             rest = parts[end:]
             v = cfg['versions'][vers_key]
+            # version.VERS.jetpack
+            if rest == ['jetpack']:
+                return v.get('jetpack', '')
             # version.VERS.vendors
             if rest == ['vendors']:
                 return ' '.join(v.get('vendors', []))
@@ -66,6 +79,20 @@ def query(cfg, q):
             # version.VERS.sources.TYPE.FIELD
             if len(rest) == 3 and rest[0] == 'sources':
                 return v.get('sources', {}).get(rest[1], {}).get(rest[2], '')
+            # version.VERS.vendor_soms.VENDOR  → space-separated SoMs (len 2 rest)
+            if len(rest) == 2 and rest[0] == 'vendor_soms':
+                soms = v.get('vendor_soms', {}).get(rest[1])
+                if soms is None:
+                    return None
+                return ' '.join(soms)
+            # version.VERS.sources_by_som.SOM.TYPE.FIELD  (len 4 rest)
+            # version.VERS.sources_by_som.SOM.FIELD       (len 3 rest)
+            if len(rest) >= 3 and rest[0] == 'sources_by_som':
+                som_src = v.get('sources_by_som', {}).get(rest[1], {})
+                if len(rest) == 3:
+                    return som_src.get(rest[2], '')
+                if len(rest) == 4:
+                    return som_src.get(rest[2], {}).get(rest[3], '')
             # version.VERS.toolchain.FIELD
             if len(rest) == 2 and rest[0] == 'toolchain':
                 return v.get('toolchain', {}).get(rest[1], '')
@@ -86,6 +113,12 @@ def query(cfg, q):
         name = parts[1]
         field = parts[2]
         return cfg['carriers'].get(name, {}).get(field, '')
+
+    # som.NAME.*
+    if parts[0] == 'som' and len(parts) == 3:
+        name = parts[1]
+        field = parts[2]
+        return cfg.get('soms', {}).get(name, {}).get(field, '')
 
     return None
 

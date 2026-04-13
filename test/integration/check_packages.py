@@ -77,7 +77,7 @@ def find_ko(extract_dir, name):
     return bool(glob.glob(pattern, recursive=True))
 
 
-def check_package(deb_path, version_dir, label):
+def check_package(deb_path, version_dir, label, som=""):
     """
     Extract deb_path and run all checks.
     Returns (passed, failed, errors) where errors is a list of strings.
@@ -86,6 +86,7 @@ def check_package(deb_path, version_dir, label):
     errors = []
 
     family = version_family(version_dir)
+    has_dtbos = (som != "t186")  # t186 has no device tree overlays
 
     with tempfile.TemporaryDirectory(prefix="eg_pkg_") as tmpdir:
         extract_dir = Path(tmpdir) / "pkg"
@@ -117,7 +118,9 @@ def check_package(deb_path, version_dir, label):
         boot_dir = extract_dir / "boot"
         dtbos = sorted(boot_dir.glob("*.dtbo")) if boot_dir.exists() else []
 
-        if not dtbos:
+        if not has_dtbos:
+            pass  # t186: no DTBOs expected, skip all DTBO checks
+        elif not dtbos:
             errors.append("No .dtbo files found in boot/")
         else:
             # All DTBOs parseable
@@ -178,6 +181,16 @@ def check_package(deb_path, version_dir, label):
 # Main
 # ---------------------------------------------------------------------------
 
+def extract_som(deb_name):
+    """Return the SoM name (e.g. 't210', 't186') from a .deb filename, or ''.
+
+    Handles both old format (jetson-l4t-32.7.1-t210-eg-cams) and new format
+    with JetPack infix (jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams).
+    """
+    m = re.search(r"jetson-l4t-[\d.]+(?:-jp[\d.]+)?-(t\d+)-eg-cams", deb_name)
+    return m.group(1) if m else ""
+
+
 def main():
     commit_order = get_commit_order()
 
@@ -185,12 +198,13 @@ def main():
     # version_dirs start with digits (32.*, 35.*, 36.*)
     all_debs = sorted(REPO_ROOT.glob("[0-9]*/*.deb"))
 
-    # Group by (version_dir, is_forecr)
+    # Group by (version_dir, som, is_forecr)
     groups = {}
     for deb in all_debs:
         version_dir = deb.parent.name
-        is_forecr = "forecr-dsboard-ornx" in deb.name
-        key = (version_dir, is_forecr)
+        som = extract_som(deb.name)
+        is_forecr = bool(re.search(r"forecr-dsboard-ornx", deb.name))
+        key = (version_dir, som, is_forecr)
         groups.setdefault(key, []).append(str(deb))
 
     total_passed = 0
@@ -200,15 +214,16 @@ def main():
     print(f"\n{'Label':<45} {'Result'}")
     print("-" * 60)
 
-    for (version_dir, is_forecr), debs in sorted(groups.items()):
+    for (version_dir, som, is_forecr), debs in sorted(groups.items()):
         variant = "forecr" if is_forecr else "nvidia"
-        label = f"{version_dir} | {variant}"
+        som_str = f"-{som}" if som else ""
+        label = f"{version_dir}{som_str} | {variant}"
 
         deb_path = Path(pick_latest_deb(debs, commit_order))
         commit_m = re.search(r"\+g([0-9a-f]+)_arm64", deb_path.name)
         commit_str = commit_m.group(1) if commit_m else "?"
 
-        passed, failed, errors = check_package(deb_path, version_dir, label)
+        passed, failed, errors = check_package(deb_path, version_dir, label, som=som)
         total_passed += passed
         total_failed += failed
 

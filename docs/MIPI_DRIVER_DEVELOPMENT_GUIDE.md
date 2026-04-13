@@ -28,27 +28,41 @@ sources/
 │   └── source/
 │       ├── hardware_36+/              # Device tree overlays for L4T 36.x+
 │       ├── hardware_32+/              # Device tree overlays for L4T 32.x-35.x
+│       │   ├── nvidia/platform/t210/porg/kernel-dts/    # Jetson Nano overlays
+│       │   ├── nvidia/platform/t19x/jakku/kernel-dts/   # Xavier NX overlays
+│       │   ├── nvidia/platform/t23x/concord/kernel-dts/ # AGX Orin 35.x overlays
+│       │   ├── nvidia/platform/t23x/p3768/kernel-dts/   # Orin NX/Nano overlays
+│       │   └── nvidia/platform/t18x/quill/kernel-dts/   # TX2/TX2i/TX2 NX overlays
 │       └── nvidia-oot/               # Camera kernel drivers (.c, .h)
 │           └── drivers/media/i2c/     # V4L2 sensor drivers
 │
 ├── <version>/                          # Version-specific files
 │   ├── Linux_for_Tegra/               # Generic (Nvidia) boards
 │   │   └── source/                    # Kconfig, Makefile, defconfig
+│   ├── Linux_for_Tegra_t210/          # SoM-specific (32.x only) — Jetson Nano/porg
+│   ├── Linux_for_Tegra_t186/          # SoM-specific (32.x only) — Jetson TX2/quill
 │   └── Linux_for_Tegra_<vendor>/      # Vendor-specific additions
 │       └── source/                    # Vendor defconfigs, Makefiles, DT
 ```
 
 ### Build system layering and 3-way merge
 
-When running `./l4t_copy_sources.sh -v <version> [-V <vendor>]`, sources are copied in layers:
+When running `./l4t_copy_sources.sh -v <version> [-s <som>] [-V <vendor>]`, sources are copied in layers:
 
 1. **Layer 1**: `sources/common/` — shared Exosens files
 2. **Layer 2**: `sources/<version>/Linux_for_Tegra/` — version-specific generic files
-3. **Layer 3** *(vendor only)*: `sources/<version>/Linux_for_Tegra_<vendor>/` — vendor-specific files
+3. **Layer 3** *(32.x only, when `-s <som>` is given)*: `sources/<version>/Linux_for_Tegra_<som>/` — SoM-specific files (e.g., `Linux_for_Tegra_t186/`, `Linux_for_Tegra_t210/`)
+4. **Layer 4** *(vendor only)*: `sources/<version>/Linux_for_Tegra_<vendor>/` — vendor-specific files
 
-When Layer 2 and Layer 3 both modify the same file (e.g., a Makefile), a **3-way merge** is performed using the original Nvidia BSP as the common ancestor. This means:
-- **You only need to modify files in `Linux_for_Tegra/` (generic)**. Vendor-specific Makefiles will automatically inherit additions via the merge.
-- Only add files to `Linux_for_Tegra_<vendor>/` when the vendor needs **different** content (e.g., vendor-specific defconfigs, device trees).
+When multiple layers modify the same file (e.g., a Makefile), a **3-way merge** is performed using the original Nvidia BSP as the common ancestor. This means:
+- **You only need to modify files in `Linux_for_Tegra/` (generic)**. SoM- and vendor-specific Makefiles will automatically inherit additions via the merge.
+- Only add files to `Linux_for_Tegra_<som>/` or `Linux_for_Tegra_<vendor>/` when the SoM or vendor needs **different** content (e.g., SoM-specific BSP archives, vendor defconfigs, device trees).
+
+**SoM support (32.x only):** L4T 32.x targets two SoMs via the `-s/--som` flag:
+- `t210` — Jetson Nano / porg (tegra210): has device tree overlays, supports all cameras except Y16
+- `t186` — Jetson TX2 / TX2i / TX2 NX (tegra186): has device tree overlays (`tegra186-camera-eg-*`) and kernel modules (ilumos, microlynx, dione_ir, eg-ec-mipi)
+
+For L4T 35.x and 36.x, the SoM is always Orin-family and no `-s` flag is needed.
 
 ### eg_config.yaml structure
 
@@ -56,13 +70,19 @@ When Layer 2 and Layer 3 both modify the same file (e.g., a Makefile), a **3-way
 
 | Section | Purpose |
 |---------|---------|
-| `versions` | L4T version registry: BSP download URLs, toolchain, vendor list, `platform_ids` |
+| `versions` | L4T version registry: `jetpack` version, BSP download URLs, toolchain, vendor list, `platform_ids`, `vendor_soms`, `sources_by_som` |
+| `soms` | SoM definitions: display name, supported L4T version families (e.g. `32.x only`) |
 | `vendors` | Vendor definitions: list of carriers, default carrier |
 | `carriers` | Carrier board definitions: defconfig name, directory suffix |
 | `pixel_format_map` | Maps pixel format names (`Y16`, `RGB888`, …) to DT field values (`mode_type`, `pixel_phase`, `csi_pixel_bit_depth`) |
 | `platform_restrictions` | Per-platform unsupported formats (e.g. `nano_t210` cannot do `Y16`) |
 | `dtsi_platforms` | DTSI files to verify: path relative to `sources/common/source/`, `num_cams`, associated `platform_ids`, EC overlay pattern |
 | `cameras` | Camera specifications: resolutions, data lanes, modes, DT timing fields (`line_length`, `pix_clk_hz`, …) |
+
+Within a `versions` entry:
+- `jetpack` — corresponding JetPack SDK version (e.g. `"6.2.1"`); included in the generated Debian package name as `jp<version>`
+- `vendor_soms` — maps each vendor to its list of SoMs (used to enumerate packages for 32.x)
+- `sources_by_som` — maps each SoM to its source archive subdirectory (used by `l4t_prepare.sh` to download the correct BSP)
 
 The last four sections feed `tools/verify_dtsi_structure.py`, which cross-checks every DTSI file against the expected modes and DT field values on every build.
 
@@ -148,6 +168,17 @@ Three files to modify in `sources/<version>/Linux_for_Tegra/source/public/kernel
    ```
    Also enable in all vendor-specific defconfigs (e.g., `dsboard_ornx_defconfig`, `milboard_ornx_defconfig`, etc.) in `Linux_for_Tegra_<vendor>/`.
 
+> **Kernel API compatibility (32.x — kernel 4.9):** The 32.x kernel (4.9) does not have `timer_setup()` / `from_timer()` (added in kernel 4.15). If the driver or a library it uses (e.g., `gencp-over-i2c/nb_timer.c`) uses these APIs, guard them with:
+> ```c
+> #include <linux/version.h>
+> #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+>     timer_setup(&t, cb, 0);
+> #else
+>     setup_timer(&t, cb, (unsigned long)data);
+> #endif
+> ```
+> The callback signature also differs: `void cb(struct timer_list *t)` for 4.15+, `void cb(unsigned long data)` for older kernels.
+
 ### Step 3: Device tree — common DTSI
 
 Add camera sensor nodes to the common DTSI file for each supported hardware family.
@@ -174,8 +205,10 @@ Each camera node must define:
 **Special case for x4 cameras on CAM0:** If the camera requires 4 MIPI lanes, the entire CAM0 node must be guarded by `#ifdef DSBOARD_ORNXS`, because the Nvidia devkit CAM0 only supports x2 (due to the CSI lane swap). See [CSI_LANE_AND_POLARITY_SWAP_P3768.md](CSI_LANE_AND_POLARITY_SWAP_P3768.md).
 
 **Endpoint remote-endpoint references:**
-- CAM0: `remote-endpoint = <&eg_cams_csi_in0>` (36.x) or `<&rbpcv2_imx219_csi_in0>` (32+/35.x)
-- CAM1: `remote-endpoint = <&eg_cams_csi_in1>` (36.x) or `<&rbpcv2_imx219_csi_in1>` (32+/35.x)
+- CAM0: `remote-endpoint = <&eg_cams_csi_in0>` (36.x) or `<&csi_in0>` (32.x t186/quill) or `<&rbpcv2_imx219_csi_in0>` (32+/35.x t210/porg)
+- CAM1: `remote-endpoint = <&eg_cams_csi_in1>` (36.x) or `<&csi_in1>` (32.x t186/quill) or `<&rbpcv2_imx219_csi_in1>` (32+/35.x t210/porg)
+
+> **Note t186 (quill):** `csi_in0`/`csi_in1` are labels already present in the base DTB `__symbols__` (see [below](#csi-endpoint-remote-endpoint-labels)). Do NOT create new labels for these existing nodes — use the base DTB labels directly.
 
 ### Step 4: Device tree — per-port overlays
 
@@ -288,8 +321,11 @@ Once updated, the next build will run `verify_dtsi_structure.py` automatically a
 
 ```bash
 ./l4t_make.sh -v <BSP version>
-```
 
+# For 32.x, build once per SoM:
+./l4t_make.sh -v 32.7.x -s t210
+./l4t_make.sh -v 32.7.x -s t186
+```
 
 ---
 
@@ -326,7 +362,7 @@ grep "<camera>" sources/<target_version>/Linux_for_Tegra/source/.../i2c/Makefile
 Copy the camera node definitions from the source DTSI and adapt them for the target format. See the [DT differences reference](#reference-device-tree-differences-between-l4t-3235x-and-36x) for the exact changes.
 
 Key adaptations when porting from 32+/35.x to 36.x:
-- `remote-endpoint`: change from `<&rbpcv2_imx219_csi_in0>` to `<&eg_cams_csi_in0>` (CAM0) or `<&eg_cams_csi_in1>` (CAM1)
+- `remote-endpoint`: change from `<&rbpcv2_imx219_csi_in0>` (t210/porg) or `<&csi_in0>` (t186/quill) to `<&eg_cams_csi_in0>` (CAM0); same pattern for CAM1
 - The rest of the node properties (modes, lanes, polarity, etc.) remain identical
 
 Insert the new nodes in the `cam_i2cmux` block:
@@ -538,6 +574,7 @@ Add the new version entry with BSP download URLs, toolchain info, vendor list, a
 ```yaml
 versions:
   "36.5.0":
+    jetpack: "6.2.2"
     platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]  # platforms supported by this version
     vendors: [generic, forecr]
     standalone:
@@ -601,6 +638,10 @@ Review and update:
 
 ```bash
 ./l4t_make.sh -v <new_version> --prepare --copy-sources --build
+
+# For 32.x, test each SoM separately:
+./l4t_make.sh -v <new_version> -s t210 --prepare --copy-sources --build
+./l4t_make.sh -v <new_version> -s t186 --prepare --copy-sources --build
 ```
 
 Fix any compilation errors. Common issues:
@@ -612,6 +653,10 @@ Fix any compilation errors. Common issues:
 
 ```bash
 ./l4t_make.sh -v <BSP version>
+
+# For 32.x, build once per SoM:
+./l4t_make.sh -v <BSP version> -s t210
+./l4t_make.sh -v <BSP version> -s t186
 ```
 
 ---
@@ -661,12 +706,16 @@ proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/<node>";
 
 ### CSI endpoint remote-endpoint labels
 
-| Endpoint | L4T 32+/35.x | L4T 36.x |
-|----------|-------------|----------|
-| CSI input CAM0 | `rbpcv2_imx219_csi_in0` | `eg_cams_csi_in0` |
-| CSI input CAM1 | `rbpcv2_imx219_csi_in1` | `eg_cams_csi_in1` |
+| Endpoint | L4T 32.x t186 (quill) | L4T 32+/35.x t210 (porg) | L4T 36.x |
+|----------|-----------------------|--------------------------|----------|
+| CSI input CAM0 | `csi_in0` | `rbpcv2_imx219_csi_in0` | `eg_cams_csi_in0` |
+| CSI input CAM1 | `csi_in1` | `rbpcv2_imx219_csi_in1` | `eg_cams_csi_in1` |
 
 These are the labels used in `remote-endpoint` references in the camera sensor endpoint.
+
+**Critical — t186:** `csi_in0` and `csi_in1` are labels defined in the base DTB's `__symbols__` node, pointing to the existing `nvcsi@150c0000` endpoints. Multiple stock camera overlays share these same labels (e.g., `imx390_csi_in0`, `liimx274_csi_in0` all alias the same node). When writing an overlay, reference these labels directly — do NOT define new labels for these existing nodes inside an `__overlay__` block, as this creates duplicate phandles on the same node and produces an incorrect DT graph topology.
+
+The nvcsi↔vi output connection (`csi_out0` → `vi_in0`) is already bidirectionally wired in the base DTB and must not be overridden. Only the nvcsi input side (`csi_in0.remote-endpoint` → sensor) needs to be set by the EG overlay.
 
 ### Driver Makefile
 

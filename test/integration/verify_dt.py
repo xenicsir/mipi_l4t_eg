@@ -124,10 +124,25 @@ def get_nvcsi_bus_width(dts, port, l4t_mode="36x"):
     Endpoint numbering convention differs by L4T generation:
       - 36.x: endpoint@{port*2} (overlays override existing endpoints)
       - 35.x: endpoint@0 for all channels (overlays create new endpoints)
+      - 32x:  fallback search used (endpoint@N varies by SoM)
+
+    nvcsi address varies by SoC:
+      - 36.x / 35.x / 35.x Xavier: nvcsi@15a00000
+      - 32.x t186 (TX2):           nvcsi@150c0000
+      - 32.x t210 (Nano):          nvcsi (no address)
 
     Returns the integer bus-width, or None if the node can't be found.
     """
-    nvcsi_m = re.search(r'nvcsi@15a00000\s*\{', dts)
+    _NVCSI_PATTERNS = [
+        r'nvcsi@15a00000\s*\{',   # 36.x / 35.x (Orin, Xavier NX/AGX)
+        r'nvcsi@150c0000\s*\{',   # 32.x t186 (TX2 / TX2i / TX2 NX)
+        r'\bnvcsi\s*\{',          # 32.x t210 (Nano, no MMIO address suffix)
+    ]
+    nvcsi_m = None
+    for pat in _NVCSI_PATTERNS:
+        nvcsi_m = re.search(pat, dts)
+        if nvcsi_m:
+            break
     if not nvcsi_m:
         return None
 

@@ -39,13 +39,20 @@ else
    KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/ | grep -v -- '-eg$' | head -1)
 fi
 
-# Package naming: jetson-l4t-36.4.3-forecr-dsboard-ornx-eg-cams
+# Package naming: jetson-l4t-36.4.3-jp6.2-forecr-dsboard-ornx-eg-cams
+#                 jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams
+JP_INFIX=""
+[[ -n "$JETPACK_VERSION" ]] && JP_INFIX="-jp${JETPACK_VERSION}"
 if [[ "$VENDOR" == "generic" ]]; then
-   PACKAGE_NAME=jetson-l4t-${L4T_VERSION}-eg-cams
+   if [[ -n "$SOM_BOARD" ]]; then
+      PACKAGE_NAME=jetson-l4t-${L4T_VERSION}${JP_INFIX}-${SOM_BOARD}-eg-cams
+   else
+      PACKAGE_NAME=jetson-l4t-${L4T_VERSION}${JP_INFIX}-eg-cams
+   fi
 else
    # Replace underscores with hyphens for Debian package naming convention
    CARRIER_BOARD_DEB=$(echo "$CARRIER_BOARD" | tr '_' '-')
-   PACKAGE_NAME=jetson-l4t-${L4T_VERSION}-${VENDOR}-${CARRIER_BOARD_DEB}-eg-cams
+   PACKAGE_NAME=jetson-l4t-${L4T_VERSION}${JP_INFIX}-${VENDOR}-${CARRIER_BOARD_DEB}-eg-cams
 fi
 
 ROOTFS_DIR=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs
@@ -56,6 +63,7 @@ sudo rm -rf ${PACKAGE_NAME}
 echo "============================================"
 echo "Generating package: ${PACKAGE_NAME}"
 echo "  Vendor: $VENDOR"
+[[ -n "$SOM_BOARD" ]] && echo "  SoM: $SOM_BOARD"
 echo "  Carrier board: $CARRIER_BOARD"
 echo "  Kernel version: ${KERNEL_VERSION}"
 if [[ $STANDALONE_BUILD -eq 1 ]]; then
@@ -236,19 +244,66 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
       echo "  Warning: No modules found in $MODULES_SRC"
    fi
 else
-   # L4T 35.x and earlier standard build: auto-detect Exosens camera modules
+   # Standard build: auto-detect Exosens camera modules by cross-referencing
+   # the i2c Makefile with .c source files present in sources/ (Exosens-owned).
+   # This automatically picks up any new module whose .c is added to sources/.
    I2C_DRIVER_DIR="kernel/drivers/media/i2c"
-   I2C_PATCH_FILE="$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}/source_public_kernel_nvidia_drivers_media_i2c.patch"
    EG_MODULES=()
 
-   # Detect new modules from patch file (works with both l4t_copy_sources.sh and l4t_patch_sources.sh)
-   if [[ -f "$I2C_PATCH_FILE" ]]; then
-      while IFS= read -r mod_name; do
-         [[ -z "$mod_name" ]] && continue
-         EG_MODULES+=("${mod_name}.ko")
-      done < <(grep '^+obj-' "$I2C_PATCH_FILE" | sed 's/.*+=//' | tr -d '[:blank:]' | sed 's/\.o$//' | sort -u)
+   # Collect Exosens .c source basenames: any .c file under sources/*/drivers/media/i2c/
+   EG_SRCS=()
+   while IFS= read -r f; do
+      EG_SRCS+=("$(basename "$f" .c)")
+   done < <(find "$ROOT_DIR/sources" -path "*/drivers/media/i2c/*.c" 2>/dev/null)
+
+   # The EG module list is always derived from the version-generic Makefile.
+   # SoM/vendor/carrier layers contain NVIDIA stock Makefiles (no EG modules)
+   # and must never override it.
+   I2C_MAKEFILE=""
+   for rel in "source/public/kernel/nvidia/drivers/media/i2c/Makefile" \
+              "source/nvidia-oot/drivers/media/i2c/Makefile"; do
+      candidate="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/$rel"
+      [[ -f "$candidate" ]] && I2C_MAKEFILE="$candidate"
+   done
+
+   if [[ ${#EG_SRCS[@]} -gt 0 && -n "$I2C_MAKEFILE" ]]; then
+      echo "  Using i2c Makefile: $I2C_MAKEFILE"
+
+      # Join backslash-continuation lines for easier parsing
+      MAKEFILE_JOINED=$(awk '{if(/\\$/) {printf "%s ", substr($0,1,length($0)-1)} else {print}}' "$I2C_MAKEFILE")
+
+      # Build module→sources map from <mod>-objs and <mod>-y assignments
+      declare -A _mod_srcs
+      while IFS= read -r line; do
+         line="${line%%#*}"
+         if [[ "$line" =~ ^([a-zA-Z0-9_-]+)-[yo][^[:space:]=]*[[:space:]]*([:+]?=)[[:space:]]*(.*) ]]; then
+            mod="${BASH_REMATCH[1]}"
+            for tok in ${BASH_REMATCH[3]}; do
+               [[ "$tok" == *.o ]] && _mod_srcs["$mod"]+=" $(basename "${tok%.o}")"
+            done
+         fi
+      done <<< "$MAKEFILE_JOINED"
+
+      # For each obj- module: check if any source file belongs to Exosens
+      while IFS= read -r line; do
+         line="${line%%#*}"
+         if [[ "$line" =~ ^obj-[^+]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
+            mod="${BASH_REMATCH[1]}"
+            srcs="${_mod_srcs[$mod]:-$mod}"
+            for src in $srcs; do
+               for eg in "${EG_SRCS[@]}"; do
+                  if [[ "$src" == "$eg" ]]; then
+                     EG_MODULES+=("${mod}.ko")
+                     break 2
+                  fi
+               done
+            done
+         fi
+      done <<< "$MAKEFILE_JOINED"
+      unset _mod_srcs
    else
-      echo "  WARNING: Patch file not found: $I2C_PATCH_FILE"
+      [[ ${#EG_SRCS[@]} -eq 0 ]] && echo "  WARNING: No Exosens .c sources found under sources/"
+      [[ -z "$I2C_MAKEFILE" ]] && echo "  WARNING: Could not find i2c Makefile in sources"
    fi
 
    if [[ ${#EG_MODULES[@]} -gt 0 ]]; then
@@ -257,7 +312,7 @@ else
          copy_module "$I2C_DRIVER_DIR" "$module"
       done
    else
-      echo "  WARNING: Could not auto-detect modules from patch file"
+      echo "  WARNING: No Exosens modules detected"
    fi
 fi
 
@@ -268,7 +323,7 @@ update_status "Creating install scripts..."
 
 # Use build-specific temp file names to avoid collisions when multiple
 # builds run in parallel (e.g. generic and forecr for the same L4T version).
-_BUILD_ID="${L4T_VERSION_EXTENDED}_${CARRIER_BOARD:-generic}"
+_BUILD_ID="${L4T_VERSION_EXTENDED}${SOM_BOARD:+_$SOM_BOARD}_${CARRIER_BOARD:-generic}"
 _PREINST="/tmp/preinst_${_BUILD_ID}"
 _POSTINST="/tmp/postinst_${_BUILD_ID}"
 _POSTRM="/tmp/postrm_${_BUILD_ID}"
@@ -529,6 +584,7 @@ fi
 update_status "Verifying package..."
 
 VERIFY_ARGS="-v $L4T_VERSION"
+[[ -n "$SOM_BOARD" ]] && VERIFY_ARGS="$VERIFY_ARGS -s $SOM_BOARD"
 [[ "$VENDOR" != "generic" ]] && VERIFY_ARGS="$VERIFY_ARGS -V $VENDOR -c $CARRIER_BOARD"
 
 cd $ROOT_DIR
@@ -543,4 +599,5 @@ else
    echo ""
    echo "Warning: Package verification found issues"
    echo "Review the errors above before distributing the package"
+   exit 1
 fi
