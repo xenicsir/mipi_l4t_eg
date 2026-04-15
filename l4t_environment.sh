@@ -139,7 +139,8 @@ get_soms_for_version_vendor() {
 #******************************************************************************
 
 # Match versions against a pattern (supports wildcards)
-# Args: pattern (e.g., "36.4", "36.*", "36.4*")
+# Args: pattern (e.g., "36.4", "36.*", "36.x", "35.x.1", "36.4*")
+#   .x is accepted as an alias for .* (e.g. 36.x == 36.*, 35.x.1 == 35.*.1)
 # Returns: Space-separated list of matching versions
 match_versions() {
     local pattern="$1"
@@ -152,6 +153,9 @@ match_versions() {
         echo "$_L4T_ALL_VERSIONS"
         return
     fi
+
+    # Normalize .x → .* so users can write 36.x instead of "36.*"
+    pattern="${pattern//.x/.*}"
 
     for version in $_L4T_ALL_VERSIONS; do
         # If pattern contains wildcards, use glob matching
@@ -302,17 +306,15 @@ build_args() {
 
     local args="-v $version"
 
-    if [[ "$vendor" != "generic" ]]; then
-        args="$args -V $vendor"
-    fi
+    # Always include -V and -c so generated arguments are unambiguous
+    # (omitting -V generic would select all vendors when multiple exist for a version)
+    args="$args -V $vendor"
 
     if [[ -n "$som" ]]; then
         args="$args -s $som"
     fi
 
-    if [[ "$carrier" != "generic" ]]; then
-        args="$args -c $carrier"
-    fi
+    args="$args -c $carrier"
 
     if [[ -n "$extra_args" ]]; then
         args="$args $extra_args"
