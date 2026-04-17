@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     bash \
     device-tree-compiler \
     python3 \
+    python3-yaml \
     && rm -rf /var/lib/apt/lists/*
 
 # Allow sudo as root (passthrough)

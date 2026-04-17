@@ -1,0 +1,166 @@
+# Test hardware fixtures — maps eg_config.yaml platform_ids to concrete test data.
+#
+# This file is the single source of truth for TEST hardware info (board short name,
+# base DTB filename per version, DTBO prefixes, port count, compat string).
+#
+# Used by test/config/test_matrix.py to generate the full test matrix (phase 1, 2, 3).
+#
+# Keys match `platform_ids` in eg_config.yaml. If you add a platform_id there, you must
+# add a matching entry here. A coherence check (test/config/coherence.py) enforces this.
+
+platforms:
+  # ─── 32.x SoMs ─────────────────────────────────────────────────────────────
+  nano_t210:
+    board_short: nvidia-p3449
+    som: t210                               # → Linux_for_Tegra_t210
+    compat: "nvidia,tegra210"
+    l4t_mode: 32x
+    base_dtb:
+      default: tegra210-p3448-0000-p3449-0000-b00.dtb
+    base_dtb_dir: versioned                 # rootfs/boot/
+    dtbo_base_prefix: tegra210-camera-eg
+    dtbo_lane_prefix: tegra210-camera-eg
+    ports: 2
+    is_forecr: false
+
+  tx2_t186:
+    board_short: nvidia-quill
+    som: t186                               # → Linux_for_Tegra_t186
+    compat: "nvidia,p2597-0000+p3310-1000"
+    l4t_mode: 32x
+    base_dtb:
+      default: tegra186-quill-p3310-1000-c03-00-base.dtb
+    base_dtb_dir: versioned
+    dtbo_base_prefix: tegra186-camera-eg
+    dtbo_lane_prefix: tegra186-camera-eg
+    ports: 2
+    is_forecr: false
+
+  # ─── 35.x t194 (Xavier NX) ────────────────────────────────────────────────
+  # Note: xavier_nx listed in 32.7.x eg_config.yaml platform_ids is nominal only
+  # (no 32.7.x Xavier NX build is produced). Coherence check raises a warning.
+  xavier_nx:
+    board_short: nvidia-p3509
+    som: null                               # Linux_for_Tegra (no suffix)
+    compat: "nvidia,tegra194"
+    l4t_mode: 35x                           # forced 35.x-only
+    base_dtb:
+      default: tegra194-p3668-0001-p3509-0000.dtb
+    base_dtb_dir: versioned
+    dtbo_base_prefix: tegra194-camera-eg
+    dtbo_lane_prefix: tegra194-camera-eg
+    ports: 2
+    is_forecr: false
+    skip_versions: ["32.7.1", "32.7.4", "32.7.5", "32.7.6"]  # no 32.x build output
+
+  # ─── t23x AGX Orin (p3737, concord) ───────────────────────────────────────
+  agx_orin_devkit:
+    board_short: nvidia-p3737
+    som: null
+    compat: "nvidia,tegra234"
+    base_dtb:
+      # per-version override keyed by l4t_mode (no dot), falling back to 'default'
+      "35x": tegra234-p3701-0004-p3737-0000.dtb
+      "36x": tegra234-p3737-0000+p3701-0004-nv.dtb
+    base_dtb_dir: versioned
+    dtbo_base_prefix: tegra234-p3737-camera-eg
+    dtbo_lane_prefix: tegra234-p3737-camera-eg
+    ports: 4
+    is_forecr: false
+
+  # ─── t23x AGX Orin Auvidea X230D ──────────────────────────────────────────
+  agx_orin_x230d:
+    board_short_by_mode:
+      "35x": nvidia-p3737                   # 35.x reports this board_short
+      "36x": auvidea-x230d                  # 36.x DT detects Auvidea-specific vendor string
+    som: null
+    compat: "nvidia,tegra234"
+    base_dtb:
+      "35.1": auvidea_X230_35.1.dtb
+      "35.3.1": auvidea_X230_35.3.1.dtb
+      "35.4.1": auvidea_X230_35.4.1.dtb
+      "36.4": auvidea_X230_36.4.dtb
+      "36.4.3": auvidea_X230_36.4.3.dtb
+      "36.4.4": auvidea_X230_36.4.4.dtb
+    base_dtb_dir: auvidea                   # test/dts/auvidea/
+    dtbo_base_prefix: tegra234-p3737-camera-eg
+    dtbo_lane_prefix: tegra234-p3737-camera-eg
+    ports: 4                                # 4 by default; 35.1 falls back to 2 via runtime detection
+    is_forecr: false
+
+  # ─── t23x Orin NX (p3768 p3767 series) ────────────────────────────────────
+  orin_nx_nano_devkit:
+    board_short: nvidia-p3768
+    som: null
+    compat: "nvidia,tegra234"
+    base_dtb:
+      # Before 35.6.0 lives in kernel/dtb/ (SoM variant p3767-0003)
+      "35.3.1": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.4.1": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.5.0": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      # From 35.6.0 lives in rootfs/boot/ (SoM variant p3767-0000)
+      "35.6.0": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.1": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.2": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.4": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "36x":    tegra234-p3768-0000+p3767-0000-nv.dtb
+    base_dtb_dir: versioned
+    dtbo_base_prefix: tegra234-p3767-camera-p3768-eg
+    dtbo_lane_prefix: tegra234-p3767-camera-p3768-eg
+    ports: 2
+    is_forecr: false
+
+  # ─── Forecr DSBOARD-ORNXS (Orin NX carrier, vendor=forecr) ────────────────
+  # Shares base DTB with orin_nx_nano_devkit. Base DTBO has its own name.
+  forecr_ornxs:
+    board_short: dsboard-ornxs
+    som: null
+    vendor: forecr                          # drives which .deb to use (different package)
+    compat: "nvidia,tegra234"
+    base_dtb:
+      "35.3.1": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.4.1": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.5.0": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.6.0": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.1": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.2": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.4": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "36x":    tegra234-p3768-0000+p3767-0000-nv.dtb
+    base_dtb_dir: versioned
+    dtbo_base_prefix: tegra234-p3767-camera-dsboard-ornxs-eg      # Forecr-specific base DTBO
+    dtbo_lane_prefix: tegra234-p3767-camera-p3768-eg              # lane DTBOs shared with p3768
+    ports: 2
+    is_forecr: true
+
+# ─── Versions that don't have L4T suffix in the mode lookup ─────────────────
+# Used when base_dtb uses "35.x" / "36.x" keys (vs a specific version like "35.1")
+mode_fallback:
+  "32.7.1": 32x
+  "32.7.4": 32x
+  "32.7.5": 32x
+  "32.7.6": 32x
+  "35.1":   35x
+  "35.3.1": 35x
+  "35.4.1": 35x
+  "35.5.0": 35x
+  "35.6.0": 35x
+  "35.6.1": 35x
+  "35.6.2": 35x
+  "35.6.4": 35x
+  "36.4":   36x
+  "36.4.3": 36x
+  "36.4.4": 36x
+  "36.5.0": 36x
+
+# ─── Auvidea base DTB directory (where test DTBs live) ──────────────────────
+auvidea_dtb_dir: test/dts/auvidea
+
+# ─── Camera canonical names (must match CAMERA_LANES keys in eg_dt_camera_config_set.sh) ──
+test_cameras:
+  - Dione
+  - MicroCube
+  - MicroCube640
+  - SmartIR640
+  - Crius1280
+  - iLumos
+  - Microlynx

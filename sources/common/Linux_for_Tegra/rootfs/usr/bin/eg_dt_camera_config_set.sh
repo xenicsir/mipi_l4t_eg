@@ -75,14 +75,10 @@ if [[ -z "$CAMERA_PORTS" || "$CAMERA_PORTS" -eq 0 ]] 2>/dev/null; then
 fi
 MAX_PORT=$(( CAMERA_PORTS - 1 ))
 
-# Default: all ports with DEFAULT_CAMERA
-if [[ $# -eq 0 ]]; then
-	args=()
-	for port in $(seq 0 $MAX_PORT); do
-		args+=("$port/$DEFAULT_CAMERA")
-	done
-	set -- "${args[@]}"
-fi
+# Remember whether the caller passed explicit ports (default expansion deferred until
+# after 2-port detection, so MAX_PORT reflects the board's actual capabilities).
+_default_all_ports=0
+[[ $# -eq 0 ]] && _default_all_ports=1
 
 case "$BOARD" in
   dsboard-*|milboard-*|raiboard-*)
@@ -103,30 +99,80 @@ else
    base_devicetree="Exosens Cameras"
 fi
 
+# Resolve the primary boot DTB (the base kernel DTB that config-by-hardware.py
+# applies overlays to at boot time). On tegra234 boards it is the authoritative
+# source for IMX219/IMX477 and channel@N presence — more reliable than the live
+# /proc/device-tree which reflects the currently-booted user-custom.dtb.
+_primary_dtb=""
+if grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null; then
+   _primary_dtb=$(awk '/^LABEL primary/{f=1} f && /^[[:space:]]*FDT /{print $2; exit}' \
+                  /boot/extlinux/extlinux.conf 2>/dev/null)
+fi
+
+# 2-port overlay selection — Auvidea X230D on L4T 35.1 ships a kernel DTB that
+# only exposes NVCSI channels 0 and 1 (csi_chan0_port0/1, csi_chan1_port0/1 in
+# __symbols__). Using the regular 4-port overlay would silently fail at
+# fdtoverlay time (FDT_ERR_NOTFOUND on csi_chan{2,3}_port* phandles).
+# Gate: "Exosens Cameras" base + the 2ports DTBO is installed + channel@2 absent
+# in the primary boot DTB.
+if [[ $base_devicetree == "Exosens Cameras" ]] && \
+   [[ -n "$_primary_dtb" ]] && \
+   [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-2ports.dtbo" ]] && \
+   command -v fdtget >/dev/null 2>&1 && \
+   ! fdtget "$_primary_dtb" /host1x@13e00000/nvcsi@15a00000/channel@2 reg >/dev/null 2>&1 && \
+   ! fdtget "$_primary_dtb" /bus@0/host1x@13e00000/nvcsi@15a00000/channel@2 reg >/dev/null 2>&1; then
+   base_devicetree="Exosens Cameras - 2 ports"
+   MAX_PORT=1
+fi
+
+# Default all-ports expansion — done here so MAX_PORT reflects 2-port detection above.
+if [[ $_default_all_ports -eq 1 ]]; then
+   args=()
+   for port in $(seq 0 $MAX_PORT); do
+      args+=("$port/$DEFAULT_CAMERA")
+   done
+   set -- "${args[@]}"
+fi
+
 # IMX219/IMX477 conflict detection — all boards
 # Cache jetson-io overlay list once (avoid multiple sudo calls)
 disable_imx219_arg=""
 disable_imx477_arg=""
 _jetson_io_overlays=$(sudo /opt/eg/jetson-io/config-by-hardware.py -l 2>/dev/null)
 
+# IMX219/IMX477 detection: check both the live DT and the primary boot DTB.
+# The live DT may not reflect active nodes if a previous user-custom.dtb already
+# disabled them; the kernel DTB is the authoritative source for what will be in
+# the new merged DTB.
+_imx219_active=0
+_imx477_active=0
 if [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
-   if echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx219"; then
+   _imx219_active=1
+fi
+if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv2_imx219"; then
+   _imx219_active=1
+fi
+if [[ $_imx219_active -eq 1 ]]; then
+   # In 2-port mode the 2ports DTBO already folds the IMX219 disable for
+   # cam0/cam1 directly into its fragments — a separate disable-imx219 DTBO
+   # would target cam2/cam3 paths that don't exist on the 2-channel kernel DTB
+   # and would fail fdtoverlay with FDT_ERR_NOTFOUND.
+   if [[ $base_devicetree != "Exosens Cameras - 2 ports" ]] && \
+      echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx219"; then
       disable_imx219_arg="2=Exosens Cameras. Disable imx219"
    fi
 fi
 
 if [[ -n "$(find -L /proc/device-tree -name "rbpcv3_imx477*" -type d 2>/dev/null | head -1)" ]]; then
+   _imx477_active=1
+fi
+if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv3_imx477"; then
+   _imx477_active=1
+fi
+if [[ $_imx477_active -eq 1 ]]; then
    if echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx477"; then
       disable_imx477_arg="2=Exosens Cameras. Disable imx477"
    fi
-fi
-
-# Upgrade to global DTBO on tegra234 when no Disable overlays are needed
-if [[ $base_devicetree == "Exosens Cameras" ]] && \
-   [[ -z "$disable_imx219_arg" ]] && [[ -z "$disable_imx477_arg" ]] && \
-   grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null && \
-   [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
-   base_devicetree="Exosens Cameras (global)"
 fi
 
 dtboarg=()
@@ -144,6 +190,11 @@ for arg in "$@"; do
 
 	if [[ ! "$port_number" =~ ^[0-9]+$ ]] || [[ "$port_number" -gt "$MAX_PORT" ]]; then
 		echo "Error: invalid port number '$port_number' (from argument '$arg'). Must be 0-$MAX_PORT."
+		exit 1
+	fi
+
+	if [[ $base_devicetree == "Exosens Cameras - 2 ports" ]] && [[ "$port_number" -ge 2 ]]; then
+		echo "Error: port $port_number is not available on this board. Only CAM0 and CAM1 are supported on this L4T version."
 		exit 1
 	fi
 
@@ -180,6 +231,21 @@ done
 for (( i=0; i<${#dtboarg[@]}; i++ )); do
 	echo overlay ${dtboarg[$i]}
 done
+
+# Upgrade to global DTBO on tegra234 when no per-port cam overlays are needed
+# and no Disable overlay is needed. The global DTBO uses NVIDIA global NVCSI
+# endpoint numbering (endpoint@2 in channel@1, etc.) — compatible with stock
+# NVIDIA 35.x and Auvidea 35.4.1+ base DTBs when configuration is Dione-only.
+# Per-port cam DTBOs (cam1-ilumos, cam2-ec-*, …) target endpoint@0 (per-channel
+# numbering) and would fail fdtoverlay against a global base. Skip the upgrade
+# whenever any per-port cam DTBO will be applied.
+if [[ $base_devicetree == "Exosens Cameras" ]] && \
+   [[ ${#dtboarg[@]} -eq 0 ]] && \
+   [[ -z "$disable_imx219_arg" ]] && [[ -z "$disable_imx477_arg" ]] && \
+   grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null && \
+   [[ -f "/boot/tegra234-p3737-camera-eg-cams-dione-global.dtbo" ]]; then
+   base_devicetree="Exosens Cameras (global)"
+fi
 
 cmd="python /opt/eg/jetson-io/config-by-hardware.py -n"
 
