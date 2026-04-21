@@ -286,6 +286,44 @@ if [ -n "$dtb_file" ] && [ ! -f "$dtb_file" ]; then
     exit 1
 fi
 
+# 35.x T234 p3737 (AGX Orin): remove NVCSI extra endpoints from the IMX
+# reference design that break the EG configuration.
+#
+# On base DTBs with NVIDIA "global" endpoint numbering (NVIDIA std, Auvidea
+# X230 35.4.1+), each NVCSI channel@N/ports/port@X contains an extra
+# endpoint from the IMX reference design alongside the EG endpoint@{0,1}
+# created by our overlays.
+#
+# port@1 side: endpoint@{3,5,7} are ORPHANED — their remote-endpoint phandles
+#   pointed to /tegra-capture-vi/ports/port@{1,2,3}/endpoint but our DTSI
+#   common redefines those VI nodes as rbpcv2_vi_in{1,2,3}, so DTC drops the
+#   original phandles. At runtime, v4l2_fwnode_parse_link fails on them ->
+#   tegra_vi_graph_build_one returns error -> subdev probe fails with -EIO.
+#
+# port@0 side: endpoint@{2,4,6} have valid (but disabled) remote-endpoints.
+#   However, the CSI driver (csi.c:803) iterates ALL children of port@0
+#   WITHOUT checking 'status', so chan->port[0] gets overwritten by the last
+#   endpoint's port-index. With endpoint@{2,4,6} present (port-index=2/2/3),
+#   our endpoint@0 port-index (6/4/2) is lost -> wrong csi_port -> wrong
+#   stream_id -> "VI channel not found" at stream_open -> 2.5s timeout.
+#
+# No-op on base DTBs with per-channel numbering (Auvidea X230 35.1/35.3.1)
+# where these endpoints don't exist. fdtoverlay cannot /delete-node/ inside
+# a target-path="/" fragment, so we post-process the merged DTB here.
+if [ -n "$dtb_file" ] && [ -f "$dtb_file" ] && command -v fdtput >/dev/null 2>&1 && \
+   grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null; then
+    _nvcsi_prefix="/host1x@13e00000/nvcsi@15a00000"
+    for _ep_path in \
+        "${_nvcsi_prefix}/channel@1/ports/port@0/endpoint@2" \
+        "${_nvcsi_prefix}/channel@2/ports/port@0/endpoint@4" \
+        "${_nvcsi_prefix}/channel@3/ports/port@0/endpoint@6" \
+        "${_nvcsi_prefix}/channel@1/ports/port@1/endpoint@3" \
+        "${_nvcsi_prefix}/channel@2/ports/port@1/endpoint@5" \
+        "${_nvcsi_prefix}/channel@3/ports/port@1/endpoint@7"; do
+        sudo fdtput -r "$dtb_file" "$_ep_path" 2>/dev/null || true
+    done
+fi
+
 # 35.x: check for active IMX219/IMX477 nodes in the merged DTB
 if [ -n "$dtb_file" ] && [ -f "$dtb_file" ]; then
     if _camera_node_active_in_dtb "$dtb_file" "rbpcv2_imx219"; then

@@ -22,6 +22,7 @@ fi
 echo "=== Running Phase 1 + 2 integration tests ==="
 docker run --rm \
     --privileged \
+    -e RUN_PHASE \
     -v "$REPO_ROOT:/repo:ro" \
     -v "$SCRIPT_DIR:/repo/test/integration" \
     "$IMAGE" \

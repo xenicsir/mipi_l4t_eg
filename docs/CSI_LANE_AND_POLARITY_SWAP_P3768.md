@@ -79,11 +79,88 @@ Summary:
 
 | Connector | Nvidia P3768 Devkit | Forecr DSBOARD-ORNXS |
 |-----------|---------------------|----------------------|
-| **CAM0 (J20)** | x2 only (CSI1_CLK) | x2 and x4 (CSI0_CLK) |
+| **CAM0 (J20)** | x2 only (CSI1_CLK) — iLumos OK | x2 and x4 (CSI0_CLK) — iLumos OK |
 | **CAM1 (J21)** | x2 and x4 (CSI2_CLK) | x2 and x4 (CSI2_CLK) |
 
-**Direct consequence**: a 4-lane camera such as iLumos cannot work on
-CAM0 of the Nvidia devkit, but works on CAM0 of the Forecr board.
+**Direct consequence**: a 4-lane camera cannot work on CAM0 of the Nvidia devkit.
+2-lane cameras (including iLumos) work on CAM0 of both boards.
+
+## Driver behavior: what port-index actually controls
+
+There are **two independent** `port-index` values in the device tree, read by
+two different parts of the driver stack.
+
+### port-index in the sensor node (cam_i2cmux endpoint)
+
+Read by `camera_common_parse_ports()` in `camera_common.c` (line 310):
+
+```c
+of_property_read_u32(ep, "port-index", &port);
+s_data->csi_port = port;
+```
+
+Used **only** in `camera_common_dpd_disable/enable()`:
+
+```c
+io_idx = s_data->csi_port + i;
+tegra_io_pad_power_enable(TEGRA_IO_PAD_CSIA + io_idx);
+```
+
+**Role:** selects which CSI IO pad (CSIA, CSIB, CSIC…) to take out of Deep
+Power Down when the camera is opened. Does **not** control the NVCSI data path.
+
+### port-index in the NVCSI input endpoint
+
+The NVCSI input endpoint (under `nvcsi@.../channel@N/ports/port@0/endpoint`) uses
+`port-index` as the **raw NVCSI port number** (0 = port A, 1 = B, …, 6 = port G,
+7 = port H, range 0–7 per `NVCSI_PORT_H`). This is read by the CSI driver and
+passed to `csi5_stream_open()`.
+
+### port-index in the VI node (tegra-capture-vi endpoint)
+
+Read by `tegra_vi_get_port_info()` in `vi/channel.c`:
+
+```c
+of_property_read_u32(ep, "port-index", &value);
+chan->port[0] = value;
+```
+
+Then used directly as `setup.csi_stream_id = chan->port[0]` in `vi5_fops.c`.
+This is validated in `fusa-capture/capture-vi.c`:
+
+```c
+#define MAX_NVCSI_STREAM_IDS  U32_C(0x6)  // valid range: 0–5
+if (csi_stream_id >= MAX_NVCSI_STREAM_IDS) {
+    dev_err(..., "Invalid NVCSI stream Id\n");  // → NULL deref crash
+```
+
+The VI port-index is therefore a **stream ID (0–5)**, not a raw port number.
+For T234, `csi5_port_to_stream()` maps raw port → stream:
+
+| NVCSI port | port-index (NVCSI) | port-index (VI) = stream_id |
+|---|---|---|
+| A | 0 | 0 |
+| B | 1 | 1 |
+| C | 2 | 2 |
+| D | 3 | 3 |
+| E | 4 | 4 |
+| F | 5 | 4 |
+| **G** | **6** | **5** |
+| H | 7 | 5 |
+
+> **Key rule for AGX Orin CAM1 (serial_g, CSI 6/7 = NVCSI port G):**
+> NVCSI endpoint: `port-index = <6>` — VI endpoint: `port-index = <5>`
+
+### Practical consequence
+
+A wrong `port-index` in the **sensor node** powers the wrong IO pad but does
+not prevent capture — the data path is determined by the VI/NVCSI `port-index`.
+A wrong `port-index` in the **NVCSI node** (raw port) breaks the CSI data path.
+A wrong `port-index` in the **VI node** (stream ID) causes a kernel crash at
+stream time with "Invalid NVCSI stream Id" if the value ≥ 6.
+
+Both values must still be correct for clean operation (proper pad power
+management), but only the VI/NVCSI values are critical for functionality.
 
 ## Device tree impact
 
@@ -155,9 +232,10 @@ Figure 10-1: "CSI_0_D1 and CSI_1_D0 have P/N swapped on the module").
 Note: `tegra_sinterface` is **not** conditionally compiled. Both Nvidia devkit
 and Forecr use `serial_b` for CAM0. The only board-specific difference is `port-index`.
 
-## Special case: iLumos (4-lane camera)
+## Special case: iLumos (2-lane camera)
 
-The iLumos requires 4 MIPI lanes (`bus-width = <4>`), therefore x4 mode.
+The iLumos uses 2 MIPI lanes (`bus-width = <2>`), therefore x2 mode.
+It works on CAM0 of all boards (devkit and Forecr) and on CAM1.
 
 ### CAM1 (J21) - works on all boards
 
@@ -169,52 +247,43 @@ ilumos_c@30 {
     status = "disabled";    // enabled by cam1-ilumos overlay
 
     mode0 {
-        num_lanes = "4";
+        num_lanes = "2";
         tegra_sinterface = "serial_c";
         // no lane_polarity
     };
 
     ports / port@0 / endpoint {
-        port-index = <2>;   // Brick C (CSI2_CLK) - supports x4
-        bus-width = <4>;
+        port-index = <2>;   // Brick C (CSI2_CLK)
+        bus-width = <2>;
     };
 };
 ```
 
-### CAM0 - Forecr only
+### CAM0 - all boards
 
-The `ilumos_b@30` node (CAM0) is protected by `#ifdef DSBOARD_ORNXS`:
+The `ilumos_b@30` node (CAM0) is present on all boards. Like other 2-lane
+cameras, only `port-index` differs due to the devkit lane swap:
 
 ```
-#ifdef DSBOARD_ORNXS
 ilumos_b@30 {
     compatible = "exosens,ilumos";
     status = "disabled";    // enabled by cam0-ilumos overlay
 
     mode0 {
-        num_lanes = "4";
+        num_lanes = "2";
         tegra_sinterface = "serial_b";
-        lane_polarity = "6";
+        lane_polarity = "6";    // P/N swap on SoM, all boards
     };
 
     ports / port@0 / endpoint {
-        port-index = <0>;   // Brick A (CSI0_CLK) - x4 possible on Forecr
-        bus-width = <4>;
+#ifdef DSBOARD_ORNXS
+        port-index = <0>;   // Brick A (CSI0_CLK) - Forecr
+#else
+        port-index = <1>;   // Brick B (CSI1_CLK) - Nvidia devkit (lane swap)
+#endif
+        bus-width = <2>;
     };
 };
-#endif
-```
-
-### Runtime protection
-
-In addition to the compile-time guard (`#ifdef`), the
-`eg_dt_camera_config_set.sh` script refuses to apply the iLumos overlay on port 0
-if the board is not a Forecr:
-
-```
-Error: iLumos requires 4 MIPI lanes (x4) which is not supported on port 0 of nvidia-orin-nano.
-On Nvidia devkit, CAM0 (J20) has a lane swap and uses CSI1_CLK, limiting it to x2.
-Use port 1 (CAM1/J21) which supports x4 via CSI2_CLK.
 ```
 
 ## Device tree values summary by board
@@ -227,7 +296,7 @@ Use port 1 (CAM1/J21) which supports x4 via CSI2_CLK.
 | `tegra_sinterface` | `serial_b` | `serial_c` |
 | `lane_polarity` | `"6"` (0b0110) | _(none)_ |
 | Max mode | **x2** | **x4** |
-| iLumos | **Not supported** | Supported |
+| iLumos | Supported (x2) | Supported (x2) |
 
 ### Forecr DSBOARD-ORNXS
 

@@ -30,14 +30,16 @@ from typing import Iterator
 # ---------------------------------------------------------------------------
 REPO_ROOT    = "/repo"
 SCRIPT       = f"{REPO_ROOT}/sources/common/Linux_for_Tegra/rootfs/usr/bin/eg_dt_camera_config_set.sh"
-VERIFY_DT    = f"{REPO_ROOT}/test/integration/verify_dt.py"
 AUVIDEA_DIR  = f"{REPO_ROOT}/test/dts/auvidea"
 EXTLINUX_TPL = f"{REPO_ROOT}/test/dts/extlinux"
 BOOT_DIR     = "/boot"
 PROC_DT      = "/tmp/fake_proc_dt"
 
 sys.path.insert(0, f"{REPO_ROOT}/test/config")
+sys.path.insert(0, f"{REPO_ROOT}/test/integration")
 from test_matrix import generate_matrix, Entry  # noqa: E402
+from dt_lib import DeviceTree  # noqa: E402
+from dt_lib.checks import CheckMode, run_checks  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Camera mapping (mirrors script's CAMERA_LANES)
@@ -447,7 +449,40 @@ def assert_script_behavior(
         if "Exosens Cameras. Disable imx219" in cbh_line:
             return False, (f"disable imx219 arg leaked in 2-port mode: {cbh_line}")
 
+    # 4. DT structure: verify the merged DTB via dt_lib (in-process, no subprocess).
+    merged_dtb, err = _get_merged_dtb(entry)
+    if merged_dtb is None:
+        return False, f"merged DTB unavailable: {err}"
+
+    total_ports = 2 if in_2ports else entry.ports
+    try:
+        dt = DeviceTree.from_dtb(merged_dtb)
+    except Exception as e:
+        return False, f"verify_dt: DTB not parseable: {e}"
+    finally:
+        if merged_dtb != f"{BOOT_DIR}/kernel_merged.dtb":
+            try: os.remove(merged_dtb)
+            except OSError: pass
+
+    results = run_checks(
+        dt, CheckMode.PER_PORT,
+        camera=camera, port=port,
+        l4t_mode=entry.l4t_mode, total_ports=total_ports,
+    )
+    failures = [r for r in results if r.status == "FAIL"]
+    if failures:
+        return False, "verify_dt: " + "; ".join(f"{r.label}({r.detail})" for r in failures[:3])
+
     return True, f"state={state}, base={_base_from_cbh(cbh_line)}"
+
+
+def _get_merged_dtb(entry: Entry) -> tuple[str | None, str]:
+    """Return path to the merged DTB produced by the last script run."""
+    if entry.l4t_mode in ("35x", "32x"):
+        path = f"{BOOT_DIR}/kernel_merged.dtb"
+        return (path, "") if os.path.exists(path) else (None, "kernel_merged.dtb not found")
+    # 36.x: reconstruct from OVERLAYS line in extlinux.conf
+    return get_merged_dtb_36x()
 
 
 def _imx219_expected_in_base(entry: Entry) -> int:

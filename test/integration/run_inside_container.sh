@@ -53,13 +53,22 @@ set +e
 p1_rc=0
 p2_rc=0
 
-# RUN_PHASE=1|2|all selects which sub-phase(s) to execute. Default: all.
-# Useful for fast iteration after a fix affecting only one phase.
+# RUN_PHASE=1a|1b|1|2|all selects which sub-phase(s) to execute. Default: all.
+# P1a = base-overlay coherence (base DTBO only, no per-port).
+# P1b = per-port combination matrix (existing matrix.py).
 RUN_PHASE="${RUN_PHASE:-all}"
 
-if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "1" ]]; then
+p1a_rc=0
+if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "1" || "$RUN_PHASE" == "1a" ]]; then
     echo ""
-    echo "=== P1 — Script integration matrix ==="
+    echo "=== P1a — Base-overlay coherence (base DTBO only) ==="
+    python3 "$INTEGRATION_DIR/run_base_overlay_matrix.py"
+    p1a_rc=$?
+fi
+
+if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "1" || "$RUN_PHASE" == "1b" ]]; then
+    echo ""
+    echo "=== P1b — Script integration matrix (per-port combinations) ==="
     python3 "$INTEGRATION_DIR/matrix.py"
     p1_rc=$?
 fi
@@ -71,8 +80,8 @@ if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "2" ]]; then
     p2_rc=$?
 fi
 
-if [[ $p1_rc -ne 0 || $p2_rc -ne 0 ]]; then
+if [[ $p1a_rc -ne 0 || $p1_rc -ne 0 || $p2_rc -ne 0 ]]; then
     echo ""
-    echo "P1=${p1_rc} P2=${p2_rc}"
+    echo "P1a=${p1a_rc} P1b=${p1_rc} P2=${p2_rc}"
     exit 1
 fi

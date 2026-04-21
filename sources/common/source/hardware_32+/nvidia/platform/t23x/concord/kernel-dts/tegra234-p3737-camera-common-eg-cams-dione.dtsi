@@ -26,7 +26,7 @@
 							remote-endpoint = <&rbpcv2_csi_out0>;
 						};
 					};
-					port@1 {								//M222 CSI 67		
+					port@1 {								//M222 CSI 67
 						status = "okay";
 						reg = <1>;
 						rbpcv2_vi_in1: endpoint {
@@ -156,23 +156,39 @@
 							};
 						};
 					};
-					channel@1 {								//M222 CSI 67		
+					channel@1 {								//M222 CSI 67
 						status = "okay";
 						reg = <1>;
 						ports {
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
+							port@0 {
+								status = "okay";
+								reg = <0>;
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
 #ifndef EG_DISABLE_PORTS_23
-					channel@2 {								//M222 CSI 45		
+					channel@2 {								//M222 CSI 45
 						status = "okay";
 						reg = <2>;
 						ports {
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
+							port@0 {
+								status = "okay";
+								reg = <0>;
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
 					channel@3 {								//M222 CSI 23
@@ -182,6 +198,14 @@
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
+							port@0 {
+								status = "okay";
+								reg = <0>;
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
 #endif /* EG_DISABLE_PORTS_23 */
