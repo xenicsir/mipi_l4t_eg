@@ -4,8 +4,6 @@
 /dts-v1/;
 /plugin/;
 
-#include <dt-common/jetson/tegra234-p3767-0000-common.h>
-
 / {
 	overlay-name = "Exosens Cameras. CAM0:EC_2_lanes";
 	jetson-header-name = "Jetson AGX CSI Connector";

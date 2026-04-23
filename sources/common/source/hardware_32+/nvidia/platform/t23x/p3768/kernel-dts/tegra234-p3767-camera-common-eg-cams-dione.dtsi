@@ -6,6 +6,18 @@
 
 #include <dt-common/jetson/tegra234-p3767-0000-common.h>
 
+/* CAM0 CSI routing differs per carrier:
+ *   p3768 NVIDIA dev-kit : CAM0 is wired on CSI-B → port-index=1, serial_b
+ *   DSBOARD-ORNXS Forecr : CAM0 is wired on CSI-A → port-index=0, serial_a
+ * Keep tegra_sinterface coherent with port-index (runtime ignores sinterface
+ * but the DT must still be self-consistent for host-side integrity checks).
+ */
+#ifdef DSBOARD_ORNXS
+#define SENSOR_CAM0_SERIAL "serial_a"
+#else
+#define SENSOR_CAM0_SERIAL "serial_b"
+#endif
+
 / {
 	fragment@0 {
 		target-path = "/";
@@ -266,7 +278,7 @@
 							mclk_khz = "24000";
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
@@ -313,7 +325,7 @@
 							mclk_khz = "24000";
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
@@ -360,7 +372,7 @@
 							mclk_khz = "24000";
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
@@ -407,7 +419,7 @@
 							mclk_khz = "24000";
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
@@ -565,7 +577,7 @@
 						 mode0 { // EC_MODE_640x480_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -605,7 +617,7 @@
 						 mode1 { // EC_MODE_640x480_RGB888
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -645,7 +657,7 @@
 						 mode2 { // EC_MODE_640x480_YUYV
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -685,7 +697,7 @@
 						 mode3 { // EC_MODE_1280x1024_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -725,7 +737,7 @@
 						 mode4 { // EC_MODE_1280x1024_RGB888
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -765,7 +777,7 @@
 						 mode5 { // EC_MODE_1280x1024_YUYV
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -833,7 +845,7 @@
 						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -873,7 +885,7 @@
 						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -914,7 +926,7 @@
 						 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -956,7 +968,7 @@
 						 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -997,7 +1009,7 @@
 						 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -1038,7 +1050,7 @@
 						 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "yes";
 							dpcm_enable = "false";
@@ -1082,7 +1094,11 @@
 							port@0 {
 							   reg = <0>;
 							   ilumos_out0: endpoint {
+#ifdef DSBOARD_ORNXS
 								  port-index = <0>;
+#else
+								  port-index = <1>;
+#endif
 								  bus-width = <2>;
 								  remote-endpoint = <&rbpcv2_imx219_csi_in0>;
 							   };
@@ -1104,7 +1120,7 @@
 						 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
@@ -1145,7 +1161,7 @@
 						 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 							num_lanes = "2";
 							lane_polarity = "6";
-							tegra_sinterface = "serial_b";
+							tegra_sinterface = SENSOR_CAM0_SERIAL;
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";

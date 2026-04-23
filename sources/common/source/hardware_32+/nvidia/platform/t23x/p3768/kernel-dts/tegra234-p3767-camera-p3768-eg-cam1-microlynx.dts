@@ -45,7 +45,7 @@
 	fragment@32 {
 		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
 		__overlay__ {
-			proc-device-tree = "/proc/device-tree/i2c@31e0000/microlynx_c@51";
+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/microlynx_c@51";
 		};
 	};
 

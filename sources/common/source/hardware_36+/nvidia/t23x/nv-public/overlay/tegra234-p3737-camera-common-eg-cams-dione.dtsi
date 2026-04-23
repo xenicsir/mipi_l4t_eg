@@ -22,7 +22,7 @@
 							remote-endpoint = <&rbpcv2_csi_out0>;
 						};
 					};
-					port@1 {								//M222 CSI 67		
+					port@1 {								//M222 CSI 67
 						status = "okay";
 						reg = <1>;
 						rbpcv2_vi_in1: endpoint {
@@ -105,7 +105,7 @@
 						drivernode0 {
 							pcl_id = "v4l2_sensor";
 							devname = "dione_ir 2-0016";
-							proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/xenics_dione_ir_e@0e";
+							proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/xenics_dione_ir_c@0e";
 						};
 					};
 				};
