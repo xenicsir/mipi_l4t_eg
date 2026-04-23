@@ -106,6 +106,9 @@ sudo apt install libssl-dev
 
 # For PDF generation of the deployment matrix (optional)
 sudo apt install weasyprint
+
+# For DT integration tests (host-side DTB parsing via libfdt)
+sudo apt install python3-libfdt
 ```
 
 ---

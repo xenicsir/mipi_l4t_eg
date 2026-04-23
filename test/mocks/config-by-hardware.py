@@ -63,6 +63,27 @@ if "-n" in args:
                 except OSError: pass
             tmp_files.append(out)
             current = out
+        # In 32.x/35.x, jetson-io also appends a LABEL JetsonIO to extlinux.conf
+        # pointing at the merged (user-custom) DTB. Mirror that so postinst-level
+        # tests can assert the label is present.
+        import re as _re
+        extlinux_dir = os.path.join(BOOT_DIR, "extlinux")
+        os.makedirs(extlinux_dir, exist_ok=True)
+        extlinux = os.path.join(extlinux_dir, "extlinux.conf")
+        existing = open(extlinux).read() if os.path.isfile(extlinux) else ""
+        # Strip any previous JetsonIO block (from this or prior runs)
+        stripped = _re.sub(r"(?ms)^LABEL JetsonIO\b.*?(?=^LABEL |\Z)", "", existing)
+        if not stripped.strip():
+            stripped = "TIMEOUT 30\nDEFAULT primary\n\n"
+        jio = (
+            "\nLABEL JetsonIO\n"
+            "    MENU LABEL Custom Config (EG Cameras)\n"
+            "    LINUX /boot/Image\n"
+            f"    FDT {merged}\n"
+            "    APPEND ${cbootargs} quiet root=/dev/mmcblk0p1 rw rootwait\n"
+        )
+        with open(extlinux, "w") as f:
+            f.write(stripped.rstrip() + "\n" + jio)
         print(f"Configuration saved to {merged}.")
     else:
         # Write extlinux.conf (36.x behaviour)

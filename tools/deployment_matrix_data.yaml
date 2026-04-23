@@ -22,7 +22,17 @@ platforms:
     l4t_series: "32.x"
     som: "Tegra X1"
     csi_lanes: 2
-    notes: "⚠️ Y16 pixel format is not supported on this platform (T210 / Tegra X1 hardware limitation)."
+    notes:
+      - "⚠️ Y16 pixel format is not supported on this platform (T210 / Tegra X1 hardware limitation)."
+      - "⚠️ Yocto builds (32.5.1, 32.6.1, 32.7.1) are legacy and no longer maintained. No Debian packages are provided for these versions."
+
+  - id: tx2_t186
+    name: "Jetson TX2 (T186)"
+    description: "Jetson TX2 / TX2i / TX2 NX developer kit"
+    l4t_series: "32.x"
+    som: "Tegra186"
+    csi_lanes: 2
+    notes: "Platform not tested with EG cameras"
 
   - id: xavier_nx
     name: "Xavier NX (T194)"
@@ -36,12 +46,12 @@ platforms:
       - "Seeed A206 carrier board (tested)"
 
   - id: agx_orin_devkit
-    name: "AGX Orin devkit"
-    description: "Jetson AGX Orin developer kit (p3701 + p3737)"
+    name: "AGX Orin Nvidia devkit"
+    description: "Jetson AGX Orin Nvidia developer kit (p3701 + p3737)"
     l4t_series: "35.x, 36.x"
     som: "Tegra234"
     csi_lanes: 4
-    notes: "Not tested with EG cameras - added in MIPI portage project"
+    notes: "Platform not tested with EG cameras. Auvidea X230D is our reference devkit."
 
   - id: agx_orin_x230d
     name: "AGX Orin Auvidea X230D"
@@ -49,7 +59,6 @@ platforms:
     l4t_series: "35.x, 36.x"
     som: "Tegra234"
     csi_lanes: 4
-    notes: "Tested with EG cameras"
 
   - id: orin_nx_nano_devkit
     name: "Orin NX / Nano devkit"
@@ -60,7 +69,7 @@ platforms:
 
   - id: forecr_ornxs
     name: "Forecr DSBOARD ORNXS"
-    description: "Forecr custom board (Orin NX variant)"
+    description: "Forecr custom board (Orin NX/Nano variant)"
     l4t_series: "35.x, 36.x"
     som: "Tegra234"
     csi_lanes: 4
@@ -92,11 +101,21 @@ cameras:
     csi_lanes: 2
 
 # L4T version metadata
+# JetPack versions are derived automatically from eg_config.yaml (jetpack field).
+# Only deployment-specific info is stored here:
+#   git_branch: branch name in github_repo (JetPack builds)
+#   git_url:    full URL override (Yocto builds — different repository)
+#   yocto:      true for legacy Yocto builds (os label and styling derived from this)
 l4t_versions:
   32.5.1:
-    git_branch: "2.0"
+    yocto: true
+    git_url: "https://github.com/xenicsir/dione_mipi_tegra/tree/main/yocto"
   32.6.1:
-    git_branch: "2.0"
+    yocto: true
+    git_url: "https://github.com/xenicsir/dione_mipi_tegra/tree/main/yocto"
+  32.7.1-yocto:
+    yocto: true
+    git_url: "https://github.com/xenicsir/dione_mipi_tegra/tree/main/yocto"
   32.7.1:
     git_branch: "2.0"
   32.7.4:
@@ -137,8 +156,9 @@ deployment_matrix:
   - platform: nano_t210
     cameras:
       dione_ir:
-        32.5.1: "tested|l4t-32.5.1|dione-nano-l4t-32.5.1.deb"
-        32.6.1: "tested|l4t-32.6.1|dione-nano-l4t-32.6.1.deb"
+        32.5.1: "tested||"
+        32.6.1: "tested||"
+        32.7.1-yocto: "tested||"
         32.7.1: "tested|l4t-32.7.1|dione-nano-l4t-32.7.1.deb"
         32.7.4: "tested|l4t-32.7.4|dione-nano-l4t-32.7.4.deb"
         32.7.5: "tested|l4t-32.7.5|dione-nano-l4t-32.7.5.deb"
@@ -161,12 +181,44 @@ deployment_matrix:
       ilumos: {}
       microlynx: {}
 
+  # ========== Jetson TX2 (T186) ==========
+  - platform: tx2_t186
+    cameras:
+      dione_ir:
+        32.7.1: "theoretically_supported|l4t-32.7.1|dione-tx2-l4t-32.7.1.deb"
+        32.7.4: "theoretically_supported|l4t-32.7.4|dione-tx2-l4t-32.7.4.deb"
+        32.7.5: "theoretically_supported|l4t-32.7.5|dione-tx2-l4t-32.7.5.deb"
+        32.7.6: "theoretically_supported|l4t-32.7.6|dione-tx2-l4t-32.7.6.deb"
+      microcube:
+        32.7.1: "theoretically_supported|l4t-32.7.1|microcube-tx2-l4t-32.7.1.deb"
+        32.7.4: "theoretically_supported|l4t-32.7.4|microcube-tx2-l4t-32.7.4.deb"
+        32.7.5: "theoretically_supported|l4t-32.7.5|microcube-tx2-l4t-32.7.5.deb"
+        32.7.6: "theoretically_supported|l4t-32.7.6|microcube-tx2-l4t-32.7.6.deb"
+      crius1280:
+        32.7.1: "theoretically_supported|l4t-32.7.1|crius1280-tx2-l4t-32.7.1.deb"
+        32.7.4: "theoretically_supported|l4t-32.7.4|crius1280-tx2-l4t-32.7.4.deb"
+        32.7.5: "theoretically_supported|l4t-32.7.5|crius1280-tx2-l4t-32.7.5.deb"
+        32.7.6: "theoretically_supported|l4t-32.7.6|crius1280-tx2-l4t-32.7.6.deb"
+      smartir640:
+        32.7.1: "theoretically_supported|l4t-32.7.1|smartir640-tx2-l4t-32.7.1.deb"
+        32.7.4: "theoretically_supported|l4t-32.7.4|smartir640-tx2-l4t-32.7.4.deb"
+        32.7.5: "theoretically_supported|l4t-32.7.5|smartir640-tx2-l4t-32.7.5.deb"
+        32.7.6: "theoretically_supported|l4t-32.7.6|smartir640-tx2-l4t-32.7.6.deb"
+      ilumos:
+        32.7.1: "theoretically_supported|l4t-32.7.1|ilumos-tx2-l4t-32.7.1.deb"
+        32.7.4: "theoretically_supported|l4t-32.7.4|ilumos-tx2-l4t-32.7.4.deb"
+        32.7.5: "theoretically_supported|l4t-32.7.5|ilumos-tx2-l4t-32.7.5.deb"
+        32.7.6: "theoretically_supported|l4t-32.7.6|ilumos-tx2-l4t-32.7.6.deb"
+      microlynx:
+        32.7.1: "theoretically_supported|l4t-32.7.1|microlynx-tx2-l4t-32.7.1.deb"
+        32.7.4: "theoretically_supported|l4t-32.7.4|microlynx-tx2-l4t-32.7.4.deb"
+        32.7.5: "theoretically_supported|l4t-32.7.5|microlynx-tx2-l4t-32.7.5.deb"
+        32.7.6: "theoretically_supported|l4t-32.7.6|microlynx-tx2-l4t-32.7.6.deb"
+
   # ========== Xavier NX ==========
   - platform: xavier_nx
     cameras:
       dione_ir:
-        32.5.1: "tested|l4t-32.5.1|"
-        32.6.1: "tested|l4t-32.6.1|"
         32.7.1: "tested|l4t-32.7.1|dione-xnx-l4t-32.7.1.deb"
         32.7.4: "tested|l4t-32.7.4|dione-xnx-l4t-32.7.4.deb"
         32.7.5: "tested|l4t-32.7.5|dione-xnx-l4t-32.7.5.deb"
@@ -236,6 +288,7 @@ deployment_matrix:
   - platform: agx_orin_devkit
     cameras:
       dione_ir:
+        35.1: "theoretically_supported|l4t-35.1|dione-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|dione-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|dione-orin-l4t-35.4.1.deb"
         35.5.0: "theoretically_supported|l4t-35.5.0|dione-orin-l4t-35.5.0.deb"
@@ -248,6 +301,7 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|dione-orin-l4t-36.5.0.deb"
       microcube:
+        35.1: "theoretically_supported|l4t-35.1|microcube-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microcube-orin-l4t-35.4.1.deb"
         35.5.0: "theoretically_supported|l4t-35.5.0|microcube-orin-l4t-35.5.0.deb"
@@ -260,6 +314,7 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microcube-orin-l4t-36.5.0.deb"
       crius1280:
+        35.1: "theoretically_supported|l4t-35.1|crius1280-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-orin-l4t-35.4.1.deb"
         35.5.0: "theoretically_supported|l4t-35.5.0|crius1280-orin-l4t-35.5.0.deb"
@@ -272,6 +327,7 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-orin-l4t-36.5.0.deb"
       smartir640:
+        35.1: "theoretically_supported|l4t-35.1|smartir640-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-orin-l4t-35.4.1.deb"
         35.5.0: "theoretically_supported|l4t-35.5.0|smartir640-orin-l4t-35.5.0.deb"
@@ -284,6 +340,7 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-orin-l4t-36.5.0.deb"
       ilumos:
+        35.1: "theoretically_supported|l4t-35.1|ilumos-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-orin-l4t-35.4.1.deb"
         35.5.0: "theoretically_supported|l4t-35.5.0|ilumos-orin-l4t-35.5.0.deb"
@@ -296,6 +353,7 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-orin-l4t-36.5.0.deb"
       microlynx:
+        35.1: "theoretically_supported|l4t-35.1|microlynx-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-orin-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-orin-l4t-35.4.1.deb"
         35.5.0: "theoretically_supported|l4t-35.5.0|microlynx-orin-l4t-35.5.0.deb"
@@ -312,36 +370,42 @@ deployment_matrix:
   - platform: agx_orin_x230d
     cameras:
       dione_ir:
+        35.1: "theoretically_supported|l4t-35.1|dione-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|dione-auvidea-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|dione-auvidea-l4t-35.4.1.deb"
         36.4: "tested|l4t-36.4|dione-auvidea-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|dione-auvidea-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|dione-auvidea-l4t-36.4.4.deb"
       microcube:
+        35.1: "theoretically_supported|l4t-35.1|microcube-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|microcube-auvidea-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microcube-auvidea-l4t-35.4.1.deb"
         36.4: "tested|l4t-36.4|microcube-auvidea-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|microcube-auvidea-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|microcube-auvidea-l4t-36.4.4.deb"
       crius1280:
+        35.1: "theoretically_supported|l4t-35.1|crius1280-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|crius1280-auvidea-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|crius1280-auvidea-l4t-35.4.1.deb"
         36.4: "tested|l4t-36.4|crius1280-auvidea-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|crius1280-auvidea-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|crius1280-auvidea-l4t-36.4.4.deb"
       smartir640:
+        35.1: "theoretically_supported|l4t-35.1|smartir640-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|smartir640-auvidea-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|smartir640-auvidea-l4t-35.4.1.deb"
         36.4: "tested|l4t-36.4|smartir640-auvidea-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|smartir640-auvidea-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|smartir640-auvidea-l4t-36.4.4.deb"
       ilumos:
+        35.1: "theoretically_supported|l4t-35.1|ilumos-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|ilumos-auvidea-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|ilumos-auvidea-l4t-35.4.1.deb"
         36.4: "tested|l4t-36.4|ilumos-auvidea-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|ilumos-auvidea-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|ilumos-auvidea-l4t-36.4.4.deb"
       microlynx:
+        35.1: "theoretically_supported|l4t-35.1|microlynx-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|microlynx-auvidea-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microlynx-auvidea-l4t-35.4.1.deb"
         36.4: "tested|l4t-36.4|microlynx-auvidea-l4t-36.4.deb"

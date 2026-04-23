@@ -1,20 +1,25 @@
 # Plan de développement — Framework de tests eg_dt_camera_config_set.sh
 
-## Vue d'ensemble
+## Vue d'ensemble (mise à jour 2026-04-17)
 
-Deux niveaux de tests progressifs.
+3 phases hors-matériel + 1 phase matériel.
 
 ```
-Niveau 1 : Integration (host)  → vrais DTBOs × vrais base DTBs × toutes versions L4T
-Niveau 2 : Hardware            → streaming caméra sur vrai Jetson
+P0 : Cohérence (host)       → eg_config.yaml ↔ hardware.yaml ↔ .debs
+P1 : Script matrix (x86)    → eg_dt_camera_config_set.sh × 4 états extlinux × ports × cams
+P2 : dpkg postinst (x86)    → dpkg-deb -x + bash preinst/postinst
+P3 : Real dpkg -i (arm64)   → docker --platform=linux/arm64 + qemu-aarch64 + dpkg -i
+P4 : Hardware               → streaming caméra sur vrai Jetson (manuel)
 ```
 
-**Principe directeur : tester les DTBOs existants, pour les caméras existantes, sur des boards existantes.**
+**Principe directeur : tester les DTBOs existants, pour les caméras existantes, sur des boards existantes. Source de vérité = `eg_config.yaml` + `test/config/hardware.yaml`.**
 
 **Lancement :**
 ```bash
-bash test/run_all.sh           # build Docker + run
-bash test/run_all.sh --no-build  # run sans rebuild
+bash test/run_all.sh           # P0 → P1+P2 → P3 (build Docker + run)
+bash test/run_all.sh --no-build  # skip rebuild Docker images
+# Itération rapide :
+RUN_PHASE=2 bash test/integration/run_all.sh --no-build   # just P2
 ```
 
 ---

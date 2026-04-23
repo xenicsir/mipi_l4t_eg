@@ -30,21 +30,27 @@
 		__overlay__ {
 			host1x {
 				vi@15700000 {
+					status = "okay";
 					num-channels = <2>;
 					ports {
+						status = "okay";
 						#address-cells = <1>;
 						#size-cells = <0>;
 						port@0 {
+							status = "okay";
 							reg = <0>;
 							endpoint {
+								status = "okay";
 								port-index = <0>;
 								bus-width = <2>;
 								/* remote-endpoint already wired to csi_out0 in base DTB */
 							};
 						};
 						port@1 {
+							status = "okay";
 							reg = <1>;
 							endpoint {
+								status = "okay";
 								port-index = <2>;
 								bus-width = <2>;
 								/* remote-endpoint already wired to csi_out1 in base DTB */
@@ -54,41 +60,54 @@
 				};
 
 				nvcsi@150c0000 {
+					status = "okay";
 					num-channels = <2>;
 					#address-cells = <1>;
 					#size-cells = <0>;
 					channel@0 {
+						status = "okay";
 						reg = <0>;
 						ports {
+							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
 							port@0 {
+								status = "okay";
 								reg = <0>;
 								endpoint@0 {
+									status = "okay";
 									port-index = <0>;
 									bus-width = <2>;
 									remote-endpoint = <&xenics_dione_ir_out0>;
 								};
 							};
-							/* port@1 / csi_out0: remote-endpoint to vi_in0
-							 * already wired in base DTB — no override needed */
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
 					channel@1 {
+						status = "okay";
 						reg = <1>;
 						ports {
+							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
 							port@0 {
+								status = "okay";
 								reg = <0>;
 								endpoint@2 {
+									status = "okay";
 									port-index = <2>;
 									bus-width = <2>;
 									remote-endpoint = <&xenics_dione_ir_out1>;
 								};
 							};
-							/* port@1 / csi_out1: remote-endpoint to vi_in1
-							 * already wired in base DTB — no override needed */
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
 				};

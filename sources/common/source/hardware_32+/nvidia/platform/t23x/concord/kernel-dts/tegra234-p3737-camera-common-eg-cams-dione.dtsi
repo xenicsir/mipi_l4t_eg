@@ -7,7 +7,11 @@
 		__overlay__ {
 			tegra-capture-vi {
 				status = "okay";
+#ifdef EG_DISABLE_PORTS_23
+				num-channels = <2>;
+#else
 				num-channels = <4>;
+#endif /* EG_DISABLE_PORTS_23 */
 				ports {
 					status = "okay";
 					#address-cells = <1>;
@@ -22,7 +26,7 @@
 							remote-endpoint = <&rbpcv2_csi_out0>;
 						};
 					};
-					port@1 {								//M222 CSI 67		
+					port@1 {								//M222 CSI 67
 						status = "okay";
 						reg = <1>;
 						rbpcv2_vi_in1: endpoint {
@@ -32,6 +36,7 @@
 							remote-endpoint = <&rbpcv2_csi_out1>;
 						};
 					};
+#ifndef EG_DISABLE_PORTS_23
 					port@2 {								//M222 CSI 45	
 						status = "okay";
 						reg = <2>;
@@ -52,6 +57,7 @@
 							remote-endpoint = <&rbpcv2_csi_out3>;
 						};
 					};
+#endif /* EG_DISABLE_PORTS_23 */
 				};
 			};
 
@@ -88,6 +94,7 @@
 							proc-device-tree = "/proc/device-tree/i2c@c240000/xenics_dione_ir_g@0e";
 						};
 					};
+#ifndef EG_DISABLE_PORTS_23
 					module2 {
 						badge = "topleft_eg_cam";
 						position = "topleft";
@@ -108,13 +115,18 @@
 							proc-device-tree = "/proc/device-tree/i2c@3180000/xenics_dione_ir_c@0e";
 						};
 					};
+#endif /* EG_DISABLE_PORTS_23 */
 				};
 			};
 
 			host1x@13e00000 {
 				nvcsi@15a00000 {
 					status = "okay";
+#ifdef EG_DISABLE_PORTS_23
+					num-channels = <2>;
+#else
 					num-channels = <4>;
+#endif /* EG_DISABLE_PORTS_23 */
 					#address-cells = <1>;
 					#size-cells = <0>;
 					channel@0 {								//M222 CSI 01		
@@ -144,22 +156,39 @@
 							};
 						};
 					};
-					channel@1 {								//M222 CSI 67		
+					channel@1 {								//M222 CSI 67
 						status = "okay";
 						reg = <1>;
 						ports {
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
+							port@0 {
+								status = "okay";
+								reg = <0>;
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
-					channel@2 {								//M222 CSI 45		
+#ifndef EG_DISABLE_PORTS_23
+					channel@2 {								//M222 CSI 45
 						status = "okay";
 						reg = <2>;
 						ports {
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
+							port@0 {
+								status = "okay";
+								reg = <0>;
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
 					channel@3 {								//M222 CSI 23
@@ -169,8 +198,17 @@
 							status = "okay";
 							#address-cells = <1>;
 							#size-cells = <0>;
+							port@0 {
+								status = "okay";
+								reg = <0>;
+							};
+							port@1 {
+								status = "okay";
+								reg = <1>;
+							};
 						};
 					};
+#endif /* EG_DISABLE_PORTS_23 */
 				};
 			};
 
@@ -1658,6 +1696,7 @@
 				 };
 			  };
 			};
+#ifndef EG_DISABLE_PORTS_23
 			i2c@c250000 {												//M222 CSI 45	
 			  dione_ir_cam2: xenics_dione_ir_e@0e {
 				 compatible = "xenics,dioneir", "exosens,dioneir";
@@ -2976,6 +3015,7 @@
 				 };
 			  };
 		   };
+#endif /* EG_DISABLE_PORTS_23 */
 	   };
    };
 

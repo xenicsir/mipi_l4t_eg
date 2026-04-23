@@ -93,6 +93,12 @@ class DeploymentMatrixGenerator:
         with open(yaml_file, 'r') as f:
             self.data = yaml.safe_load(f)
 
+        # YAML parses single-dot numbers (35.1, 36.4) as float — normalize all keys to str
+        if 'l4t_versions' in self.data:
+            self.data['l4t_versions'] = {
+                str(k): v for k, v in self.data['l4t_versions'].items()
+            }
+
         self.platforms_by_id = {p['id']: p for p in self.data['platforms']}
         self.cameras_by_id = {c: self.data['cameras'][c] for c in self.data['cameras']}
         self.matrix_data = self.data['deployment_matrix']
@@ -153,8 +159,165 @@ class DeploymentMatrixGenerator:
         for entry in self.matrix_data:
             for camera_id, version_dict in entry['cameras'].items():
                 versions.update(str(v) for v in version_dict.keys())
-        return sorted(versions, key=lambda x: tuple(int(p) if p.isdigit() else p
-                                                     for p in str(x).split('.')))
+        def version_sort_key(x):
+            parts = []
+            for p in str(x).split('.'):
+                seg = p.split('-', 1)
+                num = int(seg[0]) if seg[0].isdigit() else 0
+                suffix = seg[1] if len(seg) > 1 else ''
+                # suffixed variants (e.g. "1-yocto") sort before bare numbers (e.g. "1")
+                parts.append((num, 0 if suffix else 1, suffix))
+            return parts
+        return sorted(versions, key=version_sort_key)
+
+    def get_versions_for_platform(self, platform):
+        """Return l4t_versions filtered to those matching the platform's l4t_series.
+
+        e.g. l4t_series="32.x, 35.x" → only versions whose major number is 32 or 35.
+        Yocto versions are only included when the platform has explicit data for them.
+        """
+        all_versions = self.get_all_l4t_versions()
+        l4t_series_str = platform.get('l4t_series', '')
+        if not l4t_series_str:
+            return all_versions
+        # Parse "32.x, 35.x" → {"32", "35"}
+        prefixes = {s.strip().split('.')[0] for s in l4t_series_str.split(',') if s.strip()}
+
+        # Collect versions that have at least one explicit entry for this platform
+        platform_id = platform['id']
+        explicit_versions: set = set()
+        for entry in self.matrix_data:
+            if entry['platform'] == platform_id:
+                for cam_data in entry['cameras'].values():
+                    explicit_versions.update(str(k) for k in cam_data.keys())
+                break
+
+        filtered = []
+        for v in all_versions:
+            if str(v).split('.')[0] not in prefixes:
+                continue
+            ver_data = self.data.get('l4t_versions', {}).get(str(v), {})
+            # Skip Yocto versions that have no explicit entry for this platform
+            if ver_data.get('yocto') and str(v) not in explicit_versions:
+                continue
+            filtered.append(v)
+        return filtered
+
+    def get_os_label(self, version):
+        """Derive the OS label for a given L4T version.
+
+        - Yocto entries (yocto: true in l4t_versions) → "Yocto (obsolete)"
+        - JetPack entries → "JetPack X.Y.Z" from eg_config.yaml jetpack field
+        - Unknown versions → empty string
+        """
+        version = str(version)
+        ver_data = self.data.get('l4t_versions', {}).get(version, {})
+        if ver_data.get('yocto'):
+            return "Yocto (obsolete)"
+        # Strip suffix for eg_config lookup (e.g. "32.7.1-yocto" → "32.7.1")
+        base_version = version.split('-')[0]
+        jp = self.camera_db.get('versions', {}).get(base_version, {}).get('jetpack', '')
+        return f"JetPack {jp}" if jp else ''
+
+    def get_version_display(self, version):
+        """Return a human-readable label for a version key.
+
+        '32.7.1-yocto' → '32.7.1'  (suffix stripped; OS column carries the info)
+        '32.7.1'        → '32.7.1'
+        """
+        version = str(version)
+        if '-' in version:
+            return version.split('-', 1)[0]
+        return version
+
+    def get_git_link(self, version, git_branch):
+        """Return a full git URL.
+
+        Uses git_branch (→ github_repo/tree/branch) when set; otherwise falls back
+        to git_url from l4t_versions (used for Yocto builds pointing to a different repo).
+        """
+        if git_branch:
+            return f"{self.github_repo}/tree/{git_branch}"
+        ver_data = self.data.get('l4t_versions', {}).get(str(version), {})
+        return ver_data.get('git_url', '')
+
+    # ------------------------------------------------------------------ #
+    # Validation
+    # ------------------------------------------------------------------ #
+
+    def validate(self):
+        """Cross-check deployment_matrix_data.yaml against eg_config.yaml.
+
+        Returns a list of issue strings (empty = all good).
+        Checks:
+          1. Versions in eg_config with no l4t_versions entry → no git metadata
+          2. Platforms in deployment_matrix not referenced by any eg_config platform_ids
+          3. Explicit matrix entries for (platform, version) where eg_config doesn't
+             list that platform in platform_ids
+          4. (Informational) platform+version combos covered only by auto-generation
+        """
+        issues = []
+        eg_versions = self.camera_db.get('versions', {})
+        matrix_l4t = self.data.get('l4t_versions', {})
+        matrix_platform_ids = {p['id'] for p in self.data['platforms']}
+        camera_ids = list(self.data['cameras'].keys())
+
+        # 1. Versions in eg_config missing from l4t_versions
+        for ver in eg_versions:
+            if ver not in matrix_l4t:
+                issues.append(
+                    f"⚠️  L4T {ver}: present in eg_config but missing from l4t_versions "
+                    f"(no git_branch → no links in matrix)"
+                )
+
+        # 2. Platforms in deployment_matrix not referenced in any eg_config version
+        all_eg_platform_ids = set()
+        for vcfg in eg_versions.values():
+            all_eg_platform_ids.update(vcfg.get('platform_ids', []))
+        for pid in sorted(matrix_platform_ids):
+            if pid not in all_eg_platform_ids:
+                issues.append(
+                    f"⚠️  Platform '{pid}': in deployment_matrix platforms but not in "
+                    f"any eg_config version's platform_ids"
+                )
+
+        # 3. Explicit matrix entries conflicting with eg_config platform_ids
+        for entry in self.matrix_data:
+            pid = entry['platform']
+            for cam_id, version_dict in entry['cameras'].items():
+                for ver in version_dict:
+                    ver_str = str(ver)
+                    base_ver = ver_str.split('-')[0]
+                    vcfg = eg_versions.get(base_ver)
+                    if vcfg and pid not in vcfg.get('platform_ids', []):
+                        issues.append(
+                            f"⚠️  {pid} / {cam_id} / {ver_str}: explicit entry in matrix "
+                            f"but '{pid}' not in eg_config platform_ids for {base_ver}"
+                        )
+
+        # 4. Informational: platform+version in eg_config with no explicit matrix entry
+        implicit = []
+        for ver, vcfg in eg_versions.items():
+            for pid in vcfg.get('platform_ids', []):
+                if pid not in matrix_platform_ids:
+                    continue
+                has_explicit = any(
+                    ver in [str(k) for k in cam_data.keys()]
+                    for entry in self.matrix_data
+                    if entry['platform'] == pid
+                    for cam_data in entry['cameras'].values()
+                )
+                if not has_explicit:
+                    implicit.append(f"      {pid:<28} L4T {ver}")
+
+        if implicit:
+            issues.append(
+                "ℹ️  Platform+version combos with no explicit entry "
+                "(auto-generated as theoretically_supported from eg_config):"
+            )
+            issues.extend(implicit)
+
+        return issues
 
     # ------------------------------------------------------------------ #
     # Flex cable appendix helpers
@@ -290,22 +453,34 @@ class DeploymentMatrixGenerator:
                     f.write(f"**{platform['description']}**\n\n")
 
                 if 'notes' in platform:
-                    f.write(f"> **Note:** {platform['notes']}\n\n")
+                    notes = platform['notes']
+                    if isinstance(notes, list):
+                        f.write("> **Notes:**\n>\n")
+                        for note in notes:
+                            f.write(f"> {note}\n>\n")
+                        f.write("\n")
+                    else:
+                        f.write(f"> **Note:** {notes}\n\n")
 
                 # Build table header
-                f.write("| L4T Version |")
+                f.write("| OS | L4T Version |")
                 for cam_id in camera_ids:
                     cam_name = self.data['cameras'][cam_id]['name']
                     f.write(f" {cam_name} | Git | Package |")
                 f.write("\n")
 
                 # Header separator
-                f.write("|" + " --- |" * (1 + len(camera_ids) * 3))
+                f.write("|" + " --- |" * (2 + len(camera_ids) * 3))
                 f.write("\n")
 
-                # Data rows
-                for version in l4t_versions:
-                    f.write(f"| `{version}` |")
+                # Data rows — filtered to this platform's L4T series
+                platform_versions = self.get_versions_for_platform(platform)
+                for version in platform_versions:
+                    ver_display = self.get_version_display(version)
+                    ver_data = self.data.get('l4t_versions', {}).get(str(version), {})
+                    os_label = self.get_os_label(version)
+                    is_yocto = ver_data.get('yocto', False)
+                    f.write(f"| {os_label} | `{ver_display}` |")
                     for cam_id in camera_ids:
                         status, git_branch, deb_pkg = self.get_status(platform_id, cam_id, version)
 
@@ -315,8 +490,8 @@ class DeploymentMatrixGenerator:
                             f.write(f" {icon} {label} |")
 
                             # Git link
-                            if git_branch:
-                                git_url = f"{self.github_repo}/tree/{git_branch}"
+                            git_url = self.get_git_link(version, git_branch)
+                            if git_url:
                                 f.write(f" [🔗]({git_url}) |")
                             else:
                                 f.write(" |")
@@ -477,6 +652,16 @@ class DeploymentMatrixGenerator:
             text-align: center;
         }}
 
+        tr.row-yocto td {{
+            background: #f2f2f2 !important;
+            color: #aaa !important;
+            font-style: italic;
+        }}
+
+        tr.row-yocto td.link-cell a {{
+            opacity: 0.4;
+        }}
+
         .link-cell {{
             text-align: center;
             padding: 8px;
@@ -575,7 +760,12 @@ class DeploymentMatrixGenerator:
                 html_content += f"        <p><strong>{platform['description']}</strong></p>\n"
 
             if 'notes' in platform:
-                html_content += f'        <div class="platform-notes">📌 <strong>Note:</strong> {platform["notes"]}</div>\n'
+                notes = platform['notes']
+                if isinstance(notes, list):
+                    notes_html = '<br>'.join(notes)
+                    html_content += f'        <div class="platform-notes">📌 <strong>Notes:</strong><br>{notes_html}</div>\n'
+                else:
+                    html_content += f'        <div class="platform-notes">📌 <strong>Note:</strong> {notes}</div>\n'
 
             html_content += f"""        <p style="color: #666; font-size: 0.9em;">
             <strong>L4T Series:</strong> {platform.get('l4t_series', 'N/A')} |
@@ -588,7 +778,8 @@ class DeploymentMatrixGenerator:
             html_content += """        <table>
             <thead>
                 <tr>
-                    <th>L4T Version</th>
+                    <th rowspan='2'>OS</th>
+                    <th rowspan='2'>L4T Version</th>
 """
             for cam_id in camera_ids:
                 cam_name = self.data['cameras'][cam_id]['name']
@@ -596,7 +787,6 @@ class DeploymentMatrixGenerator:
 
             html_content += """                </tr>
                 <tr>
-                    <th></th>
 """
             for _ in camera_ids:
                 html_content += "                    <th style='font-size: 0.85em;'>Status</th>\n"
@@ -608,8 +798,19 @@ class DeploymentMatrixGenerator:
             <tbody>
 """
 
-            for version in l4t_versions:
-                html_content += f'                <tr>\n                    <td class="version-cell">{version}</td>\n'
+            platform_versions = self.get_versions_for_platform(platform)
+            for version in platform_versions:
+                ver_display = self.get_version_display(version)
+                ver_data = self.data.get('l4t_versions', {}).get(str(version), {})
+                os_label = self.get_os_label(version)
+                os_html = os_label.replace('JetPack ', 'JetPack<br>', 1) if os_label.startswith('JetPack ') else os_label
+                is_yocto = ver_data.get('yocto', False)
+                row_class = ' class="row-yocto"' if is_yocto else ''
+                html_content += (
+                    f'                <tr{row_class}>\n'
+                    f'                    <td style="font-size:0.8em;color:#666;text-align:center;">{os_html}</td>\n'
+                    f'                    <td class="version-cell">{ver_display}</td>\n'
+                )
 
                 for cam_id in camera_ids:
                     status, git_branch, deb_pkg = self.get_status(platform_id, cam_id, version)
@@ -631,8 +832,8 @@ class DeploymentMatrixGenerator:
                         html_content += f'                    <td class="{css_class}"><span class="icon">{icon}</span> {label}</td>\n'
 
                         # Git link
-                        if git_branch and self.github_repo:
-                            git_url = f"{self.github_repo}/tree/{git_branch}"
+                        git_url = self.get_git_link(version, git_branch)
+                        if git_url:
                             html_content += f'                    <td class="link-cell"><a href="{git_url}" target="_blank" title="Git branch">🔗</a></td>\n'
                         else:
                             html_content += '                    <td class="link-cell">—</td>\n'
@@ -737,8 +938,10 @@ class DeploymentMatrixGenerator:
         th, td { border: 1px solid #bbb; padding: 2px 4px; text-align: center; }
         th { background: #2c3e50; color: white; font-size: 7pt; }
         th.ver-col { width: 52px; }
+        th.os-col  { width: 60px; }
         td.ver { font-family: monospace; font-size: 7pt; text-align: left;
                  color: #1a3a5c; white-space: nowrap; }
+        td.os  { font-size: 6.5pt; color: #555; text-align: left; white-space: nowrap; }
         .tested       { background: #d4edda; color: #155724; }
         .theoretical  { background: #fff3cd; color: #856404; }
         .unsupported  { background: #f8d7da; color: #721c24; }
@@ -768,23 +971,32 @@ class DeploymentMatrixGenerator:
             if 'csi_lanes' in platform:   meta.append(f"CSI lanes: {platform['csi_lanes']}")
             if meta:
                 lines.append(f"<div class='plat-meta'>{' | '.join(meta)}</div>")
+            if 'notes' in platform:
+                notes = platform['notes']
+                if isinstance(notes, list):
+                    label = 'Notes'
+                    notes_text = ' — '.join(notes)
+                else:
+                    label = 'Note'
+                    notes_text = notes
+                lines.append(f"<div class='plat-meta' style='color:#8a6d00;'>📌 <b>{label}:</b> {notes_text}</div>")
 
             lines.append("<table><thead><tr>")
+            lines.append("<th class='os-col'>OS</th>")
             lines.append("<th class='ver-col'>L4T</th>")
             for cam_id in camera_ids:
                 cam_name = self.data['cameras'][cam_id]['name']
                 lines.append(f"<th>{cam_name}</th>")
             lines.append("</tr></thead><tbody>")
 
-            for version in l4t_versions:
-                row_has_data = any(
-                    self.get_status(pid, cid, version)[0] is not None
-                    for cid in camera_ids
-                )
-                if not row_has_data:
-                    continue
-
-                lines.append(f"<tr><td class='ver'>{version}</td>")
+            platform_versions = self.get_versions_for_platform(platform)
+            for version in platform_versions:
+                ver_display = self.get_version_display(version)
+                ver_data = self.data.get('l4t_versions', {}).get(str(version), {})
+                os_label = self.get_os_label(version)
+                is_yocto = ver_data.get('yocto', False)
+                row_style = " style='background:#f2f2f2;color:#aaa;font-style:italic;'" if is_yocto else ""
+                lines.append(f"<tr{row_style}><td class='os'>{os_label}</td><td class='ver'>{ver_display}</td>")
                 for cam_id in camera_ids:
                     status, _, _ = self.get_status(pid, cam_id, version)
                     if status == 'tested':
@@ -923,6 +1135,18 @@ def main():
 
     try:
         generator = DeploymentMatrixGenerator(yaml_file)
+
+        if '--check' in sys.argv:
+            print("🔍 Validating deployment matrix against eg_config.yaml...\n")
+            issues = generator.validate()
+            if issues:
+                for issue in issues:
+                    print(issue)
+                warnings = [i for i in issues if i.startswith('⚠️')]
+                print(f"\n{'❌' if warnings else '✅'} {len(warnings)} warning(s) found.")
+            else:
+                print("✅ No issues found.")
+            sys.exit(1 if any(i.startswith('⚠️') for i in issues) else 0)
 
         print("🔄 Generating deployment matrix...")
         generator.generate_markdown(markdown_file)
