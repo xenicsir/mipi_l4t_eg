@@ -273,9 +273,12 @@ def _csi5_port_to_stream(csi_port: int) -> int:
     return ((csi_port - NVCSI_PORT_E) >> 1) + NVCSI_PORT_E
 
 
-def check_sensor_graph_chains(dt: DeviceTree) -> list[CheckResult]:
+def check_sensor_graph_chains(dt: DeviceTree, camera: Optional[str] = None) -> list[CheckResult]:
     out = []
     sensors = find_active_sensors(dt)
+    if camera is not None:
+        prefix = CAMERA_NODE.get(camera, ("",))[0]
+        sensors = [s for s in sensors if s.name.startswith(prefix)]
     for s in sensors:
         label = f"graph[{s.name}]"
         ep = sensor_primary_endpoint(s)
@@ -484,8 +487,10 @@ def run_checks(dt: DeviceTree,
     # At least one active Exosens sensor must exist
     out += check_any_exosens_sensor_active(dt)
 
-    # Graph chains for every active Exosens sensor
-    out += check_sensor_graph_chains(dt)
+    # Graph chains: only for the configured camera (PER_PORT), skipped in BASE_ONLY
+    # (BASE_ONLY checks infrastructure, not per-sensor chains)
+    if mode == CheckMode.PER_PORT:
+        out += check_sensor_graph_chains(dt, camera=camera)
 
     # Sensor-centric infrastructure: only validate used channels + their VI port
     used_channels = find_exosens_used_channels(dt)

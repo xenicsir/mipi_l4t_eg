@@ -310,8 +310,23 @@ fi
 # No-op on base DTBs with per-channel numbering (Auvidea X230 35.1/35.3.1)
 # where these endpoints don't exist. fdtoverlay cannot /delete-node/ inside
 # a target-path="/" fragment, so we post-process the merged DTB here.
+#
+# p3768 (Orin NX/Nano) MUST be excluded: its base DTB puts the IMX219_csi_in1
+# reference at channel@1/port@0/endpoint@2 (NVIDIA global numbering, same as
+# p3737), BUT our cams-dione overlay repurposes THAT node for Dione CAM1
+# (keeping the phandle so sensor↔NVCSI references stay valid). Deleting it
+# would strand xenics_dione_ir_c@0e's remote-endpoint phandle.
+#
+# "Exosens Cameras (global)" base (used on 35.1/35.3.1 p3737 when no per-port
+# or disable overlay is needed) also uses endpoint@{2,4,6} as the EG endpoints
+# (not IMX orphans), so the deletion would strand the Dione CAM1/CAM2/CAM3
+# sensor references. The orphan-IMX-endpoint bug only affects the non-global
+# base on 35.4.1+ where EG endpoints live at endpoint@0 and @{2,4,6} are the
+# leftover IMX reference endpoints that must be pruned.
 if [ -n "$dtb_file" ] && [ -f "$dtb_file" ] && command -v fdtput >/dev/null 2>&1 && \
-   grep -q 'nvidia,tegra234' /proc/device-tree/compatible 2>/dev/null; then
+   command -v fdtget >/dev/null 2>&1 && \
+   fdtget "$dtb_file" / compatible 2>/dev/null | grep -q 'p3737' && \
+   [[ "$base_devicetree" != *"global"* ]]; then
     _nvcsi_prefix="/host1x@13e00000/nvcsi@15a00000"
     for _ep_path in \
         "${_nvcsi_prefix}/channel@1/ports/port@0/endpoint@2" \
