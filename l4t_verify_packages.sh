@@ -285,8 +285,8 @@ check_files_exist() {
     fi
 }
 
-# NOTE: get_eg_modules_from_patch is disabled (patches/ directory removed, to be redesigned).
-# The function read module names from the i2c driver patch file to auto-detect EG modules.
+# NOTE: get_eg_modules_from_patch() was replaced by source-based detection above.
+# EG modules are now derived from sources/*/Linux_for_Tegra Makefiles, not from patch files.
 # get_eg_modules_from_patch() {
 #     local version="$1"
 #     local vendor="$2"

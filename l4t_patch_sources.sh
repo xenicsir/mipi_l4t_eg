@@ -30,85 +30,46 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 L4T_DIR="$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}"
-# NOTE: This script is disabled (patches/ directory removed, to be redesigned).
-echo "ERROR: l4t_patch_sources.sh is disabled — patches/ directory has been removed."
-echo "Use l4t_copy_sources.sh to apply Exosens sources."
-exit 1
 
-# PATCH_DIR=$ROOT_DIR/patches/${L4T_VERSION_EXTENDED}
-#
-# if [[ ! -d "$PATCH_DIR" ]]; then
-#    echo "Error: Patch directory not found: $PATCH_DIR"
-#    echo "Run l4t_copy_sources.sh first to generate patches."
-#    exit 1
-# fi
+# For 32.x the SoM (t210/t186) is not included in L4T_VERSION_EXTENDED — add it explicitly
+PATCH_NAME="${L4T_VERSION_EXTENDED}${SOM_BOARD:+_${SOM_BOARD}}"
+PATCH_FILE="$ROOT_DIR/patches/${PATCH_NAME}.patch"
+
+if [[ ! -f "$PATCH_FILE" ]]; then
+   echo "Error: Patch file not found: $PATCH_FILE"
+   echo "Run l4t_copy_sources.sh first to generate the patch."
+   exit 1
+fi
 
 echo "============================================"
-echo "Applying Exosens camera patches for L4T ${L4T_VERSION_EXTENDED}"
+echo "Applying Exosens camera patch for L4T ${L4T_VERSION_EXTENDED}"
 echo "  Vendor: $VENDOR"
 echo "  Carrier board: $CARRIER_BOARD"
-echo "Patch directory: $PATCH_DIR"
+echo "  Patch: $PATCH_FILE"
 echo "============================================"
 
 cd "$L4T_DIR"
 
-# Count patches
-PATCH_COUNT=$(ls -1 "$PATCH_DIR"/*.patch 2>/dev/null | wc -l)
-if [[ $PATCH_COUNT -eq 0 ]]; then
-   echo "No patches found in $PATCH_DIR"
-   exit 1
-fi
+file_count=$(grep -c "^diff --git" "$PATCH_FILE" 2>/dev/null || echo 0)
+printf "  [APPLY] %s.patch (%s files)\n" "${PATCH_NAME}" "$file_count"
 
-echo ""
-echo "Applying patches..."
-
-APPLIED=0
-FAILED=0
-
-for patch_file in "$PATCH_DIR"/*.patch; do
-   [[ ! -f "$patch_file" ]] && continue
-
-   filename=$(basename "$patch_file")
-   file_count=$(grep -c "^diff --git" "$patch_file" 2>/dev/null || echo 0)
-
-   printf "  [APPLY] %s (%s files) to %s\n" "$filename" "$file_count" "$L4T_DIR"
-
-   # Apply patch
-   if sudo patch -p1 --forward --batch < "$patch_file" > /dev/null 2>&1; then
-      echo "           -> Success"
-      ((APPLIED++))
+# Apply patch (sudo needed: L4T files are root-owned in a fresh environment)
+if sudo patch -p1 --forward --batch < "$PATCH_FILE" > /dev/null 2>&1; then
+   echo -e "           -> ${GREEN}Success${NC}"
+else
+   # Check if already applied
+   if sudo patch -p1 --forward --batch --dry-run < "$PATCH_FILE" > /dev/null 2>&1; then
+      echo -e "           -> ${YELLOW}Already applied${NC}"
    else
-      # Check if already applied
-      if sudo patch -p1 --forward --batch --dry-run < "$patch_file" > /dev/null 2>&1; then
-         echo "           -> Success (already partially applied)"
-         sudo patch -p1 --forward --batch < "$patch_file" > /dev/null 2>&1 || true
-         ((APPLIED++))
-      else
-         echo -e "           -> ${RED}ERROR: Patch does not apply cleanly${NC}"
-         echo "           -> Try running on a fresh L4T environment (re-run l4t_prepare.sh)"
-         ((FAILED++))
-      fi
+      echo -e "           -> ${RED}ERROR: Patch does not apply cleanly${NC}"
+      echo "           -> Try running on a fresh L4T environment (re-run l4t_prepare.sh)"
+      exit 1
    fi
-done
+fi
 
 echo ""
 echo "============================================"
-if [[ $FAILED -eq 0 ]]; then
-   echo -e "${GREEN}All patches applied successfully!${NC}"
-   echo "  - Applied: $APPLIED patches"
-else
-   echo -e "${YELLOW}WARNING: $FAILED patch(es) failed to apply!${NC}"
-   echo ""
-   echo "This can happen if:"
-   echo "  - The L4T environment was already modified"
-   echo "  - The patches were generated for a different L4T version"
-   echo ""
-   echo "To fix, try:"
-   echo "  1. Remove the L4T build directory: rm -rf $L4T_VERSION/"
-   echo "  2. Re-run l4t_prepare.sh: ./l4t_prepare.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}"
-   echo "  3. Re-run this script: ./l4t_patch_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}"
-   exit 1
-fi
+echo -e "${GREEN}Patch applied successfully!${NC}"
 
 echo ""
 echo "Next steps:"

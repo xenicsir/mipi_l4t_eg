@@ -16,8 +16,8 @@
 #
 # Build Steps (at least one required):
 #   --prepare                   Run l4t_prepare.sh (download and extract)
-#   --copy-sources              Run l4t_copy_sources.sh (copies sources)
-#   # --patch-sources           DISABLED: patch support removed, to be redesigned
+#   --copy-sources              Run l4t_copy_sources.sh (copies sources + generates patch)
+#   --patch-sources             Run l4t_patch_sources.sh (applies pre-generated patch)
 #   --build                     Run l4t_build.sh
 #   --gen-package               Run l4t_gen_delivery_package.sh
 #
@@ -72,7 +72,7 @@ NO_ARGS=0
 
 DO_PREPARE=0
 DO_COPY_SOURCES=0
-# DO_PATCH_SOURCES=0  # DISABLED: patch support removed, to be redesigned
+DO_PATCH_SOURCES=0
 DO_BUILD=0
 DO_GEN_PACKAGE=0
 
@@ -159,10 +159,10 @@ while [[ $# -gt 0 ]]; do
             DO_COPY_SOURCES=1
             shift
             ;;
-        # --patch-sources)  # DISABLED: patch support removed, to be redesigned
-        #     DO_PATCH_SOURCES=1
-        #     shift
-        #     ;;
+        --patch-sources)
+            DO_PATCH_SOURCES=1
+            shift
+            ;;
         --build)
             DO_BUILD=1
             shift
@@ -223,8 +223,6 @@ if [[ $DO_PREPARE -eq 0 && $DO_COPY_SOURCES -eq 0 && $DO_BUILD -eq 0 && $DO_GEN_
     DO_GEN_PACKAGE=1
 fi
 
-# NOTE: --patch-sources is disabled (patches/ directory removed, to be redesigned)
-
 # Check that --from-scratch requires --prepare
 if [[ $FROM_SCRATCH -eq 1 && $DO_PREPARE -eq 0 ]]; then
     echo "Error: --from-scratch requires --prepare"
@@ -268,7 +266,7 @@ fi
 steps=""
 [[ $DO_PREPARE -eq 1 ]] && steps="$steps prepare"
 [[ $DO_COPY_SOURCES -eq 1 ]] && steps="$steps copy-sources"
-# [[ $DO_PATCH_SOURCES -eq 1 ]] && steps="$steps patch-sources"  # DISABLED
+[[ $DO_PATCH_SOURCES -eq 1 ]] && steps="$steps patch-sources"
 [[ $DO_BUILD -eq 1 ]] && steps="$steps build"
 [[ $DO_GEN_PACKAGE -eq 1 ]] && steps="$steps gen-package"
 steps=$(echo "$steps" | xargs)  # Trim
@@ -365,16 +363,15 @@ run_config() {
         fi
     fi
 
-    # DISABLED: patch-sources step removed (patches/ directory removed, to be redesigned)
-    # if [[ $DO_PATCH_SOURCES -eq 1 ]]; then
-    #     [[ -n "$status_file" ]] && echo "Patching sources..." > "$status_file"
-    #     echo "[patch-sources] l4t_patch_sources.sh $base_args"
-    #     if ! "$SCRIPT_DIR/l4t_patch_sources.sh" $base_args; then
-    #         [[ -n "$status_file" ]] && echo "FAILED" > "$status_file"
-    #         echo "[FAILED] l4t_patch_sources.sh"
-    #         return 1
-    #     fi
-    # fi
+    if [[ $DO_PATCH_SOURCES -eq 1 ]]; then
+        [[ -n "$status_file" ]] && echo "Patching sources..." > "$status_file"
+        echo "[patch-sources] l4t_patch_sources.sh $base_args"
+        if ! "$SCRIPT_DIR/l4t_patch_sources.sh" $base_args; then
+            [[ -n "$status_file" ]] && echo "FAILED" > "$status_file"
+            echo "[FAILED] l4t_patch_sources.sh"
+            return 1
+        fi
+    fi
 
     if [[ $DO_BUILD -eq 1 ]]; then
         [[ -n "$status_file" ]] && echo "Building..." > "$status_file"
@@ -477,7 +474,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
         echo -e "${CYAN}$CFG_VERSION / $CFG_VENDOR${som_label} / $CFG_CARRIER:${NC}"
         [[ $DO_PREPARE -eq 1 ]] && echo -e "    ${BLUE}[prepare]${NC} l4t_prepare.sh $base_args"
         [[ $DO_COPY_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[copy-sources]${NC} l4t_copy_sources.sh $base_args"
-        # [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"  # DISABLED
+        [[ $DO_PATCH_SOURCES -eq 1 ]] && echo -e "    ${BLUE}[patch-sources]${NC} l4t_patch_sources.sh $base_args"
         [[ $DO_BUILD -eq 1 ]] && echo -e "    ${BLUE}[build]${NC} l4t_build.sh $base_args"
         if [[ $DO_GEN_PACKAGE -eq 1 ]]; then
             dry_pkg_args="$base_args"
