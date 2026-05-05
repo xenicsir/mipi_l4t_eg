@@ -110,6 +110,31 @@ platforms:
     ports: 2
     is_forecr: false
 
+  # ─── Seeed Studio reComputer J4012 (Orin NX carrier, lane swap corrected) ───
+  # Corrects the p3768 SoM CAM0 lane swap (CSI-A used for CAM0, like Forecr)
+  # but uses the standard devkit I2C mux GPIO (TEGRA234_AON_GPIO CC,3).
+  # Base DTBO: tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo (36.x only).
+  seeed_recomputer_j4012:
+    board_short: seeed-recomputer-j4012
+    som: null
+    compat: "nvidia,tegra234"
+    base_dtb:
+      "35.3.1": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.4.1": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.5.0": {name: tegra234-p3767-0003-p3768-0000-a0.dtb, dir: versioned_kernel_dtb}
+      "35.6.0": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.1": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.2": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "35.6.4": tegra234-p3767-0000-p3768-0000-a0.dtb
+      "36x":    tegra234-p3768-0000+p3767-0000-nv.dtb
+    base_dtb_dir: versioned
+    dtbo_base_prefix: tegra234-p3767-camera-p3768-eg      # for disable-imx overlays
+    dtbo_lane_prefix: tegra234-p3767-camera-p3768-eg      # per-port DTBOs shared with devkit
+    ports: 2
+    is_forecr: false
+    cam0_lane_swap: true
+    skip_versions: ["32.7.1", "32.7.4", "32.7.5", "32.7.6", "35.1"]
+
   # ─── Forecr DSBOARD-ORNXS (Orin NX carrier, vendor=forecr) ────────────────
   # Shares base DTB with orin_nx_nano_devkit. Base DTBO has its own name.
   forecr_ornxs:

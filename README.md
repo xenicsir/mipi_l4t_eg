@@ -30,6 +30,7 @@ The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of 
 - [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
 - [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
 - [Appendix B: Adding a new camera type](#appendix-b-adding-a-new-camera-type)
+- [Appendix C: Configuring camera ports manually with config-by-hardware.py](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy)
 
 ---
 
@@ -399,6 +400,29 @@ The package was either delivered (see [MIPI deployment matrix](MIPI_DEPLOYMENT_M
 - For the AGX Orin Auvidea X230D carrier board, port 0 is "CD" and port 1 is "AB" on the PCB
 - The `/dev/videoX` device number is NOT the camera port number, but the registration order. Carefully check with the eg_dt_camera_config_get script.
 
+**Note on CAM0 lane swap (Orin NX/Nano):**
+
+Some Orin NX/Nano carrier boards have a CSI data lane swap on the CAM0 connector.
+See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical background.
+
+- **Nvidia Orin NX/Nano devkit**: the lane swap affects CAM0 — handled automatically by `eg_dt_camera_config_set.sh`.
+- **Forecr DSBOARD-ORNXS**: the lane swap is corrected on the carrier board — handled automatically by `eg_dt_camera_config_set.sh`.
+- **Seeed Studio reComputer J4012**: the lane swap is corrected on the carrier board but **not** detected automatically by `eg_dt_camera_config_set.sh`. Additionally, the silkscreen labeling differs from the Nvidia devkit: the J4012 "CAM0" connector corresponds to "CAM1" on the devkit, and vice-versa.
+
+  To apply the lane-swap fix (support not tested), edit `/boot/extlinux/extlinux.conf` and replace:
+
+  > **Warning: this must be repeated after every use of `eg_dt_camera_config_set.sh`**, as the script overwrites the overlay line.
+  ```
+  OVERLAYS /boot/tegra234-p3767-camera-eg-cams-dione.dtbo
+  ```
+  with:
+  ```
+  OVERLAYS /boot/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
+  ```
+  Then reboot.
+
+- **Other carrier boards with corrected lane swap**: if CAM0 produces no video while CAM1 works normally, the carrier board likely corrects the lane swap without automatic detection. Apply the same manual procedure as for the reComputer J4012.
+
 **Default configuration:**
 
 After first installation, both ports are configured for Dione cameras.
@@ -467,6 +491,10 @@ Total configured: 2 camera(s)
 ```
 
 **Note:** For some boards with multiple camera ports, it is possible to mix Exosens cameras with sensors originally supported by Jetson boards (IMX219, IMX477). Consult the support team if needed.
+
+**Advanced / manual configuration:**
+
+`eg_dt_camera_config_set.sh` calls `config-by-hardware.py` internally. For cases not handled automatically (e.g. the Seeed Studio reComputer J4012 CAM0 lane swap) or for manual control over individual overlays, you can invoke `config-by-hardware.py` directly. See [Appendix C](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy) for the full list of available overlays and examples.
 
 ### Quick start - Testing the camera
 
@@ -567,8 +595,9 @@ Consult the support team for assistance with custom modifications.
 
 ### Orin NX/Nano CSI lanes issues
 
-The Orin SoM has a CSI differential pair swap issue, and the Orin NX/Nano devkit carrier board has a CSI data lane swap issue. 
-More information is avalaible in the docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md document.
+The Orin NX/Nano SoM has a CSI differential pair swap (P/N inversion) inherent to the module, and the Nvidia devkit carrier board has an additional CSI data lane swap on CAM0. Some third-party carrier boards correct the lane swap, which requires a different device tree overlay.
+
+See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical details, and the [Configuring camera ports](#configuring-camera-ports) section for the practical workaround for boards not handled automatically.
 
 ---
 
@@ -661,6 +690,113 @@ This appendix provides a summary of the files involved. For detailed step-by-ste
 | postinst | `l4t_gen_delivery_package.sh` | Camera type normalization |
 
 The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
+
+---
+
+## Appendix C: Configuring camera ports manually with `config-by-hardware.py`
+
+`eg_dt_camera_config_set.sh` (see [Configuring camera ports](#configuring-camera-ports)) is the recommended way to configure camera overlays. It automatically detects the board, selects the appropriate base overlay, handles IMX219/IMX477 conflicts, and validates the result before reboot.
+
+For cases not handled automatically (e.g. the Seeed Studio reComputer J4012 CAM0 lane swap correction, or advanced manual control), configuration can be done directly using the jetson-io tool patched by the Exosens package:
+
+```bash
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n <args>
+```
+
+Followed by a reboot.
+
+### Listing available Exosens overlays
+
+```bash
+sudo python /opt/eg/jetson-io/config-by-hardware.py -l
+```
+
+This lists all overlays registered for the current hardware, including Exosens-specific ones.
+
+### Principle
+
+The `-n` command takes one or more `N="overlay-name"` arguments, where `N=2` refers to the CSI camera connector (Jetson 24-pin CSI header). The tool writes the corresponding DTBO paths to the `OVERLAYS` line in `/boot/extlinux/extlinux.conf`.
+
+A correct configuration always consists of:
+
+1. **One base overlay** — mandatory; selects board variant and configures all ports for Dione by default
+2. **Zero or more per-port camera overlays** — one for each port that uses a non-Dione camera
+3. **Zero or more disable overlays** — required on boards where IMX219/IMX477 sensors are active in the base device tree (handled automatically by `eg_dt_camera_config_set.sh`)
+
+Dione cameras do not require a per-port overlay — they are fully covered by the base overlay.
+
+### Available overlays — Orin NX / Nano (p3768)
+
+**Base overlays — choose exactly one:**
+
+| Overlay name | Use case |
+|---|---|
+| `"Exosens Cameras"` | Nvidia Orin NX/Nano devkit and compatible boards |
+| `"Exosens Cameras for DSBOARD-ORNXS"` | Forecr DSBOARD-ORNXS (Forecr-specific I2C mux GPIO + corrected CAM0 lane swap) |
+| `"Exosens Cameras - CAM0 lane swap"` | Boards with corrected CAM0 lane swap but standard devkit I2C mux (e.g. Seeed Studio reComputer J4012) |
+
+**Per-port camera overlays — stack on top of base (0, 1, or 2):**
+
+| Overlay name | Camera(s) | Port |
+|---|---|---|
+| `"Exosens Cameras. CAM0:EC_1_lane"` | MicroCube, MicroCube640 | CAM0 |
+| `"Exosens Cameras. CAM0:EC_2_lanes"` | SmartIR640, Crius1280 | CAM0 |
+| `"Exosens Cameras. CAM0:iLumos"` | iLumos | CAM0 |
+| `"Exosens Cameras. CAM0:Microlynx"` | Microlynx | CAM0 |
+| `"Exosens Cameras. CAM1:EC_1_lane"` | MicroCube, MicroCube640 | CAM1 |
+| `"Exosens Cameras. CAM1:EC_2_lanes"` | SmartIR640, Crius1280 | CAM1 |
+| `"Exosens Cameras. CAM1:iLumos"` | iLumos | CAM1 |
+| `"Exosens Cameras. CAM1:Microlynx"` | Microlynx | CAM1 |
+
+**Disable overlays — add when the base DTB has active IMX nodes:**
+
+| Overlay name | Purpose |
+|---|---|
+| `"Exosens Cameras. Disable imx219"` | Disable Sony IMX219 nodes (RPi Camera Module v2 reference design) |
+
+### Available overlays — AGX Orin (p3737)
+
+**Base overlays — choose exactly one:**
+
+| Overlay name | Use case |
+|---|---|
+| `"Exosens Cameras"` | Standard configuration (up to 4 ports) |
+| `"Exosens Cameras (global)"` | Dione-only on 35.x base DTBs using NVIDIA global NVCSI endpoint numbering — selected automatically by `eg_dt_camera_config_set.sh` when applicable |
+| `"Exosens Cameras - 2 ports"` | AGX Orin boards with only 2 active CSI channels (e.g. Auvidea X230D on L4T 35.1) |
+
+**Per-port camera overlays:** same principle as above; ports go from CAM0 to CAM3 — e.g. `"Exosens Cameras. CAM2:EC_1_lane"`, `"Exosens Cameras. CAM3:EC_2_lanes"`.
+
+**Disable overlays:** `"Exosens Cameras. Disable imx219"` (same as above).
+
+### Examples
+
+Configure all ports for Dione on a standard devkit:
+
+```bash
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras"
+sudo reboot
+```
+
+Configure Dione on CAM0 and MicroCube640 on CAM1 (devkit):
+
+```bash
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras" 2="Exosens Cameras. CAM1:EC_1_lane"
+sudo reboot
+```
+
+Configure Dione on CAM0 and SmartIR640 on CAM1 (DSBOARD-ORNXS):
+
+```bash
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras for DSBOARD-ORNXS" 2="Exosens Cameras. CAM1:EC_2_lanes"
+sudo reboot
+```
+
+Configure Dione on both ports (Seeed Studio reComputer J4012, with CAM0 lane swap correction):
+
+```bash
+sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras - CAM0 lane swap"
+sudo reboot
+```
 
 ---
 

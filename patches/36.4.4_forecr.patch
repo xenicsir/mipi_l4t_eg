@@ -5559,10 +5559,10 @@ index 0000000..e95af00
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..efa91fc
+index 0000000..e92c0ef
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,420 @@
+@@ -0,0 +1,425 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -5649,6 +5649,9 @@ index 0000000..efa91fc
 +  dsboard-*|milboard-*|raiboard-*)
 +	  echo "Forecr board detected: $BOARD"
 +	  ;;
++  seeed-recomputer-j4012)
++	  echo "Seeed Studio reComputer J4012 detected: CAM0 lane swap corrected on carrier"
++	  ;;
 +  nvidia-*)
 +	  echo "Nvidia official board"
 +	  ;;
@@ -5660,6 +5663,8 @@ index 0000000..efa91fc
 +# Select base overlay name
 +if [[ x$BOARD == xdsboard-ornxs ]]; then
 +   base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
++elif [[ x$BOARD == xseeed-recomputer-j4012 ]]; then
++   base_devicetree="Exosens Cameras - CAM0 lane swap"
 +else
 +   base_devicetree="Exosens Cameras"
 +fi
@@ -13902,10 +13907,10 @@ index 0000000..b59501d
 +	};
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-index 93728f4..2309c2b 100644
+index 93728f4..6a225ef 100644
 --- a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-@@ -9,62 +9,112 @@ dtb-y :=
+@@ -9,62 +9,113 @@ dtb-y :=
  dtbo-y :=
  makefile-path := t23x/nv-public/overlay
  
@@ -14047,6 +14052,7 @@ index 93728f4..2309c2b 100644
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
 +dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
++dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
 +
 +dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo
@@ -19275,7 +19281,7 @@ index 0000000..fcee765
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..fbde17a
+index 0000000..4890b89
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,3037 @@
@@ -19288,14 +19294,14 @@ index 0000000..fbde17a
 +#define CAM0_RST    TEGRA234_MAIN_GPIO(H, 3)
 +#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
 +#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
-+#ifdef DSBOARD_ORNXS
++#ifdef DSBOARD_ORNXS_CAM_I2C_MUX
 +#define CAM_I2C_MUX TEGRA234_MAIN_GPIO(Q, 6)
 +#else
 +#define CAM_I2C_MUX TEGRA234_AON_GPIO(CC, 3)
 +#endif
 +
 +/* CAM0 CSI routing differs per carrier — see hardware_32+ dtsi for details. */
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +#define SENSOR_CAM0_SERIAL "serial_a"
 +#else
 +#define SENSOR_CAM0_SERIAL "serial_b"
@@ -19321,7 +19327,7 @@ index 0000000..fbde17a
 +						reg = <0>;
 +						eg_cams_vi_in0: endpoint {
 +							status = "okay";
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +							port-index = <0>;
 +#else
 +							port-index = <1>;
@@ -19434,7 +19440,7 @@ index 0000000..fbde17a
 +									reg = <0>;
 +									eg_cams_csi_in0: endpoint@0 {
 +										status = "okay";
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +										port-index = <0>;
 +#else
 +										port-index = <1>;
@@ -19487,7 +19493,7 @@ index 0000000..fbde17a
 +					compatible = "i2c-mux-gpio";
 +					#address-cells = <1>;
 +					#size-cells = <0>;
-+#ifdef DSBOARD_ORNXS
++#ifdef DSBOARD_ORNXS_CAM_I2C_MUX
 +					mux-gpios = <&gpio CAM_I2C_MUX GPIO_ACTIVE_HIGH>;
 +#else
 +					mux-gpios = <&gpio_aon CAM_I2C_MUX GPIO_ACTIVE_HIGH>;
@@ -19789,7 +19795,7 @@ index 0000000..fbde17a
 +								port@0 {
 +								   reg = <0>;
 +								   xenics_dione_ir_out0: endpoint {
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +									  port-index = <0>;
 +#else
 +									  port-index = <1>;
@@ -20142,7 +20148,7 @@ index 0000000..fbde17a
 +								port@0 {
 +								   reg = <0>;
 +								   eg_ec_out0: endpoint {
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +									  port-index = <0>;
 +#else
 +									  port-index = <1>;
@@ -20415,7 +20421,7 @@ index 0000000..fbde17a
 +								port@0 {
 +								   reg = <0>;
 +								   ilumos_out0: endpoint {
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +									  port-index = <0>;
 +#else
 +									  port-index = <1>;
@@ -20530,7 +20536,7 @@ index 0000000..fbde17a
 +								port@0 {
 +								   reg = <0>;
 +								   microlynx_out0: endpoint {
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +									  port-index = <0>;
 +#else
 +									  port-index = <1>;
@@ -20727,7 +20733,7 @@ index 0000000..fbde17a
 +									reg = <0>;
 +									rbpcv3_imx477_out0: endpoint {
 +										status = "okay";
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +										port-index = <0>;
 +#else
 +										port-index = <1>;
@@ -21029,7 +21035,7 @@ index 0000000..fbde17a
 +									reg = <0>;
 +									rbpcv2_imx219_out0: endpoint {
 +										status = "okay";
-+#ifdef DSBOARD_ORNXS
++#ifdef CAM0_LANE_SWAP
 +										port-index = <0>;
 +#else
 +										port-index = <1>;
@@ -26672,17 +26678,18 @@ index 0000000..cf99a4e
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
 new file mode 100644
-index 0000000..6a0555d
+index 0000000..a984916
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,16 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
 +/dts-v1/;
 +/plugin/;
 +
-+#define DSBOARD_ORNXS
++#define DSBOARD_ORNXS_CAM_I2C_MUX
++#define CAM0_LANE_SWAP
 +
 +#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
 +
@@ -27999,6 +28006,31 @@ index 0000000..81118ca
 +
 +		}; //__overlay__ ends
 +	}; //fragment-camera@0 ends
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts
+new file mode 100644
+index 0000000..b82d331
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/* CAM0 lane swap corrected on carrier board (e.g. Seeed Studio reComputer J4012).
++ * CSI0_CLK (brick A) is used for CAM0, same as on DSBOARD-ORNXS but without
++ * the Forecr-specific I2C mux GPIO (TEGRA234_MAIN_GPIO Q,6).
++ * The standard devkit mux GPIO (TEGRA234_AON_GPIO CC,3) is used instead. */
++#define CAM0_LANE_SWAP
++
++#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
++
++/ {
++	overlay-name = "Exosens Cameras - CAM0 lane swap";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
 new file mode 100644

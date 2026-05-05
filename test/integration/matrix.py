@@ -182,8 +182,16 @@ def build_overlay_map(entry: Entry) -> dict[str, str]:
     m: dict[str, str] = {}
 
     # Base overlay
-    base_key = "Exosens Cameras for DSBOARD-ORNXS" if is_forecr else "Exosens Cameras"
-    base_dtbo = f"{boot}/{bpfx}-cams-dione.dtbo"
+    cam0_lane_swap = entry.cam0_lane_swap
+    if is_forecr:
+        base_key = "Exosens Cameras for DSBOARD-ORNXS"
+        base_dtbo = f"{boot}/{bpfx}-cams-dione.dtbo"
+    elif cam0_lane_swap:
+        base_key = "Exosens Cameras - CAM0 lane swap"
+        base_dtbo = f"{boot}/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo"
+    else:
+        base_key = "Exosens Cameras"
+        base_dtbo = f"{boot}/{bpfx}-cams-dione.dtbo"
     if os.path.exists(base_dtbo):
         m[base_key] = base_dtbo
 
@@ -410,6 +418,10 @@ def assert_script_behavior(
     elif entry.is_forecr:
         if "Exosens Cameras for DSBOARD-ORNXS" not in cbh_line:
             return False, f"expected Forecr base overlay, got: {cbh_line}"
+    # CAM0 lane-swap boards (e.g. Seeed reComputer J4012)
+    elif entry.cam0_lane_swap:
+        if "Exosens Cameras - CAM0 lane swap" not in cbh_line:
+            return False, f"expected CAM0 lane swap base overlay, got: {cbh_line}"
     # t234 non-Forecr, Dione-only, no active IMX → script upgrades to "(global)".
     # Per-port cams (camera != Dione) keep the per-channel "Exosens Cameras" base
     # because per-port DTBOs target endpoint@0, incompatible with the global base's
@@ -653,8 +665,12 @@ def main() -> int:
             continue
 
         overlay_map = build_overlay_map(entry)
-        base_key = ("Exosens Cameras for DSBOARD-ORNXS"
-                    if entry.is_forecr else "Exosens Cameras")
+        if entry.is_forecr:
+            base_key = "Exosens Cameras for DSBOARD-ORNXS"
+        elif entry.cam0_lane_swap:
+            base_key = "Exosens Cameras - CAM0 lane swap"
+        else:
+            base_key = "Exosens Cameras"
         if base_key not in overlay_map:
             _fail(f"L4T {entry.version} / {entry.platform_id}: base DTBO {base_key!r} "
                   f"missing in {entry.dtbo_boot_dir} — build output incomplete")

@@ -65,7 +65,7 @@ platforms:
     description: "Jetson Orin NX and Orin Nano developer kits (p3767 + p3768)"
     l4t_series: "35.x, 36.x"
     som: "Tegra234"
-    csi_lanes: 2
+    csi_lanes: 4
 
   - id: forecr_ornxs
     name: "Forecr DSBOARD ORNXS"
@@ -74,6 +74,16 @@ platforms:
     som: "Tegra234"
     csi_lanes: 4
     notes: "Custom build in forecr variant"
+
+  - id: seeed_recomputer_j4012
+    name: "Seeed Studio reComputer J4012"
+    description: "Seeed Studio reComputer J4012 (Orin NX/Nano carrier with corrected CAM0 lane swap)"
+    l4t_series: "35.x, 36.x"
+    som: "Tegra234"
+    csi_lanes: 4
+    notes:
+      - "⚠️ Camera port configuration is not handled by the `eg_dt_camera_config_set.sh` script on this board and must be done manually. See [Appendix C: Configuring camera ports manually with config-by-hardware.py](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy) in the README."
+      - "⚠️ CAM0 and CAM1 ports are inverted compared to the Orin NX / Nano devkit."
 
 cameras:
   dione_ir:
@@ -486,6 +496,82 @@ deployment_matrix:
         36.4: "tested|l4t-36.4|microlynx-ornx-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|microlynx-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|microlynx-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-ornx-l4t-36.5.0.deb"
+
+  # ========== Seeed Studio reComputer J4012 ==========
+  - platform: seeed_recomputer_j4012
+    cameras:
+      dione_ir:
+        35.3.1: "theoretically_supported|l4t-35.3.1|dione-ornx-l4t-35.3.1.deb"
+        35.4.1: "theoretically_supported|l4t-35.4.1|dione-ornx-l4t-35.4.1.deb"
+        35.5.0: "theoretically_supported|l4t-35.5.0|dione-ornx-l4t-35.5.0.deb"
+        35.6.0: "theoretically_supported|l4t-35.6.0|dione-ornx-l4t-35.6.0.deb"
+        35.6.1: "theoretically_supported|l4t-35.6.1|dione-ornx-l4t-35.6.1.deb"
+        35.6.2: "theoretically_supported|l4t-35.6.2|dione-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|dione-ornx-l4t-35.6.4.deb"
+        36.4: "theoretically_supported|l4t-36.4|dione-ornx-l4t-36.4.deb"
+        36.4.3: "theoretically_supported|l4t-36.4.3|dione-ornx-l4t-36.4.3.deb"
+        36.4.4: "theoretically_supported|l4t-36.4.4|dione-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|dione-ornx-l4t-36.5.0.deb"
+      microcube:
+        35.3.1: "theoretically_supported|l4t-35.3.1|microcube-ornx-l4t-35.3.1.deb"
+        35.4.1: "theoretically_supported|l4t-35.4.1|microcube-ornx-l4t-35.4.1.deb"
+        35.5.0: "theoretically_supported|l4t-35.5.0|microcube-ornx-l4t-35.5.0.deb"
+        35.6.0: "theoretically_supported|l4t-35.6.0|microcube-ornx-l4t-35.6.0.deb"
+        35.6.1: "theoretically_supported|l4t-35.6.1|microcube-ornx-l4t-35.6.1.deb"
+        35.6.2: "theoretically_supported|l4t-35.6.2|microcube-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microcube-ornx-l4t-35.6.4.deb"
+        36.4: "theoretically_supported|l4t-36.4|microcube-ornx-l4t-36.4.deb"
+        36.4.3: "theoretically_supported|l4t-36.4.3|microcube-ornx-l4t-36.4.3.deb"
+        36.4.4: "theoretically_supported|l4t-36.4.4|microcube-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|microcube-ornx-l4t-36.5.0.deb"
+      crius1280:
+        35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-ornx-l4t-35.3.1.deb"
+        35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-ornx-l4t-35.4.1.deb"
+        35.5.0: "theoretically_supported|l4t-35.5.0|crius1280-ornx-l4t-35.5.0.deb"
+        35.6.0: "theoretically_supported|l4t-35.6.0|crius1280-ornx-l4t-35.6.0.deb"
+        35.6.1: "theoretically_supported|l4t-35.6.1|crius1280-ornx-l4t-35.6.1.deb"
+        35.6.2: "theoretically_supported|l4t-35.6.2|crius1280-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|crius1280-ornx-l4t-35.6.4.deb"
+        36.4: "theoretically_supported|l4t-36.4|crius1280-ornx-l4t-36.4.deb"
+        36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-ornx-l4t-36.4.3.deb"
+        36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-ornx-l4t-36.5.0.deb"
+      smartir640:
+        35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-ornx-l4t-35.3.1.deb"
+        35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-ornx-l4t-35.4.1.deb"
+        35.5.0: "theoretically_supported|l4t-35.5.0|smartir640-ornx-l4t-35.5.0.deb"
+        35.6.0: "theoretically_supported|l4t-35.6.0|smartir640-ornx-l4t-35.6.0.deb"
+        35.6.1: "theoretically_supported|l4t-35.6.1|smartir640-ornx-l4t-35.6.1.deb"
+        35.6.2: "theoretically_supported|l4t-35.6.2|smartir640-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|smartir640-ornx-l4t-35.6.4.deb"
+        36.4: "theoretically_supported|l4t-36.4|smartir640-ornx-l4t-36.4.deb"
+        36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-ornx-l4t-36.4.3.deb"
+        36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-ornx-l4t-36.5.0.deb"
+      ilumos:
+        35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-ornx-l4t-35.3.1.deb"
+        35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-ornx-l4t-35.4.1.deb"
+        35.5.0: "theoretically_supported|l4t-35.5.0|ilumos-ornx-l4t-35.5.0.deb"
+        35.6.0: "theoretically_supported|l4t-35.6.0|ilumos-ornx-l4t-35.6.0.deb"
+        35.6.1: "theoretically_supported|l4t-35.6.1|ilumos-ornx-l4t-35.6.1.deb"
+        35.6.2: "theoretically_supported|l4t-35.6.2|ilumos-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|ilumos-ornx-l4t-35.6.4.deb"
+        36.4: "theoretically_supported|l4t-36.4|ilumos-ornx-l4t-36.4.deb"
+        36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-ornx-l4t-36.4.3.deb"
+        36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
+        36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-ornx-l4t-36.5.0.deb"
+      microlynx:
+        35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-ornx-l4t-35.3.1.deb"
+        35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-ornx-l4t-35.4.1.deb"
+        35.5.0: "theoretically_supported|l4t-35.5.0|microlynx-ornx-l4t-35.5.0.deb"
+        35.6.0: "theoretically_supported|l4t-35.6.0|microlynx-ornx-l4t-35.6.0.deb"
+        35.6.1: "theoretically_supported|l4t-35.6.1|microlynx-ornx-l4t-35.6.1.deb"
+        35.6.2: "theoretically_supported|l4t-35.6.2|microlynx-ornx-l4t-35.6.2.deb"
+        35.6.4: "theoretically_supported|l4t-35.6.4|microlynx-ornx-l4t-35.6.4.deb"
+        36.4: "theoretically_supported|l4t-36.4|microlynx-ornx-l4t-36.4.deb"
+        36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-ornx-l4t-36.4.3.deb"
+        36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-ornx-l4t-36.5.0.deb"
 
   # ========== Forecr DSBOARD ORNXS ==========

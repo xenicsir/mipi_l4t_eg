@@ -97,8 +97,12 @@ def _run_entry(entry: Entry, result: Result) -> None:
         return
 
     overlay_map = build_overlay_map(entry)
-    base_key = ("Exosens Cameras for DSBOARD-ORNXS"
-                if entry.is_forecr else "Exosens Cameras")
+    if entry.is_forecr:
+        base_key = "Exosens Cameras for DSBOARD-ORNXS"
+    elif entry.cam0_lane_swap:
+        base_key = "Exosens Cameras - CAM0 lane swap"
+    else:
+        base_key = "Exosens Cameras"
     if base_key not in overlay_map:
         print(f"  {RED}FAIL {NC} {label}: base DTBO {base_key!r} missing")
         result.failed += 1

@@ -82,6 +82,7 @@ dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
+dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
 
 dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo

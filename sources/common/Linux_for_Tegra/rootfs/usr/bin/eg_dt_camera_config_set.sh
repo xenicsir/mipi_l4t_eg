@@ -84,6 +84,9 @@ case "$BOARD" in
   dsboard-*|milboard-*|raiboard-*)
 	  echo "Forecr board detected: $BOARD"
 	  ;;
+  seeed-recomputer-j4012)
+	  echo "Seeed Studio reComputer J4012 detected: CAM0 lane swap corrected on carrier"
+	  ;;
   nvidia-*)
 	  echo "Nvidia official board"
 	  ;;
@@ -95,6 +98,8 @@ esac
 # Select base overlay name
 if [[ x$BOARD == xdsboard-ornxs ]]; then
    base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
+elif [[ x$BOARD == xseeed-recomputer-j4012 ]]; then
+   base_devicetree="Exosens Cameras - CAM0 lane swap"
 else
    base_devicetree="Exosens Cameras"
 fi

@@ -4,7 +4,7 @@
 /dts-v1/;
 /plugin/;
 
-#define DSBOARD_ORNXS
+#define CAM0_LANE_SWAP
 
 #include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
 

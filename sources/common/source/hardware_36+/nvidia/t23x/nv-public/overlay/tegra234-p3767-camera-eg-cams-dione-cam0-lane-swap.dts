@@ -4,13 +4,16 @@
 /dts-v1/;
 /plugin/;
 
-#define DSBOARD_ORNXS_CAM_I2C_MUX
+/* CAM0 lane swap corrected on carrier board (e.g. Seeed Studio reComputer J4012).
+ * CSI0_CLK (brick A) is used for CAM0, same as on DSBOARD-ORNXS but without
+ * the Forecr-specific I2C mux GPIO (TEGRA234_MAIN_GPIO Q,6).
+ * The standard devkit mux GPIO (TEGRA234_AON_GPIO CC,3) is used instead. */
 #define CAM0_LANE_SWAP
 
 #include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
 
 / {
-	overlay-name = "Exosens Cameras for DSBOARD-ORNXS";
+	overlay-name = "Exosens Cameras - CAM0 lane swap";
 	jetson-header-name = "Jetson 24pin CSI Connector";
 	compatible = JETSON_COMPATIBLE_P3768;
 };

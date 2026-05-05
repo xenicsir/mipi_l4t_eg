@@ -375,6 +375,42 @@ def verify(quiet=False):
             status = "FAIL" if had_error else "OK"
             print(f"  [{status}] {plat_key}: {plat_ok} nodes correct")
 
+    # -----------------------------------------------------------------------
+    # Overlay wrapper consistency: verify #define presence in DTS wrappers
+    # Each entry: (path, required_defines, label)
+    # -----------------------------------------------------------------------
+    OVERLAY_WRAPPERS = [
+        (SOURCES / "hardware_36+/nvidia/t23x/nv-public/overlay"
+                   "/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts",
+         ["CAM0_LANE_SWAP"],
+         "cam0_lane_swap_36"),
+        (SOURCES / "hardware_36+/nvidia/t23x/nv-public/overlay"
+                   "/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts",
+         ["DSBOARD_ORNXS_CAM_I2C_MUX", "CAM0_LANE_SWAP"],
+         "dsboard_ornxs_36"),
+        (SOURCES / "hardware_32+/nvidia/platform/t23x/p3768/kernel-dts"
+                   "/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts",
+         ["CAM0_LANE_SWAP"],
+         "dsboard_ornxs_32"),
+        (SOURCES / "hardware_32+/nvidia/platform/t23x/p3768/kernel-dts"
+                   "/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts",
+         ["CAM0_LANE_SWAP"],
+         "cam0_lane_swap_32"),
+    ]
+    for path, defines, label in OVERLAY_WRAPPERS:
+        had_error_before = len(errors)
+        if not path.exists():
+            errors.append(f"[{label}] FILE NOT FOUND: {path}")
+        else:
+            content = path.read_text()
+            for define in defines:
+                if f"#define {define}" not in content:
+                    errors.append(f"[{label}] Missing #define {define} in {path.name}")
+        if not quiet:
+            had_error = len(errors) > had_error_before
+            print(f"  [{'FAIL' if had_error else 'OK'}] {label}: {path.name}")
+        total_ok += 1
+
     return errors, total_ok
 
 

@@ -53,6 +53,7 @@ class Entry:
     dtbo_lane_prefix: str
     ports: int
     is_forecr: bool
+    cam0_lane_swap: bool        # True when carrier corrects the p3768 SoM lane swap on CAM0
     vendor: str                 # "generic" | "forecr"
     package_path: str | None    # absolute path to built .deb, or None if missing
 
@@ -168,6 +169,7 @@ def generate_matrix() -> Iterator[Entry]:
             dtbo_lane_prefix = hw["dtbo_lane_prefix"]
             ports = hw["ports"]
             is_forecr = hw.get("is_forecr", False)
+            cam0_lane_swap = hw.get("cam0_lane_swap", False)
 
             try:
                 dtb_name, dtb_dir = _pick_base_dtb(hw, version, l4t_mode)
@@ -205,6 +207,7 @@ def generate_matrix() -> Iterator[Entry]:
                     dtbo_base_prefix=dtbo_base_prefix,
                     dtbo_lane_prefix=dtbo_lane_prefix,
                     ports=ports, is_forecr=is_forecr,
+                    cam0_lane_swap=cam0_lane_swap,
                     vendor=vendor, package_path=package_path,
                 )
 

@@ -12,7 +12,7 @@
  * Keep tegra_sinterface coherent with port-index (runtime ignores sinterface
  * but the DT must still be self-consistent for host-side integrity checks).
  */
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 #define SENSOR_CAM0_SERIAL "serial_a"
 #else
 #define SENSOR_CAM0_SERIAL "serial_b"
@@ -32,7 +32,7 @@
 						reg = <0>;
 						endpoint {
 							status = "okay";
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 							port-index = <0>;
 #else
 							port-index = <1>;
@@ -143,7 +143,7 @@
 								reg = <0>;
 								endpoint@0 {
 									status = "okay";
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 									port-index = <0>;
 #else
 									port-index = <1>;
@@ -468,7 +468,7 @@
 							port@0 {
 							   reg = <0>;
 							   xenics_dione_ir_out0: endpoint {
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 								  port-index = <0>;
 #else
 								  port-index = <1>;
@@ -821,7 +821,7 @@
 							port@0 {
 							   reg = <0>;
 							   eg_ec_out0: endpoint {
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 								  port-index = <0>;
 #else
 								  port-index = <1>;
@@ -1094,7 +1094,7 @@
 							port@0 {
 							   reg = <0>;
 							   ilumos_out0: endpoint {
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 								  port-index = <0>;
 #else
 								  port-index = <1>;
@@ -1204,7 +1204,7 @@
 							port@0 {
 							   reg = <0>;
 							   microlynx_out0: endpoint {
-#ifdef DSBOARD_ORNXS
+#ifdef CAM0_LANE_SWAP
 								  port-index = <0>;
 #else
 								  port-index = <1>;
