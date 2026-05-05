@@ -12977,10 +12977,10 @@ index 0000000..fcee765
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..4890b89
+index 0000000..e30a09c
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,3037 @@
+@@ -0,0 +1,3041 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -13007,7 +13007,11 @@ index 0000000..4890b89
 +
 +/ {
 +	overlay-name = "Exosens Cameras";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@0 {
@@ -16020,10 +16024,10 @@ index 0000000..4890b89
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
 new file mode 100644
-index 0000000..a984916
+index 0000000..4f1191a
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dts
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,20 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -16037,15 +16041,19 @@ index 0000000..a984916
 +
 +/ {
 +	overlay-name = "Exosens Cameras for DSBOARD-ORNXS";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts
 new file mode 100644
-index 0000000..b82d331
+index 0000000..046669c
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,23 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -16062,15 +16070,19 @@ index 0000000..b82d331
 +
 +/ {
 +	overlay-name = "Exosens Cameras - CAM0 lane swap";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
 new file mode 100644
-index 0000000..638c539
+index 0000000..53a478f
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,119 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -16081,7 +16093,11 @@ index 0000000..638c539
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:EC_1_lane";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16188,10 +16204,10 @@ index 0000000..638c539
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..f633b7b
+index 0000000..3ff7b62
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,120 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -16202,7 +16218,11 @@ index 0000000..f633b7b
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:EC_2_lanes";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16310,10 +16330,10 @@ index 0000000..f633b7b
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
 new file mode 100644
-index 0000000..e1f6092
+index 0000000..2e5af27
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,79 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -16324,7 +16344,11 @@ index 0000000..e1f6092
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:iLumos";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16391,10 +16415,10 @@ index 0000000..e1f6092
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx219.dts
 new file mode 100644
-index 0000000..52236df
+index 0000000..8b4362c
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx219.dts
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,78 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/dts-v1/;
@@ -16404,7 +16428,11 @@ index 0000000..52236df
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:imx219";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16471,10 +16499,10 @@ index 0000000..52236df
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dts
 new file mode 100644
-index 0000000..090a541
+index 0000000..f27a609
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dts
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,103 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/dts-v1/;
@@ -16484,7 +16512,11 @@ index 0000000..090a541
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:imx477-4-lanes";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16576,10 +16608,10 @@ index 0000000..090a541
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx477.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx477.dts
 new file mode 100644
-index 0000000..500fe91
+index 0000000..8cc8106
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-imx477.dts
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,103 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/dts-v1/;
@@ -16589,7 +16621,11 @@ index 0000000..500fe91
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:imx477";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16681,10 +16717,10 @@ index 0000000..500fe91
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts
 new file mode 100644
-index 0000000..a383f93
+index 0000000..e84c82e
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-microlynx.dts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,79 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -16695,7 +16731,11 @@ index 0000000..a383f93
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:Microlynx";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16762,10 +16802,10 @@ index 0000000..a383f93
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
 new file mode 100644
-index 0000000..5f690fe
+index 0000000..455dc49
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,120 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -16776,7 +16816,11 @@ index 0000000..5f690fe
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:EC_1_lane";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -16884,10 +16928,10 @@ index 0000000..5f690fe
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..8dff8f7
+index 0000000..f4b1b06
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,120 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -16898,7 +16942,11 @@ index 0000000..8dff8f7
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:EC_2_lanes";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -17006,10 +17054,10 @@ index 0000000..8dff8f7
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
 new file mode 100644
-index 0000000..1836b53
+index 0000000..255eae1
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,79 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -17020,7 +17068,11 @@ index 0000000..1836b53
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:iLumos";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -17087,10 +17139,10 @@ index 0000000..1836b53
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx219.dts
 new file mode 100644
-index 0000000..b6e98a7
+index 0000000..613a57a
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx219.dts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,79 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -17101,7 +17153,11 @@ index 0000000..b6e98a7
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:imx219";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -17168,10 +17224,10 @@ index 0000000..b6e98a7
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx477.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx477.dts
 new file mode 100644
-index 0000000..8e7ce3e
+index 0000000..9246a87
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-imx477.dts
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,81 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -17182,7 +17238,11 @@ index 0000000..8e7ce3e
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:imx477";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -17251,10 +17311,10 @@ index 0000000..8e7ce3e
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts
 new file mode 100644
-index 0000000..563de49
+index 0000000..8c32f0e
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,79 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +
@@ -17265,7 +17325,11 @@ index 0000000..563de49
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:Microlynx";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = JETSON_COMPATIBLE_P3768;
 +
 +	fragment@10 {
@@ -17346,10 +17410,10 @@ index 0000000..6549cd7
 +
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts
 new file mode 100644
-index 0000000..26986c7
+index 0000000..2dfa147
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cams-disable-imx219.dts
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,32 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -17358,7 +17422,11 @@ index 0000000..26986c7
 +
 +/ {
 +	overlay-name = "Exosens Cameras. Disable imx219";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
 +	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
 +	compatible = "nvidia,p3768-0000+p3767-0000", "nvidia,p3768-0000+p3767-0001",
 +		     "nvidia,p3768-0000+p3767-0003", "nvidia,p3768-0000+p3767-0004",
 +		     "nvidia,p3768-0000+p3767-0005";

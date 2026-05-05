@@ -14,6 +14,10 @@
 
 / {
 	overlay-name = "Exosens Cameras - CAM0 lane swap";
+#ifdef EG_CSI_22PIN
+	jetson-header-name = "Jetson 22pin CSI Connector";
+#else
 	jetson-header-name = "Jetson 24pin CSI Connector";
+#endif
 	compatible = JETSON_COMPATIBLE_P3768;
 };

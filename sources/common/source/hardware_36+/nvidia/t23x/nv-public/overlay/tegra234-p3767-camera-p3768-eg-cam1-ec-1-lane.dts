@@ -8,7 +8,11 @@
 
 / {
 	overlay-name = "Exosens Cameras. CAM1:EC_1_lane";
+#ifdef EG_CSI_22PIN
+	jetson-header-name = "Jetson 22pin CSI Connector";
+#else
 	jetson-header-name = "Jetson 24pin CSI Connector";
+#endif
 	compatible = JETSON_COMPATIBLE_P3768;
 
 	fragment@10 {

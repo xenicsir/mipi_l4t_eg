@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
 
 DTC_FLAGS += -@
+DTC_CPP_FLAGS += -DEG_CSI_22PIN
 
 old-dtb := $(dtb-y)
 old-dtbo := $(dtbo-y)
