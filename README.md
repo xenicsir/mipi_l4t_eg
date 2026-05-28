@@ -31,6 +31,8 @@ The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of 
 - [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
 - [Appendix B: Adding a new camera type](#appendix-b-adding-a-new-camera-type)
 - [Appendix C: Configuring camera ports manually with config-by-hardware.py](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy)
+- [Appendix D: Integrating with Vision Components (VC) MIPI patches](#appendix-d-integrating-with-vision-components-vc-mipi-patches)
+- [Appendix E: Device tree adaptation for the Forecr DSADDON-MIPI-AGX-6CH](#appendix-e-device-tree-adaptation-for-the-forecr-dsaddon-mipi-agx-6ch)
 
 ---
 
@@ -797,6 +799,264 @@ Configure Dione on both ports (Seeed Studio reComputer J4012, with CAM0 lane swa
 sudo python /opt/eg/jetson-io/config-by-hardware.py -n 2="Exosens Cameras - CAM0 lane swap"
 sudo reboot
 ```
+
+---
+
+## Appendix D: Integrating with Vision Components (VC) MIPI patches
+
+This appendix describes the changes required to make Exosens camera drivers coexist with the
+[VC MIPI kernel patches](https://github.com/VC-MIPI-modules/vc_mipi_nvidia/tree/184-Orin-AGX-DSADDON/patch/kernel_Xavier_36.4.4)
+for L4T 36.x (nvidia-oot). These patches modify the Tegra camera framework in ways that are
+incompatible with Exosens drivers in their unmodified form.
+
+The patches concerned are:
+
+| Patch file | Framework change | Impact on Exosens drivers |
+|---|---|---|
+| `0001-Handler-function-ready_to_stream-introduced.patch` | Adds `ready_to_stream` op to sensor ops struct; STREAMON fails with `-ENODEV` if NULL | All `media/i2c` drivers |
+| `0001-Added-cropping-position-left-top-to-sensor-image-pro.patch` | Adds `active_l`/`active_t` to `sensor_image_properties`; parsing fails if absent in DT | All camera device tree nodes |
+| `0001-Added-implementation-to-set-image-position-and-size-.patch` | `VIDIOC_S_FMT` writes back to `frmfmt` table via a `const`-cast; crashes on `.rodata` | All `media/i2c` drivers |
+
+### Changes required in `media/i2c` drivers
+
+Apply the following two modifications to each Exosens driver source file
+(`eg_ec_mipi_src.c`, `dione_ir_src.c`, `ilumos.c`, `microlynx_src.c`).
+
+#### 1 — Remove `const` from the `frmfmt` table
+
+The VC patch `__tegra_channel_set_frame_size()` casts away `const` from `s_data->frmfmt`
+and writes to it on every `VIDIOC_S_FMT` call (triggered by GStreamer and `v4l2-ctl`).
+Exosens drivers declare their format table as `static const`, placing it in read-only memory
+(`.rodata`). The write causes a kernel page fault on ARM64 with `CONFIG_STRICT_MODULE_RWX=y`.
+
+```c
+// BEFORE — in every driver, e.g. eg_ec_mipi_src.c:
+static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = { ... };
+
+// AFTER — remove const:
+static struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = { ... };
+```
+
+The `frmfmt_table` pointer type (`const struct camera_common_frmfmt *`) does not need to change —
+a non-`const` array is safely assigned to a `const` pointer.
+
+#### 2 — Add a `ready_to_stream` no-op
+
+The VC patch adds `int (*ready_to_stream)(struct tegracam_device *tc_dev)` to
+`camera_common_sensor_ops` and calls it before STREAMON. A `NULL` pointer results in
+`-ENODEV` being returned (preventing streaming) or a NULL dereference in some call paths.
+
+Add a no-op implementation and register it in the sensor ops struct:
+
+```c
+static int eg_ec_mipi_ready_to_stream(struct tegracam_device *tc_dev)
+{
+    return 0;
+}
+
+static struct camera_common_sensor_ops eg_ec_mipi_common_ops = {
+    /* ... existing fields ... */
+    .ready_to_stream = eg_ec_mipi_ready_to_stream,
+};
+```
+
+Apply the same pattern (`<driver>_ready_to_stream`) to every other Exosens driver.
+
+### Changes required in device tree overlays
+
+The VC patch `0001-Added-cropping-position-left-top-to-sensor-image-pro.patch` modifies
+`sensor_common_parse_image_props()` to read two new mandatory properties from each `mode*`
+node. The function returns an error (camera probe fails) if either property is absent.
+
+Add `active_l` and `active_t` to **every mode node** in every Exosens camera DTSI/DTS:
+
+```dts
+mode0 {
+    /* ... existing properties ... */
+    active_l = "0";   /* left crop offset — must be present */
+    active_t = "0";   /* top crop offset  — must be present */
+};
+```
+
+These properties are required for all formats and all resolutions. The value `"0"` disables
+cropping, which is the correct setting for Exosens cameras (no hardware cropping support).
+
+> **Note:** The VC DT also contains sensor-level properties specific to VC cameras
+> (`trigger_mode`, `io_mode`, `reset-gpios`, `physical_w`, `physical_h`,
+> `set_mode_delay_ms`). These are **not** required for Exosens drivers and should not be
+> added to Exosens device tree nodes.
+
+---
+
+## Appendix E: Device tree adaptation for the Forecr DSADDON-MIPI-AGX-6CH
+
+The [Forecr DSADDON-MIPI-AGX-6CH](https://www.forecr.io/products/dsaddon-mipi-agx-6ch) is a
+MIPI CSI expansion board for AGX Orin that provides 6 simultaneous camera slots (up to 4×2-lane
+and 2×4-lane, or 6×2-lane). All cameras share a single AGX Orin I2C root bus and are
+multiplexed through a TCA9548 I2C switch. Each camera slot is wired to a dedicated CSI serial
+interface on the T234 SoC.
+
+This appendix describes the device tree modifications required to replace the standard
+`tegra234-p3737-camera-*` Exosens overlays with a DSADDON-compatible configuration.
+
+### Hardware topology
+
+```
+AGX Orin (T234)
+ └─ i2c@3180000  ─────────────────────────────────── TCA9548 @ 0x70
+                                                       ├─ i2c@0  → Slot 0 sensor    → NVCSI serial_a
+                                                       ├─ i2c@1  → Slot 1 sensor    → NVCSI serial_b
+                                                       ├─ i2c@2  → Slot 2 sensor    → NVCSI serial_c
+                                                       ├─ i2c@3  → Slot 3 sensor    → NVCSI serial_d
+                                                       ├─ i2c@4  → Slot 4 sensor    → NVCSI serial_e
+                                                       ├─ i2c@5  → Slot 5 sensor    → NVCSI serial_g
+                                                       └─ i2c@6  → PCF8574A @ 0x38 (GPIO reset controller)
+```
+
+### Slot → I2C / NVCSI mapping
+
+| Slot | TCA9548 channel | Linux I2C bus | NVCSI channel | `tegra_sinterface` | `port-index` |
+|------|-----------------|---------------|---------------|--------------------|-------------|
+| 0    | `i2c@0`         | 9             | `channel@0`   | `serial_a`         | 0           |
+| 1    | `i2c@1`         | 10            | `channel@1`   | `serial_b`         | 1           |
+| 2    | `i2c@2`         | 11            | `channel@2`   | `serial_c`         | 2           |
+| 3    | `i2c@3`         | 12            | `channel@3`   | `serial_d`         | 3           |
+| 4    | `i2c@4`         | 13            | `channel@4`   | `serial_e`         | 4           |
+| 5    | `i2c@5`         | 14            | `channel@5`   | `serial_g`         | 6           |
+
+> **Slot 5 note:** `serial_g` maps to `port-index = 6` (skipping `serial_f`/port-index 5, which
+> is unavailable on the DSADDON for standard camera use).
+
+### Changes to the common DTSI
+
+The standard `tegra234-p3737-camera-common-eg-cams-dione.dtsi` places sensors directly on
+`i2c@31e0000` (CAM0) and `i2c@c240000` (CAM1). For the DSADDON, all sensors move under
+`i2c@3180000` through the TCA9548 mux. The NVCSI `channel@N` assignments remain the same
+provided you map slots to the same `port-index` as the standard Exosens overlays.
+
+**Add the following infrastructure nodes under `i2c@3180000` in the common DTSI:**
+
+```dts
+i2c@3180000 {
+
+    tca9548@70 {
+        compatible = "nxp,pca9548";
+        reg = <0x70>;
+        status = "okay";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        vcc-supply  = <&p3737_vdd_1v8_sys>;
+        vif-supply  = <&p3737_vdd_1v8_sys>;
+        skip_mux_detect;
+
+        /* GPIO reset controller for camera power-down lines */
+        i2c@6 {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            i2c-mux,deselect-on-exit;
+            status = "okay";
+            reg = <6>;
+
+            pcf8574a_38: pcf8574a@38 {
+                compatible = "nxp,pcf8574a";
+                reg = <0x38>;
+                status = "okay";
+                gpio-controller;
+                #gpio-cells = <2>;
+
+                pcf8574a_38_outlow {
+                    gpio-hog;
+                    gpios = <0 0>, <1 0>, <2 0>, <3 0>,
+                            <4 0>, <5 0>, <6 0>, <7 0>;
+                    output-low;
+                };
+            };
+        };
+
+        /* Slot 0 — serial_a — place your sensor here */
+        i2c@0 {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            i2c-mux,deselect-on-exit;
+            status = "okay";
+            reg = <0>;
+
+            eg_ec_cam0: eg_ec_a@16 {
+                /* same node as standard CAM0, except:        */
+                /*   tegra_sinterface = "serial_a" (unchanged) */
+                /*   add active_l / active_t to all modes      */
+                /*   (see Appendix D)                          */
+            };
+        };
+
+        /* Slot 1 — serial_b */
+        i2c@1 { ... };
+
+        /* Slots 2-5 follow the same pattern */
+    };
+};
+```
+
+**Sensor mode nodes** must also contain `active_l = "0"` and `active_t = "0"` when the
+system runs VC MIPI patches (see [Appendix D](#appendix-d-integrating-with-vision-components-vc-mipi-patches)).
+
+For **slot 0**, the NVCSI channel configuration (`channel@0`, `port-index = 0`,
+`tegra_sinterface = "serial_a"`) is **identical** to the standard Exosens AGX Orin CAM0
+configuration. No changes are needed in the NVCSI section of the DTSI for this slot.
+
+For **slots 1–5**, update `port-index` and `tegra_sinterface` in both the sensor `mode*`
+nodes and the corresponding `nvcsi@15a00000/channel@N/ports/port@0/endpoint@{2*N}` node:
+
+```dts
+/* Example: slot 2 (serial_c, port-index = 2) */
+nvcsi@15a00000 {
+    channel@2 {
+        status = "okay";
+        ports {
+            port@0 {
+                endpoint@4 {                   /* @{port-index * 2} */
+                    bus-width    = <2>;        /* adjust per camera */
+                    port-index   = <2>;
+                    remote-endpoint = <&eg_ec_out2>;
+                    status = "okay";
+                };
+            };
+        };
+    };
+};
+```
+
+### Changes to per-camera overlay DTS
+
+The per-camera overlay DTS files (`tegra234-p3737-camera-eg-camN-*.dts`) reference sensor
+nodes via `target-path`. Update these paths and the `devname`/`proc-device-tree` strings to
+reflect the mux hierarchy:
+
+**Standard path (direct bus):**
+```dts
+/* CAM0 standard: sensor on i2c@31e0000 — bus 8 */
+target-path = "/bus@0/i2c@31e0000/eg_ec_a@16";
+devname     = "eg_ec 8-0016";
+proc-device-tree = "/proc/device-tree/bus@0/i2c@31e0000/eg_ec_a@16";
+```
+
+**DSADDON path (through TCA9548 mux):**
+```dts
+/* Slot 0: sensor on i2c@3180000 → tca9548@70 → i2c@0 — bus 9 */
+target-path = "/bus@0/i2c@3180000/tca9548@70/i2c@0/eg_ec_a@16";
+devname     = "eg_ec 9-0016";
+proc-device-tree = "/proc/device-tree/bus@0/i2c@3180000/tca9548@70/i2c@0/eg_ec_a@16";
+```
+
+The NVCSI `target-path` fragments (`endpoint@0` for slot 0) do **not** need to change,
+since the NVCSI channel assignment is identical to the standard CAM0 overlay.
+
+### PCF8574A and reset GPIOs
+
+The PCF8574A node is required to register the GPIO controller that VC camera drivers
+reference for their `reset-gpios` property. Exosens drivers do not use reset GPIOs; the
+`pcf8574a_38_outlow` hog keeps all lines low (cameras active) at boot. No additional
+changes are needed in Exosens sensor nodes for GPIO handling.
 
 ---
 
