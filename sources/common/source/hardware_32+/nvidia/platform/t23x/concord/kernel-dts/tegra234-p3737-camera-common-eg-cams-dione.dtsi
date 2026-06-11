@@ -724,7 +724,6 @@
 
 				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -742,7 +741,6 @@
 
 				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -779,10 +777,9 @@
 
 				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -820,10 +817,9 @@
 
 				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -861,10 +857,9 @@
 
 				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -873,7 +868,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "51000000";
+					pix_clk_hz = "148750000";
 					embedded_metadata_height = "0";
 
 					/* unused */
@@ -902,10 +897,9 @@
 
 				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -943,10 +937,9 @@
 
 				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -984,10 +977,9 @@
 
 				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -1383,7 +1375,6 @@
 
 				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -1401,7 +1392,6 @@
 
 				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -1438,10 +1428,9 @@
 
 				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -1479,10 +1468,9 @@
 
 				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -1520,10 +1508,9 @@
 
 				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -1532,7 +1519,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "51000000";
+					pix_clk_hz = "148750000";
 					embedded_metadata_height = "0";
 
 					/* unused */
@@ -1561,10 +1548,9 @@
 
 				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -1602,10 +1588,9 @@
 
 				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -1643,10 +1628,9 @@
 
 				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -2043,7 +2027,6 @@
 
 				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -2061,7 +2044,6 @@
 
 				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -2098,10 +2080,9 @@
 
 				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2139,10 +2120,9 @@
 
 				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2180,10 +2160,9 @@
 
 				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -2192,7 +2171,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "51000000";
+					pix_clk_hz = "148750000";
 					embedded_metadata_height = "0";
 
 					/* unused */
@@ -2221,10 +2200,9 @@
 
 				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2262,10 +2240,9 @@
 
 				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2303,10 +2280,9 @@
 
 				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -2702,7 +2678,6 @@
 
 				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -2720,7 +2695,6 @@
 
 				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
@@ -2757,10 +2731,9 @@
 
 				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2798,10 +2771,9 @@
 
 				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2839,10 +2811,9 @@
 
 				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";
@@ -2851,7 +2822,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "51000000";
+					pix_clk_hz = "148750000";
 					embedded_metadata_height = "0";
 
 					/* unused */
@@ -2880,10 +2851,9 @@
 
 				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2921,10 +2891,9 @@
 
 				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "2048";
@@ -2962,10 +2931,9 @@
 
 				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 					num_lanes = "2";
-					lane_polarity = "6";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
-					discontinuous_clk = "yes";
+					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
 					active_w = "1280";

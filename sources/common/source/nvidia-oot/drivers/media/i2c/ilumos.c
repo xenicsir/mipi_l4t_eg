@@ -220,6 +220,7 @@ static int ilumos_i2c_write_register(struct i2c_client *client, u32 reg, u32 val
 }
 
 
+/*
 static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
                                               u32 reg, u32 *val)
 {
@@ -237,6 +238,7 @@ static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
    return ilumos_i2c_read_register(client, REG_CROSSLINK_DATA,
                                    (u8 *)val, sizeof(*val));
 }
+*/
 
 static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
                                   u8 *buf, u16 len)
@@ -325,7 +327,7 @@ static int ilumos_sensor_check(struct ilumos *priv)
    struct device *dev = &priv->i2c_client->dev;
    int i, mode;
    u8 buf[64];
-   u32 read_data;
+//   u32 read_data;
    u32 width, height;
    bool is_raw14 = false;
 
@@ -338,10 +340,12 @@ static int ilumos_sensor_check(struct ilumos *priv)
       priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
       dev_info(dev, "FPGA firmware version = %s\n", priv->firmware_version);
    } else {
-      dev_warn(dev, "FPGA firmware read failed\n");
+      dev_err(dev, "FPGA firmware read failed\n");
+      goto error_exit;
    }
 
    /* Pixel format via Crosslink */
+/*
    if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
                                           REG_CROSSLINK_PIXEL_FORMAT,
                                           &read_data) == 0) {
@@ -354,8 +358,9 @@ static int ilumos_sensor_check(struct ilumos *priv)
    } else {
       dev_warn(dev, "PIXEL_FORMAT read failed, assuming RAW16\n");
    }
-
+*/
    /* Read Width and Height via Crosslink FRAME_SIZE */
+/*
    if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
                                           REG_CROSSLINK_FRAME_SIZE,
                                           &read_data) != 0) {
@@ -379,6 +384,20 @@ static int ilumos_sensor_check(struct ilumos *priv)
       width = read_data & 0xFFFF;
       height = read_data >> 16;
    }
+*/
+
+      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
+                                   (u8 *)&width, sizeof(width)) == 0) {
+         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
+                                      (u8 *)&height, sizeof(height)) == 0) {
+         } else {
+            dev_err(dev, "Failed to read height\n");
+            goto error_exit;
+         }
+      } else {
+         dev_err(dev, "Failed to read width\n");
+         goto error_exit;
+      }
    dev_info(dev, "Frame width = %u px\n", width);
    dev_info(dev, "Frame height = %u px\n", height);
 
@@ -431,6 +450,10 @@ static int ilumos_sensor_check(struct ilumos *priv)
       priv->serial_number[0] = '\0';
       dev_warn(dev, "failed to read serial number\n");
    }
+
+   // Stop the video streaming by default
+   dev_dbg(dev, "%s Stop streaming\n", __func__);
+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
 
    return 0;
 
@@ -563,9 +586,10 @@ static int ilumos_start_streaming(struct tegracam_device *tc_dev)
 
 static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
 {
+   struct ilumos *priv = tegracam_get_privdata(tc_dev);
    dev_dbg(tc_dev->dev, "%s\n", __func__);
+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
 
-   /* Note: We don't actually stop the camera, just acknowledge the call */
    return 0;
 }
 

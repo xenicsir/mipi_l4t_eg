@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
-D-PHY single-packet detail analyzer — visual output.
+D-PHY analyzer — packet detail and global recording analysis.
 
 Usage:
-  python3 analyze_dphy_packet_detail.py FILE.csv --packet 5
-  python3 analyze_dphy_packet_detail.py FILE.csv --timestamp 16.670  # in ms
-  python3 analyze_dphy_packet_detail.py FILE.csv --packet 5 --clock 340 --sample-rate 500
+  python3 dphy_analyze_packet_detail.py FILE.csv --packet 5
+  python3 dphy_analyze_packet_detail.py FILE.csv --timestamp 16.670  # in ms
+  python3 dphy_analyze_packet_detail.py FILE.csv --packet 5 --clock 340 --sample-rate 500
+
+  python3 dphy_analyze_packet_detail.py FILE.csv --global
+  python3 dphy_analyze_packet_detail.py FILE.csv --global --expected-lines 1024
+  python3 dphy_analyze_packet_detail.py FILE.csv --global --interframe-gap 100
 """
 
 import argparse
@@ -275,24 +279,275 @@ def print_detail(data, t, phases, dt_ns, clock_mhz, num_lanes):
             print(f"  {i:7d} │ {t[i]:14.8f} │ {v:7.4f} │ {bar}{marker}")
 
 
+# ─── Streaming burst scanner (global analysis of large files) ────────────────
+
+def scan_bursts_streaming(path, dt_ns=2.0, enter_hs=0.50, enter_lp=1.00, debounce=3):
+    """
+    Full-file streaming burst detector using LP/HS hysteresis.
+    LP→HS : VA drops below enter_hs (catches LP-00 entry + HS data)
+    HS→LP : VA rises above enter_lp (LP-11 return)
+    Returns (bursts, total_ns) where bursts = list of (start_ns, dur_ns).
+    """
+    state = 'LP'
+    consec = 0
+    candidate = 'LP'
+    hs_start = 0
+    sample_idx = 0
+    bursts = []
+
+    with open(path, 'r') as f:
+        for line in f:
+            if not line.strip() or ';' not in line:
+                continue
+            parts = line.split(';')
+            if len(parts) < 2:
+                continue
+            try:
+                v = float(parts[1].replace(',', '.'))
+            except ValueError:
+                continue
+
+            sample_idx += 1
+            if sample_idx % 5_000_000 == 0:
+                print(f"  {sample_idx // 1_000_000}M samples...", flush=True)
+
+            if state == 'LP' and v < enter_hs:
+                cand = 'HS'
+            elif state == 'HS' and v > enter_lp:
+                cand = 'LP'
+            else:
+                cand = state
+
+            if cand != state:
+                if cand == candidate:
+                    consec += 1
+                else:
+                    candidate = cand
+                    consec = 1
+                if consec >= debounce:
+                    if state == 'LP':
+                        hs_start = sample_idx
+                    else:
+                        bursts.append((int(hs_start * dt_ns), int((sample_idx - hs_start) * dt_ns)))
+                    state = cand
+                    consec = 0
+                    candidate = cand
+            else:
+                candidate = cand
+                consec = 0
+
+    return bursts, sample_idx * dt_ns
+
+
+# ─── Global analysis ─────────────────────────────────────────────────────────
+
+_SHORT_MAX_NS = 1_000   # < 1 µs → short packet (SoF/EoF)
+_LONG_MIN_NS  = 3_000   # ≥ 3 µs → long packet (line data)
+
+
+def _classify_and_group(bursts, short_max_ns=_SHORT_MAX_NS, long_min_ns=_LONG_MIN_NS,
+                        interframe_gap_us=50.0):
+    """Classify bursts and group them into frame groups by inter-frame gap."""
+    interframe_gap_ns = interframe_gap_us * 1_000
+
+    classified = []
+    for start_ns, dur_ns in bursts:
+        if dur_ns < short_max_ns:
+            kind = 'short'
+        elif dur_ns >= long_min_ns:
+            kind = 'long'
+        else:
+            kind = 'mid'
+        classified.append({'start_ns': start_ns, 'end_ns': start_ns + dur_ns,
+                            'dur_ns': dur_ns, 'kind': kind})
+
+    frames = []
+    if classified:
+        cur = [classified[0]]
+        for b in classified[1:]:
+            if b['start_ns'] - cur[-1]['end_ns'] >= interframe_gap_ns:
+                frames.append(cur)
+                cur = [b]
+            else:
+                cur.append(b)
+        frames.append(cur)
+
+    return classified, frames
+
+
+def _frame_stats(frame_bursts):
+    n_long  = sum(1 for b in frame_bursts if b['kind'] == 'long')
+    n_short = sum(1 for b in frame_bursts if b['kind'] == 'short')
+    n_mid   = sum(1 for b in frame_bursts if b['kind'] == 'mid')
+    has_sof = bool(frame_bursts) and frame_bursts[0]['kind'] == 'short'
+    has_eof = (len(frame_bursts) > 1 and frame_bursts[-1]['kind'] == 'short')
+    return dict(n_long=n_long, n_short=n_short, n_mid=n_mid,
+                has_sof=has_sof, has_eof=has_eof,
+                start_ns=frame_bursts[0]['start_ns'],
+                end_ns=frame_bursts[-1]['end_ns'])
+
+
+def print_global_analysis(classified, frames, total_ns, expected_lines=None):
+    from collections import Counter
+
+    n_short = sum(1 for b in classified if b['kind'] == 'short')
+    n_long  = sum(1 for b in classified if b['kind'] == 'long')
+    n_mid   = sum(1 for b in classified if b['kind'] == 'mid')
+    W = 82
+
+    print(f"\n{'═' * W}")
+    print(f"  GLOBAL RECORDING ANALYSIS")
+    print(f"{'═' * W}")
+    print(f"  Total duration : {total_ns / 1e6:.3f} ms")
+    print(f"  Total bursts   : {len(classified):,}"
+          f"  ({n_long:,} long, {n_short} short"
+          + (f", {n_mid} mid" if n_mid else "") + ")")
+
+    if n_short:
+        sd = [b['dur_ns'] for b in classified if b['kind'] == 'short']
+        print(f"  Short packets  : {n_short}  —  duration {min(sd):.0f}–{max(sd):.0f} ns"
+              f"  (avg {sum(sd)/len(sd):.0f} ns)")
+    if n_long:
+        ld = [b['dur_ns'] for b in classified if b['kind'] == 'long']
+        print(f"  Long packets   : {n_long:,}  —  duration"
+              f" {min(ld)/1000:.2f}–{max(ld)/1000:.2f} µs"
+              f"  (avg {sum(ld)/len(ld)/1000:.2f} µs)")
+
+    stats = [_frame_stats(f) for f in frames]
+    print(f"\n  Frames detected : {len(frames)}")
+
+    sof_times_ns = [s['start_ns'] for s in stats if s['has_sof']]
+    if len(sof_times_ns) >= 2:
+        period_ns = (sof_times_ns[-1] - sof_times_ns[0]) / (len(sof_times_ns) - 1)
+        fps = 1e9 / period_ns
+        print(f"  FPS (SoF→SoF)  : {fps:.1f}  ({period_ns / 1e6:.3f} ms/frame)")
+
+    # Auto-detect expected line count from inner complete frames
+    if expected_lines is None:
+        inner_counts = [
+            s['n_long'] for i, s in enumerate(stats)
+            if s['has_sof'] and 0 < i < len(stats) - 1
+        ]
+        if inner_counts:
+            expected_lines = Counter(inner_counts).most_common(1)[0][0]
+
+    # Per-frame table
+    print(f"\n  {'#':>4} │ {'Start (ms)':>10} │ {'Long pkts':>9} │ {'SoF':>4} │ {'EoF':>4} │ Status")
+    print(f"  {'─' * 4}─┼{'─' * 12}┼{'─' * 11}┼{'─' * 6}┼{'─' * 6}┼{'─' * 36}")
+
+    for i, (s, frame) in enumerate(zip(stats, frames)):
+        sof_mark = '✓' if s['has_sof'] else '✗'
+        eof_mark = '✓' if s['has_eof'] else '✗'
+        issues = []
+
+        is_first = (i == 0 and not s['has_sof'])
+        is_last  = (i == len(stats) - 1)
+
+        if is_first:
+            issues.append('truncated (capture start)')
+        elif not s['has_sof']:
+            issues.append('SoF MISSING')
+
+        if not s['has_eof']:
+            if is_last:
+                issues.append('truncated (capture end)')
+            else:
+                issues.append('EoF MISSING')
+
+        if expected_lines and not is_first:
+            ref = expected_lines
+            if s['n_long'] != ref and not (is_last and s['n_long'] < ref):
+                issues.append(f'lines={s["n_long"]} expected {ref}')
+
+        if s['n_mid']:
+            issues.append(f'{s["n_mid"]} intermediate-duration burst(s)')
+
+        if not issues:
+            issues.append('OK')
+
+        print(f"  {i:4d} │ {s['start_ns']/1e6:10.3f} │ {s['n_long']:9d} │"
+              f" {sof_mark:>4} │ {eof_mark:>4} │ {', '.join(issues)}")
+
+    # Summary
+    n_with_sof = sum(1 for s in stats if s['has_sof'])
+    n_with_eof = sum(1 for s in stats if s['has_eof'])
+    n_total    = len(stats)
+
+    inner = stats[1:-1] if len(stats) > 2 else []
+    lines_ok = (
+        all(s['n_long'] == expected_lines for s in inner)
+        if inner and expected_lines else None
+    )
+
+    print(f"\n  ─── Summary ─────────────────────────────────────────────────")
+    print(f"  SoF present      : {n_with_sof}/{n_total} frames")
+    print(f"  EoF present      : {n_with_eof}/{n_total} frames")
+    if expected_lines and inner:
+        ok = '✓ consistent' if lines_ok else '⚠ inconsistent'
+        print(f"  Long pkts/frame  : {expected_lines} (auto-detected)  {ok}")
+
+    problems = []
+    inner_no_eof = sum(1 for i, s in enumerate(stats) if not s['has_eof'] and 0 < i < n_total - 1)
+    if inner_no_eof:
+        problems.append(
+            f"EoF missing in {inner_no_eof} complete frame(s) out of {n_total - 2}"
+            f" — CSI-2 spec violation: transmitter does not send EoF short packet"
+        )
+    inner_no_sof = sum(1 for i, s in enumerate(stats) if not s['has_sof'] and i > 0)
+    if inner_no_sof:
+        problems.append(f"SoF missing in {inner_no_sof} non-truncated frame(s)")
+    if lines_ok is False:
+        bad = [s['n_long'] for s in inner if s['n_long'] != expected_lines]
+        problems.append(f"Inconsistent line count: {Counter(bad).most_common()}")
+
+    if problems:
+        print(f"\n  ⚠ ISSUES DETECTED:")
+        for p in problems:
+            print(f"    • {p}")
+    else:
+        print(f"\n  ✓ Frame structure is consistent")
+
+    print(f"{'═' * W}\n")
+
+
 # ─── Main ───────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description='D-PHY single-packet detail analyzer')
+    parser = argparse.ArgumentParser(
+        description='D-PHY analyzer — packet detail and global recording analysis',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument('csv', help='Path to PicoScope CSV file')
     parser.add_argument('--packet', type=int, default=1, help='Packet number (1-based, default: 1)')
     parser.add_argument('--timestamp', type=float, default=None, help='Timestamp in ms (overrides --packet)')
     parser.add_argument('--clock', type=float, default=340.0, help='MIPI clock MHz (default: 340)')
     parser.add_argument('--lanes', type=int, default=2, help='Number of data lanes (default: 2)')
     parser.add_argument('--sample-rate', type=float, default=500.0, help='Sample rate MSa/s (default: 500)')
-    parser.add_argument('--max-samples', type=int, default=20_000_000, help='Max samples to load')
+    parser.add_argument('--max-samples', type=int, default=20_000_000, help='Max samples to load (packet mode)')
+    parser.add_argument('--global', dest='global_mode', action='store_true',
+                        help='Global recording analysis: frames, SoF/EoF, consistency (full file scan)')
+    parser.add_argument('--expected-lines', type=int, default=None,
+                        help='Expected long packets per frame (auto-detected if omitted)')
+    parser.add_argument('--interframe-gap', type=float, default=50.0,
+                        help='Inter-frame gap threshold in µs (default: 50)')
     args = parser.parse_args()
 
     dt_ns = 1000.0 / args.sample_rate
+
+    if args.global_mode:
+        print(f"Scanning {args.csv} (streaming)...")
+        bursts_raw, total_ns = scan_bursts_streaming(args.csv, dt_ns=dt_ns)
+        classified, frames = _classify_and_group(
+            bursts_raw,
+            interframe_gap_us=args.interframe_gap,
+        )
+        print_global_analysis(classified, frames, total_ns,
+                              expected_lines=args.expected_lines)
+        return
+
     dt_ms = dt_ns / 1e6
 
     if args.timestamp is not None:
-        # Load around timestamp
         df, offset = load_around_timestamp(args.csv, args.timestamp, margin_samples=15000, dt_ms=dt_ms)
         data = df['A'].values
         t = df['t'].values
@@ -301,20 +556,18 @@ def main():
         if not bursts:
             print("No bursts found in this region!")
             sys.exit(1)
-        # Find burst closest to timestamp
         target_sample = int(args.timestamp / dt_ms) - offset
         best = min(bursts, key=lambda b: abs(b[0] - target_sample))
         bs, be, bdur = best
         print(f"Nearest burst at sample {bs} (t={t[bs]:.8f} ms), duration={bdur} samp")
     else:
-        # Load and find N-th burst
         df = load_samples(args.csv, max_samples=args.max_samples)
         data = df['A'].values
         t = df['t'].values
         print(f"Loaded {len(data):,} samples")
         bursts = find_bursts(data)
         print(f"Found {len(bursts)} HS bursts")
-        pkt_idx = args.packet - 1  # 0-based
+        pkt_idx = args.packet - 1
         if pkt_idx < 0 or pkt_idx >= len(bursts):
             print(f"Packet {args.packet} out of range (1–{len(bursts)})")
             sys.exit(1)
@@ -322,10 +575,7 @@ def main():
         print(f"Packet {args.packet}: burst at samples {bs}–{be}, duration={bdur} samp, "
               f"t={t[bs]:.8f} ms")
 
-    # Analyze phases
     phases = analyze_phases(data, t, bs, be, dt_ns)
-
-    # Print detail
     print_detail(data, t, phases, dt_ns, args.clock, args.lanes)
 
 

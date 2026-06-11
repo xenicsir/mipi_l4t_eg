@@ -53,9 +53,10 @@ set +e
 p1_rc=0
 p2_rc=0
 
-# RUN_PHASE=1a|1b|1|2|all selects which sub-phase(s) to execute. Default: all.
+# RUN_PHASE=1a|1b|1|2|2b|all selects which sub-phase(s) to execute. Default: all.
 # P1a = base-overlay coherence (base DTBO only, no per-port).
 # P1b = per-port combination matrix (existing matrix.py).
+# P2b = preinst FORCE_INSTALL_EG_CAMS + postinst cleanup (standalone).
 RUN_PHASE="${RUN_PHASE:-all}"
 
 p1a_rc=0
@@ -73,6 +74,7 @@ if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "1" || "$RUN_PHASE" == "1b" ]]; t
     p1_rc=$?
 fi
 
+p2b_rc=0
 if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "2" ]]; then
     echo ""
     echo "=== P2 — .deb preinst/postinst execution ==="
@@ -80,8 +82,15 @@ if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "2" ]]; then
     p2_rc=$?
 fi
 
-if [[ $p1a_rc -ne 0 || $p1_rc -ne 0 || $p2_rc -ne 0 ]]; then
+if [[ "$RUN_PHASE" == "all" || "$RUN_PHASE" == "2" || "$RUN_PHASE" == "2b" ]]; then
     echo ""
-    echo "P1a=${p1a_rc} P1b=${p1_rc} P2=${p2_rc}"
+    echo "=== P2b — Preinst FORCE_INSTALL_EG_CAMS + postinst cleanup ==="
+    python3 "$PACKAGING_DIR/test_preinst_force.py"
+    p2b_rc=$?
+fi
+
+if [[ $p1a_rc -ne 0 || $p1_rc -ne 0 || $p2_rc -ne 0 || $p2b_rc -ne 0 ]]; then
+    echo ""
+    echo "P1a=${p1a_rc} P1b=${p1_rc} P2=${p2_rc} P2b=${p2b_rc}"
     exit 1
 fi

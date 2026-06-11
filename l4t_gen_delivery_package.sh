@@ -46,13 +46,16 @@ JP_INFIX=""
 if [[ "$VENDOR" == "generic" ]]; then
    if [[ -n "$SOM_BOARD" ]]; then
       PACKAGE_NAME=jetson-l4t-${L4T_VERSION}${JP_INFIX}-${SOM_BOARD}-eg-cams
+      CANONICAL_NAME="jetson-eg-cams-${SOM_BOARD}"
    else
       PACKAGE_NAME=jetson-l4t-${L4T_VERSION}${JP_INFIX}-eg-cams
+      CANONICAL_NAME="jetson-eg-cams"
    fi
 else
    # Replace underscores with hyphens for Debian package naming convention
    CARRIER_BOARD_DEB=$(echo "$CARRIER_BOARD" | tr '_' '-')
    PACKAGE_NAME=jetson-l4t-${L4T_VERSION}${JP_INFIX}-${VENDOR}-${CARRIER_BOARD_DEB}-eg-cams
+   CANONICAL_NAME="jetson-eg-cams-${VENDOR}-${CARRIER_BOARD_DEB}"
 fi
 
 ROOTFS_DIR=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs
@@ -340,6 +343,7 @@ EOT
 # Embed the exact same string that Step 3 writes to /etc/version_eg_cams
 cat >> "$_PREINST" << EOT
 PACKAGE_VERSION_LINE="jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT_COMMIT})"
+EXPECTED_KERNEL_VERSION="${KERNEL_VERSION}"
 EOT
 
 cat >> "$_PREINST" << 'EOT'
@@ -381,36 +385,59 @@ case "$1" in
 
         RUNNING_L4T="${NV_MAJOR}.${NV_REVISION}"
 
-        # Check L4T version match (allow only .0 patch variants: 36.4 == 36.4.0, but NOT 36.4 == 36.4.3)
-        # Normalize by replacing .0 with nothing for both versions
-        EXPECTED_NORMALIZED=$(echo "$EXPECTED_L4T" | sed 's/\.0$//')
-        RUNNING_NORMALIZED=$(echo "$RUNNING_L4T" | sed 's/\.0$//')
-
-        if [[ "$EXPECTED_NORMALIZED" != "$RUNNING_NORMALIZED" ]]; then
-            echo "Error: Incompatible L4T version." >&2
-            echo "  This package was built for L4T ${EXPECTED_L4T}." >&2
-            echo "  Running system: L4T ${RUNNING_L4T}" >&2
-            echo "  Install the package matching your L4T version." >&2
-            exit 1
-        fi
-
-        # Detect running system's board vendor (generic NVIDIA vs Forecr/others)
-        RUNNING_VENDOR="generic"
-        if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
-            DTB=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
-            # Forecr boards have DTB names containing dsboard, milboard, raiboard
-            if [[ "$DTB" =~ (dsboard|milboard|raiboard) ]]; then
-                RUNNING_VENDOR="forecr"
+        if [[ -n "$FORCE_INSTALL_EG_CAMS" ]]; then
+            # L4T check bypassed — verify kernel version matches instead
+            RUNNING_KERNEL=$(uname -r | sed 's/-eg$//')
+            EXPECTED_KERNEL_STRIPPED=$(echo "$EXPECTED_KERNEL_VERSION" | sed 's/-eg$//')
+            if [[ "$RUNNING_KERNEL" != "$EXPECTED_KERNEL_STRIPPED" ]]; then
+                echo "Error: Kernel version mismatch (FORCE_INSTALL_EG_CAMS set)." >&2
+                echo "  This package contains modules for kernel ${EXPECTED_KERNEL_VERSION}." >&2
+                echo "  Running kernel: $(uname -r)" >&2
+                echo "  Rebuild the package for $(uname -r) or install the matching version." >&2
+                exit 1
+            fi
+        else
+            # Default: strict L4T version check
+            if [[ "$EXPECTED_L4T" != "$RUNNING_L4T" ]]; then
+                echo "Error: Incompatible L4T version." >&2
+                echo "  This package was built for L4T ${EXPECTED_L4T}." >&2
+                echo "  Running system: L4T ${RUNNING_L4T}" >&2
+                echo "  Install the package matching your L4T version." >&2
+                exit 1
             fi
         fi
 
-        # Check board vendor match
-        if [[ "$RUNNING_VENDOR" != "$EXPECTED_VENDOR" ]]; then
-            echo "Error: Board vendor mismatch." >&2
-            echo "  This package was built for: $EXPECTED_VENDOR" >&2
-            echo "  Running system: $RUNNING_VENDOR" >&2
-            echo "  Install the package matching your board type." >&2
-            exit 1
+        # Vendor check: only enforce for generic packages.
+        # Forecr packages install unconditionally — Forecr board detection via
+        # nvidia,dtsfilename is unreliable on JP6 (not all SoM SKUs have a
+        # Forecr DTB in the BSP, e.g. p3767-0005).
+        if [[ "$EXPECTED_VENDOR" != "forecr" ]]; then
+            RUNNING_VENDOR="generic"
+
+            # Method 1: active DTB (post-reboot)
+            if [[ -f /proc/device-tree/nvidia,dtsfilename ]]; then
+                DTB=$(cat /proc/device-tree/nvidia,dtsfilename 2>/dev/null | tr -d '\0')
+                if [[ "$DTB" =~ (dsboard|milboard|raiboard) ]]; then
+                    RUNNING_VENDOR="forecr"
+                fi
+            fi
+
+            # Method 2: previously installed eg-cams package (pre-reboot upgrade path)
+            if [[ "$RUNNING_VENDOR" == "generic" ]]; then
+                if dpkg -l 2>/dev/null | grep -q '^ii.*jetson.*-forecr-.*-eg-cams'; then
+                    RUNNING_VENDOR="forecr"
+                fi
+            fi
+
+            # If RUNNING_VENDOR is still "generic" both detection methods found
+            # nothing: genuine first install — allow any vendor package.
+            if [[ "$RUNNING_VENDOR" != "generic" && "$RUNNING_VENDOR" != "$EXPECTED_VENDOR" ]]; then
+                echo "Error: Board vendor mismatch." >&2
+                echo "  This package was built for: $EXPECTED_VENDOR" >&2
+                echo "  Running system: $RUNNING_VENDOR" >&2
+                echo "  Install the package matching your board type." >&2
+                exit 1
+            fi
         fi
         ;;
 esac
@@ -424,11 +451,24 @@ cat > "$_POSTINST" << 'EOT'
 depmod
 EOT
 
-# Inject L4T version into postinst (unquoted EOT for variable expansion)
+# Inject L4T version and package identity into postinst (unquoted EOT for variable expansion)
 cat >> "$_POSTINST" << EOT
 
 L4T_VERSION_MAJOR=$L4T_VERSION_MAJOR
+CANONICAL_NAME="${CANONICAL_NAME}"
+CURRENT_PKG="${PACKAGE_NAME//_/-}"
 EOT
+
+# For vendor packages, inject known board so postinst never calls detect_jetson_board.sh
+if [[ "$VENDOR" != "generic" ]]; then
+   # Convert underscores to hyphens (CARRIER_BOARD uses underscores internally; detect_jetson_board.sh uses hyphens).
+   # Temporary: dsboard_ornx in eg_config.yaml is a typo for dsboard_ornxs (two different Forecr products).
+   _EG_FORCE_BOARD="${CARRIER_BOARD//_/-}"
+   [[ "$_EG_FORCE_BOARD" == "dsboard-ornx" ]] && _EG_FORCE_BOARD="dsboard-ornxs"
+cat >> "$_POSTINST" << EOT
+export EG_FORCE_BOARD="${_EG_FORCE_BOARD}"
+EOT
+fi
 
 # Add Exosens camera overlay configuration (quoted EOT, no expansion)
 cat >> "$_POSTINST" << 'EOT'
@@ -517,6 +557,16 @@ else
       fi
    fi
 fi
+
+# Remove stale packages from the same hardware family (deferred to avoid dpkg lock)
+_OLD_PKGS=$(dpkg-query -W --showformat='${Package}\t${Status}\t${Provides}\n' 2>/dev/null | \
+    awk -F'\t' -v cn="$CANONICAL_NAME" -v cp="$CURRENT_PKG" \
+    '$1 != cp && $2 == "install ok installed" && index($3, cn) > 0 {print $1}' | tr '\n' ' ')
+if [[ -n "$_OLD_PKGS" ]]; then
+    echo "Removing replaced package(s): $_OLD_PKGS"
+    ( sleep 3 && dpkg --purge $_OLD_PKGS > /dev/null 2>&1 ) &
+    disown $!
+fi
 EOT
 
 #******************************************************************************
@@ -555,6 +605,8 @@ fpm -v ${DEB_VERSION} \
    -s dir \
    -t deb \
    -n ${PACKAGE_NAME} \
+   --provides "${CANONICAL_NAME}" \
+   --replaces "${CANONICAL_NAME}" \
    --before-install "$_PREINST" \
    --after-install "$_POSTINST" \
    --after-remove "$_POSTRM" \

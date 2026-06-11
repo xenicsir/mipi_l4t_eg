@@ -383,17 +383,44 @@ This generates: `jetson-l4t-<l4t_version>-jp<jp_version>-forecr-dsboard-ornx-eg-
 
 #### Package installation
 
-**Important:** If you have driver version 2.x.x or lower already installed, you must **uninstall** it first (not just update) :
+The package was either delivered (see [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md)) or built locally following the previous steps.
+
+**Standard install** (matching L4T version, no previous package or same-version reinstall):
 
 ```bash
-# Uninstall old version if present
-sudo dpkg -r jetson-l4t-mipi-eg-cam  # or similar package name
-
-# Install new version
-sudo dpkg -i jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<debian_version>_arm64.deb
+sudo dpkg -i jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
 ```
 
-The package was either delivered (see [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md)) or built locally following the previous steps.
+**Cross-L4T-version install** (e.g. installing a 35.6.1 package on a 35.6.0 board):
+
+> ⚠️ **This must remain exceptional.** Installing a package built for a different L4T version than the one running on the target is not a supported upgrade path. It is only justified in specific situations — for example, when two L4T patch releases share the exact same kernel (e.g. 35.6.0 and 35.6.1 both use `5.10.216-tegra`) and no matching package is yet available. In all other cases, **use the package that matches the target's L4T version**.
+
+The package contains kernel modules compiled for a specific kernel. Two safety checks are enforced:
+
+- **Without `FORCE_INSTALL_EG_CAMS`**: the L4T version must match exactly (strict check).
+- **With `FORCE_INSTALL_EG_CAMS=1`**: the L4T check is bypassed, but the kernel version (`uname -r`, stripping any `-eg` suffix) must match the kernel the package was built for. This prevents loading modules built for an incompatible kernel.
+
+When the L4T version differs from the running system and the kernel version matches, use:
+
+```bash
+sudo FORCE_INSTALL_EG_CAMS=1 dpkg -i --force-overwrite \
+    jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+```
+
+- `FORCE_INSTALL_EG_CAMS=1` — bypasses the L4T version check (verified against kernel instead)
+- `--force-overwrite` — allows dpkg to overwrite files from the previously installed package
+
+The previously installed package is automatically removed from the dpkg database a few seconds after installation completes.
+
+**If a package with version ≤ 2.0.0 is already installed**, it does not carry the package-family metadata (`Provides`) needed for automatic cleanup. You must uninstall it manually first:
+
+```bash
+# Find and remove the old package (check exact name with: dpkg -l | grep eg-cams)
+sudo dpkg --purge <old-package-name>
+
+# Then install normally (or with FORCE if L4T version differs)
+sudo dpkg -i jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+```
 
 #### Configuring camera ports
 

@@ -679,8 +679,8 @@ cameras:
         modes:
           - pixel_format: "Y16"
             line_length: 1280
-            pix_clk_hz: 51000000
-            csi_clock_mhz: 149.5
+            pix_clk_hz: 148750000
+            csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 1280
             pix_clk_hz: 100000000

@@ -65,7 +65,16 @@ _camera_node_active_in_dtb() {
     '
 }
 
-BOARD=$(detect_jetson_board.sh --short)
+if [[ -n "$EG_FORCE_BOARD" ]]; then
+	BOARD="$EG_FORCE_BOARD"
+elif grep -q "dsboard-ornxs" /boot/extlinux/extlinux.conf 2>/dev/null; then
+	# A dsboard-ornxs overlay is already active — stay on Forecr config
+	# regardless of what detect_jetson_board.sh returns (e.g. p3767-0005 with
+	# no Forecr DTB in QSPI will wrongly return nvidia/p3768 without this check).
+	BOARD="dsboard-ornxs"
+else
+	BOARD=$(detect_jetson_board.sh --short)
+fi
 
 # Detect number of camera ports from device tree
 CAMERA_PORTS=$(detect_jetson_board.sh --camera-ports 2>/dev/null)

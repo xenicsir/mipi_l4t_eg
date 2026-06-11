@@ -5542,10 +5542,10 @@ index 0000000..e95af00
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..e92c0ef
+index 0000000..9e49165
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,425 @@
+@@ -0,0 +1,434 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -5613,7 +5613,16 @@ index 0000000..e92c0ef
 +    '
 +}
 +
-+BOARD=$(detect_jetson_board.sh --short)
++if [[ -n "$EG_FORCE_BOARD" ]]; then
++	BOARD="$EG_FORCE_BOARD"
++elif grep -q "dsboard-ornxs" /boot/extlinux/extlinux.conf 2>/dev/null; then
++	# A dsboard-ornxs overlay is already active — stay on Forecr config
++	# regardless of what detect_jetson_board.sh returns (e.g. p3767-0005 with
++	# no Forecr DTB in QSPI will wrongly return nvidia/p3768 without this check).
++	BOARD="dsboard-ornxs"
++else
++	BOARD=$(detect_jetson_board.sh --short)
++fi
 +
 +# Detect number of camera ports from device tree
 +CAMERA_PORTS=$(detect_jetson_board.sh --camera-ports 2>/dev/null)
@@ -7684,7 +7693,7 @@ index 0000000..5387a89
 +sep()
 diff --git a/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..1320300
+index 0000000..bba6a4d
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1318 @@
@@ -8125,7 +8134,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8159,7 +8168,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8193,7 +8202,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -8202,7 +8211,7 @@ index 0000000..1320300
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "51000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8227,7 +8236,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8261,7 +8270,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8295,7 +8304,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -8699,7 +8708,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8733,7 +8742,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8767,7 +8776,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -8776,7 +8785,7 @@ index 0000000..1320300
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "51000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8801,7 +8810,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8835,7 +8844,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -8869,7 +8878,7 @@ index 0000000..1320300
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -9722,7 +9731,7 @@ index 925e46f..b9e4412
  endif
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..4f741aa
+index 0000000..7b2ca4a
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1680 @@
@@ -10326,7 +10335,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -10367,7 +10376,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -10408,7 +10417,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -10417,7 +10426,7 @@ index 0000000..4f741aa
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "51000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10449,7 +10458,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -10490,7 +10499,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -10531,7 +10540,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -10992,7 +11001,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -11033,7 +11042,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -11074,7 +11083,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -11083,7 +11092,7 @@ index 0000000..4f741aa
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "51000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -11115,7 +11124,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -11156,7 +11165,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -11197,7 +11206,7 @@ index 0000000..4f741aa
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -12387,7 +12396,7 @@ index 0000000..1f6be84
 +};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..a0b9c1e
+index 0000000..97df601
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1336 @@
@@ -12959,7 +12968,7 @@ index 0000000..a0b9c1e
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -13000,7 +13009,7 @@ index 0000000..a0b9c1e
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -13041,7 +13050,7 @@ index 0000000..a0b9c1e
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -13453,7 +13462,7 @@ index 0000000..a0b9c1e
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_e";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -13494,7 +13503,7 @@ index 0000000..a0b9c1e
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_e";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -13535,7 +13544,7 @@ index 0000000..a0b9c1e
 +							lane_polarity = "6";
 +							tegra_sinterface = "serial_e";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -14690,10 +14699,10 @@ index 8e040d6..e100dc5
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..35e99f7
+index 0000000..95da8b7
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,3027 @@
+@@ -0,0 +1,2995 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -15420,7 +15429,6 @@ index 0000000..35e99f7
 +
 +				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -15438,7 +15446,6 @@ index 0000000..35e99f7
 +
 +				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -15475,10 +15482,9 @@ index 0000000..35e99f7
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -15516,10 +15522,9 @@ index 0000000..35e99f7
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -15557,10 +15562,9 @@ index 0000000..35e99f7
 +
 +				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -15569,7 +15573,7 @@ index 0000000..35e99f7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "51000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -15598,10 +15602,9 @@ index 0000000..35e99f7
 +
 +				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -15639,10 +15642,9 @@ index 0000000..35e99f7
 +
 +				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -15680,10 +15682,9 @@ index 0000000..35e99f7
 +
 +				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -16079,7 +16080,6 @@ index 0000000..35e99f7
 +
 +				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -16097,7 +16097,6 @@ index 0000000..35e99f7
 +
 +				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -16134,10 +16133,9 @@ index 0000000..35e99f7
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16175,10 +16173,9 @@ index 0000000..35e99f7
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16216,10 +16213,9 @@ index 0000000..35e99f7
 +
 +				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -16228,7 +16224,7 @@ index 0000000..35e99f7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "51000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16257,10 +16253,9 @@ index 0000000..35e99f7
 +
 +				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16298,10 +16293,9 @@ index 0000000..35e99f7
 +
 +				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16339,10 +16333,9 @@ index 0000000..35e99f7
 +
 +				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -16739,7 +16732,6 @@ index 0000000..35e99f7
 +
 +				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -16757,7 +16749,6 @@ index 0000000..35e99f7
 +
 +				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -16794,10 +16785,9 @@ index 0000000..35e99f7
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16835,10 +16825,9 @@ index 0000000..35e99f7
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16876,10 +16865,9 @@ index 0000000..35e99f7
 +
 +				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -16888,7 +16876,7 @@ index 0000000..35e99f7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "51000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16917,10 +16905,9 @@ index 0000000..35e99f7
 +
 +				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16958,10 +16945,9 @@ index 0000000..35e99f7
 +
 +				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -16999,10 +16985,9 @@ index 0000000..35e99f7
 +
 +				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -17398,7 +17383,6 @@ index 0000000..35e99f7
 +
 +				 mode0 { // MICROLYNX_MODE_1024x128_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -17416,7 +17400,6 @@ index 0000000..35e99f7
 +
 +				 mode1 { // MICROLYNX_MODE_1024x128_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
 +					discontinuous_clk = "no";
@@ -17453,10 +17436,9 @@ index 0000000..35e99f7
 +
 +				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -17494,10 +17476,9 @@ index 0000000..35e99f7
 +
 +				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -17535,10 +17516,9 @@ index 0000000..35e99f7
 +
 +				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -17547,7 +17527,7 @@ index 0000000..35e99f7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "51000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -17576,10 +17556,9 @@ index 0000000..35e99f7
 +
 +				 mode3 { // ILUMOS_MODE_2048x2048_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -17617,10 +17596,9 @@ index 0000000..35e99f7
 +
 +				 mode4 { // ILUMOS_MODE_2048x1088_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "2048";
@@ -17658,10 +17636,9 @@ index 0000000..35e99f7
 +
 +				 mode5 { // ILUMOS_MODE_1280x1024_RAW14
 +					num_lanes = "2";
-+					lane_polarity = "6";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
-+					discontinuous_clk = "yes";
++					discontinuous_clk = "no";
 +					dpcm_enable = "false";
 +					cil_settletime = "0";
 +					active_w = "1280";
@@ -19521,10 +19498,10 @@ index b4c3f73..5b877c1 100644
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..f07ffc3
+index 0000000..4cf5f2b
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,2098 @@
+@@ -0,0 +1,2097 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -20374,7 +20351,7 @@ index 0000000..f07ffc3
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -20414,7 +20391,7 @@ index 0000000..f07ffc3
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -20455,7 +20432,7 @@ index 0000000..f07ffc3
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -20464,8 +20441,7 @@ index 0000000..f07ffc3
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+//							pix_clk_hz = "85000000";
-+							pix_clk_hz = "51000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -20497,7 +20473,7 @@ index 0000000..f07ffc3
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -20538,7 +20514,7 @@ index 0000000..f07ffc3
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -20579,7 +20555,7 @@ index 0000000..f07ffc3
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -21232,7 +21208,7 @@ index 0000000..f07ffc3
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -21273,7 +21249,7 @@ index 0000000..f07ffc3
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -21314,7 +21290,7 @@ index 0000000..f07ffc3
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -21323,7 +21299,7 @@ index 0000000..f07ffc3
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "51000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -21355,7 +21331,7 @@ index 0000000..f07ffc3
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -21396,7 +21372,7 @@ index 0000000..f07ffc3
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "2048";
@@ -21437,7 +21413,7 @@ index 0000000..f07ffc3
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
-+							discontinuous_clk = "yes";
++							discontinuous_clk = "no";
 +							dpcm_enable = "false";
 +							cil_settletime = "0";
 +							active_w = "1280";
@@ -21641,6 +21617,31 @@ index 0000000..eaaf948
 +
 +/ {
 +	overlay-name = "Exosens Cameras for DSBOARD-ORNXS";
++	jetson-header-name = "Jetson 24pin CSI Connector";
++	compatible = JETSON_COMPATIBLE_P3768;
++};
+diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts
+new file mode 100644
+index 0000000..b82d331
+--- /dev/null
++++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dts
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/* CAM0 lane swap corrected on carrier board (e.g. Seeed Studio reComputer J4012).
++ * CSI0_CLK (brick A) is used for CAM0, same as on DSBOARD-ORNXS but without
++ * the Forecr-specific I2C mux GPIO (TEGRA234_MAIN_GPIO Q,6).
++ * The standard devkit mux GPIO (TEGRA234_AON_GPIO CC,3) is used instead. */
++#define CAM0_LANE_SWAP
++
++#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
++
++/ {
++	overlay-name = "Exosens Cameras - CAM0 lane swap";
 +	jetson-header-name = "Jetson 24pin CSI Connector";
 +	compatible = JETSON_COMPATIBLE_P3768;
 +};
@@ -28949,10 +28950,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..0f897ca
+index 0000000..9dd999e
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,771 @@
+@@ -0,0 +1,795 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -29175,6 +29176,7 @@ index 0000000..0f897ca
 +}
 +
 +
++/*
 +static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
 +                                              u32 reg, u32 *val)
 +{
@@ -29192,6 +29194,7 @@ index 0000000..0f897ca
 +   return ilumos_i2c_read_register(client, REG_CROSSLINK_DATA,
 +                                   (u8 *)val, sizeof(*val));
 +}
++*/
 +
 +static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
 +                                  u8 *buf, u16 len)
@@ -29280,7 +29283,7 @@ index 0000000..0f897ca
 +   struct device *dev = &priv->i2c_client->dev;
 +   int i, mode;
 +   u8 buf[64];
-+   u32 read_data;
++//   u32 read_data;
 +   u32 width, height;
 +   bool is_raw14 = false;
 +
@@ -29293,10 +29296,12 @@ index 0000000..0f897ca
 +      priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
 +      dev_info(dev, "FPGA firmware version = %s\n", priv->firmware_version);
 +   } else {
-+      dev_warn(dev, "FPGA firmware read failed\n");
++      dev_err(dev, "FPGA firmware read failed\n");
++      goto error_exit;
 +   }
 +
 +   /* Pixel format via Crosslink */
++/*
 +   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
 +                                          REG_CROSSLINK_PIXEL_FORMAT,
 +                                          &read_data) == 0) {
@@ -29309,8 +29314,9 @@ index 0000000..0f897ca
 +   } else {
 +      dev_warn(dev, "PIXEL_FORMAT read failed, assuming RAW16\n");
 +   }
-+
++*/
 +   /* Read Width and Height via Crosslink FRAME_SIZE */
++/*
 +   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
 +                                          REG_CROSSLINK_FRAME_SIZE,
 +                                          &read_data) != 0) {
@@ -29334,6 +29340,20 @@ index 0000000..0f897ca
 +      width = read_data & 0xFFFF;
 +      height = read_data >> 16;
 +   }
++*/
++
++      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
++                                   (u8 *)&width, sizeof(width)) == 0) {
++         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
++                                      (u8 *)&height, sizeof(height)) == 0) {
++         } else {
++            dev_err(dev, "Failed to read height\n");
++            goto error_exit;
++         }
++      } else {
++         dev_err(dev, "Failed to read width\n");
++         goto error_exit;
++      }
 +   dev_info(dev, "Frame width = %u px\n", width);
 +   dev_info(dev, "Frame height = %u px\n", height);
 +
@@ -29386,6 +29406,10 @@ index 0000000..0f897ca
 +      priv->serial_number[0] = '\0';
 +      dev_warn(dev, "failed to read serial number\n");
 +   }
++
++   // Stop the video streaming by default
++   dev_dbg(dev, "%s Stop streaming\n", __func__);
++   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
 +
 +   return 0;
 +
@@ -29518,9 +29542,10 @@ index 0000000..0f897ca
 +
 +static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
 +{
++   struct ilumos *priv = tegracam_get_privdata(tc_dev);
 +   dev_dbg(tc_dev->dev, "%s\n", __func__);
++   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
 +
-+   /* Note: We don't actually stop the camera, just acknowledge the call */
 +   return 0;
 +}
 +
