@@ -647,7 +647,7 @@ cameras:
         active_w: 2048
         active_h: 2048
         data_lanes: 2
-        discontinuous_clk: "yes"
+        discontinuous_clk: "no"
         modes:
           - pixel_format: "Y16"
             line_length: 2048
@@ -661,7 +661,7 @@ cameras:
         active_w: 2048
         active_h: 1088
         data_lanes: 2
-        discontinuous_clk: "yes"
+        discontinuous_clk: "no"
         modes:
           - pixel_format: "Y16"
             line_length: 2048
@@ -675,7 +675,7 @@ cameras:
         active_w: 1280
         active_h: 1024
         data_lanes: 2
-        discontinuous_clk: "yes"
+        discontinuous_clk: "no"
         modes:
           - pixel_format: "Y16"
             line_length: 1280
