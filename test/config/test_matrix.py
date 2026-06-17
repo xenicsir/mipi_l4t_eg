@@ -103,7 +103,7 @@ def _find_package(version: str, platform_id: str, vendor: str) -> str | None:
       - generic generic:      jetson-l4t-<ver>-jp<jp>-eg-cams_*_arm64.deb
       - generic t210:         jetson-l4t-<ver>-jp<jp>-t210-eg-cams_*_arm64.deb
       - generic t186:         jetson-l4t-<ver>-jp<jp>-t186-eg-cams_*_arm64.deb
-      - forecr:               jetson-l4t-<ver>-jp<jp>-forecr-dsboard-ornx-eg-cams_*_arm64.deb
+      - forecr:               jetson-l4t-<ver>-jp<jp>-forecr-dsboard-ornxs-eg-cams_*_arm64.deb
     """
     import glob
 
@@ -113,7 +113,7 @@ def _find_package(version: str, platform_id: str, vendor: str) -> str | None:
 
     # Build the discriminator substring that must appear in the filename
     if vendor == "forecr":
-        discriminator = "-forecr-dsboard-ornx-eg-cams"
+        discriminator = "-forecr-dsboard-ornxs-eg-cams"
     elif platform_id == "nano_t210":
         discriminator = "-t210-eg-cams"
     elif platform_id == "tx2_t186":

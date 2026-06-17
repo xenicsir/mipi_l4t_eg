@@ -39,7 +39,7 @@ else
    KERNEL_VERSION=$(ls $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/lib/modules/ | grep -v -- '-eg$' | head -1)
 fi
 
-# Package naming: jetson-l4t-36.4.3-jp6.2-forecr-dsboard-ornx-eg-cams
+# Package naming: jetson-l4t-36.4.3-jp6.2-forecr-dsboard-ornxs-eg-cams
 #                 jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams
 JP_INFIX=""
 [[ -n "$JETPACK_VERSION" ]] && JP_INFIX="-jp${JETPACK_VERSION}"
@@ -462,9 +462,7 @@ EOT
 # For vendor packages, inject known board so postinst never calls detect_jetson_board.sh
 if [[ "$VENDOR" != "generic" ]]; then
    # Convert underscores to hyphens (CARRIER_BOARD uses underscores internally; detect_jetson_board.sh uses hyphens).
-   # Temporary: dsboard_ornx in eg_config.yaml is a typo for dsboard_ornxs (two different Forecr products).
    _EG_FORCE_BOARD="${CARRIER_BOARD//_/-}"
-   [[ "$_EG_FORCE_BOARD" == "dsboard-ornx" ]] && _EG_FORCE_BOARD="dsboard-ornxs"
 cat >> "$_POSTINST" << EOT
 export EG_FORCE_BOARD="${_EG_FORCE_BOARD}"
 EOT

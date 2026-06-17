@@ -287,7 +287,7 @@ copy_exosens_sources() {
       merge_copy "$ROOT_DIR/sources/${L4T_VERSION}/$VENDOR_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
    fi
 
-   # Layer 6: Carrier-specific files (e.g. sources/35.6.2/Linux_for_Tegra_dsboard_ornx)
+   # Layer 6: Carrier-specific files (e.g. sources/35.6.2/Linux_for_Tegra_dsboard_ornxs)
    if [[ -n "$CARRIER_SOURCE_DIR" ]]; then
       merge_copy "$ROOT_DIR/sources/${L4T_VERSION}/$CARRIER_SOURCE_DIR" "$L4T_DIR" "" "$verbose"
    fi

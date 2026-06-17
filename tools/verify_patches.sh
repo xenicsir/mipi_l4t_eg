@@ -21,7 +21,7 @@
 # Directory naming conventions:
 #   - patches/$VERSION_$VENDOR/ (e.g., patches/36.4.3_forecr/)
 #   - sources/$VERSION/Linux_for_Tegra_$VENDOR/ (e.g., sources/36.4.3/Linux_for_Tegra_forecr/)
-#   - $VERSION/Linux_for_Tegra_${VENDOR}_${CARRIER}/ (e.g., 36.4.3/Linux_for_Tegra_forecr_dsboard_ornx/)
+#   - $VERSION/Linux_for_Tegra_${VENDOR}_${CARRIER}/ (e.g., 36.4.3/Linux_for_Tegra_forecr_dsboard_ornxs/)
 #
 # Usage:
 #   ./tools/verify_patches.sh [options] [version_filter]
@@ -120,7 +120,7 @@ get_major_version() {
 # Function: Extract vendor from directory name
 # Linux_for_Tegra -> ""
 # Linux_for_Tegra_forecr -> "forecr"
-# Linux_for_Tegra_forecr_dsboard_ornx -> "forecr"
+# Linux_for_Tegra_forecr_dsboard_ornxs -> "forecr"
 #******************************************************************************
 extract_vendor() {
     local dir_name="$1"

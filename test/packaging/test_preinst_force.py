@@ -304,7 +304,7 @@ def test_postinst_cleanup(entry: Entry, info: dict) -> tuple[str, str]:
 _FORECR_DPKG_MOCK = (
     "#!/bin/sh\n"
     "[ \"$1\" = '-l' ] && "
-    "echo 'ii  jetson-l4t-36.4.4-forecr-dsboard-ornx-eg-cams 1.0 arm64 -'\n"
+    "echo 'ii  jetson-l4t-36.4.4-forecr-dsboard-ornxs-eg-cams 1.0 arm64 -'\n"
 )
 
 

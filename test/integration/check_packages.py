@@ -203,7 +203,7 @@ def main():
     for deb in all_debs:
         version_dir = deb.parent.name
         som = extract_som(deb.name)
-        is_forecr = bool(re.search(r"forecr-dsboard-ornx", deb.name))
+        is_forecr = bool(re.search(r"forecr-dsboard-ornxs", deb.name))
         key = (version_dir, som, is_forecr)
         groups.setdefault(key, []).append(str(deb))
 

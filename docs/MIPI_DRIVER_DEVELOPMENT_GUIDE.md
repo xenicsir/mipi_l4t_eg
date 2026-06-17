@@ -585,7 +585,7 @@ versions:
     platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs]  # platforms supported by this version
     vendors: [generic, forecr]
     standalone:
-      forecr: {dsboard_ornx: true}
+      forecr: {dsboard_ornxs: true}
       generic: {generic: true}
     sources:
       public:

@@ -328,7 +328,7 @@ versions:
     platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
     vendors: [generic, forecr]
     standalone:
-      forecr: {dsboard_ornx: true}
+      forecr: {dsboard_ornxs: true}
       generic: {generic: true}
     sources:
       public:
@@ -351,7 +351,7 @@ versions:
     platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
     vendors: [generic, forecr]
     standalone:
-      forecr: {dsboard_ornx: true}
+      forecr: {dsboard_ornxs: true}
       generic: {generic: true}
     sources:
       public:
@@ -374,7 +374,7 @@ versions:
     platform_ids: [agx_orin_devkit, agx_orin_x230d, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
     vendors: [generic, forecr]
     standalone:
-      forecr: {dsboard_ornx: true}
+      forecr: {dsboard_ornxs: true}
       generic: {generic: true}
     sources:
       public:
@@ -397,7 +397,7 @@ versions:
     platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
     vendors: [generic, forecr]
     standalone:
-      forecr: {dsboard_ornx: true}
+      forecr: {dsboard_ornxs: true}
       generic: {generic: true}
     sources:
       public:
@@ -423,16 +423,16 @@ vendors:
     carriers: [generic]
     default_carrier: generic
   forecr:
-    carriers: [dsboard_ornx]
-    default_carrier: dsboard_ornx
+    carriers: [dsboard_ornxs]
+    default_carrier: dsboard_ornxs
 
 carriers:
   generic:
     defconfig: tegra_defconfig
     dir_suffix: ""
-  dsboard_ornx:
+  dsboard_ornxs:
     defconfig: dsboard_ornx_defconfig
-    dir_suffix: dsboard_ornx
+    dir_suffix: dsboard_ornxs
 
 soms:
   t210:

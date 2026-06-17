@@ -7,7 +7,7 @@
 # naming conventions:
 #   - Linux_for_Tegra (generic)
 #   - Linux_for_Tegra_forecr (old vendor naming)
-#   - Linux_for_Tegra_forecr_dsboard_ornx (new vendor_carrier naming)
+#   - Linux_for_Tegra_forecr_dsboard_ornxs (new vendor_carrier naming)
 #
 # Matching logic for forecr:
 #   - If only Linux_for_Tegra_forecr exists in both repos, compare them

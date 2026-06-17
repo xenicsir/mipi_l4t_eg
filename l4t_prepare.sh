@@ -11,7 +11,7 @@
 # Examples:
 #   ./l4t_prepare.sh -v 36.4.3
 #   ./l4t_prepare.sh -v 36.4.3 -V forecr
-#   ./l4t_prepare.sh --l4t-version 36.4.3 --vendor forecr --carrier-board dsboard_ornx
+#   ./l4t_prepare.sh --l4t-version 36.4.3 --vendor forecr --carrier-board dsboard_ornxs
 #
 # Performance:
 #   Install parallel decompression tools for faster extraction:

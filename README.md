@@ -188,7 +188,7 @@ Each argument acts as a filter. When an argument is omitted, `l4t_make.sh` itera
 | `-v / --l4t-version` | L4T version: exact (`35.5.0`), `.x` shorthand (`36.x`, `35.6.x`), or quoted wildcard (`"36.*"`) | all versions |
 | `-V / --vendor` | Vendor (`generic`, `forecr`) | all vendors for the matched versions |
 | `-s / --som` | SoM (`t210`, `t186`) — 32.x only | all SoMs for the matched version+vendor |
-| `-c / --carrier-board` | Carrier board (`dsboard_ornx`, …) | all carriers for the matched vendor |
+| `-c / --carrier-board` | Carrier board (`dsboard_ornxs`, …) | all carriers for the matched vendor |
 
 For example, `-v 35.3.1` alone would build **both** `generic` and `forecr` for that version. To target a single configuration, specify all four filters explicitly (use the arguments shown by `--list` as a safe starting point).
 
@@ -368,29 +368,29 @@ Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi, ilumos
 - Applies an additional carrier-specific source layer (`sources/<version>/Linux_for_Tegra_<vendor>_<carrier>/`) on top of the vendor layer, using the same 3-way merge mechanism
 - Reflects the carrier name in the generated package filename
 
-When a vendor has a single carrier (e.g., `forecr` has only `dsboard_ornx`), that carrier is used by default and `-c` can be omitted.
+When a vendor has a single carrier (e.g., `forecr` has only `dsboard_ornxs`), that carrier is used by default and `-c` can be omitted.
 
-**Example: Building for Forecr carrier board with dsboard_ornx:**
+**Example: Building for Forecr carrier board with dsboard_ornxs:**
 
 ```bash
-# Build all steps for forecr/dsboard_ornx
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx
+# Build all steps for forecr/dsboard_ornxs
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornxs
 
 # Or step by step:
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --prepare
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --copy-sources
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --build
-./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornx --gen-package
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornxs --prepare
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornxs --copy-sources
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornxs --build
+./l4t_make.sh -v <l4t_version> -V forecr -c dsboard_ornxs --gen-package
 
 # Or step by step with individual scripts :
-./l4t_prepare.sh -v <l4t_version> -V forecr -c dsboard_ornx
-./l4t_copy_sources.sh -v <l4t_version> -V forecr -c dsboard_ornx
-./l4t_build.sh -v <l4t_version> -V forecr -c dsboard_ornx
-./l4t_gen_delivery_package.sh -v <l4t_version> -V forecr -c dsboard_ornx
+./l4t_prepare.sh -v <l4t_version> -V forecr -c dsboard_ornxs
+./l4t_copy_sources.sh -v <l4t_version> -V forecr -c dsboard_ornxs
+./l4t_build.sh -v <l4t_version> -V forecr -c dsboard_ornxs
+./l4t_gen_delivery_package.sh -v <l4t_version> -V forecr -c dsboard_ornxs
 
 ```
 
-This generates: `jetson-l4t-<l4t_version>-jp<jp_version>-forecr-dsboard-ornx-eg-cams_<debian_version>_arm64.deb`
+This generates: `jetson-l4t-<l4t_version>-jp<jp_version>-forecr-dsboard-ornxs-eg-cams_<debian_version>_arm64.deb`
 
 ### Installing and configuring the MIPI drivers on the board
 
@@ -662,7 +662,7 @@ This provides tab-completion for:
 - L4T versions (`-v 36.4.4`)
 - SoMs (`-s t186`, `-s t210`) — 32.x builds only
 - Vendors (`-V forecr`)
-- Carrier boards (`-c dsboard_ornx`)
+- Carrier boards (`-c dsboard_ornxs`)
 
 ---
 
