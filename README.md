@@ -11,6 +11,7 @@ The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of 
 ## Table of Contents
 
 - [Acronyms](#acronyms)
+- [Flashing JetPack on Jetson Orin NX/Nano](#flashing-jetpack-on-jetson-orin-nxnano)
 - [Prerequisites for cross-compiling](#prerequisites-for-cross-compiling)
   - [Host PC requirements](#host-pc-requirements)
 - [Building, installing, configuring and testing MIPI drivers](#building-installing-configuring-and-testing-mipi-drivers)
@@ -63,6 +64,18 @@ The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of 
 | **V4L2** | Video for Linux 2 | Linux kernel API for video capture and output devices (controls formats, modes, streaming) |
 | **Y16** | — | 16-bit greyscale pixel format code in V4L2; used by infrared cameras |
 | **YUYV** | — | YUV 4:2:2 packed pixel format (alternating Y, U, Y, V bytes); also written YCbCr 4:2:2 |
+
+---
+
+## Flashing JetPack on Jetson Orin NX/Nano
+
+Before building and installing the MIPI drivers, the board must be flashed with a
+supported L4T version (35.6.0 or 36.4.4). Flashing, upgrading and **downgrading** Orin
+NX/Nano boards — on NVIDIA devkits and Forecr DSBOARD-ORNXS carriers, SD card or NVMe —
+each needs a specific command sequence (downgrading from 36.x to 35.x in particular).
+
+See **[docs/JETSON_FLASHING_GUIDE.md](docs/JETSON_FLASHING_GUIDE.md)** for the per-board
+command reference, host prerequisites, and flashing troubleshooting.
 
 ---
 
