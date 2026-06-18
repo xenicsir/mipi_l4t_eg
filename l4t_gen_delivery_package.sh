@@ -471,10 +471,16 @@ fi
 # Add Exosens camera overlay configuration (quoted EOT, no expansion)
 cat >> "$_POSTINST" << 'EOT'
 
-# Configure Exosens camera overlay if not already done
+# Configure Exosens camera overlay if not already done.
+# Track the camera-config outcome so a FRESH install that fails to configure the
+# cameras propagates as a non-zero postinst exit (dpkg reports failure) instead
+# of silently succeeding with a broken/empty camera config. The upgrade
+# re-application below stays best-effort: the previous working config is already
+# in place, so a re-apply hiccup must not abort the package upgrade.
+_CONFIG_RC=0
 if ! grep -q "JetsonIO" /boot/extlinux/extlinux.conf 2>/dev/null; then
    # Fresh install: configure all ports with default camera (Dione)
-   eg_dt_camera_config_set.sh
+   eg_dt_camera_config_set.sh || _CONFIG_RC=$?
 else
    # Upgrade: JetsonIO already configured
 
@@ -521,14 +527,17 @@ else
 
       if [[ -n "$CAMERA_ARGS" ]]; then
          echo "Re-applying camera configuration:$CAMERA_ARGS"
-         eg_dt_camera_config_set.sh $CAMERA_ARGS
+         eg_dt_camera_config_set.sh $CAMERA_ARGS || \
+            echo "Warning: camera config re-apply failed; keeping existing configuration" >&2
       else
          echo "No camera configuration found, applying defaults"
-         eg_dt_camera_config_set.sh
+         eg_dt_camera_config_set.sh || \
+            echo "Warning: camera config re-apply failed; keeping existing configuration" >&2
       fi
    else
       echo "Could not read camera configuration, applying defaults"
-      eg_dt_camera_config_set.sh
+      eg_dt_camera_config_set.sh || \
+         echo "Warning: camera config re-apply failed; keeping existing configuration" >&2
    fi
 
    # Check if /boot/eg/Image is a standalone kernel (version ends with -eg)
@@ -565,6 +574,10 @@ if [[ -n "$_OLD_PKGS" ]]; then
     ( sleep 3 && dpkg --purge $_OLD_PKGS > /dev/null 2>&1 ) &
     disown $!
 fi
+
+# Propagate a fresh-install camera-config failure. The best-effort cleanup above
+# must not mask it; _CONFIG_RC is 0 on success and for best-effort upgrades.
+exit $_CONFIG_RC
 EOT
 
 #******************************************************************************

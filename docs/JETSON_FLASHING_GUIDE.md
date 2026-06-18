@@ -167,8 +167,9 @@ sudo ./tools/kernel_flash/l4t_initrd_flash.sh \
 
 ## Troubleshooting (quick)
 
-| Symptom (host log) | Cause | Action |
+| Symptom (host log or serial console) | Cause | Action |
 |--------------------|-------|--------|
 | `tegrarcm_v2 … Error: Return value 8` (~15 s into flash) | USB link dropped — **VM / USB hub** | Flash from bare-metal, direct USB-C, no hub |
 | `ECID is` empty / `probing the target board failed` | Board not in recovery | Re-arm recovery (hold RECOVERY, tap RESET) and retry |
 | `python: command not found` | Host prerequisites missing | `sudo ./tools/l4t_flash_prerequisites.sh` |
+| Flash says *successfully* but the board never boots; serial console hangs at MB2 `Prepare eeprom data` → `I2C: slave not found … slave 0xae` → `Task failed (err: 0x1f1e050d)` → `Busy Spin` | A **Forecr DSBOARD-ORNXS** was flashed with the **NVIDIA stock BSP** (or a non-Forecr board config). MB2 fails to read the carrier EEPROM (0x57) that only the devkit has → hang before UEFI. | Re-flash with the **Forecr BSP** for DSBOARD-ORNXS (see the Forecr install links above). Never flash a Forecr carrier with the stock NVIDIA BSP. |
