@@ -14,6 +14,7 @@
 #include <linux/of_gpio.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/delay.h>
 #include <media/tegracam_core.h>
 
 /* ilumos GenCP registers */
@@ -31,6 +32,7 @@
 #define REG_CROSSLINK_R_WR_CMD      0x50000C08
 
 #define REG_CROSSLINK_FW_VERSION    0x0
+#define REG_CROSSLINK_DEBUG_ENABLE  0x1
 #define REG_CROSSLINK_PIXEL_FORMAT  0x2
 #define REG_CROSSLINK_LINE_LENGTH   0x3
 #define REG_CROSSLINK_FIFO_STATUS   0x7
@@ -240,6 +242,22 @@ static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
 }
 */
 
+static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
+{
+   int ret;
+
+   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_ADDR, reg);
+   if (ret)
+      return ret;
+
+   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_DATA, val);
+   if (ret)
+      return ret;
+
+   return ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
+                                   WRITE_CROSSLINK);
+}
+
 static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
                                   u8 *buf, u16 len)
 {
@@ -386,18 +404,21 @@ static int ilumos_sensor_check(struct ilumos *priv)
    }
 */
 
-      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
-                                   (u8 *)&width, sizeof(width)) == 0) {
-         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
-                                      (u8 *)&height, sizeof(height)) == 0) {
-         } else {
-            dev_err(dev, "Failed to read height\n");
-            goto error_exit;
-         }
+   if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
+                                (u8 *)&width, sizeof(width)) == 0) {
+      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
+                                   (u8 *)&height, sizeof(height)) == 0) {
       } else {
-         dev_err(dev, "Failed to read width\n");
+         dev_err(dev, "Failed to read height\n");
          goto error_exit;
       }
+   } else {
+      dev_err(dev, "Failed to read width\n");
+      goto error_exit;
+   }
+
+//   width  = 2048;
+//   height = 2048;
    dev_info(dev, "Frame width = %u px\n", width);
    dev_info(dev, "Frame height = %u px\n", height);
 
@@ -571,6 +592,9 @@ static int ilumos_start_streaming(struct tegracam_device *tc_dev)
 
    dev_dbg(tc_dev->dev, "%s\n", __func__);
 
+   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 1);
+   return 0;
+
    status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
          (u8 *)&read_data, sizeof(read_data));
    if (status == 0) {
@@ -588,6 +612,12 @@ static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
 {
    struct ilumos *priv = tegracam_get_privdata(tc_dev);
    dev_dbg(tc_dev->dev, "%s\n", __func__);
+
+   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 0);
+   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
+   msleep(50);
+   return 0;
+
    ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
 
    return 0;
