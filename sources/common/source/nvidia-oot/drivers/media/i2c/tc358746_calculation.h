@@ -3,8 +3,7 @@
 #ifndef __TC358746_CALCULATION_H
 #define __TC358746_CALCULATION_H
 
-#include <stdbool.h>
-#include <linux/types.h>
+#include <linux/types.h>	/* bool/true/false — ne pas inclure <stdbool.h> (userspace, absent avec la toolchain noble/x-tools) */
 
 struct tc358746_mbus_fmt {
    u32 code;

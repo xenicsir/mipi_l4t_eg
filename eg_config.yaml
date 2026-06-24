@@ -415,6 +415,29 @@ versions:
       dir: aarch64--glibc--stable-2022.08-1
       prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
 
+  "39.2":
+    jetpack: "7.2"
+    platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
+    vendors: [generic, forecr]
+    standalone:
+      forecr: {dsboard_ornxs: true}
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r39_release_v2.0/sources/public_sources.tbz2
+      release:
+        filename: jetson_linux_r39.2.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r39_release_v2.0/release/jetson_linux_r39.2.0_aarch64.tbz2
+      sample_fs:
+        filename: tegra_linux_sample-root-filesystem_r39.2.0_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r39_release_v2.0/release/tegra_linux_sample-root-filesystem_r39.2.0_aarch64.tbz2
+    toolchain:
+      archive: x-tools.tbz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r38_release_v2.0/release/x-tools.tbz2
+      dir: x-tools
+      prefix: x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+
 # ---------------------------------------------------------------------------
 # Vendors and carriers
 # ---------------------------------------------------------------------------

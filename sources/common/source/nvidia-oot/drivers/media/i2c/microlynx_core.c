@@ -570,8 +570,12 @@ static const struct file_operations microlynx_cdev_fops = {
 
 /* ----------------------------------------------------------------------- */
 
+#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
+static int microlynx_probe(struct i2c_client *client)
+#else
 static int microlynx_probe(struct i2c_client *client,
       const struct i2c_device_id *id)
+#endif
 {
    struct device *dev = &client->dev;
    struct tegracam_device *tc_dev;
@@ -701,6 +705,6 @@ static struct i2c_driver microlynx_i2c_driver = {
 module_i2c_driver(microlynx_i2c_driver);
 
 MODULE_AUTHOR("Exosens");
-MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for Microlynx IR cameras");
+MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for Microlynx cameras");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");

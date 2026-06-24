@@ -417,8 +417,8 @@ static int ilumos_sensor_check(struct ilumos *priv)
       goto error_exit;
    }
 
-//   width  = 2048;
-//   height = 2048;
+   width  = 2048;
+   height = 2048;
    dev_info(dev, "Frame width = %u px\n", width);
    dev_info(dev, "Frame height = %u px\n", height);
 
@@ -474,7 +474,7 @@ static int ilumos_sensor_check(struct ilumos *priv)
 
    // Stop the video streaming by default
    dev_dbg(dev, "%s Stop streaming\n", __func__);
-   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 2);
 
    return 0;
 
@@ -597,6 +597,7 @@ static int ilumos_start_streaming(struct tegracam_device *tc_dev)
 
    status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
          (u8 *)&read_data, sizeof(read_data));
+   dev_dbg(tc_dev->dev, "%s Lecture REG_ACQ_STATUS_R = %d\n", __func__, read_data);
    if (status == 0) {
       if (read_data != 0x1) {
          status = ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 1);
@@ -619,6 +620,8 @@ static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
    return 0;
 
    ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
+   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
+   msleep(50);
 
    return 0;
 }
@@ -696,8 +699,12 @@ static const struct v4l2_subdev_internal_ops ilumos_subdev_internal_ops = {
    .open = ilumos_open,
 };
 
+#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
+static int ilumos_probe(struct i2c_client *client)
+#else
 static int ilumos_probe(struct i2c_client *client,
       const struct i2c_device_id *id)
+#endif
 {
    struct device *dev = &client->dev;
    struct tegracam_device *tc_dev;
@@ -820,6 +827,6 @@ static struct i2c_driver ilumos_i2c_driver = {
 module_i2c_driver(ilumos_i2c_driver);
 
 MODULE_AUTHOR("Exosens");
-MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for ilumos IR cameras");
+MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for iLumos cameras");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");

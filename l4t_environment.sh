@@ -657,6 +657,16 @@ compute_derived_vars() {
     # Version major number
     L4T_VERSION_MAJOR=$(echo $L4T_VERSION | awk -F '.' '{print $1}')
 
+    # Kernel source subdirectory and family label (per L4T family).
+    # OOT families (>=36) use nvidia-oot; in-tree families (32/35) use Kconfig/defconfig.
+    case "$L4T_VERSION_MAJOR" in
+        32) KERNEL_SUBDIR="kernel-4.9";       L4T_FAMILY="32.x" ;;
+        35) KERNEL_SUBDIR="kernel-5.10";      L4T_FAMILY="35.x" ;;
+        36) KERNEL_SUBDIR="kernel-jammy-src"; L4T_FAMILY="36.x" ;;
+        39) KERNEL_SUBDIR="kernel-noble";     L4T_FAMILY="39.x" ;;
+        *)  KERNEL_SUBDIR="kernel-noble";     L4T_FAMILY="${L4T_VERSION_MAJOR}.x" ;;
+    esac
+
     # Directory paths
     ROOT_DIR=$(pwd)
     ARCHIVE_DIR=${ARCHIVE_DIR_ARG:+$ROOT_DIR/$ARCHIVE_DIR_ARG}

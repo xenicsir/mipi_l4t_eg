@@ -31,7 +31,7 @@ _l4t_init_completion() {
         _l4t_soms=$($_EGCFG soms "$_L4T_CONFIG_FILE" 2>/dev/null)
     fi
     # Fallback defaults if no configuration file
-    _l4t_versions="${_l4t_versions:-32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 35.6.4 36.4 36.4.3 36.4.4 36.5.0}"
+    _l4t_versions="${_l4t_versions:-32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 35.6.4 36.4 36.4.3 36.4.4 36.5.0 39.2}"
     _l4t_vendors="${_l4t_vendors:-generic forecr}"
     _l4t_carrier_boards="${_l4t_carrier_boards:-generic dsboard_ornxs}"
     _l4t_soms="${_l4t_soms:-t210 t186}"

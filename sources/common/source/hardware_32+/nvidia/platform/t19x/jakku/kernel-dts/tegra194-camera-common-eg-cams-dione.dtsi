@@ -595,7 +595,6 @@
 
 						mode0 { // ILUMOS_MODE_2048x2048_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -636,7 +635,6 @@
 
 						mode1 { // ILUMOS_MODE_2048x1088_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -677,7 +675,6 @@
 
 						mode2 { // ILUMOS_MODE_1280x1024_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -718,7 +715,6 @@
 
 						mode3 { // ILUMOS_MODE_2048x2048_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -759,7 +755,6 @@
 
 						mode4 { // ILUMOS_MODE_2048x1088_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -800,7 +795,6 @@
 
 						mode5 { // ILUMOS_MODE_1280x1024_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -863,7 +857,6 @@
 
 						mode0 { // MICROLYNX_MODE_1024x128_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -881,7 +874,6 @@
 
 						mode1 { // MICROLYNX_MODE_1024x128_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_a";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1261,7 +1253,6 @@
 
 						mode0 { // ILUMOS_MODE_2048x2048_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1302,7 +1293,6 @@
 
 						mode1 { // ILUMOS_MODE_2048x1088_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1343,7 +1333,6 @@
 
 						mode2 { // ILUMOS_MODE_1280x1024_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1384,7 +1373,6 @@
 
 						mode3 { // ILUMOS_MODE_2048x2048_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1425,7 +1413,6 @@
 
 						mode4 { // ILUMOS_MODE_2048x1088_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1466,7 +1453,6 @@
 
 						mode5 { // ILUMOS_MODE_1280x1024_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1529,7 +1515,6 @@
 
 						mode0 { // MICROLYNX_MODE_1024x128_RAW16
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
@@ -1547,7 +1532,6 @@
 
 						mode1 { // MICROLYNX_MODE_1024x128_RAW14
 							num_lanes = "2";
-							lane_polarity = "6";
 							tegra_sinterface = "serial_c";
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";

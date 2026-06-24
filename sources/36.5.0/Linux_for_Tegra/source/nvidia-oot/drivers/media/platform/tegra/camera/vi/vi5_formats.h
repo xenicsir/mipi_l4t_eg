@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * NVIDIA Tegra Video Input Device Driver VI5 formats
+/* SPDX-License-Identifier: GPL-2.0-only
+ * SPDX-FileCopyrightText: Copyright (c) 2017-2024 NVIDIA CORPORATION & AFFILIATES.
+ * All rights reserved.
  *
- * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * NVIDIA Tegra Video Input Device Driver VI5 formats
  *
  * Author: Bhanu Murthy V <bmurthyv@nvidia.com>
  *

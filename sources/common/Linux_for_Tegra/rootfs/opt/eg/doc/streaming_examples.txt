@@ -63,6 +63,13 @@ YUYV (YCbCr 4:2:2 Packed)
 GSTREAMER EXAMPLES
 ───────────────────
 
+Note on display sink:
+  autovideosink is used throughout. It auto-selects the best available sink:
+    - Ubuntu 22.04 / L4T 36.x (X11):     ximagesink or glimagesink
+    - Ubuntu 24.04 / L4T 39.x (X11+GL):  glimagesink (ximagesink broken by XInput2 bug)
+  Do NOT use ximagesink directly on Ubuntu 24.04+ or Wayland environments.
+
+
 MONO16 (Y16 - 16-bit Greyscale)
 
   Capture to file (1 frame):
@@ -73,12 +80,12 @@ MONO16 (Y16 - 16-bit Greyscale)
   Display 640x480:
     gst-launch-1.0 -v v4l2src device="/dev/video0" \
       ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" \
-      ! videoconvert ! ximagesink sync=false
+      ! videoconvert ! autovideosink sync=false
 
   Display 1280x1024:
     gst-launch-1.0 -v v4l2src device="/dev/video0" \
       ! "video/x-raw, format=(string)GRAY16_LE, width=1280, height=1024" \
-      ! videoconvert ! ximagesink sync=false
+      ! videoconvert ! autovideosink sync=false
 
 
 ARGB888 (32-bit BGRA)
@@ -97,12 +104,12 @@ ARGB888 (32-bit BGRA)
   Display 640x480:
     gst-launch-1.0 -v v4l2src device="/dev/video0" \
       ! "video/x-raw, format=(string)BGRA, width=640, height=480" \
-      ! videoconvert ! ximagesink sync=false
+      ! videoconvert ! autovideosink sync=false
 
   Display 1280x1024:
     gst-launch-1.0 -v v4l2src device="/dev/video0" \
       ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" \
-      ! videoconvert ! ximagesink sync=false
+      ! videoconvert ! autovideosink sync=false
 
   Stream to UDP (GStreamer receiver, host 192.168.1.1):
     gst-launch-1.0 v4l2src device=/dev/video0 \
@@ -138,12 +145,12 @@ YUYV (YCbCr 4:2:2 Packed)
   Display 640x480:
     gst-launch-1.0 -v v4l2src device=/dev/video0 \
       ! "video/x-raw, format=(string)YUY2, width=640, height=480" \
-      ! videoconvert ! ximagesink sync=false
+      ! videoconvert ! autovideosink sync=false
 
   Display 1280x1024:
     gst-launch-1.0 -v v4l2src device=/dev/video0 \
       ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" \
-      ! videoconvert ! ximagesink sync=false
+      ! videoconvert ! autovideosink sync=false
 
   Stream to TCP:
     gst-launch-1.0 -v v4l2src device=/dev/video0 \
@@ -182,3 +189,8 @@ NOTES
   remove backslashes and put everything on one line.
 
 • DISPLAY=:1 sets the X11 display for graphical output on a remote host.
+
+• ximagesink is NOT recommended: it fails on Ubuntu 24.04+ (L4T 39.x) with an
+  XInput2 device-ID bug, and does not work under Wayland.
+  Use autovideosink instead — it selects glimagesink / waylandsink / ximagesink
+  automatically depending on the environment.

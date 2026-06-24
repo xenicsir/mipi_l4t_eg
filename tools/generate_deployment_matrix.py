@@ -443,6 +443,7 @@ class DeploymentMatrixGenerator:
             f.write("- ⚠️ **Theoretically Supported** - Supported but not tested\n")
             f.write("- ❌ **Not Supported** - Not supported on this platform\n")
             f.write("- (empty) - Data not available\n\n")
+            f.write("**Acronyms:** EG = Exosens Group\n\n")
 
             # For each platform
             for platform in self.data['platforms']:
@@ -745,6 +746,7 @@ class DeploymentMatrixGenerator:
         <div class="legend-item"><span class="icon">⚠️</span> <strong>Theoretically Supported</strong> - Not tested</div>
         <div class="legend-item"><span class="icon">🔗</span> <strong>Git</strong> - Branch link</div>
         <div class="legend-item"><span class="icon">📦</span> <strong>Package</strong> - .deb download</div>
+        <div class="legend-item"><strong>EG</strong> = Exosens Group</div>
     </div>
 """
 
@@ -958,6 +960,7 @@ class DeploymentMatrixGenerator:
             "<span>⚠️ Theoretical (not yet tested)</span>",
             "<span>❌ Not supported</span>",
             "<span>— No data</span>",
+            "<span><strong>EG</strong> = Exosens Group</span>",
             "</div>",
         ]
 
