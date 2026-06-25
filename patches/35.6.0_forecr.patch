@@ -76976,7 +76976,7 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..517a57e
+index 0000000..c7df032
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 @@ -0,0 +1,832 @@
@@ -77399,8 +77399,8 @@ index 0000000..517a57e
 +      goto error_exit;
 +   }
 +
-+   width  = 2048;
-+   height = 2048;
++//   width  = 2048;
++//   height = 2048;
 +   dev_info(dev, "Frame width = %u px\n", width);
 +   dev_info(dev, "Frame height = %u px\n", height);
 +

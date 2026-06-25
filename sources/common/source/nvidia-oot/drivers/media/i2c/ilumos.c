@@ -417,8 +417,8 @@ static int ilumos_sensor_check(struct ilumos *priv)
       goto error_exit;
    }
 
-   width  = 2048;
-   height = 2048;
+//   width  = 2048;
+//   height = 2048;
    dev_info(dev, "Frame width = %u px\n", width);
    dev_info(dev, "Frame height = %u px\n", height);
 

@@ -345,11 +345,38 @@ _SHORT_MAX_NS = 1_000   # < 1 µs → short packet (SoF/EoF)
 _LONG_MIN_NS  = 3_000   # ≥ 3 µs → long packet (line data)
 
 
-def _classify_and_group(bursts, short_max_ns=_SHORT_MAX_NS, long_min_ns=_LONG_MIN_NS,
-                        interframe_gap_us=50.0):
-    """Classify bursts and group them into frame groups by inter-frame gap."""
-    interframe_gap_ns = interframe_gap_us * 1_000
+def _autodetect_interframe_gap(classified):
+    """
+    Detect the EoF→SoF inter-frame gap from consecutive short-packet pairs.
 
+    Scans for adjacent short bursts with no long burst between them.
+    These represent EoF (end of frame N) followed by SoF (start of frame N+1).
+    Returns half the minimum gap found, to be used as the frame split threshold.
+    Returns None if no such pairs found.
+    """
+    eof_sof_gaps_ns = []
+    for i in range(len(classified) - 1):
+        a, b = classified[i], classified[i + 1]
+        if a['kind'] == 'short' and b['kind'] == 'short':
+            gap_ns = b['start_ns'] - a['end_ns']
+            if gap_ns > 0:
+                eof_sof_gaps_ns.append(gap_ns)
+    if not eof_sof_gaps_ns:
+        return None
+    min_gap_ns = min(eof_sof_gaps_ns)
+    # Split threshold = midpoint between 0 and EoF→SoF gap
+    return min_gap_ns // 2
+
+
+def _classify_and_group(bursts, short_max_ns=_SHORT_MAX_NS, long_min_ns=_LONG_MIN_NS,
+                        interframe_gap_us=None):
+    """
+    Classify bursts and group them into frame groups by inter-frame gap.
+
+    If interframe_gap_us is None (default), the EoF→SoF gap is auto-detected
+    from consecutive short-packet pairs, so SoF and its lines are correctly
+    grouped even when the inter-frame blanking is only a few µs.
+    """
     classified = []
     for start_ns, dur_ns in bursts:
         if dur_ns < short_max_ns:
@@ -360,6 +387,18 @@ def _classify_and_group(bursts, short_max_ns=_SHORT_MAX_NS, long_min_ns=_LONG_MI
             kind = 'mid'
         classified.append({'start_ns': start_ns, 'end_ns': start_ns + dur_ns,
                             'dur_ns': dur_ns, 'kind': kind})
+
+    if interframe_gap_us is None:
+        auto_ns = _autodetect_interframe_gap(classified)
+        if auto_ns is not None:
+            interframe_gap_ns = auto_ns
+            print(f"  Auto-detected EoF→SoF gap: ~{auto_ns*2/1000:.1f} µs  "
+                  f"→ using split threshold {auto_ns/1000:.1f} µs")
+        else:
+            interframe_gap_ns = 50_000   # 50 µs fallback
+            print(f"  No EoF→SoF pair found, using fallback threshold 50 µs")
+    else:
+        interframe_gap_ns = interframe_gap_us * 1_000
 
     frames = []
     if classified:
@@ -528,8 +567,8 @@ def main():
                         help='Global recording analysis: frames, SoF/EoF, consistency (full file scan)')
     parser.add_argument('--expected-lines', type=int, default=None,
                         help='Expected long packets per frame (auto-detected if omitted)')
-    parser.add_argument('--interframe-gap', type=float, default=50.0,
-                        help='Inter-frame gap threshold in µs (default: 50)')
+    parser.add_argument('--interframe-gap', type=float, default=None,
+                        help='Inter-frame gap threshold in µs (default: auto-detect from EoF→SoF short-packet pairs)')
     args = parser.parse_args()
 
     dt_ns = 1000.0 / args.sample_rate
