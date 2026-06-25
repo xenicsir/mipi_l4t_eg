@@ -609,6 +609,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|dione-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|dione-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microcube:
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microcube-forecr-l4t-35.4.1.deb"
@@ -621,6 +622,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microcube-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microcube-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       crius1280:
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-forecr-l4t-35.4.1.deb"
@@ -633,6 +635,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       smartir640:
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-forecr-l4t-35.4.1.deb"
@@ -645,6 +648,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       ilumos:
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-forecr-l4t-35.4.1.deb"
@@ -657,6 +661,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-forecr-l4t-35.4.1.deb"
@@ -669,3 +674,4 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"

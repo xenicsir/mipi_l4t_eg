@@ -674,12 +674,12 @@ cameras:
         modes:
           - pixel_format: "Y16"
             line_length: 2048
-            pix_clk_hz: 100000000
-            csi_clock_mhz: 450
+            pix_clk_hz: 148750000
+            csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 2048
-            pix_clk_hz: 100000000
-            csi_clock_mhz: 450
+            pix_clk_hz: 148750000
+            csi_clock_mhz: 595
       - res: "2048x1088"
         active_w: 2048
         active_h: 1088
@@ -688,12 +688,12 @@ cameras:
         modes:
           - pixel_format: "Y16"
             line_length: 2048
-            pix_clk_hz: 100000000
-            csi_clock_mhz: 450
+            pix_clk_hz: 148750000
+            csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 2048
-            pix_clk_hz: 100000000
-            csi_clock_mhz: 450
+            pix_clk_hz: 148750000
+            csi_clock_mhz: 595
       - res: "1280x1024"
         active_w: 1280
         active_h: 1024
@@ -706,8 +706,8 @@ cameras:
             csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 1280
-            pix_clk_hz: 100000000
-            csi_clock_mhz: 450
+            pix_clk_hz: 148750000
+            csi_clock_mhz: 595
 
   microlynx:
     name: "Microlynx"

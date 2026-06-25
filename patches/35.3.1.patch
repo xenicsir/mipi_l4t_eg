@@ -7698,7 +7698,7 @@ index 0000000..5387a89
 +sep()
 diff --git a/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..b1c6322
+index 0000000..e2d5ac2
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1302 @@
@@ -8147,7 +8147,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8180,7 +8180,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8246,7 +8246,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8279,7 +8279,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8312,7 +8312,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8713,7 +8713,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8746,7 +8746,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8812,7 +8812,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8845,7 +8845,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -8878,7 +8878,7 @@ index 0000000..b1c6322
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +							gain_factor = "16";
 +							exposure_factor = "1000000";
@@ -9718,7 +9718,7 @@ index 925e46f..b9e4412 100644
  endif
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..d372d66
+index 0000000..60d7c2f
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1664 @@
@@ -10330,7 +10330,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10370,7 +10370,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10450,7 +10450,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10490,7 +10490,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10530,7 +10530,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -10988,7 +10988,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -11028,7 +11028,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -11108,7 +11108,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -11148,7 +11148,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -11188,7 +11188,7 @@ index 0000000..d372d66
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -12367,7 +12367,7 @@ index 0000000..1f6be84
 +};
 diff --git a/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..927707c
+index 0000000..6a2b44d
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t210/porg/kernel-dts/tegra210-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1328 @@
@@ -12947,7 +12947,7 @@ index 0000000..927707c
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -12987,7 +12987,7 @@ index 0000000..927707c
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -13027,7 +13027,7 @@ index 0000000..927707c
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -13437,7 +13437,7 @@ index 0000000..927707c
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -13477,7 +13477,7 @@ index 0000000..927707c
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -13517,7 +13517,7 @@ index 0000000..927707c
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -14662,7 +14662,7 @@ index 450191e..3da251e
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..95da8b7
+index 0000000..b3df4c9
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2995 @@
@@ -15456,7 +15456,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -15496,7 +15496,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -15576,7 +15576,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -15616,7 +15616,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -15656,7 +15656,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16107,7 +16107,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16147,7 +16147,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16227,7 +16227,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16267,7 +16267,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16307,7 +16307,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16759,7 +16759,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16799,7 +16799,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16879,7 +16879,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16919,7 +16919,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -16959,7 +16959,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -17410,7 +17410,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -17450,7 +17450,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -17530,7 +17530,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -17570,7 +17570,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -17610,7 +17610,7 @@ index 0000000..95da8b7
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "14";
-+					pix_clk_hz = "100000000";
++					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
 +
 +					/* unused */
@@ -19461,7 +19461,7 @@ index f306119..198790e 100644
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..4cf5f2b
+index 0000000..3490191
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2097 @@
@@ -20323,7 +20323,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -20363,7 +20363,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -20445,7 +20445,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -20486,7 +20486,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -20527,7 +20527,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -21180,7 +21180,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +
@@ -21221,7 +21221,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -21303,7 +21303,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -21344,7 +21344,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -21385,7 +21385,7 @@ index 0000000..4cf5f2b
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "14";
-+							pix_clk_hz = "100000000";
++							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
