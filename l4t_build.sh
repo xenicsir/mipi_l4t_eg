@@ -137,6 +137,11 @@ else
 	export KERNEL_HEADERS=$TEGRA_KERNEL_OUT
 	export INSTALL_MOD_PATH=$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs
 
+	# kernel-noble (L4T 39.x): tegra_ivc/tegra_hv symbols are built into vmlinux.
+	# Makefile.config.noble activates NV_OOT_IVC_EXT_SKIP_BUILD=y + NV_OOT_TEGRA_HV_SKIP_BUILD=y
+	# to replace the OOT modules with stubs and avoid the modpost "exported twice" error.
+	[[ "$KERNEL_SUBDIR" == "kernel-noble" ]] && export kernel_name=noble
+
 	# Use vendor defconfig if not generic
 	if [[ "$CARRIER_BOARD" != "generic" ]]; then
 		export KERNEL_DEF_CONFIG=$KERNEL_DEFCONFIG
@@ -145,30 +150,49 @@ else
 	# Standalone build: use -eg suffix to create a separate kernel version
 	# This avoids overwriting original kernel/modules and allows dual-boot
 	if [[ $STANDALONE_BUILD -eq 1 ]]; then
-		export LOCALVERSION_SUFFIX=-eg
-		echo "Building standalone kernel with LOCALVERSION_SUFFIX=-eg"
+		if [[ "$KERNEL_SUBDIR" == "kernel-noble" ]]; then
+			# 39.x: source/kernel/Makefile gives priority to env LOCALVERSION (ifndef guard).
+			# Read SRU from the kernel changelog to match its own logic, then append -eg.
+			KERNEL_CHANGELOG="$L4T_SRC/kernel/${KERNEL_SUBDIR}/debian.nvidia-tegra/changelog"
+			NV_SRU=""
+			if command -v dpkg-parsechangelog &>/dev/null && [[ -f "$KERNEL_CHANGELOG" ]]; then
+				NV_SRU=$(dpkg-parsechangelog -l "$KERNEL_CHANGELOG" -S version 2>/dev/null | cut -d'-' -f2 | cut -d'.' -f1)
+			fi
+			if [[ -n "$NV_SRU" ]]; then
+				export LOCALVERSION="-${NV_SRU}-tegra-eg"
+			else
+				export LOCALVERSION="-tegra-eg"
+			fi
+			echo "Building standalone kernel with LOCALVERSION=${LOCALVERSION}"
+		else
+			# 36.x: source/kernel/Makefile uses LOCALVERSION_SUFFIX ?= variable
+			export LOCALVERSION_SUFFIX=-eg
+			echo "Building standalone kernel with LOCALVERSION_SUFFIX=-eg"
 
-		# Patch kernel/Makefile to support LOCALVERSION_SUFFIX if not already patched
-		KERNEL_MAKEFILE="$L4T_SRC/kernel/Makefile"
-		if [[ -f "$KERNEL_MAKEFILE" ]] && ! grep -q "LOCALVERSION_SUFFIX" "$KERNEL_MAKEFILE"; then
-			echo "Patching kernel/Makefile to support LOCALVERSION_SUFFIX..."
-			sed -i 's/# LOCALVERSION : -tegra or -rt-tegra/# LOCALVERSION : -tegra or -rt-tegra, with optional suffix (e.g., -eg)\nLOCALVERSION_SUFFIX ?=/' "$KERNEL_MAKEFILE"
-			sed -i 's/echo "-rt-tegra" || echo "-tegra")/echo "-rt-tegra$(LOCALVERSION_SUFFIX)" || echo "-tegra$(LOCALVERSION_SUFFIX)")/' "$KERNEL_MAKEFILE"
+			# Patch kernel/Makefile to support LOCALVERSION_SUFFIX if not already patched
+			KERNEL_MAKEFILE="$L4T_SRC/kernel/Makefile"
+			if [[ -f "$KERNEL_MAKEFILE" ]] && ! grep -q "LOCALVERSION_SUFFIX" "$KERNEL_MAKEFILE"; then
+				echo "Patching kernel/Makefile to support LOCALVERSION_SUFFIX..."
+				sed -i 's/# LOCALVERSION : -tegra or -rt-tegra/# LOCALVERSION : -tegra or -rt-tegra, with optional suffix (e.g., -eg)\nLOCALVERSION_SUFFIX ?=/' "$KERNEL_MAKEFILE"
+				sed -i 's/echo "-rt-tegra" || echo "-tegra")/echo "-rt-tegra$(LOCALVERSION_SUFFIX)" || echo "-tegra$(LOCALVERSION_SUFFIX)")/' "$KERNEL_MAKEFILE"
+			fi
 		fi
 	fi
 
+	# Fix ownership on source directories before building.
+	# Directories created by sudo (via patch or copy) may be root-owned,
+	# causing "Permission denied" when the compiler writes build artifacts.
+	if [[ -d "$L4T_SRC/nvidia-oot" ]]; then
+		sudo chown -R "$USER:$(id -gn)" "$L4T_SRC/nvidia-oot"
+	fi
+	if [[ -d "$L4T_SRC/kernel" ]]; then
+		sudo chown -R "$USER:$(id -gn)" "$L4T_SRC/kernel"
+	fi
 	run_build_step "Building kernel..." \
 		make -C kernel
 	run_build_step "Installing kernel..." \
 		sudo -E make install -C kernel
 	##export IGNORE_PREEMPT_RT_PRESENCE=1
-	# Fix ownership on nvidia-oot source directories before building modules.
-	# For out-of-tree builds, the compiler writes .o.d dependency files directly
-	# into the source directories. Directories created by sudo (via patch or copy)
-	# may be root-owned, causing "Permission denied" when creating .o.d files.
-	if [[ -d "$L4T_SRC/nvidia-oot" ]]; then
-		sudo chown -R "$USER:$(id -gn)" "$L4T_SRC/nvidia-oot"
-	fi
 	run_build_step "Building kernel modules..." \
 		make modules
 	run_build_step "Installing modules..." \
@@ -179,7 +203,13 @@ else
 
 	# Copy device tree to destination dir
 	update_status "Copying build artifacts..."
-	sudo cp -fv $L4T_SRC/kernel-devicetree/generic-dts/dtbs/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
+	# 36.x: kernel-devicetree/generic-dts/dtbs/  — 39.x: build/nvidia-public/devicetree/generic-dtbs/
+	if [[ "$KERNEL_SUBDIR" == "kernel-noble" ]]; then
+		DTBS_SRC="$L4T_SRC/build/nvidia-public/devicetree/generic-dtbs"
+	else
+		DTBS_SRC="$L4T_SRC/kernel-devicetree/generic-dts/dtbs"
+	fi
+	sudo cp -fv "$DTBS_SRC"/*-eg-*.dtb* $JETSON_DIR/${LINUX_FOR_TEGRA_DIR}/rootfs/boot/
 
 fi
 

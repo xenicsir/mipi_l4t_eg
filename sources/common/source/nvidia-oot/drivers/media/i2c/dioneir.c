@@ -36,6 +36,17 @@
 #include "tc358746_regs.h"
 #include "tc358746_calculation.h"
 
+/*
+ * gpio_cansleep() (legacy integer GPIO API) a été retiré du kernel en 6.x.
+ * gpiod_cansleep()+gpio_to_desc() existent de 4.9 à 6.8 -> on garde les deux branches
+ * pour que ce driver commun compile sur toutes les versions L4T (cf runbook §7.14).
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+#define EG_GPIO_CANSLEEP(g)	gpiod_cansleep(gpio_to_desc(g))
+#else
+#define EG_GPIO_CANSLEEP(g)	gpio_cansleep(g)
+#endif
+
 //#define DBG_TC358746
 
 #define MAX_I2C_CLIENTS_NUMBER 128
@@ -296,7 +307,7 @@ static int dione_ir_power_on(struct camera_common_data *s_data)
    if (!priv->quick_mode) {
       if (pw->reset_gpio) {
          dev_info(dev, "%s camera power off.\n", __func__);
-         if (gpio_cansleep(pw->reset_gpio))
+         if (EG_GPIO_CANSLEEP(pw->reset_gpio))
          {
             gpio_set_value_cansleep(pw->reset_gpio, reset);
          }
@@ -334,7 +345,7 @@ static int dione_ir_power_on(struct camera_common_data *s_data)
 skip_power_seqn:
       if (pw->reset_gpio) {
          dev_info(dev, "%s camera power on.\n", __func__);
-         if (gpio_cansleep(pw->reset_gpio))
+         if (EG_GPIO_CANSLEEP(pw->reset_gpio))
             gpio_set_value_cansleep(pw->reset_gpio, !reset);
          else
             gpio_set_value(pw->reset_gpio, !reset);
@@ -383,7 +394,7 @@ static int dione_ir_power_off(struct camera_common_data *s_data)
       if (!priv->quick_mode) {
          if (pw->reset_gpio) {
             dev_info(dev, "%s camera power off.\n", __func__);
-            if (gpio_cansleep(pw->reset_gpio))
+            if (EG_GPIO_CANSLEEP(pw->reset_gpio))
                gpio_set_value_cansleep(pw->reset_gpio, reset);
             else
                gpio_set_value(pw->reset_gpio, reset);
@@ -1951,8 +1962,12 @@ static int dione_ir_parse_link_frequencies(struct i2c_client *client,
    }
 }
 
+#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
+static int dione_ir_probe(struct i2c_client *client)
+#else
 static int dione_ir_probe(struct i2c_client *client,
       const struct i2c_device_id *id)
+#endif
 {
    struct device *dev = &client->dev;
    struct tegracam_device *tc_dev;

@@ -397,8 +397,11 @@ case "$1" in
                 exit 1
             fi
         else
-            # Default: strict L4T version check
-            if [[ "$EXPECTED_L4T" != "$RUNNING_L4T" ]]; then
+            # L4T version check: compare only as many components as EXPECTED has.
+            # JP7.x (L4T 39.x) reports REVISION as "2.0" → RUNNING=39.2.0 but EXPECTED=39.2.
+            NCOMP=$(echo "$EXPECTED_L4T" | awk -F'.' '{print NF}')
+            RUNNING_L4T_CMP=$(echo "$RUNNING_L4T" | cut -d'.' -f1-${NCOMP})
+            if [[ "$EXPECTED_L4T" != "$RUNNING_L4T_CMP" ]]; then
                 echo "Error: Incompatible L4T version." >&2
                 echo "  This package was built for L4T ${EXPECTED_L4T}." >&2
                 echo "  Running system: L4T ${RUNNING_L4T}" >&2
@@ -646,9 +649,8 @@ fi
 #******************************************************************************
 update_status "Verifying package..."
 
-VERIFY_ARGS="-v $L4T_VERSION"
+VERIFY_ARGS="-v $L4T_VERSION -V $VENDOR -c $CARRIER_BOARD"
 [[ -n "$SOM_BOARD" ]] && VERIFY_ARGS="$VERIFY_ARGS -s $SOM_BOARD"
-[[ "$VENDOR" != "generic" ]] && VERIFY_ARGS="$VERIFY_ARGS -V $VENDOR -c $CARRIER_BOARD"
 
 cd $ROOT_DIR
 if ./l4t_verify_packages.sh $VERIFY_ARGS; then

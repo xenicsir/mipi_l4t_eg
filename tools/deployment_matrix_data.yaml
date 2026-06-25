@@ -48,7 +48,7 @@ platforms:
   - id: agx_orin_devkit
     name: "AGX Orin Nvidia devkit"
     description: "Jetson AGX Orin Nvidia developer kit (p3701 + p3737)"
-    l4t_series: "35.x, 36.x"
+    l4t_series: "35.x, 36.x, 39.x"
     som: "Tegra234"
     csi_lanes: 4
     notes: "Platform not tested with EG cameras. Auvidea X230D is our reference devkit."
@@ -56,21 +56,21 @@ platforms:
   - id: agx_orin_x230d
     name: "AGX Orin Auvidea X230D"
     description: "Auvidea X230D carrier board for AGX Orin (p3701 + p3737)"
-    l4t_series: "35.x, 36.x"
+    l4t_series: "35.x, 36.x, 39.x"
     som: "Tegra234"
     csi_lanes: 4
 
   - id: orin_nx_nano_devkit
     name: "Orin NX / Nano devkit"
     description: "Jetson Orin NX and Orin Nano developer kits (p3767 + p3768)"
-    l4t_series: "35.x, 36.x"
+    l4t_series: "35.x, 36.x, 39.x"
     som: "Tegra234"
     csi_lanes: 4
 
   - id: forecr_ornxs
     name: "Forecr DSBOARD ORNXS"
     description: "Forecr custom board (Orin NX/Nano variant)"
-    l4t_series: "35.x, 36.x"
+    l4t_series: "35.x, 36.x, 39.x"
     som: "Tegra234"
     csi_lanes: 4
     notes: "Custom build in forecr variant"
@@ -78,7 +78,7 @@ platforms:
   - id: seeed_recomputer_j4012
     name: "Seeed Studio reComputer J4012"
     description: "Seeed Studio reComputer J4012 (Orin NX/Nano carrier with corrected CAM0 lane swap)"
-    l4t_series: "35.x, 36.x"
+    l4t_series: "35.x, 36.x, 39.x"
     som: "Tegra234"
     csi_lanes: 4
     notes:
@@ -127,37 +127,39 @@ l4t_versions:
     yocto: true
     git_url: "https://github.com/xenicsir/dione_mipi_tegra/tree/main/yocto"
   32.7.1:
-    git_branch: "2.0"
+    git_branch: "3.0"
   32.7.4:
-    git_branch: "2.0"
+    git_branch: "3.0"
   32.7.5:
-    git_branch: "2.0"
+    git_branch: "3.0"
   32.7.6:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.1:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.3.1:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.4.1:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.5.0:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.6.0:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.6.1:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.6.2:
-    git_branch: "2.0"
+    git_branch: "3.0"
   35.6.4:
-    git_branch: "2.0"
+    git_branch: "3.0"
   36.4:
-    git_branch: "2.0"
+    git_branch: "3.0"
   36.4.3:
-    git_branch: "2.0"
+    git_branch: "3.0"
   36.4.4:
-    git_branch: "2.0"
+    git_branch: "3.0"
   36.5.0:
-    git_branch: "2.0"
+    git_branch: "3.0"
+  39.2:
+    git_branch: "3.0"
 
 # Deployment matrix: platform x camera x l4t_version
 # Format: status | git_branch | deb_package
@@ -310,6 +312,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|dione-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|dione-orin-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microcube:
         35.1: "theoretically_supported|l4t-35.1|microcube-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube-orin-l4t-35.3.1.deb"
@@ -323,6 +326,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microcube-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microcube-orin-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       crius1280:
         35.1: "theoretically_supported|l4t-35.1|crius1280-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-orin-l4t-35.3.1.deb"
@@ -336,6 +340,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-orin-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       smartir640:
         35.1: "theoretically_supported|l4t-35.1|smartir640-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-orin-l4t-35.3.1.deb"
@@ -349,6 +354,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-orin-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       ilumos:
         35.1: "theoretically_supported|l4t-35.1|ilumos-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-orin-l4t-35.3.1.deb"
@@ -362,6 +368,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-orin-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microlynx:
         35.1: "theoretically_supported|l4t-35.1|microlynx-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-orin-l4t-35.3.1.deb"
@@ -375,6 +382,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-orin-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-orin-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
 
   # ========== AGX Orin Auvidea X230D ==========
   - platform: agx_orin_x230d
@@ -437,6 +445,7 @@ deployment_matrix:
         36.4.3: "tested|l4t-36.4.3|dione-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|dione-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|dione-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microcube:
         35.3.1: "tested|l4t-35.3.1|microcube-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microcube-ornx-l4t-35.4.1.deb"
@@ -449,6 +458,7 @@ deployment_matrix:
         36.4.3: "tested|l4t-36.4.3|microcube-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|microcube-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microcube-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       crius1280:
         35.3.1: "tested|l4t-35.3.1|crius1280-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|crius1280-ornx-l4t-35.4.1.deb"
@@ -461,6 +471,7 @@ deployment_matrix:
         36.4.3: "tested|l4t-36.4.3|crius1280-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|crius1280-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       smartir640:
         35.3.1: "tested|l4t-35.3.1|smartir640-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|smartir640-ornx-l4t-35.4.1.deb"
@@ -473,6 +484,7 @@ deployment_matrix:
         36.4.3: "tested|l4t-36.4.3|smartir640-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|smartir640-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       ilumos:
         35.3.1: "tested|l4t-35.3.1|ilumos-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|ilumos-ornx-l4t-35.4.1.deb"
@@ -485,6 +497,7 @@ deployment_matrix:
         36.4.3: "tested|l4t-36.4.3|ilumos-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-ornx-l4t-36.5.0.deb"
+        39.2: "tested|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microlynx:
         35.3.1: "tested|l4t-35.3.1|microlynx-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microlynx-ornx-l4t-35.4.1.deb"
@@ -497,6 +510,7 @@ deployment_matrix:
         36.4.3: "tested|l4t-36.4.3|microlynx-ornx-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|microlynx-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
 
   # ========== Seeed Studio reComputer J4012 ==========
   - platform: seeed_recomputer_j4012
@@ -513,6 +527,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|dione-ornx-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|dione-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microcube:
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube-ornx-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microcube-ornx-l4t-35.4.1.deb"
@@ -525,6 +540,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microcube-ornx-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microcube-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       crius1280:
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-ornx-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-ornx-l4t-35.4.1.deb"
@@ -537,6 +553,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-ornx-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       smartir640:
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-ornx-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-ornx-l4t-35.4.1.deb"
@@ -549,6 +566,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-ornx-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       ilumos:
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-ornx-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-ornx-l4t-35.4.1.deb"
@@ -561,6 +579,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-ornx-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-ornx-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-ornx-l4t-35.4.1.deb"
@@ -573,6 +592,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-ornx-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-ornx-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
 
   # ========== Forecr DSBOARD ORNXS ==========
   - platform: forecr_ornxs
@@ -589,6 +609,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|dione-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|dione-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|dione-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microcube:
         35.3.1: "theoretically_supported|l4t-35.3.1|microcube-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microcube-forecr-l4t-35.4.1.deb"
@@ -601,6 +622,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microcube-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microcube-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microcube-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       crius1280:
         35.3.1: "theoretically_supported|l4t-35.3.1|crius1280-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|crius1280-forecr-l4t-35.4.1.deb"
@@ -613,6 +635,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|crius1280-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|crius1280-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|crius1280-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       smartir640:
         35.3.1: "theoretically_supported|l4t-35.3.1|smartir640-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|smartir640-forecr-l4t-35.4.1.deb"
@@ -625,6 +648,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|smartir640-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|smartir640-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|smartir640-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       ilumos:
         35.3.1: "theoretically_supported|l4t-35.3.1|ilumos-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|ilumos-forecr-l4t-35.4.1.deb"
@@ -637,6 +661,7 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|ilumos-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-forecr-l4t-35.4.1.deb"
@@ -649,3 +674,4 @@ deployment_matrix:
         36.4.3: "theoretically_supported|l4t-36.4.3|microlynx-forecr-l4t-36.4.3.deb"
         36.4.4: "theoretically_supported|l4t-36.4.4|microlynx-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|microlynx-forecr-l4t-36.5.0.deb"
+        39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"

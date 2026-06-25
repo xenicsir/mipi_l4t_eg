@@ -49,6 +49,7 @@ The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of 
 | **DTBO** | Device Tree Blob Overlay | Partial DTB applied at boot to enable or configure optional hardware (e.g., a camera) |
 | **DTS** | Device Tree Source | Human-readable source file describing hardware, compiled into a DTB |
 | **DTSI** | Device Tree Source Include | Reusable device tree fragment included by one or more DTS files |
+| **EG** | Exosens Group | Exosens — the manufacturer of the cameras referenced in this project |
 | **FDT** | Flattened Device Tree | Binary format for device trees passed by the bootloader to the Linux kernel |
 | **GPIO** | General Purpose Input/Output | Configurable digital pin used to control or sense external hardware signals |
 | **I2C** | Inter-Integrated Circuit | Two-wire serial protocol used to communicate with camera control registers |

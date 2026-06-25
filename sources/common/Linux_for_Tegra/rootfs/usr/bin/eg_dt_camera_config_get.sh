@@ -644,7 +644,7 @@ else
                             echo "        v4l2src device=$video_dev \\"
                             echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
                             echo "        ! videoconvert \\"
-                            echo "        ! ximagesink sync=false"
+                            echo "        ! autovideosink sync=false"
                             if [[ "$cam_type" == "Microlynx" ]]; then
                                 echo "      # Single line (first):"
                                 echo "      gst-launch-1.0 -v \\"
@@ -653,7 +653,7 @@ else
                                 echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
                                 echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
                                 echo "        ! videoconvert \\"
-                                echo "        ! ximagesink sync=false"
+                                echo "        ! autovideosink sync=false"
                             fi
                         fi
                     fi

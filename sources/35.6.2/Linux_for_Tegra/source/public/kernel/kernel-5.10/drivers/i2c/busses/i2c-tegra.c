@@ -167,7 +167,7 @@
 /* packet header size in bytes */
 #define I2C_PACKET_HEADER_SIZE			12
 
-#define I2C_ADAPTER_TIMEOUT_INIT (6 * HZ) // DAL custom code
+#define I2C_ADAPTER_TIMEOUT_INIT (6 * HZ) // EG custom code
 
 /*
  * I2C Controller will use PIO mode for transfers up to 32 bytes in order to
@@ -1570,7 +1570,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 	 * Total bits = 9 bits per byte (including ACK bit) + Start & stop bits
 	 */
 	
-	 // DAL custom code start
+	 // EG custom code start
 	if (i2c_dev->adapter.timeout != I2C_ADAPTER_TIMEOUT_INIT) // If value changed from init value, modify the the transfer timeout
 	{
 		if (i2c_dev->adapter.timeout < 0)
@@ -1583,7 +1583,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 		}
 		// Value 0 = keep defaut transfer timeout
 	}
-	 // DAL custom code end
+	 // EG custom code end
 	xfer_time += DIV_ROUND_CLOSEST(((xfer_size * 9) + 2) * MSEC_PER_SEC,
 				       i2c_dev->bus_clk_rate);
 
@@ -2326,7 +2326,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->adapter.dev.of_node = i2c_dev->dev->of_node;
 	i2c_dev->adapter.dev.parent = i2c_dev->dev;
 	i2c_dev->adapter.retries = 1;
-	i2c_dev->adapter.timeout = I2C_ADAPTER_TIMEOUT_INIT; // DAL custom code
+	i2c_dev->adapter.timeout = I2C_ADAPTER_TIMEOUT_INIT; // EG custom code
 	i2c_dev->adapter.quirks = i2c_dev->hw->quirks;
 	i2c_dev->adapter.owner = THIS_MODULE;
 	i2c_dev->adapter.class = I2C_CLASS_DEPRECATED;

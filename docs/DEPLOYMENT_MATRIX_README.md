@@ -27,6 +27,8 @@ Each cell shows the support status:
 | ❌ | **Not Supported** | Not supported due to hardware or firmware limitations |
 | (empty) | **No Data** | Data not yet collected for this combination |
 
+**Acronyms:** EG = Exosens Group
+
 ### Platforms
 
 - **Jetson Nano (T210)** — Legacy T210 SoC, supports older cameras only (Dione, MicroCube, Crius, SmartIR)

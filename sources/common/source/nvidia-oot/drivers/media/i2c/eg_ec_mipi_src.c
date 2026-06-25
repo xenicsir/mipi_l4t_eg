@@ -714,8 +714,12 @@ static const struct v4l2_subdev_internal_ops eg_ec_mipi_subdev_internal_ops = {
    .open = eg_ec_mipi_open,
 };
 
+#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
+static int eg_ec_mipi_probe(struct i2c_client *client)
+#else
 static int eg_ec_mipi_probe(struct i2c_client *client,
       const struct i2c_device_id *id)
+#endif
 {
    struct device *dev = &client->dev;
    struct tegracam_device *tc_dev;

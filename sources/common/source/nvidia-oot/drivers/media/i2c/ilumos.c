@@ -14,6 +14,7 @@
 #include <linux/of_gpio.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/delay.h>
 #include <media/tegracam_core.h>
 
 /* ilumos GenCP registers */
@@ -31,6 +32,7 @@
 #define REG_CROSSLINK_R_WR_CMD      0x50000C08
 
 #define REG_CROSSLINK_FW_VERSION    0x0
+#define REG_CROSSLINK_DEBUG_ENABLE  0x1
 #define REG_CROSSLINK_PIXEL_FORMAT  0x2
 #define REG_CROSSLINK_LINE_LENGTH   0x3
 #define REG_CROSSLINK_FIFO_STATUS   0x7
@@ -240,6 +242,22 @@ static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
 }
 */
 
+static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
+{
+   int ret;
+
+   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_ADDR, reg);
+   if (ret)
+      return ret;
+
+   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_DATA, val);
+   if (ret)
+      return ret;
+
+   return ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
+                                   WRITE_CROSSLINK);
+}
+
 static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
                                   u8 *buf, u16 len)
 {
@@ -386,18 +404,21 @@ static int ilumos_sensor_check(struct ilumos *priv)
    }
 */
 
-      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
-                                   (u8 *)&width, sizeof(width)) == 0) {
-         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
-                                      (u8 *)&height, sizeof(height)) == 0) {
-         } else {
-            dev_err(dev, "Failed to read height\n");
-            goto error_exit;
-         }
+   if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
+                                (u8 *)&width, sizeof(width)) == 0) {
+      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
+                                   (u8 *)&height, sizeof(height)) == 0) {
       } else {
-         dev_err(dev, "Failed to read width\n");
+         dev_err(dev, "Failed to read height\n");
          goto error_exit;
       }
+   } else {
+      dev_err(dev, "Failed to read width\n");
+      goto error_exit;
+   }
+
+   width  = 2048;
+   height = 2048;
    dev_info(dev, "Frame width = %u px\n", width);
    dev_info(dev, "Frame height = %u px\n", height);
 
@@ -453,7 +474,7 @@ static int ilumos_sensor_check(struct ilumos *priv)
 
    // Stop the video streaming by default
    dev_dbg(dev, "%s Stop streaming\n", __func__);
-   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 2);
 
    return 0;
 
@@ -571,8 +592,12 @@ static int ilumos_start_streaming(struct tegracam_device *tc_dev)
 
    dev_dbg(tc_dev->dev, "%s\n", __func__);
 
+   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 1);
+   return 0;
+
    status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
          (u8 *)&read_data, sizeof(read_data));
+   dev_dbg(tc_dev->dev, "%s Lecture REG_ACQ_STATUS_R = %d\n", __func__, read_data);
    if (status == 0) {
       if (read_data != 0x1) {
          status = ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 1);
@@ -588,7 +613,15 @@ static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
 {
    struct ilumos *priv = tegracam_get_privdata(tc_dev);
    dev_dbg(tc_dev->dev, "%s\n", __func__);
+
+   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 0);
+   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
+   msleep(50);
+   return 0;
+
    ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
+   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
+   msleep(50);
 
    return 0;
 }
@@ -666,8 +699,12 @@ static const struct v4l2_subdev_internal_ops ilumos_subdev_internal_ops = {
    .open = ilumos_open,
 };
 
+#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
+static int ilumos_probe(struct i2c_client *client)
+#else
 static int ilumos_probe(struct i2c_client *client,
       const struct i2c_device_id *id)
+#endif
 {
    struct device *dev = &client->dev;
    struct tegracam_device *tc_dev;
@@ -790,6 +827,6 @@ static struct i2c_driver ilumos_i2c_driver = {
 module_i2c_driver(ilumos_i2c_driver);
 
 MODULE_AUTHOR("Exosens");
-MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for ilumos IR cameras");
+MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for iLumos cameras");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");

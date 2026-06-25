@@ -2500,10 +2500,10 @@ index 0000000..da8716f
 +    → RAW16=0x2e, RAW8=0x2a, YUV422=0x1e
 diff --git a/rootfs/opt/eg/doc/streaming_examples.txt b/rootfs/opt/eg/doc/streaming_examples.txt
 new file mode 100644
-index 0000000..8726ac9
+index 0000000..27239b5
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/streaming_examples.txt
-@@ -0,0 +1,184 @@
+@@ -0,0 +1,196 @@
 +================================================================================
 +EG CAMERA STREAMING EXAMPLES
 +================================================================================
@@ -2569,6 +2569,13 @@ index 0000000..8726ac9
 +GSTREAMER EXAMPLES
 +───────────────────
 +
++Note on display sink:
++  autovideosink is used throughout. It auto-selects the best available sink:
++    - Ubuntu 22.04 / L4T 36.x (X11):     ximagesink or glimagesink
++    - Ubuntu 24.04 / L4T 39.x (X11+GL):  glimagesink (ximagesink broken by XInput2 bug)
++  Do NOT use ximagesink directly on Ubuntu 24.04+ or Wayland environments.
++
++
 +MONO16 (Y16 - 16-bit Greyscale)
 +
 +  Capture to file (1 frame):
@@ -2579,12 +2586,12 @@ index 0000000..8726ac9
 +  Display 640x480:
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)GRAY16_LE, width=640, height=480" \
-+      ! videoconvert ! ximagesink sync=false
++      ! videoconvert ! autovideosink sync=false
 +
 +  Display 1280x1024:
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)GRAY16_LE, width=1280, height=1024" \
-+      ! videoconvert ! ximagesink sync=false
++      ! videoconvert ! autovideosink sync=false
 +
 +
 +ARGB888 (32-bit BGRA)
@@ -2603,12 +2610,12 @@ index 0000000..8726ac9
 +  Display 640x480:
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)BGRA, width=640, height=480" \
-+      ! videoconvert ! ximagesink sync=false
++      ! videoconvert ! autovideosink sync=false
 +
 +  Display 1280x1024:
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" \
-+      ! videoconvert ! ximagesink sync=false
++      ! videoconvert ! autovideosink sync=false
 +
 +  Stream to UDP (GStreamer receiver, host 192.168.1.1):
 +    gst-launch-1.0 v4l2src device=/dev/video0 \
@@ -2644,12 +2651,12 @@ index 0000000..8726ac9
 +  Display 640x480:
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 \
 +      ! "video/x-raw, format=(string)YUY2, width=640, height=480" \
-+      ! videoconvert ! ximagesink sync=false
++      ! videoconvert ! autovideosink sync=false
 +
 +  Display 1280x1024:
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 \
 +      ! "video/x-raw, format=(string)YUY2, width=1280, height=1024" \
-+      ! videoconvert ! ximagesink sync=false
++      ! videoconvert ! autovideosink sync=false
 +
 +  Stream to TCP:
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 \
@@ -2688,6 +2695,11 @@ index 0000000..8726ac9
 +  remove backslashes and put everything on one line.
 +
 +• DISPLAY=:1 sets the X11 display for graphical output on a remote host.
++
++• ximagesink is NOT recommended: it fails on Ubuntu 24.04+ (L4T 39.x) with an
++  XInput2 device-ID bug, and does not work under Wayland.
++  Use autovideosink instead — it selects glimagesink / waylandsink / ximagesink
++  automatically depending on the environment.
 diff --git a/rootfs/opt/eg/jetson-io/Headers b/rootfs/opt/eg/jetson-io/Headers
 new file mode 120000
 index 0000000..38ae962
@@ -4893,7 +4905,7 @@ index 0000000..b6929f9
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..e95af00
+index 0000000..c91f7b0
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 @@ -0,0 +1,668 @@
@@ -5543,7 +5555,7 @@ index 0000000..e95af00
 +                            echo "        v4l2src device=$video_dev \\"
 +                            echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
 +                            echo "        ! videoconvert \\"
-+                            echo "        ! ximagesink sync=false"
++                            echo "        ! autovideosink sync=false"
 +                            if [[ "$cam_type" == "Microlynx" ]]; then
 +                                echo "      # Single line (first):"
 +                                echo "      gst-launch-1.0 -v \\"
@@ -5552,7 +5564,7 @@ index 0000000..e95af00
 +                                echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
 +                                echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
 +                                echo "        ! videoconvert \\"
-+                                echo "        ! ximagesink sync=false"
++                                echo "        ! autovideosink sync=false"
 +                            fi
 +                        fi
 +                    fi
@@ -7717,15 +7729,9 @@ index 0000000..5387a89
 +
 +sep()
 diff --git a/source/Makefile b/source/Makefile
-index c09cfb3..2be449d 100644
+index c09cfb3..4f93cef 100644
 --- a/source/Makefile
 +++ b/source/Makefile
-@@ -1,4 +1,4 @@
--# SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-+# SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- # SPDX-License-Identifier: BSD-3-Clause
- 
- KERNEL_HEADERS ?= /lib/modules/$(shell uname -r)/build
 @@ -7,7 +7,6 @@ KERNEL_OUTPUT ?= ${KERNEL_HEADERS}
  MAKEFILE_DIR := $(abspath $(shell dirname $(lastword $(MAKEFILE_LIST))))
  NVIDIA_HEADERS ?= ${MAKEFILE_DIR}/out/nvidia-linux-header
@@ -14823,7 +14829,7 @@ index c5859a7..261dafa 100644
  	overlay-name = "Tegra234 p3737-0000+p3701-xxxx Dynamic Overlay";
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..cd235a1
+index 0000000..c7cbbb8
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,3562 @@
@@ -15773,7 +15779,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -15813,7 +15819,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -15893,7 +15899,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -15933,7 +15939,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -15973,7 +15979,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -16563,7 +16569,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -16603,7 +16609,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -16683,7 +16689,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -16723,7 +16729,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -16763,7 +16769,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -17352,7 +17358,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -17392,7 +17398,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -17472,7 +17478,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -17512,7 +17518,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -17552,7 +17558,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -18141,7 +18147,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -18181,7 +18187,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "16";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -18261,7 +18267,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -18301,7 +18307,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -18341,7 +18347,7 @@ index 0000000..cd235a1
 +						mode_type = "raw";
 +						pixel_phase = "grey";
 +						csi_pixel_bit_depth = "14";
-+						pix_clk_hz = "100000000";
++						pix_clk_hz = "148750000";
 +						embedded_metadata_height = "0";
 +
 +						/* unused */
@@ -19990,7 +19996,7 @@ index 0000000..fcee765
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..acc4a33
+index 0000000..1ac8545
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,3040 @@
@@ -20896,7 +20902,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -20936,7 +20942,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -21018,7 +21024,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "14";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -21059,7 +21065,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "14";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -21100,7 +21106,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "14";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -22261,7 +22267,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -22300,7 +22306,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "16";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -22380,7 +22386,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "14";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -22420,7 +22426,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "14";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -22460,7 +22466,7 @@ index 0000000..acc4a33
 +								mode_type = "raw";
 +								pixel_phase = "grey";
 +								csi_pixel_bit_depth = "14";
-+								pix_clk_hz = "100000000";
++								pix_clk_hz = "148750000";
 +								embedded_metadata_height = "0";
 +
 +								/* unused */
@@ -41727,14 +41733,14 @@ index 0000000..9cdbc2a
 +MODULE_DESCRIPTION("ina238 driver");
 +MODULE_LICENSE("GPL");
 diff --git a/source/kernel/kernel-jammy-src/drivers/i2c/busses/i2c-tegra.c b/source/kernel/kernel-jammy-src/drivers/i2c/busses/i2c-tegra.c
-index 3792ddf..e420425 100644
+index 3792ddf..e4191fc 100644
 --- a/source/kernel/kernel-jammy-src/drivers/i2c/busses/i2c-tegra.c
 +++ b/source/kernel/kernel-jammy-src/drivers/i2c/busses/i2c-tegra.c
 @@ -142,6 +142,8 @@
  /* packet header size in bytes */
  #define I2C_PACKET_HEADER_SIZE			12
  
-+#define I2C_ADAPTER_TIMEOUT_INIT (6 * HZ) // DAL custom code
++#define I2C_ADAPTER_TIMEOUT_INIT (6 * HZ) // EG custom code
 +
  /*
   * I2C Controller will use PIO mode for transfers up to 32 bytes in order to
@@ -41769,7 +41775,7 @@ index 3792ddf..e420425 100644
  	 * Total bits = 9 bits per byte (including ACK bit) + Start & stop bits
  	 */
 +	
-+	 // DAL custom code start
++	 // EG custom code start
 +	if (i2c_dev->adapter.timeout != I2C_ADAPTER_TIMEOUT_INIT) // If value changed from init value, modify the the transfer timeout
 +	{
 +		if (i2c_dev->adapter.timeout < 0)
@@ -41782,7 +41788,7 @@ index 3792ddf..e420425 100644
 +		}
 +		// Value 0 = keep defaut transfer timeout
 +	}
-+	 // DAL custom code end
++	 // EG custom code end
  	xfer_time += DIV_ROUND_CLOSEST(((xfer_size * 9) + 2) * MSEC_PER_SEC,
  				       i2c_dev->bus_clk_rate);
  
@@ -41829,12 +41835,12 @@ index 3792ddf..e420425 100644
  	i2c_dev->adapter.dev.parent = i2c_dev->dev;
  	i2c_dev->adapter.retries = 1;
 -	i2c_dev->adapter.timeout = 6 * HZ;
-+	i2c_dev->adapter.timeout = I2C_ADAPTER_TIMEOUT_INIT; // DAL custom code
++	i2c_dev->adapter.timeout = I2C_ADAPTER_TIMEOUT_INIT; // EG custom code
  	i2c_dev->adapter.quirks = i2c_dev->hw->quirks;
  	i2c_dev->adapter.owner = THIS_MODULE;
  	i2c_dev->adapter.class = I2C_CLASS_DEPRECATED;
 diff --git a/source/kernel/kernel-jammy-src/drivers/i2c/i2c-mux.c b/source/kernel/kernel-jammy-src/drivers/i2c/i2c-mux.c
-index c90cec8..5255ce9 100644
+index c90cec8..627df6b 100644
 --- a/source/kernel/kernel-jammy-src/drivers/i2c/i2c-mux.c
 +++ b/source/kernel/kernel-jammy-src/drivers/i2c/i2c-mux.c
 @@ -48,7 +48,10 @@ static int __i2c_mux_master_xfer(struct i2c_adapter *adap,
@@ -41842,7 +41848,7 @@ index c90cec8..5255ce9 100644
  	ret = muxc->select(muxc, priv->chan_id);
  	if (ret >= 0)
 +	{
-+		parent->timeout = adap->timeout; // DAL custom code
++		parent->timeout = adap->timeout; // EG custom code
  		ret = __i2c_transfer(parent, msgs, num);
 +	}
  	if (muxc->deselect)
@@ -45509,10 +45515,10 @@ index a85d6e8..407d495 100644
  obj-m += pca9570.o
 diff --git a/source/nvidia-oot/drivers/media/i2c/dioneir.c b/source/nvidia-oot/drivers/media/i2c/dioneir.c
 new file mode 100755
-index 0000000..a87daf3
+index 0000000..acbe199
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/dioneir.c
-@@ -0,0 +1,2085 @@
+@@ -0,0 +1,2100 @@
 +/*
 + * dione_ir.c - Dione IR sensor driver
 + *
@@ -45550,6 +45556,17 @@ index 0000000..a87daf3
 +
 +#include "tc358746_regs.h"
 +#include "tc358746_calculation.h"
++
++/*
++ * gpio_cansleep() (legacy integer GPIO API) a été retiré du kernel en 6.x.
++ * gpiod_cansleep()+gpio_to_desc() existent de 4.9 à 6.8 -> on garde les deux branches
++ * pour que ce driver commun compile sur toutes les versions L4T (cf runbook §7.14).
++ */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
++#define EG_GPIO_CANSLEEP(g)	gpiod_cansleep(gpio_to_desc(g))
++#else
++#define EG_GPIO_CANSLEEP(g)	gpio_cansleep(g)
++#endif
 +
 +//#define DBG_TC358746
 +
@@ -45811,7 +45828,7 @@ index 0000000..a87daf3
 +   if (!priv->quick_mode) {
 +      if (pw->reset_gpio) {
 +         dev_info(dev, "%s camera power off.\n", __func__);
-+         if (gpio_cansleep(pw->reset_gpio))
++         if (EG_GPIO_CANSLEEP(pw->reset_gpio))
 +         {
 +            gpio_set_value_cansleep(pw->reset_gpio, reset);
 +         }
@@ -45849,7 +45866,7 @@ index 0000000..a87daf3
 +skip_power_seqn:
 +      if (pw->reset_gpio) {
 +         dev_info(dev, "%s camera power on.\n", __func__);
-+         if (gpio_cansleep(pw->reset_gpio))
++         if (EG_GPIO_CANSLEEP(pw->reset_gpio))
 +            gpio_set_value_cansleep(pw->reset_gpio, !reset);
 +         else
 +            gpio_set_value(pw->reset_gpio, !reset);
@@ -45898,7 +45915,7 @@ index 0000000..a87daf3
 +      if (!priv->quick_mode) {
 +         if (pw->reset_gpio) {
 +            dev_info(dev, "%s camera power off.\n", __func__);
-+            if (gpio_cansleep(pw->reset_gpio))
++            if (EG_GPIO_CANSLEEP(pw->reset_gpio))
 +               gpio_set_value_cansleep(pw->reset_gpio, reset);
 +            else
 +               gpio_set_value(pw->reset_gpio, reset);
@@ -47466,8 +47483,12 @@ index 0000000..a87daf3
 +   }
 +}
 +
++#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
++static int dione_ir_probe(struct i2c_client *client)
++#else
 +static int dione_ir_probe(struct i2c_client *client,
 +      const struct i2c_device_id *id)
++#endif
 +{
 +   struct device *dev = &client->dev;
 +   struct tegracam_device *tc_dev;
@@ -48771,10 +48792,10 @@ index 0000000..4458e5b
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c b/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..86b14d3
+index 0000000..0bcdea9
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,1010 @@
+@@ -0,0 +1,1014 @@
 +/*
 + * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
@@ -49491,8 +49512,12 @@ index 0000000..86b14d3
 +   .open = eg_ec_mipi_open,
 +};
 +
++#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
++static int eg_ec_mipi_probe(struct i2c_client *client)
++#else
 +static int eg_ec_mipi_probe(struct i2c_client *client,
 +      const struct i2c_device_id *id)
++#endif
 +{
 +   struct device *dev = &client->dev;
 +   struct tegracam_device *tc_dev;
@@ -51492,10 +51517,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/nvidia-oot/drivers/media/i2c/ilumos.c b/source/nvidia-oot/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..9dd999e
+index 0000000..517a57e
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,795 @@
+@@ -0,0 +1,832 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -51512,6 +51537,7 @@ index 0000000..9dd999e
 +#include <linux/of_gpio.h>
 +#include <linux/uaccess.h>
 +#include <linux/version.h>
++#include <linux/delay.h>
 +#include <media/tegracam_core.h>
 +
 +/* ilumos GenCP registers */
@@ -51529,6 +51555,7 @@ index 0000000..9dd999e
 +#define REG_CROSSLINK_R_WR_CMD      0x50000C08
 +
 +#define REG_CROSSLINK_FW_VERSION    0x0
++#define REG_CROSSLINK_DEBUG_ENABLE  0x1
 +#define REG_CROSSLINK_PIXEL_FORMAT  0x2
 +#define REG_CROSSLINK_LINE_LENGTH   0x3
 +#define REG_CROSSLINK_FIFO_STATUS   0x7
@@ -51738,6 +51765,22 @@ index 0000000..9dd999e
 +}
 +*/
 +
++static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
++{
++   int ret;
++
++   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_ADDR, reg);
++   if (ret)
++      return ret;
++
++   ret = ilumos_i2c_write_register(client, REG_CROSSLINK_DATA, val);
++   if (ret)
++      return ret;
++
++   return ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
++                                   WRITE_CROSSLINK);
++}
++
 +static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
 +                                  u8 *buf, u16 len)
 +{
@@ -51884,18 +51927,21 @@ index 0000000..9dd999e
 +   }
 +*/
 +
-+      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
-+                                   (u8 *)&width, sizeof(width)) == 0) {
-+         if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
-+                                      (u8 *)&height, sizeof(height)) == 0) {
-+         } else {
-+            dev_err(dev, "Failed to read height\n");
-+            goto error_exit;
-+         }
++   if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_WIDTH_R,
++                                (u8 *)&width, sizeof(width)) == 0) {
++      if (ilumos_i2c_read_register(priv->i2c_client, REG_IMG_HEIGHT_R,
++                                   (u8 *)&height, sizeof(height)) == 0) {
 +      } else {
-+         dev_err(dev, "Failed to read width\n");
++         dev_err(dev, "Failed to read height\n");
 +         goto error_exit;
 +      }
++   } else {
++      dev_err(dev, "Failed to read width\n");
++      goto error_exit;
++   }
++
++   width  = 2048;
++   height = 2048;
 +   dev_info(dev, "Frame width = %u px\n", width);
 +   dev_info(dev, "Frame height = %u px\n", height);
 +
@@ -51951,7 +51997,7 @@ index 0000000..9dd999e
 +
 +   // Stop the video streaming by default
 +   dev_dbg(dev, "%s Stop streaming\n", __func__);
-+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
++   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 2);
 +
 +   return 0;
 +
@@ -52069,8 +52115,12 @@ index 0000000..9dd999e
 +
 +   dev_dbg(tc_dev->dev, "%s\n", __func__);
 +
++   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 1);
++   return 0;
++
 +   status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
 +         (u8 *)&read_data, sizeof(read_data));
++   dev_dbg(tc_dev->dev, "%s Lecture REG_ACQ_STATUS_R = %d\n", __func__, read_data);
 +   if (status == 0) {
 +      if (read_data != 0x1) {
 +         status = ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 1);
@@ -52086,7 +52136,15 @@ index 0000000..9dd999e
 +{
 +   struct ilumos *priv = tegracam_get_privdata(tc_dev);
 +   dev_dbg(tc_dev->dev, "%s\n", __func__);
++
++   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 0);
++   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
++   msleep(50);
++   return 0;
++
 +   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
++   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
++   msleep(50);
 +
 +   return 0;
 +}
@@ -52164,8 +52222,12 @@ index 0000000..9dd999e
 +   .open = ilumos_open,
 +};
 +
++#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
++static int ilumos_probe(struct i2c_client *client)
++#else
 +static int ilumos_probe(struct i2c_client *client,
 +      const struct i2c_device_id *id)
++#endif
 +{
 +   struct device *dev = &client->dev;
 +   struct tegracam_device *tc_dev;
@@ -52288,15 +52350,15 @@ index 0000000..9dd999e
 +module_i2c_driver(ilumos_i2c_driver);
 +
 +MODULE_AUTHOR("Exosens");
-+MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for ilumos IR cameras");
++MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for iLumos cameras");
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
 diff --git a/source/nvidia-oot/drivers/media/i2c/microlynx_core.c b/source/nvidia-oot/drivers/media/i2c/microlynx_core.c
 new file mode 100644
-index 0000000..c0f17f8
+index 0000000..54700a8
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/microlynx_core.c
-@@ -0,0 +1,706 @@
+@@ -0,0 +1,710 @@
 +/*
 + * A V4L2 driver for Exosens Microlynx MIPI IR cameras.
 + *
@@ -52869,8 +52931,12 @@ index 0000000..c0f17f8
 +
 +/* ----------------------------------------------------------------------- */
 +
++#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
++static int microlynx_probe(struct i2c_client *client)
++#else
 +static int microlynx_probe(struct i2c_client *client,
 +      const struct i2c_device_id *id)
++#endif
 +{
 +   struct device *dev = &client->dev;
 +   struct tegracam_device *tc_dev;
@@ -53000,7 +53066,7 @@ index 0000000..c0f17f8
 +module_i2c_driver(microlynx_i2c_driver);
 +
 +MODULE_AUTHOR("Exosens");
-+MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for Microlynx IR cameras");
++MODULE_DESCRIPTION("Exosens MIPI camera I2C driver for Microlynx cameras");
 +MODULE_LICENSE("GPL v2");
 +MODULE_VERSION("1.0");
 diff --git a/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.c b/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.c
@@ -53559,17 +53625,16 @@ index 0000000..4ad39e0
 +}
 diff --git a/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.h b/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.h
 new file mode 100755
-index 0000000..a8de6b0
+index 0000000..727e549
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/tc358746_calculation.h
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,73 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +
 +#ifndef __TC358746_CALCULATION_H
 +#define __TC358746_CALCULATION_H
 +
-+#include <stdbool.h>
-+#include <linux/types.h>
++#include <linux/types.h>	/* bool/true/false — ne pas inclure <stdbool.h> (userspace, absent avec la toolchain noble/x-tools) */
 +
 +struct tc358746_mbus_fmt {
 +   u32 code;
@@ -53952,32 +54017,10 @@ index 582917d..568fc32
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
 old mode 100644
 new mode 100755
-index 501a230..6c3398f
+index 501a230..7bac27f
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c
-@@ -1,19 +1,8 @@
- // SPDX-License-Identifier: GPL-2.0-only
- /*
-- * SPDX-FileCopyrightText: Copyright (c) 2017-2024 NVIDIA CORPORATION & AFFILIATES.
-- * All rights reserved.
-+ * sensor_common.c - utilities for tegra sensor drivers
-  *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ * Copyright (c) 2017-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-  */
- 
- #include <media/sensor_common.h>
-@@ -254,14 +243,6 @@ static int extract_pixel_format(
+@@ -254,14 +254,6 @@ static int extract_pixel_format(
  		*format = V4L2_PIX_FMT_SGBRG12;
  	else if (strncmp(pixel_t, "bayer_grbg12", size) == 0)
  		*format = V4L2_PIX_FMT_SGRBG12;
@@ -53992,7 +54035,7 @@ index 501a230..6c3398f
  	else if (strncmp(pixel_t, "rgb_rgb88824", size) == 0)
  		*format = V4L2_PIX_FMT_RGB24;
  	else if (strncmp(pixel_t, "bayer_wdr_pwl_rggb12", size) == 0)
-@@ -272,16 +253,6 @@ static int extract_pixel_format(
+@@ -272,16 +264,6 @@ static int extract_pixel_format(
  		*format = V4L2_PIX_FMT_SGRBG12;
  	else if (strncmp(pixel_t, "bayer_wdr_dol_rggb10", size) == 0)
  		*format = V4L2_PIX_FMT_SRGGB10;
@@ -54009,7 +54052,7 @@ index 501a230..6c3398f
  #if 0 /* disable for Canonical kenrel */
  	else if (strncmp(pixel_t, "bayer_xbggr10p", size) == 0)
  		*format = V4L2_PIX_FMT_XBGGR10P;
-@@ -296,8 +267,14 @@ static int extract_pixel_format(
+@@ -296,8 +278,14 @@ static int extract_pixel_format(
  		*format = V4L2_PIX_FMT_UYVY;
  	else if (strncmp(pixel_t, "yuv_vyuy16", size) == 0)
  		*format = V4L2_PIX_FMT_VYUY;
@@ -54096,26 +54139,91 @@ index 37c5383..abaf1da 100644
  	cdev->bpp = chan->fmtinfo->bpp.numerator;
  	/* BW in kBps */
  	cdev->bw = cdev->pixel_rate * cdev->bpp / 1024;
+diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_fops.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_fops.c
+index 90e4603..d0937e5 100644
+--- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_fops.c
++++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_fops.c
+@@ -39,7 +39,7 @@
+ #define VI_CHANNEL_DEV "/dev/capture-vi-channel"
+ #define VI_CHAN_PATH_MAX 40
+ 
+-#define CAPTURE_TIMEOUT_MS	2500
++#define MIPI_NO_TIMEOUT (-1)
+ 
+ static const struct vi_capture_setup default_setup = {
+ 	.channel_flags = 0
+@@ -214,7 +214,7 @@ static const struct v4l2_ctrl_config vi5_custom_ctrls[] = {
+ 		.id = TEGRA_CAMERA_CID_VI_CAPTURE_TIMEOUT,
+ 		.name = "Override capture timeout ms",
+ 		.type = V4L2_CTRL_TYPE_INTEGER,
+-		.def = CAPTURE_TIMEOUT_MS,
++		.def = -1,
+ 		.min = -1,
+ 		.max = 0x7FFFFFFF,
+ 		.step = 1,
+@@ -516,7 +516,7 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
+ 	unsigned long flags;
+ 	struct tegra_mc_vi *vi = chan->vi;
+ 	struct vb2_v4l2_buffer *vb = &buf->buf;
+-	int timeout_ms = CAPTURE_TIMEOUT_MS;
++	int timeout_ms = MIPI_NO_TIMEOUT;
+ 	struct timespec64 ts;
+ 	struct capture_descriptor *descr = NULL;
+ 
+@@ -527,7 +527,6 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
+ 			goto rel_buf;
+ 
+ 		/* Dequeue a frame and check its capture status */
+-		timeout_ms = chan->capture_timeout_ms;
+ 		err = vi_capture_status(chan->tegra_vi_channel[vi_port], timeout_ms);
+ 		if (err) {
+ 			if (err == -ETIMEDOUT) {
+@@ -553,11 +552,11 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
+ 				dev_err(vi->dev, "uncorr_err: flags %d, err_data %d\n",
+ 					descr->status.flags, descr->status.err_data);
+ 			} else {
+-				dev_warn(vi->dev,
+-					"corr_err: discarding frame %d, flags: %d, "
+-					"err_data %d\n",
+-					descr->status.frame_id, descr->status.flags,
+-					descr->status.err_data);
++//				dev_warn(vi->dev,
++//					"corr_err: discarding frame %d, flags: %d, "
++//					"err_data %d\n",
++//					descr->status.frame_id, descr->status.flags,
++//					descr->status.err_data);
+ 				frame_err = true;
+ 			}
+ 		} else if (!vi_port) {
+@@ -889,6 +888,7 @@ static int vi5_channel_start_streaming(struct vb2_queue *vq, u32 count)
+ 
+ 	/* Skip in bypass mode */
+ 	if (!chan->bypass) {
++		chan->timeout = MIPI_NO_TIMEOUT;
+ 		for (vi_port = 0; vi_port < chan->valid_ports; vi_port++) {
+ 			int err = vi5_channel_open(chan, vi_port);
+ 
+@@ -1020,8 +1020,13 @@ static int vi5_channel_stop_streaming(struct vb2_queue *vq)
+ 	struct tegra_channel *chan = vb2_get_drv_priv(vq);
+ 	long err;
+ 	int vi_port = 0;
+-	if (!chan->bypass)
++	if (!chan->bypass) {
++		for (vi_port = 0; vi_port < chan->valid_ports; vi_port++) {
++			complete_all(&chan->tegra_vi_channel[vi_port]->capture_data->capture_resp);
++		}
++
+ 		vi5_channel_stop_kthreads(chan);
++	}
+ 
+ 	/* csi stream/sensor(s) devices to be closed before vi channel */
+ 	tegra_channel_set_stream(chan, false);
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 old mode 100644
 new mode 100755
-index 4baafc7..6366c21
+index 4baafc7..c3ce468
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
-@@ -1,9 +1,9 @@
--/* SPDX-License-Identifier: GPL-2.0-only
-- * SPDX-FileCopyrightText: Copyright (c) 2017-2024 NVIDIA CORPORATION & AFFILIATES.
-- * All rights reserved.
-- *
-+/* SPDX-License-Identifier: GPL-2.0-only */
-+/*
-  * NVIDIA Tegra Video Input Device Driver VI5 formats
-  *
-+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-+ *
-  * Author: Bhanu Murthy V <bmurthyv@nvidia.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
 @@ -97,16 +97,6 @@ static const struct tegra_video_format vi5_video_formats[] = {
  	TEGRA_VIDEO_FORMAT(RAW8, 8, SBGGR8_1X8, 1, 1, T_R8,
  				RAW8, SBGGR8, "BGBG.. GRGR.."),

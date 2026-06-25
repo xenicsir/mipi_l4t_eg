@@ -856,7 +856,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -896,7 +896,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -978,7 +978,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "14";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1019,7 +1019,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "14";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1060,7 +1060,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "14";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1713,7 +1713,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 
@@ -1754,7 +1754,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "16";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1836,7 +1836,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "14";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1877,7 +1877,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "14";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */
@@ -1918,7 +1918,7 @@
 							mode_type = "raw";
 							pixel_phase = "grey";
 							csi_pixel_bit_depth = "14";
-							pix_clk_hz = "100000000";
+							pix_clk_hz = "148750000";
 							embedded_metadata_height = "0";
 
 							/* unused */

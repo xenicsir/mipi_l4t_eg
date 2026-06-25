@@ -194,6 +194,17 @@ if [[ -f nvidia_kernel_display_driver_source.tbz2 ]]; then
    fi
 fi
 
+if [[ -f nvidia_unified_gpu_display_driver_source.tbz2 ]]; then
+   if [[ -f .nvidia_unified_gpu_display_driver_done ]]; then
+      update_status "Unified GPU display driver already extracted, skipping"
+   else
+      rm -rf unifiedgpudisp
+      update_status "Extracting unified GPU display driver..."
+      fast_tar_extract nvidia_unified_gpu_display_driver_source.tbz2
+      touch .nvidia_unified_gpu_display_driver_done
+   fi
+fi
+
 update_status "Done"
 echo ""
 echo "============================================"

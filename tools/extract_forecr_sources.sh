@@ -117,7 +117,22 @@ fi
 # Remove trailing slash if present
 NVIDIA_BSP_DIR="${NVIDIA_BSP_DIR%/}"
 
-if [[ $L4T_MAJOR -ge 36 ]]; then
+if [[ $L4T_MAJOR -ge 39 ]]; then
+    # L4T 39.x structure: source/ (no public, no kernel-devicetree — DTBs via build/nvidia-public/)
+    NVIDIA_SRC="$NVIDIA_BSP_DIR/source"
+    DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source"
+
+    # Directories to process for L4T 39.x
+    SUBDIRS=(
+        "hardware"
+        "kernel"
+        "nvidia-oot"
+        "hwpm"
+        "nvdisplay"
+        "nvethernetrm"
+        "nvgpu"
+    )
+elif [[ $L4T_MAJOR -ge 36 ]]; then
     # L4T 36.x structure: source/ (no public subdirectory)
     NVIDIA_SRC="$NVIDIA_BSP_DIR/source"
     DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_forecr/source"
@@ -296,8 +311,17 @@ copy_new_files() {
         src_file="$FORECR_SRC/$dir/$filename"
         dest_file="$DEST/$dir/$filename"
 
-        # Skip if it's a directory (will be handled recursively by diff)
+        # If it's a new directory absent from NVIDIA BSP, copy it entirely
         if [[ -d "$src_file" ]]; then
+            if [[ ! -d "$NVIDIA_SRC/$dir/$filename" ]]; then
+                mkdir -p "$DEST/$dir/$filename"
+                cp -r "$src_file"/. "$DEST/$dir/$filename/"
+                local n
+                n=$(find "$DEST/$dir/$filename" -type f | wc -l)
+                echo "    NEW DIR: $dir/$filename/ ($n files)"
+                count=$((count + n))
+            fi
+            # If directory exists in both, diff already recurses into it
             continue
         fi
 
@@ -367,15 +391,20 @@ merge_exosens_defconfig() {
     echo ""
 
     # Determine kernel version directory pattern
-    if [[ $L4T_MAJOR -ge 36 ]]; then
+    if [[ $L4T_MAJOR -ge 39 ]]; then
+        KERNEL_SUBDIR="kernel-noble"
+        FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+        NVIDIA_DEFCONFIG="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra/source/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+        DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
+    elif [[ $L4T_MAJOR -ge 36 ]]; then
         KERNEL_SUBDIR="kernel-jammy-src"
         FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
-        NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+        NVIDIA_DEFCONFIG="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra/source/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
     else
         KERNEL_SUBDIR="kernel-5.10"
         FORECR_VENDOR_DEFCONFIG="$FORECR_SRC/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
-        NVIDIA_DEFCONFIG="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
+        NVIDIA_DEFCONFIG="$ROOT_DIR/$L4T_VERSION/Linux_for_Tegra/source/public/kernel/$KERNEL_SUBDIR/arch/arm64/configs/defconfig"
         DEST_CONFIGS_DIR="$DEST/kernel/$KERNEL_SUBDIR/arch/arm64/configs"
     fi
 
@@ -568,6 +597,58 @@ fix_makefile_localversion() {
 }
 
 fix_makefile_localversion
+
+#******************************************************************************
+# Fix Makefile.generic DTBs copy command (ARG_MAX issue with large BSPs)
+#******************************************************************************
+
+fix_makefile_generic_dtbs() {
+    local makefile="$DEST/build/nvidia-public/devicetree/Makefile.generic"
+
+    echo -e "${BLUE}=============================================="
+    echo "Fixing Makefile.generic DTBs copy command"
+    echo -e "==============================================${NC}"
+    echo ""
+
+    if [[ ! -f "$makefile" ]]; then
+        # Not present in sources yet — copy from BSP (source/build/… for 36.x and 39.x)
+        local bsp_makefile="$NVIDIA_BSP_DIR/source/build/nvidia-public/devicetree/Makefile.generic"
+        if [[ ! -f "$bsp_makefile" ]]; then
+            echo -e "${YELLOW}  Makefile.generic not found in BSP, skipping${NC}"
+            echo ""
+            return 0
+        fi
+        mkdir -p "$(dirname "$makefile")"
+        cp "$bsp_makefile" "$makefile"
+    fi
+
+    if grep -q 'cp -u \$(DTB_OBJS) \$(DTBO_OBJS)' "$makefile" 2>/dev/null; then
+        echo "  Patching: replacing cp with find|xargs to avoid ARG_MAX limit..."
+        python3 - "$makefile" <<'PYEOF'
+import sys
+path = sys.argv[1]
+content = open(path).read()
+old_line = '\t\tcp -u $(DTB_OBJS) $(DTBO_OBJS) $(obj)/generic-dtbs/ ; \\\n'
+new_lines = (
+    '\t\tfind $(obj) \\( -name "*.dtb" -o -name "*.dtbo" \\) \\\n'
+    '\t\t\t! -path "$(obj)/generic-dtbs/*" \\\n'
+    '\t\t\t| xargs -I{} cp -u {} $(obj)/generic-dtbs/ ; \\\n'
+)
+if old_line in content:
+    open(path, 'w').write(content.replace(old_line, new_lines))
+    sys.exit(0)
+else:
+    print("  WARNING: expected pattern not found in Makefile.generic", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+        echo -e "  ${GREEN}FIXED: Makefile.generic DTBs copy patched${NC}"
+    else
+        echo "  Already patched or pattern not found, skipping"
+    fi
+    echo ""
+}
+
+fix_makefile_generic_dtbs
 
 #******************************************************************************
 # Generate summary

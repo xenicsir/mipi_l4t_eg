@@ -49,7 +49,7 @@ static int __i2c_mux_master_xfer(struct i2c_adapter *adap,
 	ret = muxc->select(muxc, priv->chan_id);
 	if (ret >= 0)
 	{
-		parent->timeout = adap->timeout; // DAL custom code
+		parent->timeout = adap->timeout; // EG custom code
 		ret = __i2c_transfer(parent, msgs, num);
 	}
 	if (muxc->deselect)
