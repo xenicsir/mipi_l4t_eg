@@ -484,10 +484,26 @@ else
     TEGRA_SOC="unknown"
 fi
 
+# Detect L4T major version to select the appropriate GStreamer display sink.
+# - L4T ≤35.x (Ubuntu ≤20.04): nveglglessink is installed and has higher rank
+#   than ximagesink; autovideosink picks it but it fails without an EGL display.
+#   Use ximagesink directly.
+# - L4T ≥36.x (Ubuntu ≥22.04): nveglglessink is not installed; autovideosink
+#   selects waylandsink / ximagesink cleanly. On L4T ≥39.x (Ubuntu 24.04+),
+#   ximagesink is additionally broken by an XInput2 device-ID bug, so
+#   autovideosink is required there too.
+_l4t_major=$(grep -oP 'R\K\d+' /etc/nv_tegra_release 2>/dev/null | head -1)
+if [[ "${_l4t_major:-0}" -lt 36 ]]; then
+    GST_DISPLAY_SINK="ximagesink"
+else
+    GST_DISPLAY_SINK="autovideosink"
+fi
+
 if [[ $VERBOSE -eq 1 ]]; then
     echo "Board Type: $BOARD_TYPE" >&2
     echo "SoM Type: $SOM_TYPE" >&2
     echo "Tegra SoC: $TEGRA_SOC" >&2
+    echo "L4T major: ${_l4t_major:-unknown}  → GStreamer sink: $GST_DISPLAY_SINK" >&2
     echo "" >&2
 fi
 
@@ -644,7 +660,7 @@ else
                             echo "        v4l2src device=$video_dev \\"
                             echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
                             echo "        ! videoconvert \\"
-                            echo "        ! autovideosink sync=false"
+                            echo "        ! $GST_DISPLAY_SINK sync=false"
                             if [[ "$cam_type" == "Microlynx" ]]; then
                                 echo "      # Single line (first):"
                                 echo "      gst-launch-1.0 -v \\"
@@ -653,7 +669,7 @@ else
                                 echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
                                 echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
                                 echo "        ! videoconvert \\"
-                                echo "        ! autovideosink sync=false"
+                                echo "        ! $GST_DISPLAY_SINK sync=false"
                             fi
                         fi
                     fi
