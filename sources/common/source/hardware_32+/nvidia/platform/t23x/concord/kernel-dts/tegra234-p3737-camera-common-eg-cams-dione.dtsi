@@ -735,7 +735,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "87500000";
+					pix_clk_hz = "90000000";
 					embedded_metadata_height = "0";
 				 };
 
@@ -1386,7 +1386,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "87500000";
+					pix_clk_hz = "90000000";
 					embedded_metadata_height = "0";
 				 };
 
@@ -2038,7 +2038,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "87500000";
+					pix_clk_hz = "90000000";
 					embedded_metadata_height = "0";
 				 };
 
@@ -2689,7 +2689,7 @@
 					mode_type = "raw";
 					pixel_phase = "grey";
 					csi_pixel_bit_depth = "16";
-					pix_clk_hz = "87500000";
+					pix_clk_hz = "90000000";
 					embedded_metadata_height = "0";
 				 };
 

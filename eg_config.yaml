@@ -721,7 +721,7 @@ cameras:
         modes:
           - pixel_format: "Y16"
             line_length: 1024
-            pix_clk_hz: 87500000    # 87.5 MHz → 350 MHz CSI / (2 lanes × 2 DDR / 16 bits)
+            pix_clk_hz: 90000000    # 90 MHz → 360 MHz CSI / (2 lanes × 2 DDR / 16 bits)
             csi_clock_mhz: 350
           - pixel_format: "Y14"
             line_length: 1024

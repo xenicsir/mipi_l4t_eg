@@ -37,7 +37,7 @@ platforms:
   - id: xavier_nx
     name: "Xavier NX (T194)"
     description: "Jetson Xavier NX developer kit"
-    l4t_series: "32.x, 35.x"
+    l4t_series: "35.x"
     som: "Tegra194"
     csi_lanes: 2
     variants:
@@ -231,10 +231,6 @@ deployment_matrix:
   - platform: xavier_nx
     cameras:
       dione_ir:
-        32.7.1: "tested|l4t-32.7.1|dione-xnx-l4t-32.7.1.deb"
-        32.7.4: "tested|l4t-32.7.4|dione-xnx-l4t-32.7.4.deb"
-        32.7.5: "tested|l4t-32.7.5|dione-xnx-l4t-32.7.5.deb"
-        32.7.6: "tested|l4t-32.7.6|dione-xnx-l4t-32.7.6.deb"
         35.1: "tested|l4t-35.1|dione-xnx-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|dione-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|dione-xnx-l4t-35.4.1.deb"
@@ -244,10 +240,6 @@ deployment_matrix:
         35.6.2: "tested|l4t-35.6.2|dione-xnx-l4t-35.6.2.deb"
         35.6.4: "theoretically_supported|l4t-35.6.4|dione-xnx-l4t-35.6.4.deb"
       microcube:
-        32.7.1: "tested|l4t-32.7.1|"
-        32.7.4: "tested|l4t-32.7.4|microcube-xnx-l4t-32.7.4.deb"
-        32.7.5: "tested|l4t-32.7.5|microcube-xnx-l4t-32.7.5.deb"
-        32.7.6: "tested|l4t-32.7.6|microcube-xnx-l4t-32.7.6.deb"
         35.3.1: "tested|l4t-35.3.1|microcube-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microcube-xnx-l4t-35.4.1.deb"
         35.5.0: "tested|l4t-35.5.0|microcube-xnx-l4t-35.5.0.deb"
@@ -256,10 +248,6 @@ deployment_matrix:
         35.6.2: "tested|l4t-35.6.2|microcube-xnx-l4t-35.6.2.deb"
         35.6.4: "theoretically_supported|l4t-35.6.4|microcube-xnx-l4t-35.6.4.deb"
       crius1280:
-        32.7.1: "tested|l4t-32.7.1|"
-        32.7.4: "tested|l4t-32.7.4|crius1280-xnx-l4t-32.7.4.deb"
-        32.7.5: "tested|l4t-32.7.5|crius1280-xnx-l4t-32.7.5.deb"
-        32.7.6: "tested|l4t-32.7.6|crius1280-xnx-l4t-32.7.6.deb"
         35.3.1: "tested|l4t-35.3.1|crius1280-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|crius1280-xnx-l4t-35.4.1.deb"
         35.5.0: "tested|l4t-35.5.0|crius1280-xnx-l4t-35.5.0.deb"
@@ -268,10 +256,6 @@ deployment_matrix:
         35.6.2: "tested|l4t-35.6.2|crius1280-xnx-l4t-35.6.2.deb"
         35.6.4: "theoretically_supported|l4t-35.6.4|crius1280-xnx-l4t-35.6.4.deb"
       smartir640:
-        32.7.1: "tested|l4t-32.7.1|"
-        32.7.4: "tested|l4t-32.7.4|smartir640-xnx-l4t-32.7.4.deb"
-        32.7.5: "tested|l4t-32.7.5|smartir640-xnx-l4t-32.7.5.deb"
-        32.7.6: "tested|l4t-32.7.6|smartir640-xnx-l4t-32.7.6.deb"
         35.3.1: "tested|l4t-35.3.1|smartir640-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|smartir640-xnx-l4t-35.4.1.deb"
         35.5.0: "tested|l4t-35.5.0|smartir640-xnx-l4t-35.5.0.deb"

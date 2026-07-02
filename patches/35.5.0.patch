@@ -7725,7 +7725,7 @@ index 0000000..5387a89
 +sep()
 diff --git a/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..e2d5ac2
+index 0000000..80cb9d5
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1302 @@
@@ -8394,7 +8394,7 @@ index 0000000..e2d5ac2
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "87500000";
++							pix_clk_hz = "90000000";
 +							embedded_metadata_height = "0";
 +						};
 +						mode1 { /* MICROLYNX_MODE_1024x128_RAW14 */
@@ -8960,7 +8960,7 @@ index 0000000..e2d5ac2
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "87500000";
++							pix_clk_hz = "90000000";
 +							embedded_metadata_height = "0";
 +						};
 +						mode1 { /* MICROLYNX_MODE_1024x128_RAW14 */
@@ -9747,7 +9747,7 @@ index 925e46f..b9e4412
  endif
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..60d7c2f
+index 0000000..8128db0
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1664 @@
@@ -10621,7 +10621,7 @@ index 0000000..60d7c2f
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "87500000";
++							pix_clk_hz = "90000000";
 +							embedded_metadata_height = "0";
 +						};
 +
@@ -11279,7 +11279,7 @@ index 0000000..60d7c2f
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "87500000";
++							pix_clk_hz = "90000000";
 +							embedded_metadata_height = "0";
 +						};
 +
@@ -14691,7 +14691,7 @@ index 8e040d6..e100dc5
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..b3df4c9
+index 0000000..90751cd
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2995 @@
@@ -15432,7 +15432,7 @@ index 0000000..b3df4c9
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "87500000";
++					pix_clk_hz = "90000000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -16083,7 +16083,7 @@ index 0000000..b3df4c9
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "87500000";
++					pix_clk_hz = "90000000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -16735,7 +16735,7 @@ index 0000000..b3df4c9
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "87500000";
++					pix_clk_hz = "90000000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -17386,7 +17386,7 @@ index 0000000..b3df4c9
 +					mode_type = "raw";
 +					pixel_phase = "grey";
 +					csi_pixel_bit_depth = "16";
-+					pix_clk_hz = "87500000";
++					pix_clk_hz = "90000000";
 +					embedded_metadata_height = "0";
 +				 };
 +
@@ -19490,7 +19490,7 @@ index 9b89c68..8bca967 100644
  endif
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..3490191
+index 0000000..9d0ab7e
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2097 @@
@@ -20626,7 +20626,7 @@ index 0000000..3490191
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "87500000";
++							pix_clk_hz = "90000000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
@@ -21479,7 +21479,7 @@ index 0000000..3490191
 +							mode_type = "raw";
 +							pixel_phase = "grey";
 +							csi_pixel_bit_depth = "16";
-+							pix_clk_hz = "87500000";
++							pix_clk_hz = "90000000";
 +							embedded_metadata_height = "0";
 +
 +							/* unused */
