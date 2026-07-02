@@ -51537,10 +51537,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/nvidia-oot/drivers/media/i2c/ilumos.c b/source/nvidia-oot/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..c7df032
+index 0000000..dcdf6c6
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,832 @@
+@@ -0,0 +1,825 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -51785,6 +51785,7 @@ index 0000000..c7df032
 +}
 +*/
 +
++/*
 +static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
 +{
 +   int ret;
@@ -51800,7 +51801,7 @@ index 0000000..c7df032
 +   return ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
 +                                   WRITE_CROSSLINK);
 +}
-+
++*/
 +static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
 +                                  u8 *buf, u16 len)
 +{
@@ -52135,9 +52136,6 @@ index 0000000..c7df032
 +
 +   dev_dbg(tc_dev->dev, "%s\n", __func__);
 +
-+   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 1);
-+   return 0;
-+
 +   status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
 +         (u8 *)&read_data, sizeof(read_data));
 +   dev_dbg(tc_dev->dev, "%s Lecture REG_ACQ_STATUS_R = %d\n", __func__, read_data);
@@ -52157,12 +52155,7 @@ index 0000000..c7df032
 +   struct ilumos *priv = tegracam_get_privdata(tc_dev);
 +   dev_dbg(tc_dev->dev, "%s\n", __func__);
 +
-+   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 0);
-+   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
-+   msleep(50);
-+   return 0;
-+
-+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
++   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 2);
 +   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
 +   msleep(50);
 +

@@ -242,6 +242,7 @@ static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
 }
 */
 
+/*
 static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
 {
    int ret;
@@ -257,7 +258,7 @@ static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 re
    return ilumos_i2c_write_register(client, REG_CROSSLINK_R_WR_CMD,
                                    WRITE_CROSSLINK);
 }
-
+*/
 static int ilumos_i2c_read_string(struct i2c_client *client, u32 reg,
                                   u8 *buf, u16 len)
 {
@@ -592,9 +593,6 @@ static int ilumos_start_streaming(struct tegracam_device *tc_dev)
 
    dev_dbg(tc_dev->dev, "%s\n", __func__);
 
-   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 1);
-   return 0;
-
    status = ilumos_i2c_read_register(priv->i2c_client, REG_ACQ_STATUS_R,
          (u8 *)&read_data, sizeof(read_data));
    dev_dbg(tc_dev->dev, "%s Lecture REG_ACQ_STATUS_R = %d\n", __func__, read_data);
@@ -614,12 +612,7 @@ static int ilumos_stop_streaming(struct tegracam_device *tc_dev)
    struct ilumos *priv = tegracam_get_privdata(tc_dev);
    dev_dbg(tc_dev->dev, "%s\n", __func__);
 
-   ilumos_i2c_write_crosslink_register(priv->i2c_client, REG_CROSSLINK_DEBUG_ENABLE, 0);
-   /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
-   msleep(50);
-   return 0;
-
-   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 0);
+   ilumos_i2c_write_register(priv->i2c_client, REG_ACQ_START_W, 2);
    /* let VI finish its last DMA before teardown (avoids SMMU context fault at stop) */
    msleep(50);
 
