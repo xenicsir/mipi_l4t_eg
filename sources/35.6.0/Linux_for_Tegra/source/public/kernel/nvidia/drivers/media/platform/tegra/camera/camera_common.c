@@ -46,6 +46,22 @@
 
 #define HDR_ENABLE		0x1
 
+/*
+ * EG-private media bus format codes for formats absent from this BSP's
+ * media-bus-format.h.  All values use #ifndef so the kernel's own definition
+ * wins automatically if a future rebase provides them.  If a conflict is ever
+ * detected, update both this file and vi5_formats.h.
+ *
+ *   Y16_1X16    (0x202e) — official mainline code added in 5.4.
+ *   Y16BE_1X16  (0x20BE) — EG-private; 0xBE mnemonic for Big-Endian.
+ */
+#ifndef MEDIA_BUS_FMT_Y16_1X16
+#define MEDIA_BUS_FMT_Y16_1X16     0x202e
+#endif
+#ifndef MEDIA_BUS_FMT_Y16BE_1X16
+#define MEDIA_BUS_FMT_Y16BE_1X16   0x20BE
+#endif
+
 static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 	{
 		MEDIA_BUS_FMT_SBGGR14_1X14,
@@ -133,6 +149,11 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 		V4L2_PIX_FMT_RGB24,
 	},
 	{
+		MEDIA_BUS_FMT_RGB888_1X24,
+		V4L2_COLORSPACE_SRGB,
+		V4L2_PIX_FMT_ABGR32,
+	},
+	{
 		MEDIA_BUS_FMT_YUYV8_2X8,
 		V4L2_COLORSPACE_SRGB,
 		V4L2_PIX_FMT_YUYV,
@@ -153,17 +174,17 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 		V4L2_PIX_FMT_VYUY,
 	},
 	{
-		MEDIA_BUS_FMT_FIXED,
+		MEDIA_BUS_FMT_Y16_1X16,
 		V4L2_COLORSPACE_RAW,
 		V4L2_PIX_FMT_Y16,
 	},
 	{
-		MEDIA_BUS_FMT_FIXED,
+		MEDIA_BUS_FMT_Y16BE_1X16,
 		V4L2_COLORSPACE_RAW,
 		V4L2_PIX_FMT_Y16_BE,
 	},
 	{
-		MEDIA_BUS_FMT_FIXED,
+		MEDIA_BUS_FMT_Y14_1X14,
 		V4L2_COLORSPACE_RAW,
 		V4L2_PIX_FMT_Y14,
 	},

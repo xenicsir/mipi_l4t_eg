@@ -7711,7 +7711,7 @@ index 0000000..5387a89
 +sep()
 diff --git a/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..80cb9d5
+index 0000000..87c926b
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1302 @@
@@ -8147,7 +8147,7 @@ index 0000000..80cb9d5
 +						use_sensor_mode_id = "false";
 +						status = "disabled";
 +
-+						mode0 { /* ILUMOS_MODE_2048x2048_RAW16 */
++						mode0 { /* ILUMOS_MODE_2048x2048_RAW16_BE */
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
@@ -8158,7 +8158,7 @@ index 0000000..80cb9d5
 +							active_h = "2048";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -8180,7 +8180,7 @@ index 0000000..80cb9d5
 +							step_exp_time = "1";
 +							default_exp_time = "2495";
 +						};
-+						mode1 { /* ILUMOS_MODE_2048x1088_RAW16 */
++						mode1 { /* ILUMOS_MODE_2048x1088_RAW16_BE */
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
@@ -8191,7 +8191,7 @@ index 0000000..80cb9d5
 +							active_h = "1088";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -8213,7 +8213,7 @@ index 0000000..80cb9d5
 +							step_exp_time = "1";
 +							default_exp_time = "2495";
 +						};
-+						mode2 { /* ILUMOS_MODE_1280x1024_RAW16 */
++						mode2 { /* ILUMOS_MODE_1280x1024_RAW16_BE */
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
@@ -8224,7 +8224,7 @@ index 0000000..80cb9d5
 +							active_h = "1024";
 +							line_length = "1280";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -8713,7 +8713,7 @@ index 0000000..80cb9d5
 +						use_sensor_mode_id = "false";
 +						status = "disabled";
 +
-+						mode0 { /* ILUMOS_MODE_2048x2048_RAW16 */
++						mode0 { /* ILUMOS_MODE_2048x2048_RAW16_BE */
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -8724,7 +8724,7 @@ index 0000000..80cb9d5
 +							active_h = "2048";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -8746,7 +8746,7 @@ index 0000000..80cb9d5
 +							step_exp_time = "1";
 +							default_exp_time = "2495";
 +						};
-+						mode1 { /* ILUMOS_MODE_2048x1088_RAW16 */
++						mode1 { /* ILUMOS_MODE_2048x1088_RAW16_BE */
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -8757,7 +8757,7 @@ index 0000000..80cb9d5
 +							active_h = "1088";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -8779,7 +8779,7 @@ index 0000000..80cb9d5
 +							step_exp_time = "1";
 +							default_exp_time = "2495";
 +						};
-+						mode2 { /* ILUMOS_MODE_1280x1024_RAW16 */
++						mode2 { /* ILUMOS_MODE_1280x1024_RAW16_BE */
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -8790,7 +8790,7 @@ index 0000000..80cb9d5
 +							active_h = "1024";
 +							line_length = "1280";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -9705,7 +9705,7 @@ index 0000000..3dde427
 +};
 diff --git a/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..8128db0
+index 0000000..e4b7990
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t19x/jakku/kernel-dts/tegra194-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,1664 @@
@@ -10304,7 +10304,7 @@ index 0000000..8128db0
 +
 +						use_sensor_mode_id = "false";
 +
-+						mode0 { // ILUMOS_MODE_2048x2048_RAW16
++						mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
@@ -10315,7 +10315,7 @@ index 0000000..8128db0
 +							active_h = "2048";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -10344,7 +10344,7 @@ index 0000000..8128db0
 +							default_exp_time = "2495"; /* us */
 +						};
 +
-+						mode1 { // ILUMOS_MODE_2048x1088_RAW16
++						mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
@@ -10355,7 +10355,7 @@ index 0000000..8128db0
 +							active_h = "1088";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -10384,7 +10384,7 @@ index 0000000..8128db0
 +							default_exp_time = "2495"; /* us */
 +						};
 +
-+						mode2 { // ILUMOS_MODE_1280x1024_RAW16
++						mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_a";
 +							phy_mode = "DPHY";
@@ -10395,7 +10395,7 @@ index 0000000..8128db0
 +							active_h = "1024";
 +							line_length = "1280";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -10962,7 +10962,7 @@ index 0000000..8128db0
 +
 +						use_sensor_mode_id = "false";
 +
-+						mode0 { // ILUMOS_MODE_2048x2048_RAW16
++						mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -10973,7 +10973,7 @@ index 0000000..8128db0
 +							active_h = "2048";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -11002,7 +11002,7 @@ index 0000000..8128db0
 +							default_exp_time = "2495"; /* us */
 +						};
 +
-+						mode1 { // ILUMOS_MODE_2048x1088_RAW16
++						mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -11013,7 +11013,7 @@ index 0000000..8128db0
 +							active_h = "1088";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -11042,7 +11042,7 @@ index 0000000..8128db0
 +							default_exp_time = "2495"; /* us */
 +						};
 +
-+						mode2 { // ILUMOS_MODE_1280x1024_RAW16
++						mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -11053,7 +11053,7 @@ index 0000000..8128db0
 +							active_h = "1024";
 +							line_length = "1280";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -14638,7 +14638,7 @@ index 0000000..c94036c
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..90751cd
+index 0000000..a15ec51
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3737-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2995 @@
@@ -15419,7 +15419,7 @@ index 0000000..90751cd
 +				 sensor_model = "ilumos";
 +				 use_sensor_mode_id = "false";
 +
-+				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++				 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
@@ -15430,7 +15430,7 @@ index 0000000..90751cd
 +					active_h = "2048";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -15459,7 +15459,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++				 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
@@ -15470,7 +15470,7 @@ index 0000000..90751cd
 +					active_h = "1088";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -15499,7 +15499,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_a";
 +					phy_mode = "DPHY";
@@ -15510,7 +15510,7 @@ index 0000000..90751cd
 +					active_h = "1024";
 +					line_length = "1280";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -16070,7 +16070,7 @@ index 0000000..90751cd
 +				 sensor_model = "ilumos";
 +				 use_sensor_mode_id = "false";
 +
-+				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++				 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
@@ -16081,7 +16081,7 @@ index 0000000..90751cd
 +					active_h = "2048";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -16110,7 +16110,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++				 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
@@ -16121,7 +16121,7 @@ index 0000000..90751cd
 +					active_h = "1088";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -16150,7 +16150,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_g";
 +					phy_mode = "DPHY";
@@ -16161,7 +16161,7 @@ index 0000000..90751cd
 +					active_h = "1024";
 +					line_length = "1280";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -16722,7 +16722,7 @@ index 0000000..90751cd
 +				 sensor_model = "ilumos";
 +				 use_sensor_mode_id = "false";
 +
-+				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++				 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
@@ -16733,7 +16733,7 @@ index 0000000..90751cd
 +					active_h = "2048";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -16762,7 +16762,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++				 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
@@ -16773,7 +16773,7 @@ index 0000000..90751cd
 +					active_h = "1088";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -16802,7 +16802,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_e";
 +					phy_mode = "DPHY";
@@ -16813,7 +16813,7 @@ index 0000000..90751cd
 +					active_h = "1024";
 +					line_length = "1280";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -17373,7 +17373,7 @@ index 0000000..90751cd
 +				 sensor_model = "ilumos";
 +				 use_sensor_mode_id = "false";
 +
-+				 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++				 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
@@ -17384,7 +17384,7 @@ index 0000000..90751cd
 +					active_h = "2048";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -17413,7 +17413,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++				 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
@@ -17424,7 +17424,7 @@ index 0000000..90751cd
 +					active_h = "1088";
 +					line_length = "2048";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -17453,7 +17453,7 @@ index 0000000..90751cd
 +					default_exp_time = "2495"; /* us */
 +				 };
 +
-+				 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++				 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +					num_lanes = "2";
 +					tegra_sinterface = "serial_c";
 +					phy_mode = "DPHY";
@@ -17464,7 +17464,7 @@ index 0000000..90751cd
 +					active_h = "1024";
 +					line_length = "1280";
 +					mode_type = "raw";
-+					pixel_phase = "grey";
++					pixel_phase = "grey_be";
 +					csi_pixel_bit_depth = "16";
 +					pix_clk_hz = "148750000";
 +					embedded_metadata_height = "0";
@@ -19408,7 +19408,7 @@ index 0000000..3f87262
 +};
 diff --git a/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..9d0ab7e
+index 0000000..56eb6dc
 --- /dev/null
 +++ b/source/public/hardware/nvidia/platform/t23x/p3768/kernel-dts/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 @@ -0,0 +1,2097 @@
@@ -20256,7 +20256,7 @@ index 0000000..9d0ab7e
 +
 +						 use_sensor_mode_id = "false";
 +
-+						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++						 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +							num_lanes = "2";
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -20268,7 +20268,7 @@ index 0000000..9d0ab7e
 +							active_h = "2048";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -20296,7 +20296,7 @@ index 0000000..9d0ab7e
 +							step_exp_time = "1";
 +							default_exp_time = "2495"; /* us */
 +						 };
-+						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++						 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +							num_lanes = "2";
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -20308,7 +20308,7 @@ index 0000000..9d0ab7e
 +							active_h = "1088";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -20337,7 +20337,7 @@ index 0000000..9d0ab7e
 +							default_exp_time = "2495"; /* us */
 +						 };
 +
-+						 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++						 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +							num_lanes = "2";
 +							lane_polarity = "6";
 +							tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -20349,7 +20349,7 @@ index 0000000..9d0ab7e
 +							active_h = "1024";
 +							line_length = "1280";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -21114,7 +21114,7 @@ index 0000000..9d0ab7e
 +
 +						 use_sensor_mode_id = "false";
 +
-+						 mode0 { // ILUMOS_MODE_2048x2048_RAW16
++						 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -21125,7 +21125,7 @@ index 0000000..9d0ab7e
 +							active_h = "2048";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -21155,7 +21155,7 @@ index 0000000..9d0ab7e
 +							default_exp_time = "2495"; /* us */
 +
 +						 };
-+						 mode1 { // ILUMOS_MODE_2048x1088_RAW16
++						 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -21166,7 +21166,7 @@ index 0000000..9d0ab7e
 +							active_h = "1088";
 +							line_length = "2048";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -21196,7 +21196,7 @@ index 0000000..9d0ab7e
 +
 +						 };
 +
-+						 mode2 { // ILUMOS_MODE_1280x1024_RAW16
++						 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 +							num_lanes = "2";
 +							tegra_sinterface = "serial_c";
 +							phy_mode = "DPHY";
@@ -21207,7 +21207,7 @@ index 0000000..9d0ab7e
 +							active_h = "1024";
 +							line_length = "1280";
 +							mode_type = "raw";
-+							pixel_phase = "grey";
++							pixel_phase = "grey_be";
 +							csi_pixel_bit_depth = "16";
 +							pix_clk_hz = "148750000";
 +							embedded_metadata_height = "0";
@@ -26109,10 +26109,10 @@ index 0000000..4458e5b
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..0bcdea9
+index 0000000..67f841b
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,1014 @@
+@@ -0,0 +1,1026 @@
 +/*
 + * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
@@ -27023,12 +27023,24 @@ index 0000000..0bcdea9
 +      int m = eg_ec_find_native_mode(priv->native_width,
 +            priv->native_height, priv->native_pixfmt);
 +      if (m >= 0) {
++         u32 v4l2_pixfmt;
++         const struct camera_common_colorfmt *colorfmt;
++
 +         tc_dev->s_data->sensor_mode_id = m;
 +         tc_dev->s_data->def_mode = eg_ec_mipi_frmfmt[m].mode;
 +         tc_dev->s_data->def_width  = tc_dev->s_data->fmt_width  =
 +               eg_ec_mipi_frmfmt[m].size.width;
 +         tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
 +               eg_ec_mipi_frmfmt[m].size.height;
++
++         switch (priv->native_pixfmt) {
++            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_ABGR32; break;
++            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;   break;
++            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;    break;
++         }
++         colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
++         if (colorfmt)
++            tc_dev->s_data->colorfmt = colorfmt;
 +
 +         dev_info(dev,
 +               "default sensor_mode_id set to %d (%ux%u)\n",
@@ -28834,10 +28846,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..dcdf6c6
+index 0000000..a943f5c
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,825 @@
+@@ -0,0 +1,833 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -28923,9 +28935,9 @@ index 0000000..dcdf6c6
 +MODULE_DEVICE_TABLE(of, ilumos_of_match);
 +
 +enum {
-+   ILUMOS_MODE_2048x2048_RAW16,
-+   ILUMOS_MODE_2048x1088_RAW16,
-+   ILUMOS_MODE_1280x1024_RAW16,
++   ILUMOS_MODE_2048x2048_RAW16_BE,
++   ILUMOS_MODE_2048x1088_RAW16_BE,
++   ILUMOS_MODE_1280x1024_RAW16_BE,
 +   ILUMOS_MODE_2048x2048_RAW14,
 +   ILUMOS_MODE_2048x1088_RAW14,
 +   ILUMOS_MODE_1280x1024_RAW14,
@@ -28940,9 +28952,9 @@ index 0000000..dcdf6c6
 + * device tree!
 + */
 +static const struct camera_common_frmfmt ilumos_frmfmt[] = {
-+   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16},
-+   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16},
-+   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW16},
++   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16_BE},
++   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16_BE},
++   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW16_BE},
 +   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW14},
 +   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW14},
 +   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW14},
@@ -29275,12 +29287,20 @@ index 0000000..dcdf6c6
 +
 +   priv->tc_dev->s_data->sensor_mode_id = mode;
 +   priv->tc_dev->s_data->def_mode       = mode;
++   /* Sync the V4L2 format to the camera's actual native resolution.
++    * tegracam_device_register() always initialises fmt from frmfmt[0]
++    * (2048x2048), so without this correction GStreamer probes 2048x2048
++    * even when the camera reports 1280x1024 or 2048x1088. */
++   priv->tc_dev->s_data->def_width  = width;
++   priv->tc_dev->s_data->def_height = height;
++   priv->tc_dev->s_data->fmt_width  = width;
++   priv->tc_dev->s_data->fmt_height = height;
 +
 +   if (is_raw14)
 +      strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
 +              sizeof(priv->pixel_format) - 1);
 +   else
-+      strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
++      strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
 +              sizeof(priv->pixel_format) - 1);
 +   priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 +

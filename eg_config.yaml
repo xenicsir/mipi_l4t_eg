@@ -469,8 +469,9 @@ soms:
 # Pixel format → DT field mapping
 # ---------------------------------------------------------------------------
 pixel_format_map:
-  Y16:    {mode_type: "raw", pixel_phase: "grey",   csi_pixel_bit_depth: 16}
-  Y14:    {mode_type: "raw", pixel_phase: "grey",   csi_pixel_bit_depth: 14}
+  Y16:      {mode_type: "raw", pixel_phase: "grey",    csi_pixel_bit_depth: 16}
+  "Y16 -BE": {mode_type: "raw", pixel_phase: "grey_be", csi_pixel_bit_depth: 16}
+  Y14:      {mode_type: "raw", pixel_phase: "grey",    csi_pixel_bit_depth: 14}
   RGB888: {mode_type: "rgb", pixel_phase: "rgb888", csi_pixel_bit_depth: 24}
   YUYV:   {mode_type: "yuv", pixel_phase: "yuyv",   csi_pixel_bit_depth: 16}
 
@@ -479,7 +480,7 @@ pixel_format_map:
 # ---------------------------------------------------------------------------
 platform_restrictions:
   nano_t210:
-    unsupported_formats: [Y16]   # Y14 is supported on T210; only Y16 is excluded
+    unsupported_formats: [Y16, "Y16 -BE"]   # Y14 is supported on T210; 16-bit greyscale (LE and BE) is excluded
 
 # ---------------------------------------------------------------------------
 # DTSI platforms
@@ -672,7 +673,7 @@ cameras:
         data_lanes: 2
         discontinuous_clk: "no"
         modes:
-          - pixel_format: "Y16"
+          - pixel_format: "Y16 -BE"
             line_length: 2048
             pix_clk_hz: 148750000
             csi_clock_mhz: 595
@@ -686,7 +687,7 @@ cameras:
         data_lanes: 2
         discontinuous_clk: "no"
         modes:
-          - pixel_format: "Y16"
+          - pixel_format: "Y16 -BE"
             line_length: 2048
             pix_clk_hz: 148750000
             csi_clock_mhz: 595
@@ -700,7 +701,7 @@ cameras:
         data_lanes: 2
         discontinuous_clk: "no"
         modes:
-          - pixel_format: "Y16"
+          - pixel_format: "Y16 -BE"
             line_length: 1280
             pix_clk_hz: 148750000
             csi_clock_mhz: 595

@@ -37,6 +37,13 @@
 	 master->ops->op(master, __VA_ARGS__) : 0)
 
 #define HDR_ENABLE		0x1
+#ifndef MEDIA_BUS_FMT_Y16_1X16
+#define MEDIA_BUS_FMT_Y16_1X16     0x202e
+#endif
+#ifndef MEDIA_BUS_FMT_Y16BE_1X16
+#define MEDIA_BUS_FMT_Y16BE_1X16   0x20BE
+#endif
+
 
 static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 	{
@@ -107,6 +114,11 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 	{
 		MEDIA_BUS_FMT_RGB888_1X24,
 		V4L2_COLORSPACE_SRGB,
+		V4L2_PIX_FMT_ABGR32,
+	},
+	{
+		MEDIA_BUS_FMT_RGB888_1X24,
+		V4L2_COLORSPACE_SRGB,
 		V4L2_PIX_FMT_RGB24,
 	},
 	{
@@ -130,17 +142,17 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 		V4L2_PIX_FMT_VYUY,
 	},
 	{
-		MEDIA_BUS_FMT_FIXED,
+		MEDIA_BUS_FMT_Y16_1X16,
 		V4L2_COLORSPACE_RAW,
 		V4L2_PIX_FMT_Y16,
 	},
 	{
-		MEDIA_BUS_FMT_FIXED,
+		MEDIA_BUS_FMT_Y16BE_1X16,
 		V4L2_COLORSPACE_RAW,
 		V4L2_PIX_FMT_Y16_BE,
 	},
 	{
-		MEDIA_BUS_FMT_FIXED,
+		MEDIA_BUS_FMT_Y14_1X14,
 		V4L2_COLORSPACE_RAW,
 		V4L2_PIX_FMT_Y14,
 	},

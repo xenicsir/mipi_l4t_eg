@@ -83,9 +83,9 @@ static const struct of_device_id ilumos_of_match[] = {
 MODULE_DEVICE_TABLE(of, ilumos_of_match);
 
 enum {
-   ILUMOS_MODE_2048x2048_RAW16,
-   ILUMOS_MODE_2048x1088_RAW16,
-   ILUMOS_MODE_1280x1024_RAW16,
+   ILUMOS_MODE_2048x2048_RAW16_BE,
+   ILUMOS_MODE_2048x1088_RAW16_BE,
+   ILUMOS_MODE_1280x1024_RAW16_BE,
    ILUMOS_MODE_2048x2048_RAW14,
    ILUMOS_MODE_2048x1088_RAW14,
    ILUMOS_MODE_1280x1024_RAW14,
@@ -100,9 +100,9 @@ static const int ilumos_60fps[] = {
  * device tree!
  */
 static const struct camera_common_frmfmt ilumos_frmfmt[] = {
-   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16},
-   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16},
-   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW16},
+   {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW16_BE},
+   {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW16_BE},
+   {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW16_BE},
    {{2048, 2048}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x2048_RAW14},
    {{2048, 1088}, ilumos_60fps, 1, 0, ILUMOS_MODE_2048x1088_RAW14},
    {{1280, 1024}, ilumos_60fps, 1, 0, ILUMOS_MODE_1280x1024_RAW14},
@@ -435,12 +435,20 @@ static int ilumos_sensor_check(struct ilumos *priv)
 
    priv->tc_dev->s_data->sensor_mode_id = mode;
    priv->tc_dev->s_data->def_mode       = mode;
+   /* Sync the V4L2 format to the camera's actual native resolution.
+    * tegracam_device_register() always initialises fmt from frmfmt[0]
+    * (2048x2048), so without this correction GStreamer probes 2048x2048
+    * even when the camera reports 1280x1024 or 2048x1088. */
+   priv->tc_dev->s_data->def_width  = width;
+   priv->tc_dev->s_data->def_height = height;
+   priv->tc_dev->s_data->fmt_width  = width;
+   priv->tc_dev->s_data->fmt_height = height;
 
    if (is_raw14)
       strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
               sizeof(priv->pixel_format) - 1);
    else
-      strncpy(priv->pixel_format, "'Y16 ' (16-bit Greyscale)",
+      strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
               sizeof(priv->pixel_format) - 1);
    priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 

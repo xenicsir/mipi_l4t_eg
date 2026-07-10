@@ -908,12 +908,24 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
       int m = eg_ec_find_native_mode(priv->native_width,
             priv->native_height, priv->native_pixfmt);
       if (m >= 0) {
+         u32 v4l2_pixfmt;
+         const struct camera_common_colorfmt *colorfmt;
+
          tc_dev->s_data->sensor_mode_id = m;
          tc_dev->s_data->def_mode = eg_ec_mipi_frmfmt[m].mode;
          tc_dev->s_data->def_width  = tc_dev->s_data->fmt_width  =
                eg_ec_mipi_frmfmt[m].size.width;
          tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
                eg_ec_mipi_frmfmt[m].size.height;
+
+         switch (priv->native_pixfmt) {
+            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_ABGR32; break;
+            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;   break;
+            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;    break;
+         }
+         colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
+         if (colorfmt)
+            tc_dev->s_data->colorfmt = colorfmt;
 
          dev_info(dev,
                "default sensor_mode_id set to %d (%ux%u)\n",

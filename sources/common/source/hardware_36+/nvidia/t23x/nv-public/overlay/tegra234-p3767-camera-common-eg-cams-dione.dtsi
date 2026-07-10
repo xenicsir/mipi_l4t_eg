@@ -886,7 +886,7 @@
 
 							 use_sensor_mode_id = "false";
 
-							 mode0 { // ILUMOS_MODE_2048x2048_RAW16
+							 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -898,7 +898,7 @@
 								active_h = "2048";
 								line_length = "2048";
 								mode_type = "raw";
-								pixel_phase = "grey";
+								pixel_phase = "grey_be";
 								csi_pixel_bit_depth = "16";
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
@@ -926,7 +926,7 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
-							 mode1 { // ILUMOS_MODE_2048x1088_RAW16
+							 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -938,7 +938,7 @@
 								active_h = "1088";
 								line_length = "2048";
 								mode_type = "raw";
-								pixel_phase = "grey";
+								pixel_phase = "grey_be";
 								csi_pixel_bit_depth = "16";
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
@@ -967,7 +967,7 @@
 								default_exp_time = "2495"; /* us */
 							 };
 
-							 mode2 { // ILUMOS_MODE_1280x1024_RAW16
+							 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -979,7 +979,7 @@
 								active_h = "1024";
 								line_length = "1280";
 								mode_type = "raw";
-								pixel_phase = "grey";
+								pixel_phase = "grey_be";
 								csi_pixel_bit_depth = "16";
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
@@ -2252,7 +2252,7 @@
 
 							 use_sensor_mode_id = "false";
 
-							 mode0 { // ILUMOS_MODE_2048x2048_RAW16
+							 mode0 { // ILUMOS_MODE_2048x2048_RAW16_BE
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -2263,7 +2263,7 @@
 								active_h = "2048";
 								line_length = "2048";
 								mode_type = "raw";
-								pixel_phase = "grey";
+								pixel_phase = "grey_be";
 								csi_pixel_bit_depth = "16";
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
@@ -2291,7 +2291,7 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
-							 mode1 { // ILUMOS_MODE_2048x1088_RAW16
+							 mode1 { // ILUMOS_MODE_2048x1088_RAW16_BE
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -2302,7 +2302,7 @@
 								active_h = "1088";
 								line_length = "2048";
 								mode_type = "raw";
-								pixel_phase = "grey";
+								pixel_phase = "grey_be";
 								csi_pixel_bit_depth = "16";
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
@@ -2331,7 +2331,7 @@
 								default_exp_time = "2495"; /* us */
 							 };
 
-							 mode2 { // ILUMOS_MODE_1280x1024_RAW16
+							 mode2 { // ILUMOS_MODE_1280x1024_RAW16_BE
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -2342,7 +2342,7 @@
 								active_h = "1024";
 								line_length = "1280";
 								mode_type = "raw";
-								pixel_phase = "grey";
+								pixel_phase = "grey_be";
 								csi_pixel_bit_depth = "16";
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";

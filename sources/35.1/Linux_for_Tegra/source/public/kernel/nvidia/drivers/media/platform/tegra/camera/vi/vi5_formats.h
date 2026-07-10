@@ -14,6 +14,19 @@
 #define __VI5_FORMATS_H_
 
 #include <media/tegra_camera_core.h>
+/*
+ * EG-private media bus format codes. #ifndef guards ensure the kernel's own
+ * definition wins on a future rebase.
+ *   Y16_1X16  (0x202e) — official mainline code added in 5.4.
+ *   Y16BE_1X16 (0x20BE) — EG-private; 0xBE mnemonic for Big-Endian.
+ */
+#ifndef MEDIA_BUS_FMT_Y16_1X16
+#define MEDIA_BUS_FMT_Y16_1X16     0x202e
+#endif
+#ifndef MEDIA_BUS_FMT_Y16BE_1X16
+#define MEDIA_BUS_FMT_Y16BE_1X16   0x20BE
+#endif
+
 
 /*
  * These go into the VI_CHn_PIXFMT_FORMAT register bits 7:0
@@ -118,18 +131,20 @@ static const struct tegra_video_format vi5_video_formats[] = {
 
 
 	/* RAW 14: packed 14-bit (CSI-2 DT=0x2d), unpacked to 16-bit via pad0_en=1 */
-   TEGRA_VIDEO_FORMAT(RAW14, 14, FIXED, 2, 1, T_R16,
+   TEGRA_VIDEO_FORMAT(RAW14, 14, Y14_1X14, 2, 1, T_R16,
             RAW14, Y14, "RAW14"),
  
 	/* RAW 16 */
-        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
+        TEGRA_VIDEO_FORMAT(RAW16, 16, Y16_1X16, 2, 1, T_R16,
                                 RAW16, Y16, "RAW16"),
-        TEGRA_VIDEO_FORMAT(RAW16, 16, FIXED, 2, 1, T_R16,
+        TEGRA_VIDEO_FORMAT(RAW16, 16, Y16BE_1X16, 2, 1, T_R16,
         			RAW16, Y16_BE, "RAW16_BE"),
 
-	/* RGB888 */
+	/* RGB888 — ABGR32 first so tegra_core_get_format_by_code(RGB888_1X24,0) → AR24 */
 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
 				RGB888, ABGR32, "BGRA-8-8-8-8"),
+	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
+				RGB888, RGBA32, "RGBA-8-8-8-8"),
 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X32_PADHI, 4, 1, T_A8B8G8R8,
 				RGB888, RGB32, "RGB-8-8-8-8"),
 
