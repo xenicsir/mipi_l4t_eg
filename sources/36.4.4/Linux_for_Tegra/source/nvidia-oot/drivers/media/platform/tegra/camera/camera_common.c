@@ -114,11 +114,6 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 	{
 		MEDIA_BUS_FMT_RGB888_1X24,
 		V4L2_COLORSPACE_SRGB,
-		V4L2_PIX_FMT_ABGR32,
-	},
-	{
-		MEDIA_BUS_FMT_RGB888_1X24,
-		V4L2_COLORSPACE_SRGB,
 		V4L2_PIX_FMT_RGB24,
 	},
 	{

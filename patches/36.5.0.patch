@@ -2500,10 +2500,10 @@ index 0000000..da8716f
 +    → RAW16=0x2e, RAW8=0x2a, YUV422=0x1e
 diff --git a/rootfs/opt/eg/doc/streaming_examples.txt b/rootfs/opt/eg/doc/streaming_examples.txt
 new file mode 100644
-index 0000000..87212e5
+index 0000000..606fdc6
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/streaming_examples.txt
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,259 @@
 +================================================================================
 +EG CAMERA STREAMING EXAMPLES
 +================================================================================
@@ -2538,17 +2538,38 @@ index 0000000..87212e5
 +      --stream-count=1 --stream-to=video.raw
 +
 +
-+ARGB888 (32-bit BGRA)
-+─────────────────────
++ARGB888 (32-bit AR24/BGRA or AB24/RGBA, depending on L4T version)
++───────────────────────────────────────────────────────────────────
 +
-+  640x480:
++  The camera always transmits the same RGB888 bytes over CSI-2. What
++  changes is which V4L2 fourcc reports this: AR24 (32-bit BGRA) on L4T
++  32.x and all 35.x (including 35.4.1-35.6.4), and AB24 (32-bit RGBA) on
++  L4T 36.x and later. NVIDIA's own vi5_formats.h/camera_common.c actually
++  switched natively to RGBA32-only starting at 35.4.1, but EG re-adds
++  AR24 alongside it through 35.6.4 (JetPack 5.x) because the
++  gst-plugins-good 1.16.3 bundled there doesn't recognize the RGBA32
++  V4L2 fourcc at all (v4l2-ctl itself is unaffected — this is purely a
++  GStreamer limitation). Run eg_dt_camera_config_get.sh to see which one
++  your board actually reports before picking an example below.
++
++  640x480 (AR24 — L4T 32.x and all 35.x):
 +    v4l2-ctl -d /dev/video0 --stream-mmap \
 +      --set-fmt-video=width=640,height=480,pixelformat="AR24" \
 +      --stream-count=1 --stream-to=video.raw
 +
-+  1280x1024:
++  640x480 (AB24 — L4T 36.x and later):
++    v4l2-ctl -d /dev/video0 --stream-mmap \
++      --set-fmt-video=width=640,height=480,pixelformat="AB24" \
++      --stream-count=1 --stream-to=video.raw
++
++  1280x1024 (AR24 — L4T 32.x and all 35.x):
 +    v4l2-ctl -d /dev/video0 --stream-mmap \
 +      --set-fmt-video=width=1280,height=1024,pixelformat="AR24" \
++      --stream-count=1 --stream-to=video.raw
++
++  1280x1024 (AB24 — L4T 36.x and later):
++    v4l2-ctl -d /dev/video0 --stream-mmap \
++      --set-fmt-video=width=1280,height=1024,pixelformat="AB24" \
 +      --stream-count=1 --stream-to=video.raw
 +
 +
@@ -2599,27 +2620,55 @@ index 0000000..87212e5
 +      ! videoconvert ! ximagesink sync=false
 +
 +
-+ARGB888 (32-bit BGRA)
++ARGB888 (32-bit AR24/BGRA or AB24/RGBA, depending on L4T version)
 +
-+  Capture native ARGB888 to file (1 frame):
++  Same underlying RGB888 bytes either way — reported as BGRA on L4T 32.x
++  and all 35.x (including 35.4.1-35.6.4), and as RGBA on L4T 36.x and
++  later (see the note under the v4l2-ctl section above for why). Use
++  eg_dt_camera_config_get.sh to check which one your board reports, then
++  use the matching examples below — GStreamer fails with "can't handle
++  caps"/"not-negotiated" if you pick the wrong one for your L4T version.
++
++  Capture native ARGB888 to file (1 frame) — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
 +      ! "video/x-raw, format=(string)BGRA" \
 +      ! filesink location=video.raw
 +
-+  Convert to RGB888 and save:
++  Capture native ARGB888 to file (1 frame) — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
++      ! "video/x-raw, format=(string)RGBA" \
++      ! filesink location=video.raw
++
++  Convert to RGB888 and save — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
 +      ! "video/x-raw, format=(string)BGRA" \
 +      ! videoconvert ! video/x-raw,format=BGR \
 +      ! filesink location=video.raw
 +
-+  Display 640x480:
++  Convert to RGB888 and save — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
++      ! "video/x-raw, format=(string)RGBA" \
++      ! videoconvert ! video/x-raw,format=RGB \
++      ! filesink location=video.raw
++
++  Display 640x480 — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)BGRA, width=640, height=480" \
 +      ! videoconvert ! ximagesink sync=false
 +
-+  Display 1280x1024:
++  Display 640x480 — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device="/dev/video0" \
++      ! "video/x-raw, format=(string)RGBA, width=640, height=480" \
++      ! videoconvert ! ximagesink sync=false
++
++  Display 1280x1024 — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" \
++      ! videoconvert ! ximagesink sync=false
++
++  Display 1280x1024 — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device="/dev/video0" \
++      ! "video/x-raw, format=(string)RGBA, width=1280, height=1024" \
 +      ! videoconvert ! ximagesink sync=false
 +
 +  Stream to UDP (GStreamer receiver, host 192.168.1.1):
@@ -2692,6 +2741,16 @@ index 0000000..87212e5
 +
 +• Y16 (16-bit greyscale) is not supported on Jetson Nano (T210). Use AR24
 +  or YUYV instead.
++
++• The AR24/AB24 split above is driven by GStreamer, not V4L2: NVIDIA's
++  own vi5_formats.h/camera_common.c natively switched to RGBA32-only
++  starting L4T 35.4.1 (v4l2-ctl always works fine there), but EG keeps
++  ABGR32/AR24 available too through L4T 35.6.4 because gst-plugins-good
++  1.16.3 (JetPack 5.x, Ubuntu 20.04) doesn't support the RGBA32 V4L2
++  fourcc. L4T 36.x+ (JetPack 6.x+, GStreamer 1.20+) doesn't need that
++  workaround and reports AB24 only, matching NVIDIA's table. L4T 32.x
++  (T210/T186, VI2/VI4 pipeline) always reports AR24 — NVIDIA never
++  changed that table on those older SoCs.
 +
 +• For GStreamer, the format and dimensions are negotiated automatically
 +  when not explicitly constrained in the caps filter.
@@ -4921,10 +4980,10 @@ index 0000000..b6929f9
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..9082728
+index 0000000..33f32aa
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
-@@ -0,0 +1,688 @@
+@@ -0,0 +1,689 @@
 +#!/bin/bash
 +#******************************************************************************
 +# eg_dt_camera_config_get.sh - Get Exosens camera configuration from device tree
@@ -5575,6 +5634,7 @@ index 0000000..9082728
 +                        "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
 +                        "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
 +                        "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
++                        "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ;;
 +                        "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
 +                    esac
 +                    if [[ -n "$_gstfmt" ]]; then
@@ -5615,10 +5675,10 @@ index 0000000..9082728
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..65849e7
+index 0000000..f779167
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,472 @@
+@@ -0,0 +1,480 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -5893,7 +5953,15 @@ index 0000000..65849e7
 +
 +	lanes="${CAMERA_LANES[$camera_type]}"
 +	if [[ -n "$lanes" ]]; then
-+		dtboarg+=("$HEADER_IDX=Exosens Cameras. CAM$port_number:$lanes")
++		# Hadron DM's real PCA9540 I2C mux needs its own EC overlay variant
++		# (different target-path than the plain cam_i2cmux one — see
++		# tegra234-p3767-camera-p3768-cti-eg-cam*-ec-*.dts), selected via a
++		# distinct overlay-name so jetson-io doesn't ambiguously match both.
++		if [[ x$BOARD == xhadron-dm ]]; then
++			dtboarg+=("$HEADER_IDX=Exosens Cameras for Connect Tech Hadron DM. CAM$port_number:$lanes")
++		else
++			dtboarg+=("$HEADER_IDX=Exosens Cameras. CAM$port_number:$lanes")
++		fi
 +	fi
 +
 +    echo "Port number : $port_number"
@@ -7874,7 +7942,7 @@ index c09cfb3..4f93cef 100644
 +	rm -fr $(MAKEFILE_DIR)/kernel-devicetree/generic-dts/dtbs
  
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-index c5b0cad..8002929 100644
+index c5b0cad..ccd5244 100644
 --- a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 @@ -2,6 +2,7 @@
@@ -7885,7 +7953,7 @@ index c5b0cad..8002929 100644
  
  old-dtb := $(dtb-y)
  old-dtbo := $(dtbo-y)
-@@ -67,6 +68,54 @@ dtbo-y += tegra234-p3767-camera-p3768-imx219-imx477.dtbo
+@@ -67,6 +68,61 @@ dtbo-y += tegra234-p3767-camera-p3768-imx219-imx477.dtbo
  dtbo-y += tegra234-p3767-camera-p3768-imx477-C.dtbo
  dtbo-y += tegra234-p3767-camera-p3768-imx477-A.dtbo
  
@@ -7912,6 +7980,13 @@ index c5b0cad..8002929 100644
 +dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 +dtbo-y += tegra234-p3767-camera-cti-eg-cams-dione.dtbo
 +dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
++# Hadron DM's real PCA9540 I2C mux (tca9540@70) means the plain EC overlays
++# above (targeting cam_i2cmux) don't apply — see
++# tegra234-p3767-camera-p3768-common-eg-cam{0,1}-ec-*.dtsi.
++dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-1-lane.dtbo
++dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-1-lane.dtbo
++dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-2-lanes.dtbo
++dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-2-lanes.dtbo
 +
 +dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
 +dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo
@@ -16343,254 +16418,29 @@ index 0000000..046669c
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
 new file mode 100644
-index 0000000..53a478f
+index 0000000..1c37c23
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,7 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
-+
-+/dts-v1/;
-+/plugin/;
-+
-+#include <dt-bindings/tegra234-p3767-0000-common.h>
++#include "tegra234-p3767-camera-p3768-common-eg-cam0-ec-1-lane.dtsi"
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:EC_1_lane";
-+#ifdef EG_CSI_22PIN
-+	jetson-header-name = "Jetson 22pin CSI Connector";
-+#else
-+	jetson-header-name = "Jetson 24pin CSI Connector";
-+#endif
-+	compatible = JETSON_COMPATIBLE_P3768;
-+
-+	fragment@10 {
-+		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
-+		__overlay__ {
-+			bus-width=<1>;
-+		};
-+	};
-+
-+	fragment@11 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
-+		__overlay__ {
-+			bus-width=<1>;
-+         remote-endpoint = <&eg_ec_out0>;
-+		};
-+	};
-+
-+   // Disable Dione cameras
-+	fragment@12 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+   // Enable EngineCore cameras
-+	fragment@13 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16";
-+		__overlay__ {
-+         status = "okay";
-+		};
-+	};
-+	fragment@14 {   
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode0";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "20000000";
-+		};
-+	};
-+	fragment@15 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode1";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "20000000";
-+		};
-+	};
-+	fragment@16 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode2";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "20000000";
-+		};
-+	};
-+	fragment@17 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode3";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@18 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode4";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "133333336";
-+		};
-+	};
-+	fragment@19 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode5";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@20 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/ports/port@0/endpoint";
-+		__overlay__ {
-+			bus-width=<1>;
-+		};
-+	};
-+
-+	fragment@21 {
-+		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
-+		__overlay__ {
-+         devname = "eg_ec 9-0016";
-+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_b@16";
-+		};
-+	};
-+
-+  // Disable other cameras 
-+	fragment@30 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+	fragment@31 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
 new file mode 100644
-index 0000000..3ff7b62
+index 0000000..9626cac
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,7 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
-+
-+/dts-v1/;
-+/plugin/;
-+
-+#include <dt-bindings/tegra234-p3767-0000-common.h>
++#include "tegra234-p3767-camera-p3768-common-eg-cam0-ec-2-lanes.dtsi"
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM0:EC_2_lanes";
-+#ifdef EG_CSI_22PIN
-+	jetson-header-name = "Jetson 22pin CSI Connector";
-+#else
-+	jetson-header-name = "Jetson 24pin CSI Connector";
-+#endif
-+	compatible = JETSON_COMPATIBLE_P3768;
-+
-+	fragment@10 {
-+		target-path = "/tegra-capture-vi/ports/port@0/endpoint";
-+		__overlay__ {
-+			bus-width=<2>;
-+		};
-+	};
-+
-+	fragment@11 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@0/ports/port@0/endpoint@0";
-+		__overlay__ {
-+			bus-width=<2>;
-+         remote-endpoint = <&eg_ec_out0>;
-+		};
-+	};
-+
-+   // Disable Dione cameras
-+	fragment@12 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+   // Enable EngineCore cameras
-+	fragment@13 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16";
-+		__overlay__ {
-+         status = "okay";
-+		};
-+	};
-+	fragment@14 {   
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode0";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@15 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode1";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@16 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode2";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@17 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode3";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@18 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode4";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "133333336";
-+		};
-+	};
-+	fragment@19 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/mode5";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@20 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/eg_ec_b@16/ports/port@0/endpoint";
-+		__overlay__ {
-+			bus-width=<2>;
-+		};
-+	};
-+
-+	fragment@21 {
-+		target-path = "/tegra-camera-platform/modules/module0/drivernode0";
-+		__overlay__ {
-+         devname = "eg_ec 9-0016";
-+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@0/eg_ec_b@16";
-+		};
-+	};
-+
-+  // Disable other cameras 
-+	fragment@30 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv3_imx477_a@1a";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+	fragment@31 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@0/rbpcv2_imx219_a@10";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam0-ilumos.dts
 new file mode 100644
@@ -17066,255 +16916,29 @@ index 0000000..e84c82e
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
 new file mode 100644
-index 0000000..455dc49
+index 0000000..165c032
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,7 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
-+
-+/dts-v1/;
-+/plugin/;
-+
-+#include <dt-bindings/tegra234-p3767-0000-common.h>
++#include "tegra234-p3767-camera-p3768-common-eg-cam1-ec-1-lane.dtsi"
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:EC_1_lane";
-+#ifdef EG_CSI_22PIN
-+	jetson-header-name = "Jetson 22pin CSI Connector";
-+#else
-+	jetson-header-name = "Jetson 24pin CSI Connector";
-+#endif
-+	compatible = JETSON_COMPATIBLE_P3768;
-+
-+	fragment@10 {
-+		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
-+		__overlay__ {
-+			bus-width=<1>;
-+		};
-+	};
-+
-+	fragment@11 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
-+		__overlay__ {
-+			bus-width=<1>;
-+         remote-endpoint = <&eg_ec_out1>;
-+		};
-+	};
-+
-+   // Disable Dione cameras
-+	fragment@12 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+   // Enable EngineCore cameras
-+	fragment@13 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16";
-+		__overlay__ {
-+         status = "okay";
-+		};
-+	};
-+	fragment@14 {   
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode0";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "20000000";
-+		};
-+	};
-+	fragment@15 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode1";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "20000000";
-+		};
-+	};
-+	fragment@16 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode2";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "20000000";
-+		};
-+	};
-+	fragment@17 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@18 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "133333336";
-+		};
-+	};
-+	fragment@19 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
-+		__overlay__ {
-+         num_lanes = "1";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@20 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/ports/port@0/endpoint";
-+		__overlay__ {
-+			bus-width=<1>;
-+		};
-+	};
-+
-+	fragment@21 {
-+		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
-+		__overlay__ {
-+         devname = "eg_ec 10-0016";
-+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/eg_ec_c@16";
-+		};
-+	};
-+
-+  // Disable other cameras 
-+	fragment@30 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv3_imx477_c@1a";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+	fragment@31 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
 new file mode 100644
-index 0000000..f4b1b06
+index 0000000..b517247
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ec-2-lanes.dts
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,7 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
-+
-+/dts-v1/;
-+/plugin/;
-+
-+#include <dt-bindings/tegra234-p3767-0000-common.h>
++#include "tegra234-p3767-camera-p3768-common-eg-cam1-ec-2-lanes.dtsi"
 +
 +/ {
 +	overlay-name = "Exosens Cameras. CAM1:EC_2_lanes";
-+#ifdef EG_CSI_22PIN
-+	jetson-header-name = "Jetson 22pin CSI Connector";
-+#else
-+	jetson-header-name = "Jetson 24pin CSI Connector";
-+#endif
-+	compatible = JETSON_COMPATIBLE_P3768;
-+
-+	fragment@10 {
-+		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
-+		__overlay__ {
-+			bus-width=<2>;
-+		};
-+	};
-+
-+	fragment@11 {
-+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
-+		__overlay__ {
-+			bus-width=<2>;
-+         remote-endpoint = <&eg_ec_out1>;
-+		};
-+	};
-+
-+   // Disable Dione cameras
-+	fragment@12 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+   // Enable EngineCore cameras
-+	fragment@13 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16";
-+		__overlay__ {
-+         status = "okay";
-+		};
-+	};
-+	fragment@14 {   
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode0";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@15 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode1";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@16 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode2";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@17 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@18 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "133333336";
-+		};
-+	};
-+	fragment@19 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
-+		__overlay__ {
-+         num_lanes = "2";
-+         pix_clk_hz = "100000000";
-+		};
-+	};
-+	fragment@20 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/ports/port@0/endpoint";
-+		__overlay__ {
-+			bus-width=<2>;
-+		};
-+	};
-+
-+	fragment@21 {
-+		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
-+		__overlay__ {
-+         devname = "eg_ec 10-0016";
-+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/eg_ec_c@16";
-+		};
-+	};
-+
-+  // Disable other cameras 
-+	fragment@30 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv3_imx477_c@1a";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+	fragment@31 {
-+		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
-+		__overlay__ {
-+         status = "disabled";
-+		};
-+	};
-+
-+
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-p3768-eg-cam1-ilumos.dts
 new file mode 100644
@@ -17833,10 +17457,10 @@ index c90cec8..627df6b 100644
  		muxc->deselect(muxc, priv->chan_id);
  
 diff --git a/source/nvidia-oot/drivers/media/i2c/Makefile b/source/nvidia-oot/drivers/media/i2c/Makefile
-index a85d6e8..74f54bb 100644
+index a85d6e8..2d4e649 100644
 --- a/source/nvidia-oot/drivers/media/i2c/Makefile
 +++ b/source/nvidia-oot/drivers/media/i2c/Makefile
-@@ -21,6 +21,22 @@ obj-m += nv_ov5693.o
+@@ -21,6 +21,35 @@ obj-m += nv_ov5693.o
  obj-m += nv_ar0234.o
  obj-m += nv_hawk_owl.o
  obj-m += max929x.o
@@ -17844,6 +17468,19 @@ index a85d6e8..74f54bb 100644
 +dione_ir-y += dioneir.o tc358746_calculation.o
 +eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 +obj-m += eg-ec-mipi.o
++
++# NVIDIA's own vi5_formats.h/camera_common.c report RGB888 CSI-2 as
++# RGBA32 (AB24) only from L4T 35.4.1 on (see vi5_formats_mbus_fix.md in
++# shared memory) -- but EG re-adds ABGR32 (AR24) alongside it on 35.4.1
++# through 35.6.4 (JetPack 5.x, Ubuntu 20.04) because gst-plugins-good
++# 1.16.3 there doesn't recognize the V4L2_PIX_FMT_RGBA32 fourcc at all
++# (v4l2src can't produce RGBA caps, confirmed via GST_DEBUG=v4l2*:5 on
++# real hardware) -- so those versions still default to AR24. This L4T
++# version (JetPack 6.x+, Ubuntu 22.04+, GStreamer 1.20+) doesn't need that
++# workaround: stays AB24-only, matching NVIDIA's own table. Tell
++# dioneir.c/eg_ec_mipi_src.c's descriptive pixel_format sysfs strings to
++# match, since LINUX_VERSION_CODE alone can't express this distinction.
++ccflags-y += -DEG_RGB888_AB24
 +ifndef PRISTINE_KERNEL
 +# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
 +# nvidia-oot camera framework (sensor_common.c, vi5_formats.h...), which
@@ -17861,10 +17498,10 @@ index a85d6e8..74f54bb 100644
  obj-m += pca9570.o
 diff --git a/source/nvidia-oot/drivers/media/i2c/dioneir.c b/source/nvidia-oot/drivers/media/i2c/dioneir.c
 new file mode 100755
-index 0000000..30bb1a6
+index 0000000..5d3d889
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/dioneir.c
-@@ -0,0 +1,2149 @@
+@@ -0,0 +1,2152 @@
 +/*
 + * dione_ir.c - Dione IR sensor driver
 + *
@@ -17914,7 +17551,7 @@ index 0000000..30bb1a6
 +#define EG_GPIO_CANSLEEP(g)	gpio_cansleep(g)
 +#endif
 +
-+#define DBG_TC358746
++//#define DBG_TC358746
 +
 +#define MAX_I2C_CLIENTS_NUMBER 128
 +
@@ -18841,15 +18478,6 @@ index 0000000..30bb1a6
 +   struct tc358746 params;
 +   int i, err;
 +
-+   /* TEMPORARY DEBUG TRACE — remove once the s_data->mode/priv->mode
-+    * mismatch on Hadron DM is understood. */
-+   dev_info(tc_dev->dev,
-+         "%s: DEBUG s_data->mode=%d priv->mode=%d mode_prop_idx=%d "
-+         "num_modes=%u fmt_width=%d fmt_height=%d def_mode=%d\n",
-+         __func__, s_data->mode, priv->mode, s_data->mode_prop_idx,
-+         s_data->sensor_props.num_modes, s_data->fmt_width,
-+         s_data->fmt_height, s_data->def_mode);
-+
 +   if (s_data->mode != priv->mode)
 +      return -EINVAL;
 +
@@ -19761,7 +19389,19 @@ index 0000000..30bb1a6
 +static ssize_t pixel_format_show(struct device *dev,
 +      struct device_attribute *attr, char *buf)
 +{
++   /* Dione always transmits RGB888 over CSI-2 (see tc358746_calculation.c) —
++    * what varies is which V4L2 fourcc gets used to report it: AB24 on L4T
++    * versions where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
++    * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4, where
++    * NVIDIA's own vi5_formats.h natively moved to RGBA32-only but EG
++    * re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack 5.x) doesn't
++    * recognize the RGBA32 V4L2 fourcc at all (see vi5_formats_mbus_fix.md
++    * in shared memory). */
++#ifdef EG_RGB888_AB24
++   return scnprintf(buf, PAGE_SIZE, "'AB24' (32-bit RGBA 8-8-8-8)\n");
++#else
 +   return scnprintf(buf, PAGE_SIZE, "'AR24' (32-bit BGRA 8-8-8-8)\n");
++#endif
 +}
 +static DEVICE_ATTR_RO(pixel_format);
 +
@@ -21187,10 +20827,10 @@ index 0000000..4458e5b
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c b/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..879cc46
+index 0000000..18cded1
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,1043 @@
+@@ -0,0 +1,1063 @@
 +/*
 + * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
@@ -21904,7 +21544,19 @@ index 0000000..879cc46
 +{
 +   switch (code) {
 +      case 20: return "'Y16 ' (16-bit Greyscale)";
++      /* The camera always transmits RGB888 over CSI-2 — what varies is
++       * which V4L2 fourcc gets used to report it: AB24 on L4T versions
++       * where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
++       * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4,
++       * where NVIDIA's own vi5_formats.h natively moved to RGBA32-only
++       * but EG re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack
++       * 5.x) doesn't recognize the RGBA32 V4L2 fourcc at all (see
++       * vi5_formats_mbus_fix.md in shared memory). */
++#ifdef EG_RGB888_AB24
++      case 21: return "'AB24' (32-bit RGBA 8-8-8-8)";
++#else
 +      case 21: return "'AR24' (32-bit BGRA 8-8-8-8)";
++#endif
 +      case 22: return "'YUYV' (YUYV 4:2:2)";
 +      default: return NULL;
 +   }
@@ -22129,9 +21781,17 @@ index 0000000..879cc46
 +               eg_ec_mipi_frmfmt[m].size.height;
 +
 +         switch (priv->native_pixfmt) {
-+            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_ABGR32; break;
-+            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;   break;
-+            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;    break;
++            /* RGB888: force the stock RGB24 entry (same mbus code
++             * RGB888_1X24 as the alpha-padded fourccs VI actually reports
++             * over G_FMT/ENUM_FMT — that's driven solely by vi5_formats.h's
++             * table order, not by this colorfmt) instead of hardcoding an
++             * alpha fourcc that varies by L4T version (ABGR32 pre-35.4.1,
++             * RGBA32 from 35.4.1 on — see [[vi5_formats_mbus_fix]]) and
++             * isn't guaranteed to exist in camera_common_color_fmts[].
++             * Mirrors dione_ir_probe_sensor()'s equivalent force. */
++            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_RGB24; break;
++            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;  break;
++            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;   break;
 +         }
 +         colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
 +         if (colorfmt)
@@ -26367,7 +26027,7 @@ index 0000000..d48b217
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c b/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 old mode 100644
 new mode 100755
-index 582917d..c81af81
+index 582917d..58e6a40
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/camera_common.c
 @@ -1,8 +1,19 @@
@@ -26431,19 +26091,7 @@ index 582917d..c81af81
  	{
  		MEDIA_BUS_FMT_SRGGB12_1X12,
  		V4L2_COLORSPACE_SRGB,
-@@ -113,6 +111,11 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
- 		V4L2_COLORSPACE_SRGB,
- 		V4L2_PIX_FMT_VYUY,
- 	},
-+	{
-+		MEDIA_BUS_FMT_RGB888_1X24,
-+		V4L2_COLORSPACE_SRGB,
-+		V4L2_PIX_FMT_ABGR32,
-+	},
- 	{
- 		MEDIA_BUS_FMT_RGB888_1X24,
- 		V4L2_COLORSPACE_SRGB,
-@@ -138,6 +141,21 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
+@@ -138,6 +136,21 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
  		V4L2_COLORSPACE_SRGB,
  		V4L2_PIX_FMT_VYUY,
  	},
@@ -26465,7 +26113,7 @@ index 582917d..c81af81
  };
  
  struct camera_common_csi_io_pad_ctx {
-@@ -975,12 +993,12 @@ int camera_common_get_mbus_config(struct v4l2_subdev *sd,
+@@ -975,12 +988,12 @@ int camera_common_get_mbus_config(struct v4l2_subdev *sd,
  	 *  then return an error
  	 */
  	cfg->type = V4L2_MBUS_CSI2_DPHY;
@@ -26688,7 +26336,7 @@ index 90e4603..d0937e5 100644
 diff --git a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 old mode 100644
 new mode 100755
-index 4baafc7..c9ba4f0
+index 4baafc7..a7fd3a5
 --- a/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 +++ b/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_formats.h
 @@ -15,6 +15,19 @@
@@ -26728,11 +26376,10 @@ index 4baafc7..c9ba4f0
  	/* RAW 10 */
  	TEGRA_VIDEO_FORMAT(RAW10, 10, SRGGB10_1X10, 2, 1, T_R16,
  				RAW10, SRGGB10, "RGRG.. GBGB.."),
-@@ -127,8 +130,20 @@ static const struct tegra_video_format vi5_video_formats[] = {
+@@ -127,8 +130,18 @@ static const struct tegra_video_format vi5_video_formats[] = {
  	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
  				RAW12, SBGGR12, "BGBG.. GRGR.."),
  
--	/* RGB888 */
 +	/* RAW 14: packed 14-bit (CSI-2 DT=0x2d), unpacked to 16-bit via pad0_en=1 */
 +   TEGRA_VIDEO_FORMAT(RAW14, 14, Y14_1X14, 2, 1, T_R16,
 +            RAW14, Y14, "RAW14"),
@@ -26743,9 +26390,8 @@ index 4baafc7..c9ba4f0
 +   TEGRA_VIDEO_FORMAT(RAW16, 16, Y16BE_1X16, 2, 1, T_R16,
 +            RAW16, Y16_BE, "RAW16_BE"),
 +
-+	/* RGB888 — ABGR32 first so tegra_core_get_format_by_code(RGB888_1X24,0) → AR24 */
- 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
-+				RGB888, ABGR32, "BGRA-8-8-8-8"),
+ 	/* RGB888 */
+-	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
 + 	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X24, 4, 1, T_A8R8G8B8,
  				RGB888, RGBA32, "RGBA-8-8-8-8"),
  	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X32_PADHI, 4, 1, T_A8B8G8R8,

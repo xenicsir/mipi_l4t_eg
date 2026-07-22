@@ -711,7 +711,19 @@ static const char *eg_ec_pixel_format_name(u32 code)
 {
    switch (code) {
       case 20: return "'Y16 ' (16-bit Greyscale)";
+      /* The camera always transmits RGB888 over CSI-2 — what varies is
+       * which V4L2 fourcc gets used to report it: AB24 on L4T versions
+       * where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
+       * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4,
+       * where NVIDIA's own vi5_formats.h natively moved to RGBA32-only
+       * but EG re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack
+       * 5.x) doesn't recognize the RGBA32 V4L2 fourcc at all (see
+       * vi5_formats_mbus_fix.md in shared memory). */
+#ifdef EG_RGB888_AB24
+      case 21: return "'AB24' (32-bit RGBA 8-8-8-8)";
+#else
       case 21: return "'AR24' (32-bit BGRA 8-8-8-8)";
+#endif
       case 22: return "'YUYV' (YUYV 4:2:2)";
       default: return NULL;
    }
@@ -936,9 +948,17 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
                eg_ec_mipi_frmfmt[m].size.height;
 
          switch (priv->native_pixfmt) {
-            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_ABGR32; break;
-            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;   break;
-            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;    break;
+            /* RGB888: force the stock RGB24 entry (same mbus code
+             * RGB888_1X24 as the alpha-padded fourccs VI actually reports
+             * over G_FMT/ENUM_FMT — that's driven solely by vi5_formats.h's
+             * table order, not by this colorfmt) instead of hardcoding an
+             * alpha fourcc that varies by L4T version (ABGR32 pre-35.4.1,
+             * RGBA32 from 35.4.1 on — see [[vi5_formats_mbus_fix]]) and
+             * isn't guaranteed to exist in camera_common_color_fmts[].
+             * Mirrors dione_ir_probe_sensor()'s equivalent force. */
+            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_RGB24; break;
+            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;  break;
+            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;   break;
          }
          colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
          if (colorfmt)

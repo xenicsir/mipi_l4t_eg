@@ -2500,10 +2500,10 @@ index 0000000..da8716f
 +    → RAW16=0x2e, RAW8=0x2a, YUV422=0x1e
 diff --git a/rootfs/opt/eg/doc/streaming_examples.txt b/rootfs/opt/eg/doc/streaming_examples.txt
 new file mode 100644
-index 0000000..87212e5
+index 0000000..606fdc6
 --- /dev/null
 +++ b/rootfs/opt/eg/doc/streaming_examples.txt
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,259 @@
 +================================================================================
 +EG CAMERA STREAMING EXAMPLES
 +================================================================================
@@ -2538,17 +2538,38 @@ index 0000000..87212e5
 +      --stream-count=1 --stream-to=video.raw
 +
 +
-+ARGB888 (32-bit BGRA)
-+─────────────────────
++ARGB888 (32-bit AR24/BGRA or AB24/RGBA, depending on L4T version)
++───────────────────────────────────────────────────────────────────
 +
-+  640x480:
++  The camera always transmits the same RGB888 bytes over CSI-2. What
++  changes is which V4L2 fourcc reports this: AR24 (32-bit BGRA) on L4T
++  32.x and all 35.x (including 35.4.1-35.6.4), and AB24 (32-bit RGBA) on
++  L4T 36.x and later. NVIDIA's own vi5_formats.h/camera_common.c actually
++  switched natively to RGBA32-only starting at 35.4.1, but EG re-adds
++  AR24 alongside it through 35.6.4 (JetPack 5.x) because the
++  gst-plugins-good 1.16.3 bundled there doesn't recognize the RGBA32
++  V4L2 fourcc at all (v4l2-ctl itself is unaffected — this is purely a
++  GStreamer limitation). Run eg_dt_camera_config_get.sh to see which one
++  your board actually reports before picking an example below.
++
++  640x480 (AR24 — L4T 32.x and all 35.x):
 +    v4l2-ctl -d /dev/video0 --stream-mmap \
 +      --set-fmt-video=width=640,height=480,pixelformat="AR24" \
 +      --stream-count=1 --stream-to=video.raw
 +
-+  1280x1024:
++  640x480 (AB24 — L4T 36.x and later):
++    v4l2-ctl -d /dev/video0 --stream-mmap \
++      --set-fmt-video=width=640,height=480,pixelformat="AB24" \
++      --stream-count=1 --stream-to=video.raw
++
++  1280x1024 (AR24 — L4T 32.x and all 35.x):
 +    v4l2-ctl -d /dev/video0 --stream-mmap \
 +      --set-fmt-video=width=1280,height=1024,pixelformat="AR24" \
++      --stream-count=1 --stream-to=video.raw
++
++  1280x1024 (AB24 — L4T 36.x and later):
++    v4l2-ctl -d /dev/video0 --stream-mmap \
++      --set-fmt-video=width=1280,height=1024,pixelformat="AB24" \
 +      --stream-count=1 --stream-to=video.raw
 +
 +
@@ -2599,27 +2620,55 @@ index 0000000..87212e5
 +      ! videoconvert ! ximagesink sync=false
 +
 +
-+ARGB888 (32-bit BGRA)
++ARGB888 (32-bit AR24/BGRA or AB24/RGBA, depending on L4T version)
 +
-+  Capture native ARGB888 to file (1 frame):
++  Same underlying RGB888 bytes either way — reported as BGRA on L4T 32.x
++  and all 35.x (including 35.4.1-35.6.4), and as RGBA on L4T 36.x and
++  later (see the note under the v4l2-ctl section above for why). Use
++  eg_dt_camera_config_get.sh to check which one your board reports, then
++  use the matching examples below — GStreamer fails with "can't handle
++  caps"/"not-negotiated" if you pick the wrong one for your L4T version.
++
++  Capture native ARGB888 to file (1 frame) — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
 +      ! "video/x-raw, format=(string)BGRA" \
 +      ! filesink location=video.raw
 +
-+  Convert to RGB888 and save:
++  Capture native ARGB888 to file (1 frame) — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
++      ! "video/x-raw, format=(string)RGBA" \
++      ! filesink location=video.raw
++
++  Convert to RGB888 and save — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
 +      ! "video/x-raw, format=(string)BGRA" \
 +      ! videoconvert ! video/x-raw,format=BGR \
 +      ! filesink location=video.raw
 +
-+  Display 640x480:
++  Convert to RGB888 and save — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
++      ! "video/x-raw, format=(string)RGBA" \
++      ! videoconvert ! video/x-raw,format=RGB \
++      ! filesink location=video.raw
++
++  Display 640x480 — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)BGRA, width=640, height=480" \
 +      ! videoconvert ! ximagesink sync=false
 +
-+  Display 1280x1024:
++  Display 640x480 — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device="/dev/video0" \
++      ! "video/x-raw, format=(string)RGBA, width=640, height=480" \
++      ! videoconvert ! ximagesink sync=false
++
++  Display 1280x1024 — L4T 32.x/35.x (BGRA):
 +    gst-launch-1.0 -v v4l2src device="/dev/video0" \
 +      ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" \
++      ! videoconvert ! ximagesink sync=false
++
++  Display 1280x1024 — L4T 36.x+ (RGBA):
++    gst-launch-1.0 -v v4l2src device="/dev/video0" \
++      ! "video/x-raw, format=(string)RGBA, width=1280, height=1024" \
 +      ! videoconvert ! ximagesink sync=false
 +
 +  Stream to UDP (GStreamer receiver, host 192.168.1.1):
@@ -2692,6 +2741,16 @@ index 0000000..87212e5
 +
 +• Y16 (16-bit greyscale) is not supported on Jetson Nano (T210). Use AR24
 +  or YUYV instead.
++
++• The AR24/AB24 split above is driven by GStreamer, not V4L2: NVIDIA's
++  own vi5_formats.h/camera_common.c natively switched to RGBA32-only
++  starting L4T 35.4.1 (v4l2-ctl always works fine there), but EG keeps
++  ABGR32/AR24 available too through L4T 35.6.4 because gst-plugins-good
++  1.16.3 (JetPack 5.x, Ubuntu 20.04) doesn't support the RGBA32 V4L2
++  fourcc. L4T 36.x+ (JetPack 6.x+, GStreamer 1.20+) doesn't need that
++  workaround and reports AB24 only, matching NVIDIA's table. L4T 32.x
++  (T210/T186, VI2/VI4 pipeline) always reports AR24 — NVIDIA never
++  changed that table on those older SoCs.
 +
 +• For GStreamer, the format and dimensions are negotiated automatically
 +  when not explicitly constrained in the caps filter.
@@ -3466,10 +3525,10 @@ index 0000000..ba80770
 \ No newline at end of file
 diff --git a/rootfs/usr/bin/detect_jetson_board.sh b/rootfs/usr/bin/detect_jetson_board.sh
 new file mode 100755
-index 0000000..c621d35
+index 0000000..f425b26
 --- /dev/null
 +++ b/rootfs/usr/bin/detect_jetson_board.sh
-@@ -0,0 +1,476 @@
+@@ -0,0 +1,482 @@
 +#!/bin/bash
 +#******************************************************************************
 +# detect_board.sh - Comprehensive Jetson board detection
@@ -3704,6 +3763,8 @@ index 0000000..c621d35
 +        vendor="connecttech"; carrier="spacely"; carrier_pn="Spacely (TX2/TX1)"
 +    elif [[ "$model" =~ "Orbitty" ]]; then
 +        vendor="connecttech"; carrier="orbitty"; carrier_pn="Orbitty (TX2/TX1 compact)"
++    elif [[ "$model" =~ "Hadron Dual MIPI" ]] || [[ "$dtb" =~ [Cc][Tt][Ii]-NGX024 ]]; then
++        vendor="connecttech"; carrier="hadron-dm"; carrier_pn="Hadron Dual MIPI (Orin NX/Nano)"
 +    # Auvidea carrier boards
 +    elif [[ "$model" =~ "X230" ]] || [[ "$dtb" =~ [Aa]uvidea.*[Xx]230 ]] || [[ "$dtb" =~ [Xx]230[Dd] ]]; then
 +        vendor="auvidea"; carrier="x230d"; carrier_pn="X230D (AGX Orin)"
@@ -3839,7 +3900,11 @@ index 0000000..c621d35
 +
 +    # Construct board type
 +    local board_type=""
-+    if [[ "$vendor" == "forecr" ]]; then
++    if [[ "$vendor" == "forecr" || "$carrier" == "hadron-dm" ]]; then
++        # hadron-dm bypasses the vendor-carrier concatenation (like forecr
++        # above) to match EG_FORCE_BOARD's value in the postinst script
++        # (CARRIER_BOARD "hadron_dm" hyphenated), which eg_dt_camera_config_set.sh
++        # compares BOARD against verbatim.
 +        board_type="$carrier"
 +    elif [[ "$vendor" != "unknown" && "$vendor" != "nvidia" ]]; then
 +        board_type="$vendor-$carrier"
@@ -4870,10 +4935,10 @@ index 0000000..b6929f9
 +
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_get.sh b/rootfs/usr/bin/eg_dt_camera_config_get.sh
 new file mode 100755
-index 0000000..9e9cd9b
+index 0000000..33f32aa
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_get.sh
-@@ -0,0 +1,684 @@
+@@ -0,0 +1,689 @@
 +#!/bin/bash
 +#******************************************************************************
 +# eg_dt_camera_config_get.sh - Get Exosens camera configuration from device tree
@@ -5242,6 +5307,10 @@ index 0000000..9e9cd9b
 +        "1:$dt_base/bus@0/cam_i2cmux/i2c@1"
 +        "2:$dt_base/bus@0/cam_i2cmux/i2c@2"
 +        "3:$dt_base/bus@0/cam_i2cmux/i2c@3"
++        # Connect Tech Hadron DM: real PCA9540 chip mux (reg 0x70) on cam_i2c,
++        # not a GPIO mux — see HADRON_DM_CAM_I2C_MUX in the camera dtsi.
++        "0:$dt_base/bus@0/i2c@3180000/tca9540@70/i2c@0"
++        "1:$dt_base/bus@0/i2c@3180000/tca9540@70/i2c@1"
 +        "0:$dt_base/bus@0/i2c@31e0000"
 +        "1:$dt_base/bus@0/i2c@c240000"
 +        "2:$dt_base/bus@0/i2c@c250000"
@@ -5520,6 +5589,7 @@ index 0000000..9e9cd9b
 +                        "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
 +                        "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
 +                        "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
++                        "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ;;
 +                        "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
 +                    esac
 +                    if [[ -n "$_gstfmt" ]]; then
@@ -5560,10 +5630,10 @@ index 0000000..9e9cd9b
 +exit 0
 diff --git a/rootfs/usr/bin/eg_dt_camera_config_set.sh b/rootfs/usr/bin/eg_dt_camera_config_set.sh
 new file mode 100755
-index 0000000..9e49165
+index 0000000..65849e7
 --- /dev/null
 +++ b/rootfs/usr/bin/eg_dt_camera_config_set.sh
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,472 @@
 +#!/bin/bash
 +
 +# Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
@@ -5631,6 +5701,27 @@ index 0000000..9e49165
 +    '
 +}
 +
++# Returns 0 (true) if any live /proc/device-tree node matching GLOB exists and
++# is NOT disabled. Mere existence isn't enough: our own eg-cams overlays
++# always define the alternate-sensor slots (imx219/imx477/ilumos/...) sharing
++# a port with Dione/EC, just disabled unless explicitly selected — so a naive
++# existence check flags a false conflict on every board, harmless only where
++# the disable-imx219/477 overlay's hardcoded target path happens to still
++# resolve (cam_i2cmux carriers). On a carrier with a different I2C topology
++# (e.g. Hadron DM's tca9540 chip mux) that overlay targets a path that no
++# longer exists post-merge, and fdtoverlay fails outright instead of no-op'ing.
++# Usage: _live_node_active <node_glob>
++# Example: _live_node_active "rbpcv2_imx219*"
++_live_node_active() {
++    local glob="$1"
++    local d status
++    for d in $(find -L /proc/device-tree -iname "$glob" -type d 2>/dev/null); do
++        status=$(tr -d '\0' < "$d/status" 2>/dev/null)
++        [[ "$status" != "disabled" ]] && return 0
++    done
++    return 1
++}
++
 +if [[ -n "$EG_FORCE_BOARD" ]]; then
 +	BOARD="$EG_FORCE_BOARD"
 +elif grep -q "dsboard-ornxs" /boot/extlinux/extlinux.conf 2>/dev/null; then
@@ -5638,6 +5729,10 @@ index 0000000..9e49165
 +	# regardless of what detect_jetson_board.sh returns (e.g. p3767-0005 with
 +	# no Forecr DTB in QSPI will wrongly return nvidia/p3768 without this check).
 +	BOARD="dsboard-ornxs"
++elif grep -q "cti-eg-cams-dione" /boot/extlinux/extlinux.conf 2>/dev/null; then
++	# Same rationale as dsboard-ornxs above — if the Hadron DM overlay is
++	# already active, stay on it even if hardware detection were to fail.
++	BOARD="hadron-dm"
 +else
 +	BOARD=$(detect_jetson_board.sh --short)
 +fi
@@ -5662,6 +5757,9 @@ index 0000000..9e49165
 +  seeed-recomputer-j4012)
 +	  echo "Seeed Studio reComputer J4012 detected: CAM0 lane swap corrected on carrier"
 +	  ;;
++  hadron-dm)
++	  echo "Connect Tech board detected: $BOARD"
++	  ;;
 +  nvidia-*)
 +	  echo "Nvidia official board"
 +	  ;;
@@ -5675,6 +5773,8 @@ index 0000000..9e49165
 +   base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
 +elif [[ x$BOARD == xseeed-recomputer-j4012 ]]; then
 +   base_devicetree="Exosens Cameras - CAM0 lane swap"
++elif [[ x$BOARD == xhadron-dm ]]; then
++   base_devicetree="Exosens Cameras for Connect Tech Hadron DM"
 +else
 +   base_devicetree="Exosens Cameras"
 +fi
@@ -5720,13 +5820,21 @@ index 0000000..9e49165
 +disable_imx477_arg=""
 +_jetson_io_overlays=$(sudo /opt/eg/jetson-io/config-by-hardware.py -l 2>/dev/null)
 +
++# jetson-io header index of the CSI camera connector — NOT necessarily "2".
++# Nvidia devkit / Forecr boards expose 2 headers (40-pin GPIO + CSI connector
++# as header 2); Connect Tech Hadron DM exposes only the CSI connector, as the
++# board's sole header (header 1). Detect it from the "-l" listing instead of
++# hardcoding "2", so both layouts work.
++HEADER_IDX=$(echo "$_jetson_io_overlays" | grep -oP '^Header \K[0-9]+(?=.*CSI Connector)' | head -1)
++[[ -z "$HEADER_IDX" ]] && HEADER_IDX=2
++
 +# IMX219/IMX477 detection: check both the live DT and the primary boot DTB.
 +# The live DT may not reflect active nodes if a previous user-custom.dtb already
 +# disabled them; the kernel DTB is the authoritative source for what will be in
 +# the new merged DTB.
 +_imx219_active=0
 +_imx477_active=0
-+if [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
++if _live_node_active "rbpcv2_imx219*"; then
 +   _imx219_active=1
 +fi
 +if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv2_imx219"; then
@@ -5739,11 +5847,11 @@ index 0000000..9e49165
 +   # and would fail fdtoverlay with FDT_ERR_NOTFOUND.
 +   if [[ $base_devicetree != "Exosens Cameras - 2 ports" ]] && \
 +      echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx219"; then
-+      disable_imx219_arg="2=Exosens Cameras. Disable imx219"
++      disable_imx219_arg="$HEADER_IDX=Exosens Cameras. Disable imx219"
 +   fi
 +fi
 +
-+if [[ -n "$(find -L /proc/device-tree -name "rbpcv3_imx477*" -type d 2>/dev/null | head -1)" ]]; then
++if _live_node_active "rbpcv3_imx477*"; then
 +   _imx477_active=1
 +fi
 +if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv3_imx477"; then
@@ -5751,7 +5859,7 @@ index 0000000..9e49165
 +fi
 +if [[ $_imx477_active -eq 1 ]]; then
 +   if echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx477"; then
-+      disable_imx477_arg="2=Exosens Cameras. Disable imx477"
++      disable_imx477_arg="$HEADER_IDX=Exosens Cameras. Disable imx477"
 +   fi
 +fi
 +
@@ -5800,7 +5908,7 @@ index 0000000..9e49165
 +
 +	lanes="${CAMERA_LANES[$camera_type]}"
 +	if [[ -n "$lanes" ]]; then
-+		dtboarg+=("2=Exosens Cameras. CAM$port_number:$lanes")
++		dtboarg+=("$HEADER_IDX=Exosens Cameras. CAM$port_number:$lanes")
 +	fi
 +
 +    echo "Port number : $port_number"
@@ -5830,7 +5938,7 @@ index 0000000..9e49165
 +cmd="python /opt/eg/jetson-io/config-by-hardware.py -n"
 +
 +# Build command arguments dynamically
-+cmd_args=("2=$base_devicetree")
++cmd_args=("$HEADER_IDX=$base_devicetree")
 +[[ -n "$disable_imx219_arg" ]] && cmd_args+=("$disable_imx219_arg")
 +[[ -n "$disable_imx477_arg" ]] && cmd_args+=("$disable_imx477_arg")
 +cmd_args+=("${dtboarg[@]}")
@@ -22832,10 +22940,10 @@ index c6d34e8..7624af3 100644
 +obj-$(CONFIG_VIDEO_MICROLYNX) += microlynx.o
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c b/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c
 new file mode 100755
-index 0000000..acbe199
+index 0000000..5d3d889
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/dioneir.c
-@@ -0,0 +1,2100 @@
+@@ -0,0 +1,2152 @@
 +/*
 + * dione_ir.c - Dione IR sensor driver
 + *
@@ -24636,6 +24744,25 @@ index 0000000..acbe199
 +      priv->subdev = &tc_dev->s_data->subdev;
 +      tegracam_set_privdata(tc_dev, (void *)priv);
 +
++      /* Force s_data->colorfmt to the RGB24 entry instead of leaving it to
++       * be derived later from userspace's S_FMT request. Dione only ever
++       * declares mode_type="rgb"/pixel_phase="rgb888" in DT, which
++       * sensor_common.c's extract_pixel_format() can only turn into
++       * V4L2_PIX_FMT_RGB24 (see "rgb_rgb88824" case) — but ENUM_FMT on
++       * /dev/videoX lists whatever vi5_formats.h offers for this mbus code
++       * instead (RGBA32/XRGB32/RGBX32 on a PRISTINE_KERNEL vendor's
++       * unpatched stock kernel), none of which camera_common_color_fmts[]
++       * maps back to. Forcing the known-good RGB24 entry here — matching
++       * the pattern already used in eg_ec_mipi_src.c for its own native
++       * format — avoids relying on that mismatched round-trip.
++       */
++      {
++         const struct camera_common_colorfmt *colorfmt =
++               camera_common_find_pixelfmt(V4L2_PIX_FMT_RGB24);
++         if (colorfmt)
++            tc_dev->s_data->colorfmt = colorfmt;
++      }
++
 +      priv->tx_regmap = devm_regmap_init_i2c(priv->tc35_client,
 +            &tx_regmap_config);
 +      if (IS_ERR(priv->tx_regmap)) {
@@ -24704,7 +24831,19 @@ index 0000000..acbe199
 +static ssize_t pixel_format_show(struct device *dev,
 +      struct device_attribute *attr, char *buf)
 +{
++   /* Dione always transmits RGB888 over CSI-2 (see tc358746_calculation.c) —
++    * what varies is which V4L2 fourcc gets used to report it: AB24 on L4T
++    * versions where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
++    * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4, where
++    * NVIDIA's own vi5_formats.h natively moved to RGBA32-only but EG
++    * re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack 5.x) doesn't
++    * recognize the RGBA32 V4L2 fourcc at all (see vi5_formats_mbus_fix.md
++    * in shared memory). */
++#ifdef EG_RGB888_AB24
++   return scnprintf(buf, PAGE_SIZE, "'AB24' (32-bit RGBA 8-8-8-8)\n");
++#else
 +   return scnprintf(buf, PAGE_SIZE, "'AR24' (32-bit BGRA 8-8-8-8)\n");
++#endif
 +}
 +static DEVICE_ATTR_RO(pixel_format);
 +
@@ -24842,6 +24981,27 @@ index 0000000..acbe199
 +      else
 +         dev_err(dev, "dione-ir probe error\n");
 +      return -ENODEV;
++   }
++
++   /* tegracam_device_register() hard-codes mode_idx=0 (640x480) as the
++    * default. dione_ir_probe_sensor() -> dione_ir_board_setup() ->
++    * detect_dione_ir() has already detected the ACTUAL connected variant
++    * into priv->mode (e.g. 1 for a 1280x1024 "Dione 1280" module) — but
++    * nothing before this point ever propagates that into s_data's
++    * def_mode/def_width/def_height/fmt_width/fmt_height. Left unset, the
++    * bind-time s_fmt in camera_common_try_fmt() stays on mode0 regardless
++    * of what width/height userspace later requests via S_FMT (confirmed:
++    * dione_ir_set_mode() sees s_data->mode=0/fmt_width=640/fmt_height=480
++    * even after requesting 1280x1024, silently failing the s_data->mode
++    * != priv->mode check). Same fix already applied in eg_ec_mipi_src.c
++    * for the same reason — set it here too, before v4l2 registration.
++    */
++   if (priv->mode >= 0 && priv->mode < ARRAY_SIZE(dione_ir_frmfmt)) {
++      tc_dev->s_data->def_mode = dione_ir_frmfmt[priv->mode].mode;
++      tc_dev->s_data->def_width = tc_dev->s_data->fmt_width =
++            dione_ir_frmfmt[priv->mode].size.width;
++      tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
++            dione_ir_frmfmt[priv->mode].size.height;
 +   }
 +
 +   err = tegracam_v4l2subdev_register(tc_dev, true);
@@ -26109,10 +26269,10 @@ index 0000000..4458e5b
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..67f841b
+index 0000000..18cded1
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,1026 @@
+@@ -0,0 +1,1063 @@
 +/*
 + * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
@@ -26152,12 +26312,19 @@ index 0000000..67f841b
 +MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
 +
 +enum {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++/*
++ * PRISTINE_KERNEL vendors (e.g. cti) ship a precompiled kernel/nvidia-oot we
++ * don't control: Y16 negotiation needs patches to the shared camera
++ * framework (sensor_common.c, vi5_formats.h...) that can't be applied there,
++ * so RAW16 modes are dropped and the DT overlay is renumbered to match
++ * (see tegra234-p3767-camera-cti-eg-cams-dione.dts / the shared dtsi).
++ */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   EC_MIPI_MODE_640x480_RAW16,
 +#endif
 +   EC_MIPI_MODE_640x480_RGB888,
 +   EC_MIPI_MODE_640x480_YUYV,
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   EC_MIPI_MODE_1280x1024_RAW16,
 +#endif
 +   EC_MIPI_MODE_1280x1024_RGB888,
@@ -26173,12 +26340,12 @@ index 0000000..67f841b
 + * device tree!
 + */
 +static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RAW16},
 +#endif
 +   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RGB888},
 +   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_YUYV},
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RAW16},
 +#endif
 +   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RGB888},
@@ -26788,7 +26955,7 @@ index 0000000..67f841b
 +   /* Determine which mode enum value matches (width, height, pixfmt) */
 +   if (width == 640 && height == 480) {
 +      switch (pixfmt) {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +         case 20: target_mode = EC_MIPI_MODE_640x480_RAW16; break;
 +#endif
 +         case 21: target_mode = EC_MIPI_MODE_640x480_RGB888; break;
@@ -26796,7 +26963,7 @@ index 0000000..67f841b
 +      }
 +   } else if (width == 1280 && height == 1024) {
 +      switch (pixfmt) {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +         case 20: target_mode = EC_MIPI_MODE_1280x1024_RAW16; break;
 +#endif
 +         case 21: target_mode = EC_MIPI_MODE_1280x1024_RGB888; break;
@@ -26819,7 +26986,19 @@ index 0000000..67f841b
 +{
 +   switch (code) {
 +      case 20: return "'Y16 ' (16-bit Greyscale)";
++      /* The camera always transmits RGB888 over CSI-2 — what varies is
++       * which V4L2 fourcc gets used to report it: AB24 on L4T versions
++       * where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
++       * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4,
++       * where NVIDIA's own vi5_formats.h natively moved to RGBA32-only
++       * but EG re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack
++       * 5.x) doesn't recognize the RGBA32 V4L2 fourcc at all (see
++       * vi5_formats_mbus_fix.md in shared memory). */
++#ifdef EG_RGB888_AB24
++      case 21: return "'AB24' (32-bit RGBA 8-8-8-8)";
++#else
 +      case 21: return "'AR24' (32-bit BGRA 8-8-8-8)";
++#endif
 +      case 22: return "'YUYV' (YUYV 4:2:2)";
 +      default: return NULL;
 +   }
@@ -26827,6 +27006,17 @@ index 0000000..67f841b
 +
 +static const struct v4l2_subdev_internal_ops eg_ec_mipi_subdev_internal_ops = {
 +   .open = eg_ec_mipi_open,
++};
++
++/*
++ * eg_ec_mipi does raw i2c_master_send/recv via priv->i2c_client, never
++ * regmap_read/write. This config only exists so tegracam_core's
++ * devm_regmap_init_i2c() has a non-NULL config to work with on stock
++ * NVIDIA/vendor kernels that don't carry the EG NULL-config guard.
++ */
++static const struct regmap_config eg_ec_mipi_dummy_regmap_config = {
++   .reg_bits = 8,
++   .val_bits = 8,
 +};
 +
 +#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
@@ -26995,7 +27185,7 @@ index 0000000..67f841b
 +   priv->i2c_client = tc_dev->client = client;
 +   tc_dev->dev = dev;
 +   strncpy(tc_dev->name, "eg_ec_mipi", sizeof(tc_dev->name));
-+   tc_dev->dev_regmap_config = NULL;
++   tc_dev->dev_regmap_config = &eg_ec_mipi_dummy_regmap_config;
 +   tc_dev->sensor_ops = &eg_ec_mipi_common_ops;
 +   tc_dev->v4l2sd_internal_ops = &eg_ec_mipi_subdev_internal_ops;
 +   tc_dev->tcctrl_ops = &eg_ec_mipi_ctrl_ops;
@@ -27005,7 +27195,6 @@ index 0000000..67f841b
 +      dev_err(dev, "tegra camera driver registration failed\n");
 +      goto err_camera_register;
 +   }
-+   tc_dev->s_data->i2c_client = client;
 +   priv->tc_dev = tc_dev;
 +   priv->s_data = tc_dev->s_data;
 +   priv->subdev = &tc_dev->s_data->subdev;
@@ -27034,9 +27223,17 @@ index 0000000..67f841b
 +               eg_ec_mipi_frmfmt[m].size.height;
 +
 +         switch (priv->native_pixfmt) {
-+            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_ABGR32; break;
-+            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;   break;
-+            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;    break;
++            /* RGB888: force the stock RGB24 entry (same mbus code
++             * RGB888_1X24 as the alpha-padded fourccs VI actually reports
++             * over G_FMT/ENUM_FMT — that's driven solely by vi5_formats.h's
++             * table order, not by this colorfmt) instead of hardcoding an
++             * alpha fourcc that varies by L4T version (ABGR32 pre-35.4.1,
++             * RGBA32 from 35.4.1 on — see [[vi5_formats_mbus_fix]]) and
++             * isn't guaranteed to exist in camera_common_color_fmts[].
++             * Mirrors dione_ir_probe_sensor()'s equivalent force. */
++            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_RGB24; break;
++            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;  break;
++            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;   break;
 +         }
 +         colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
 +         if (colorfmt)
@@ -28846,10 +29043,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..a943f5c
+index 0000000..e40f919
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,833 @@
+@@ -0,0 +1,843 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -29552,6 +29749,17 @@ index 0000000..a943f5c
 +   .open = ilumos_open,
 +};
 +
++/*
++ * ilumos does raw i2c_master_send/recv via priv->i2c_client, never
++ * regmap_read/write. This config only exists so tegracam_core's
++ * devm_regmap_init_i2c() has a non-NULL config to work with on stock
++ * NVIDIA/vendor kernels that don't carry the EG NULL-config guard.
++ */
++static const struct regmap_config ilumos_dummy_regmap_config = {
++   .reg_bits = 8,
++   .val_bits = 8,
++};
++
 +#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
 +static int ilumos_probe(struct i2c_client *client)
 +#else
@@ -29580,7 +29788,7 @@ index 0000000..a943f5c
 +   priv->i2c_client = tc_dev->client = client;
 +   tc_dev->dev = dev;
 +   strncpy(tc_dev->name, "ilumos", sizeof(tc_dev->name));
-+   tc_dev->dev_regmap_config = NULL;
++   tc_dev->dev_regmap_config = &ilumos_dummy_regmap_config;
 +   tc_dev->sensor_ops = &ilumos_common_ops;
 +   tc_dev->v4l2sd_internal_ops = &ilumos_subdev_internal_ops;
 +   tc_dev->tcctrl_ops = &ilumos_ctrl_ops;
@@ -29591,7 +29799,6 @@ index 0000000..a943f5c
 +      return err;
 +   }
 +
-+   tc_dev->s_data->i2c_client = client;
 +   priv->tc_dev = tc_dev;
 +   priv->s_data = tc_dev->s_data;
 +   priv->subdev = &tc_dev->s_data->subdev;
@@ -29685,10 +29892,10 @@ index 0000000..a943f5c
 +MODULE_VERSION("1.0");
 diff --git a/source/public/kernel/nvidia/drivers/media/i2c/microlynx_core.c b/source/public/kernel/nvidia/drivers/media/i2c/microlynx_core.c
 new file mode 100644
-index 0000000..54700a8
+index 0000000..9d275e1
 --- /dev/null
 +++ b/source/public/kernel/nvidia/drivers/media/i2c/microlynx_core.c
-@@ -0,0 +1,710 @@
+@@ -0,0 +1,721 @@
 +/*
 + * A V4L2 driver for Exosens Microlynx MIPI IR cameras.
 + *
@@ -30175,6 +30382,18 @@ index 0000000..54700a8
 +   .open = microlynx_open,
 +};
 +
++/*
++ * microlynx does raw i2c_master_send/recv (GenCP-over-I2C) via
++ * priv->i2c_client, never regmap_read/write. This config only exists so
++ * tegracam_core's devm_regmap_init_i2c() has a non-NULL config to work
++ * with on stock NVIDIA/vendor kernels that don't carry the EG NULL-config
++ * guard.
++ */
++static const struct regmap_config microlynx_dummy_regmap_config = {
++   .reg_bits = 8,
++   .val_bits = 8,
++};
++
 +/* ---- GenCP chardev file operations ------------------------------------ */
 +
 +static int microlynx_cdev_open(struct inode *inode, struct file *file)
@@ -30289,7 +30508,7 @@ index 0000000..54700a8
 +   priv->i2c_client = tc_dev->client = client;
 +   tc_dev->dev = dev;
 +   strncpy(tc_dev->name, "microlynx", sizeof(tc_dev->name));
-+   tc_dev->dev_regmap_config = NULL;
++   tc_dev->dev_regmap_config = &microlynx_dummy_regmap_config;
 +   tc_dev->sensor_ops = &microlynx_common_ops;
 +   tc_dev->v4l2sd_internal_ops = &microlynx_subdev_internal_ops;
 +   tc_dev->tcctrl_ops = &microlynx_ctrl_ops;
@@ -30300,7 +30519,6 @@ index 0000000..54700a8
 +      return err;
 +   }
 +
-+   tc_dev->s_data->i2c_client = client;
 +   priv->tc_dev = tc_dev;
 +   priv->s_data = tc_dev->s_data;
 +   priv->subdev = &tc_dev->s_data->subdev;
@@ -31275,17 +31493,3 @@ index 04aaa6a..b43c214
  	}
  
  	if (!tc_dev->sensor_ops) {
-diff --git a/source/public/kernel/nvidia/include/media/camera_common.h b/source/public/kernel/nvidia/include/media/camera_common.h
-old mode 100644
-new mode 100755
-index 22a41bc..882754d
---- a/source/public/kernel/nvidia/include/media/camera_common.h
-+++ b/source/public/kernel/nvidia/include/media/camera_common.h
-@@ -238,6 +238,7 @@ struct camera_common_data {
- 	/* TODO: cleanup neeeded once all the sensors adapt new framework */
- 	struct tegracam_ctrl_handler		*tegracam_ctrl_hdl;
- 	struct regmap				*regmap;
-+	struct i2c_client *i2c_client;
- 	struct camera_common_pdata		*pdata;
- 	/* TODO: cleanup needed for priv once all the sensors adapt new framework */
- 	void	*priv;

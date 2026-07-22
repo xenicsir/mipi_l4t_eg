@@ -648,6 +648,7 @@ else
                         "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
                         "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
                         "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
+                        "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ;;
                         "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
                     esac
                     if [[ -n "$_gstfmt" ]]; then

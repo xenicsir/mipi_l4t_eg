@@ -32,17 +32,38 @@ MONO16 (Y16 - 16-bit Greyscale)
       --stream-count=1 --stream-to=video.raw
 
 
-ARGB888 (32-bit BGRA)
-─────────────────────
+ARGB888 (32-bit AR24/BGRA or AB24/RGBA, depending on L4T version)
+───────────────────────────────────────────────────────────────────
 
-  640x480:
+  The camera always transmits the same RGB888 bytes over CSI-2. What
+  changes is which V4L2 fourcc reports this: AR24 (32-bit BGRA) on L4T
+  32.x and all 35.x (including 35.4.1-35.6.4), and AB24 (32-bit RGBA) on
+  L4T 36.x and later. NVIDIA's own vi5_formats.h/camera_common.c actually
+  switched natively to RGBA32-only starting at 35.4.1, but EG re-adds
+  AR24 alongside it through 35.6.4 (JetPack 5.x) because the
+  gst-plugins-good 1.16.3 bundled there doesn't recognize the RGBA32
+  V4L2 fourcc at all (v4l2-ctl itself is unaffected — this is purely a
+  GStreamer limitation). Run eg_dt_camera_config_get.sh to see which one
+  your board actually reports before picking an example below.
+
+  640x480 (AR24 — L4T 32.x and all 35.x):
     v4l2-ctl -d /dev/video0 --stream-mmap \
       --set-fmt-video=width=640,height=480,pixelformat="AR24" \
       --stream-count=1 --stream-to=video.raw
 
-  1280x1024:
+  640x480 (AB24 — L4T 36.x and later):
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=640,height=480,pixelformat="AB24" \
+      --stream-count=1 --stream-to=video.raw
+
+  1280x1024 (AR24 — L4T 32.x and all 35.x):
     v4l2-ctl -d /dev/video0 --stream-mmap \
       --set-fmt-video=width=1280,height=1024,pixelformat="AR24" \
+      --stream-count=1 --stream-to=video.raw
+
+  1280x1024 (AB24 — L4T 36.x and later):
+    v4l2-ctl -d /dev/video0 --stream-mmap \
+      --set-fmt-video=width=1280,height=1024,pixelformat="AB24" \
       --stream-count=1 --stream-to=video.raw
 
 
@@ -93,27 +114,55 @@ MONO16 (Y16 - 16-bit Greyscale)
       ! videoconvert ! ximagesink sync=false
 
 
-ARGB888 (32-bit BGRA)
+ARGB888 (32-bit AR24/BGRA or AB24/RGBA, depending on L4T version)
 
-  Capture native ARGB888 to file (1 frame):
+  Same underlying RGB888 bytes either way — reported as BGRA on L4T 32.x
+  and all 35.x (including 35.4.1-35.6.4), and as RGBA on L4T 36.x and
+  later (see the note under the v4l2-ctl section above for why). Use
+  eg_dt_camera_config_get.sh to check which one your board reports, then
+  use the matching examples below — GStreamer fails with "can't handle
+  caps"/"not-negotiated" if you pick the wrong one for your L4T version.
+
+  Capture native ARGB888 to file (1 frame) — L4T 32.x/35.x (BGRA):
     gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
       ! "video/x-raw, format=(string)BGRA" \
       ! filesink location=video.raw
 
-  Convert to RGB888 and save:
+  Capture native ARGB888 to file (1 frame) — L4T 36.x+ (RGBA):
+    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
+      ! "video/x-raw, format=(string)RGBA" \
+      ! filesink location=video.raw
+
+  Convert to RGB888 and save — L4T 32.x/35.x (BGRA):
     gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
       ! "video/x-raw, format=(string)BGRA" \
       ! videoconvert ! video/x-raw,format=BGR \
       ! filesink location=video.raw
 
-  Display 640x480:
+  Convert to RGB888 and save — L4T 36.x+ (RGBA):
+    gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=1 \
+      ! "video/x-raw, format=(string)RGBA" \
+      ! videoconvert ! video/x-raw,format=RGB \
+      ! filesink location=video.raw
+
+  Display 640x480 — L4T 32.x/35.x (BGRA):
     gst-launch-1.0 -v v4l2src device="/dev/video0" \
       ! "video/x-raw, format=(string)BGRA, width=640, height=480" \
       ! videoconvert ! ximagesink sync=false
 
-  Display 1280x1024:
+  Display 640x480 — L4T 36.x+ (RGBA):
+    gst-launch-1.0 -v v4l2src device="/dev/video0" \
+      ! "video/x-raw, format=(string)RGBA, width=640, height=480" \
+      ! videoconvert ! ximagesink sync=false
+
+  Display 1280x1024 — L4T 32.x/35.x (BGRA):
     gst-launch-1.0 -v v4l2src device="/dev/video0" \
       ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" \
+      ! videoconvert ! ximagesink sync=false
+
+  Display 1280x1024 — L4T 36.x+ (RGBA):
+    gst-launch-1.0 -v v4l2src device="/dev/video0" \
+      ! "video/x-raw, format=(string)RGBA, width=1280, height=1024" \
       ! videoconvert ! ximagesink sync=false
 
   Stream to UDP (GStreamer receiver, host 192.168.1.1):
@@ -186,6 +235,16 @@ NOTES
 
 • Y16 (16-bit greyscale) is not supported on Jetson Nano (T210). Use AR24
   or YUYV instead.
+
+• The AR24/AB24 split above is driven by GStreamer, not V4L2: NVIDIA's
+  own vi5_formats.h/camera_common.c natively switched to RGBA32-only
+  starting L4T 35.4.1 (v4l2-ctl always works fine there), but EG keeps
+  ABGR32/AR24 available too through L4T 35.6.4 because gst-plugins-good
+  1.16.3 (JetPack 5.x, Ubuntu 20.04) doesn't support the RGBA32 V4L2
+  fourcc. L4T 36.x+ (JetPack 6.x+, GStreamer 1.20+) doesn't need that
+  workaround and reports AB24 only, matching NVIDIA's table. L4T 32.x
+  (T210/T186, VI2/VI4 pipeline) always reports AR24 — NVIDIA never
+  changed that table on those older SoCs.
 
 • For GStreamer, the format and dimensions are negotiated automatically
   when not explicitly constrained in the caps filter.

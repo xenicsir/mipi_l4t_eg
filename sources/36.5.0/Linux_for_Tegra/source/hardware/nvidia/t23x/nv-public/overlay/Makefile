@@ -91,6 +91,13 @@ endif
 dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3767-camera-cti-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
+# Hadron DM's real PCA9540 I2C mux (tca9540@70) means the plain EC overlays
+# above (targeting cam_i2cmux) don't apply — see
+# tegra234-p3767-camera-p3768-common-eg-cam{0,1}-ec-*.dtsi.
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-1-lane.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-1-lane.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-2-lanes.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-2-lanes.dtbo
 
 dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo

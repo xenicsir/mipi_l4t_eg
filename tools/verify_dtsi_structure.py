@@ -199,12 +199,32 @@ def parse_sensor_nodes(lines):
 # Parsing overlay DTS (bus-width)
 # ---------------------------------------------------------------------------
 
+_INCLUDE_RE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
+
+
+def _read_overlay_text(overlay_path):
+    """
+    Reads an overlay DTS, following one level of local #include "foo.dtsi"
+    (thin-wrapper pattern: a per-vendor .dts #define's a macro then includes
+    a shared .dtsi body — see tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
+    and its common .dtsi). Concatenates the wrapper + included body so the
+    regex-based parsers below can find fragments regardless of which file
+    they actually live in.
+    """
+    text = overlay_path.read_text()
+    for inc in _INCLUDE_RE.findall(text):
+        inc_path = overlay_path.parent / inc
+        if inc_path.exists():
+            text += "\n" + inc_path.read_text()
+    return text
+
+
 def parse_overlay_bus_width(overlay_path):
     """
     Returns the bus-width found in the overlay DTS (sensor endpoint).
     Finds the last occurrence of bus-width=<N> in the file.
     """
-    text = overlay_path.read_text()
+    text = _read_overlay_text(overlay_path)
     matches = re.findall(r'bus-width\s*=\s*<(\d+)>', text)
     if not matches:
         return None
@@ -218,7 +238,7 @@ def parse_overlay_mode_overrides(overlay_path):
     Possible fields: pix_clk_hz, num_lanes.
     Searches for fragments targeting .../modeN.
     """
-    text = overlay_path.read_text()
+    text = _read_overlay_text(overlay_path)
     result = {}
     for frag in re.finditer(r'fragment@\d+\s*\{(.*?)\n\s*\}', text, re.DOTALL):
         frag_text = frag.group(1)

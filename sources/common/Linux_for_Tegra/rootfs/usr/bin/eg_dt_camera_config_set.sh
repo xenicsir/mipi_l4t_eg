@@ -272,7 +272,15 @@ for arg in "$@"; do
 
 	lanes="${CAMERA_LANES[$camera_type]}"
 	if [[ -n "$lanes" ]]; then
-		dtboarg+=("$HEADER_IDX=Exosens Cameras. CAM$port_number:$lanes")
+		# Hadron DM's real PCA9540 I2C mux needs its own EC overlay variant
+		# (different target-path than the plain cam_i2cmux one — see
+		# tegra234-p3767-camera-p3768-cti-eg-cam*-ec-*.dts), selected via a
+		# distinct overlay-name so jetson-io doesn't ambiguously match both.
+		if [[ x$BOARD == xhadron-dm ]]; then
+			dtboarg+=("$HEADER_IDX=Exosens Cameras for Connect Tech Hadron DM. CAM$port_number:$lanes")
+		else
+			dtboarg+=("$HEADER_IDX=Exosens Cameras. CAM$port_number:$lanes")
+		fi
 	fi
 
     echo "Port number : $port_number"

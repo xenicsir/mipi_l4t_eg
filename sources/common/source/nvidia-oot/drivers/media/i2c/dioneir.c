@@ -1885,7 +1885,19 @@ static DEVICE_ATTR_RO(resolution);
 static ssize_t pixel_format_show(struct device *dev,
       struct device_attribute *attr, char *buf)
 {
+   /* Dione always transmits RGB888 over CSI-2 (see tc358746_calculation.c) —
+    * what varies is which V4L2 fourcc gets used to report it: AB24 on L4T
+    * versions where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
+    * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4, where
+    * NVIDIA's own vi5_formats.h natively moved to RGBA32-only but EG
+    * re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack 5.x) doesn't
+    * recognize the RGBA32 V4L2 fourcc at all (see vi5_formats_mbus_fix.md
+    * in shared memory). */
+#ifdef EG_RGB888_AB24
+   return scnprintf(buf, PAGE_SIZE, "'AB24' (32-bit RGBA 8-8-8-8)\n");
+#else
    return scnprintf(buf, PAGE_SIZE, "'AR24' (32-bit BGRA 8-8-8-8)\n");
+#endif
 }
 static DEVICE_ATTR_RO(pixel_format);
 
