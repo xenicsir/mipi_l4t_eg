@@ -644,6 +644,12 @@ load_version_config() {
     SAMPLE_FS_PACKAGE=$($_EGCFG "$src_prefix.sample_fs.filename" "$L4T_CONFIG_FILE")
     SAMPLE_FS_PACKAGE_URL=$($_EGCFG "$src_prefix.sample_fs.url" "$L4T_CONFIG_FILE")
 
+    # CTI archive (vendor cti only — meaning depends on pristine_kernel, see
+    # eg_config.yaml comment). Absent for every other version/vendor, so
+    # default to empty rather than letting egcfg.py fail the whole call.
+    CTI_ARCHIVE=$($_EGCFG "$src_prefix.cti.filename" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+    CTI_ARCHIVE_URL=$($_EGCFG "$src_prefix.cti.url" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+
     # Toolchain
     JETSON_TOOLCHAIN_ARCHIVE=$($_EGCFG "version.$version.toolchain.archive" "$L4T_CONFIG_FILE")
     JETSON_TOOLCHAIN_ARCHIVE_URL=$($_EGCFG "version.$version.toolchain.url" "$L4T_CONFIG_FILE")

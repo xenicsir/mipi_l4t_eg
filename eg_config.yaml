@@ -410,6 +410,21 @@ versions:
       sample_fs:
         filename: tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2
         url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.0/release/tegra_linux_sample-root-filesystem_r36.5.0_aarch64.tbz2
+      # CTI's own archive for the "cti" vendor. Its meaning depends on
+      # vendors.cti.pristine_kernel (see below):
+      #  - pristine_kernel: true  (current) -> CTI's public BSP release
+      #    archive; `url` set, l4t_prepare.sh downloads it automatically to
+      #    archives/CTI/<filename> if missing. tools/extract_cti.sh pulls
+      #    just the 2 precompiled kernel/nvidia-oot header .deb packages out
+      #    of it (see cti_pristine_kernel_porting.md in shared memory).
+      #  - pristine_kernel: false (future) -> CTI's real GPL source archive.
+      #    Confidential — `url` intentionally NOT set; the archive must be
+      #    placed manually at archives/CTI/<filename> (same convention as
+      #    Forecr's extract_forecr_sources.sh manual step). l4t_prepare.sh
+      #    never auto-downloads when `url` is absent.
+      cti:
+        filename: CTI-L4T-ORIN-NX-NANO-36.5.0-V003.tgz
+        url: https://connecttech.com/ftp/Drivers/CTI-L4T-ORIN-NX-NANO-36.5.0-V003.tgz
     toolchain:
       archive: aarch64--glibc--stable-2022.08-1.tar.bz2
       url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2

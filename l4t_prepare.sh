@@ -205,17 +205,44 @@ if [[ -f nvidia_unified_gpu_display_driver_source.tbz2 ]]; then
    fi
 fi
 
-# CTI ships a precompiled kernel/nvidia-oot (no source available, see
-# cti_pristine_kernel_porting.md in shared memory): our EG driver modules must
-# be compiled against its real headers, not our own generic build. Unlike
-# forecr's extract_forecr_sources.sh (needs an arbitrary external path, so it
-# stays a separate manual step), CTI's archive lives at a standardized
-# location (archives/CTI/*<version>*.tgz) with nothing else to ask the user —
-# so it's safe to just run it here as part of --prepare.
+# CTI's archive handling depends on vendors.cti.pristine_kernel (see
+# eg_config.yaml comment on version.<ver>.sources.cti) — the two cases are
+# handled independently, they are NOT interchangeable:
+#  - pristine_kernel=true (current): CTI ships a precompiled kernel/
+#    nvidia-oot (no source available, see cti_pristine_kernel_porting.md in
+#    shared memory) — our EG driver modules must be compiled against its
+#    real headers instead. The archive is CTI's own public BSP release, at
+#    a known URL, so it's safe to auto-download here (mirroring the NVIDIA
+#    archive downloads above) if not already at archives/CTI/<filename>.
+#    tools/extract_cti.sh then pulls just the 2 header .deb packages out of
+#    it.
+#  - pristine_kernel=false (future): CTI's real GPL source archive is
+#    confidential (no `url` configured in eg_config.yaml, deliberately never
+#    auto-downloaded) — same manual-placement convention as Forecr's
+#    extract_forecr_sources.sh. Not yet implemented: once used, this branch
+#    needs its own extraction/merge step (full source, not header-only), not
+#    tools/extract_cti.sh.
 if [[ "$VENDOR" == "cti" ]]; then
-   update_status "Extracting CTI headers..."
-   if ! "$ROOT_DIR/tools/extract_cti.sh" "$L4T_VERSION"; then
-      echo "Error: extract_cti.sh failed for L4T $L4T_VERSION" >&2
+   if [[ "$PRISTINE_KERNEL" == "1" ]]; then
+      CTI_ARCHIVE_DIR="$ARCHIVE_DIR/CTI"
+      mkdir -p "$CTI_ARCHIVE_DIR"
+      if [[ -n "$CTI_ARCHIVE_URL" ]] && [[ ! -f "$CTI_ARCHIVE_DIR/$CTI_ARCHIVE" ]]; then
+         update_status "Downloading CTI BSP archive..."
+         wget -q "$CTI_ARCHIVE_URL" -O "$CTI_ARCHIVE_DIR/$CTI_ARCHIVE"
+      fi
+      if [[ ! -f "$CTI_ARCHIVE_DIR/$CTI_ARCHIVE" ]]; then
+         echo "Error: CTI archive not found: $CTI_ARCHIVE_DIR/$CTI_ARCHIVE" >&2
+         echo "  (no url configured in eg_config.yaml — place it there manually)" >&2
+         exit 1
+      fi
+      update_status "Extracting CTI headers..."
+      if ! "$ROOT_DIR/tools/extract_cti.sh" "$L4T_VERSION" "$CTI_ARCHIVE_DIR/$CTI_ARCHIVE"; then
+         echo "Error: extract_cti.sh failed for L4T $L4T_VERSION" >&2
+         exit 1
+      fi
+   else
+      echo "Error: vendor cti with pristine_kernel=false has no --prepare support yet." >&2
+      echo "  (real GPL source archive extraction/merge not implemented — see l4t_prepare.sh)" >&2
       exit 1
    fi
 fi

@@ -27,15 +27,19 @@
 # and get re-extracted by l4t_make.sh --prepare.
 #
 # Usage:
-#   ./tools/extract_cti.sh <L4T_VERSION>
+#   ./tools/extract_cti.sh <L4T_VERSION> [ARCHIVE_PATH]
 #
-# Looks for the CTI archive at archives/CTI/*<L4T_VERSION>*.tgz (as placed by
-# the user, mirroring the archives/<nvidia-version>/ convention). Errors out
-# clearly if not found — does not fall back to any other location.
+# ARCHIVE_PATH (optional): exact path to the CTI archive to use — passed by
+# l4t_prepare.sh, which resolves it from eg_config.yaml's
+# version.<ver>.sources.cti entry (downloading it first if a `url` is
+# configured there and the file isn't present yet). If omitted (manual /
+# standalone use), falls back to globbing archives/CTI/*<L4T_VERSION>*.tgz
+# (as placed by the user, mirroring the archives/<nvidia-version>/
+# convention). Errors out clearly if the resolved archive doesn't exist.
 #
 # Example:
 #   ./tools/extract_cti.sh 36.5.0
-#   (expects archives/CTI/CTI-L4T-ORIN-NX-NANO-36.5.0-V003.tgz or similar)
+#   ./tools/extract_cti.sh 36.5.0 archives/CTI/CTI-L4T-ORIN-NX-NANO-36.5.0-V003.tgz
 #
 # Output:
 #   sources/<L4T_VERSION>/Linux_for_Tegra_cti/cti-kdir/...         (kernel-headers payload)
@@ -51,27 +55,37 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 if [[ $# -lt 1 ]]; then
-   echo "Usage: $0 <L4T_VERSION>"
+   echo "Usage: $0 <L4T_VERSION> [ARCHIVE_PATH]"
    echo ""
    echo "Example:"
    echo "  $0 36.5.0"
+   echo "  $0 36.5.0 archives/CTI/CTI-L4T-ORIN-NX-NANO-36.5.0-V003.tgz"
    echo ""
-   echo "Expects the CTI BSP archive at archives/CTI/*<L4T_VERSION>*.tgz"
+   echo "Without ARCHIVE_PATH, expects the CTI BSP archive at archives/CTI/*<L4T_VERSION>*.tgz"
    exit 1
 fi
 
 L4T_VERSION="$1"
+ARCHIVE_PATH_ARG="$2"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVE_DIR="$ROOT_DIR/archives/CTI"
 DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_cti"
 
-CTI_ARCHIVE=$(ls "$ARCHIVE_DIR"/*"$L4T_VERSION"*.tgz 2>/dev/null | head -1)
-if [[ -z "$CTI_ARCHIVE" ]]; then
-   echo -e "${RED}Error: no CTI archive found for L4T $L4T_VERSION${NC}"
-   echo "  Expected: $ARCHIVE_DIR/*${L4T_VERSION}*.tgz"
-   echo "  Place the CTI BSP release archive there first (e.g. CTI-L4T-ORIN-NX-NANO-${L4T_VERSION}-V00X.tgz)."
-   exit 1
+if [[ -n "$ARCHIVE_PATH_ARG" ]]; then
+   CTI_ARCHIVE="$ARCHIVE_PATH_ARG"
+   if [[ ! -f "$CTI_ARCHIVE" ]]; then
+      echo -e "${RED}Error: CTI archive not found: $CTI_ARCHIVE${NC}"
+      exit 1
+   fi
+else
+   CTI_ARCHIVE=$(ls "$ARCHIVE_DIR"/*"$L4T_VERSION"*.tgz 2>/dev/null | head -1)
+   if [[ -z "$CTI_ARCHIVE" ]]; then
+      echo -e "${RED}Error: no CTI archive found for L4T $L4T_VERSION${NC}"
+      echo "  Expected: $ARCHIVE_DIR/*${L4T_VERSION}*.tgz"
+      echo "  Place the CTI BSP release archive there first (e.g. CTI-L4T-ORIN-NX-NANO-${L4T_VERSION}-V00X.tgz)."
+      exit 1
+   fi
 fi
 
 echo "============================================"
