@@ -79,11 +79,17 @@ dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
+ifndef PRISTINE_KERNEL
+# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
+# nvidia-oot camera framework, which can't be patched into a PRISTINE_KERNEL
+# vendor's precompiled tegra-camera.ko (see drivers/media/i2c/Makefile).
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
+endif
 dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
+dtbo-y += tegra234-p3767-camera-cti-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
 
 dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo

@@ -117,7 +117,11 @@
 						orientation = "1";
 						cam_module0_drivernode0: drivernode0 {
 							pcl_id = "v4l2_sensor";
-							sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
+	#ifdef HADRON_DM_CAM_I2C_MUX
+						sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/i2c@3180000/tca9540@70/i2c@0/xenics_dione_ir_b@0e";
+#else
+						sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/cam_i2cmux/i2c@0/xenics_dione_ir_b@0e";
+#endif
 						};
 						drivernode1 {
 							pcl_id = "v4l2_lens";
@@ -130,7 +134,11 @@
 						orientation = "1";
 						drivernode0 {
 							pcl_id = "v4l2_sensor";
-							sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
+	#ifdef HADRON_DM_CAM_I2C_MUX
+						sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/i2c@3180000/tca9540@70/i2c@1/xenics_dione_ir_c@0e";
+#else
+						sysfs-device-tree = "/sys/firmware/devicetree/base/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
+#endif
 						};
 						drivernode1 {
 							pcl_id = "v4l2_lens";
@@ -205,6 +213,17 @@
 						};
 					};
 				};
+#ifdef HADRON_DM_CAM_I2C_MUX
+				i2c@3180000 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				tca9540@70 {
+					status = "okay";
+					compatible = "nxp,pca9540";
+					reg = <0x70>;
+					#address-cells = <1>;
+					#size-cells = <0>;
+#else
 				cam_i2cmux {
 					status = "okay";
 					compatible = "i2c-mux-gpio";
@@ -216,11 +235,21 @@
 					mux-gpios = <&gpio_aon CAM_I2C_MUX GPIO_ACTIVE_HIGH>;
 #endif
 					i2c-parent = <&cam_i2c>;
+#endif
 					i2c@0 {
 						status = "okay";
 						reg = <0>;
 						#address-cells = <1>;
 						#size-cells = <0>;
+#ifdef HADRON_DM_CAM_I2C_MUX
+						/* Required by sensor_common_init_i2c_device_config() to
+						 * detect a real chip-based mux channel (vs. the
+						 * i2c-mux-gpio path, which is detected via the parent
+						 * mux node's compatible string instead) and correctly
+						 * walk up to the real i2c bus for reg_base lookup.
+						 */
+						i2c-mux,deselect-on-exit;
+#endif
 						  dione_ir_cam0: xenics_dione_ir_b@0e {
 							 compatible = "xenics,dioneir", "exosens,dioneir";
 							 status = "okay";
@@ -618,6 +647,7 @@
 							 * Sensor embedded metadata height in units of rows.
 							 * If sensor does not support embedded metadata value should be 0.
 							 */
+#ifndef PRISTINE_KERNEL
 							 mode0 { // EC_MODE_640x480_RAW16
 								num_lanes = "2";
 								lane_polarity = "6";
@@ -658,7 +688,12 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#endif
+#ifndef PRISTINE_KERNEL
 							 mode1 { // EC_MODE_640x480_RGB888
+#else
+							 mode0 { // EC_MODE_640x480_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -698,7 +733,11 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#ifndef PRISTINE_KERNEL
 							 mode2 { // EC_MODE_640x480_YUYV
+#else
+							 mode1 { // EC_MODE_640x480_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -738,6 +777,7 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							};
+#ifndef PRISTINE_KERNEL
 							 mode3 { // EC_MODE_1280x1024_RAW16
 								num_lanes = "2";
 								lane_polarity = "6";
@@ -778,7 +818,12 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#endif
+#ifndef PRISTINE_KERNEL
 							 mode4 { // EC_MODE_1280x1024_RGB888
+#else
+							 mode2 { // EC_MODE_1280x1024_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -818,7 +863,11 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#ifndef PRISTINE_KERNEL
 							 mode5 { // EC_MODE_1280x1024_YUYV
+#else
+							 mode3 { // EC_MODE_1280x1024_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								lane_polarity = "6";
 								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -1768,6 +1817,9 @@
 						reg = <1>;
 						#address-cells = <1>;
 						#size-cells = <0>;
+#ifdef HADRON_DM_CAM_I2C_MUX
+						i2c-mux,deselect-on-exit;
+#endif
 						  dione_ir_cam1: xenics_dione_ir_c@0e {
 							 compatible = "xenics,dioneir", "exosens,dioneir";
 							 reg = <0x0e>;
@@ -1993,6 +2045,7 @@
 							 physical_h = "5.760";
 
 
+#ifndef PRISTINE_KERNEL
 							 mode0 { // EC_MODE_640x480_RAW16
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
@@ -2034,7 +2087,12 @@
 								default_exp_time = "2495"; /* us */
 
 							 };
+#endif
+#ifndef PRISTINE_KERNEL
 							 mode1 { // EC_MODE_640x480_RGB888
+#else
+							 mode0 { // EC_MODE_640x480_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -2074,7 +2132,11 @@
 								default_exp_time = "2495"; /* us */
 
 							 };
+#ifndef PRISTINE_KERNEL
 							 mode2 { // EC_MODE_640x480_YUYV
+#else
+							 mode1 { // EC_MODE_640x480_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -2113,6 +2175,7 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#ifndef PRISTINE_KERNEL
 							 mode3 { // EC_MODE_1280x1024_RAW16
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
@@ -2152,7 +2215,12 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#endif
+#ifndef PRISTINE_KERNEL
 							 mode4 { // EC_MODE_1280x1024_RGB888
+#else
+							 mode2 { // EC_MODE_1280x1024_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -2191,7 +2259,11 @@
 								step_exp_time = "1";
 								default_exp_time = "2495"; /* us */
 							 };
+#ifndef PRISTINE_KERNEL
 							 mode5 { // EC_MODE_1280x1024_YUYV
+#else
+							 mode3 { // EC_MODE_1280x1024_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
+#endif
 								num_lanes = "2";
 								tegra_sinterface = "serial_c";
 								phy_mode = "DPHY";
@@ -3010,6 +3082,9 @@
 						};
 					};
 				};
+#ifdef HADRON_DM_CAM_I2C_MUX
+				};
+#endif
 
 				lens_imx219@RBPCV2 {
 					min_focus_distance = "0.0";

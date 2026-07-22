@@ -81,6 +81,15 @@ get_default_carrier() {
     $_EGCFG "vendor.$vendor.default_carrier" "$L4T_CONFIG_FILE"
 }
 
+# Whether a vendor ships a precompiled kernel/nvidia-oot we don't control
+# (no source available for our framework patches). Reads
+# vendors.$vendor.pristine_kernel from eg_config.yaml. Echoes "1" or "".
+get_vendor_pristine_kernel() {
+    local vendor="$1"
+    local pristine=$($_EGCFG "vendor.$vendor.pristine_kernel" "$L4T_CONFIG_FILE" 2>/dev/null)
+    [[ "$pristine" == "true" ]] && echo "1" || echo ""
+}
+
 # Check if configuration requires standalone build
 # Args: version, vendor, carrier
 # Reads from versions.$version.standalone.$vendor.$carrier in JSON config
@@ -712,6 +721,12 @@ compute_derived_vars() {
         VENDOR_SOURCE_DIR=Linux_for_Tegra_${VENDOR}
         L4T_VERSION_EXTENDED=${L4T_VERSION}_${VENDOR}
     fi
+
+    # PRISTINE_KERNEL: vendor ships a precompiled kernel/nvidia-oot we don't
+    # control (e.g. cti). Exported so l4t_copy_sources.sh and l4t_build.sh
+    # can skip/gate the nvidia-oot framework patches accordingly.
+    PRISTINE_KERNEL=$(get_vendor_pristine_kernel "$VENDOR")
+    export PRISTINE_KERNEL
 
     # Kernel defconfig: SoM takes priority over carrier
     KERNEL_DEFCONFIG=$(get_som_defconfig "$SOM_BOARD")

@@ -3,3 +3,8 @@ delivery
 **/__pycache__/
 **/*.pyc
 **/*.pyo
+
+# Vendored CTI binary headers (regenerated via tools/extract_cti.sh, never
+# hand-authored EG source — see cti_pristine_kernel_porting.md in shared memory)
+sources/*/Linux_for_Tegra_cti/cti-kdir/
+sources/*/Linux_for_Tegra_cti/cti-oot-headers/

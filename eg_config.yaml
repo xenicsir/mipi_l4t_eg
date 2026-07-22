@@ -395,10 +395,11 @@ versions:
   "36.5.0":
     jetpack: "6.2.2"
     platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
-    vendors: [generic, forecr]
+    vendors: [generic, forecr, cti]
     standalone:
       forecr: {dsboard_ornxs: true}
       generic: {generic: true}
+      cti: {hadron_dm: false}
     sources:
       public:
         filename: public_sources.tbz2
@@ -448,6 +449,18 @@ vendors:
   forecr:
     carriers: [dsboard_ornxs]
     default_carrier: dsboard_ornxs
+  cti:
+    carriers: [hadron_dm]
+    default_carrier: hadron_dm
+    # CTI ships a precompiled kernel/nvidia-oot we don't control (no source
+    # available) — our framework patches (camera_common.c, channel.c,
+    # vi5_formats.h...) can't be applied. Consumed by l4t_environment.sh to
+    # export PRISTINE_KERNEL, which gates: (1) copy of the nvidia-oot
+    # framework-patch files in l4t_copy_sources.sh, (2) obj-m/dtbo-y entries
+    # in the i2c and overlay Makefiles, (3) #ifdef guards in EG driver/DTSI
+    # code (e.g. Y16 disabled on eg_ec_mipi since CTI's kernel can't
+    # negotiate it).
+    pristine_kernel: true
 
 carriers:
   generic:
@@ -456,6 +469,12 @@ carriers:
   dsboard_ornxs:
     defconfig: dsboard_ornx_defconfig
     dir_suffix: dsboard_ornxs
+  hadron_dm:
+    # kernel-jammy-src (36.x) names its own default config file "defconfig"
+    # (not "tegra_defconfig", that's a 32.x/35.x kernel-4.9/5.10 convention).
+    # We don't ship a CTI-specific kernel config, so just reuse NVIDIA's own.
+    defconfig: defconfig
+    dir_suffix: hadron_dm
 
 soms:
   t210:

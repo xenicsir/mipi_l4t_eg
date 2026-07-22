@@ -205,6 +205,21 @@ if [[ -f nvidia_unified_gpu_display_driver_source.tbz2 ]]; then
    fi
 fi
 
+# CTI ships a precompiled kernel/nvidia-oot (no source available, see
+# cti_pristine_kernel_porting.md in shared memory): our EG driver modules must
+# be compiled against its real headers, not our own generic build. Unlike
+# forecr's extract_forecr_sources.sh (needs an arbitrary external path, so it
+# stays a separate manual step), CTI's archive lives at a standardized
+# location (archives/CTI/*<version>*.tgz) with nothing else to ask the user —
+# so it's safe to just run it here as part of --prepare.
+if [[ "$VENDOR" == "cti" ]]; then
+   update_status "Extracting CTI headers..."
+   if ! "$ROOT_DIR/tools/extract_cti.sh" "$L4T_VERSION"; then
+      echo "Error: extract_cti.sh failed for L4T $L4T_VERSION" >&2
+      exit 1
+   fi
+fi
+
 update_status "Done"
 echo ""
 echo "============================================"

@@ -3352,10 +3352,10 @@ index 0000000..f401940
 \ No newline at end of file
 diff --git a/rootfs/opt/eg/jetson-io/config-by-hardware.py b/rootfs/opt/eg/jetson-io/config-by-hardware.py
 new file mode 100755
-index 0000000..b716d03
+index 0000000..70606aa
 --- /dev/null
 +++ b/rootfs/opt/eg/jetson-io/config-by-hardware.py
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,137 @@
 +#!/usr/bin/env python3
 +
 +# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
@@ -3474,7 +3474,13 @@ index 0000000..b716d03
 +            for i in range(len(hws)):
 +              hw = hws[i]
 +              if hw:
-+                  if ("Exosens Cameras" in hw):
++                  # /boot/eg/Image only exists on vendors that actually ship an
++                  # EG-built kernel (dual-boot -eg kernel or standard EG build).
++                  # On a PRISTINE_KERNEL vendor (e.g. CTI) that file is never
++                  # shipped, even though Exosens camera overlays are still
++                  # configured — the JetsonIO label must then point at the
++                  # target's real (vendor) kernel, not a nonexistent one.
++                  if ("Exosens Cameras" in hw) and os.path.exists("/boot/eg/Image"):
 +                      eg = 1
 +                  else :
 +                      eg = 0
@@ -14766,7 +14772,7 @@ index 0000000..b59501d
 +	};
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
-index c5b0cad..bff4312 100644
+index c5b0cad..aacf8e8 100644
 --- a/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/Makefile
 @@ -2,6 +2,7 @@
@@ -14777,7 +14783,7 @@ index c5b0cad..bff4312 100644
  
  old-dtb := $(dtb-y)
  old-dtbo := $(dtbo-y)
-@@ -67,6 +68,56 @@ dtbo-y += tegra234-p3767-camera-p3768-imx219-imx477.dtbo
+@@ -67,6 +68,62 @@ dtbo-y += tegra234-p3767-camera-p3768-imx219-imx477.dtbo
  dtbo-y += tegra234-p3767-camera-p3768-imx477-C.dtbo
  dtbo-y += tegra234-p3767-camera-p3768-imx477-A.dtbo
  
@@ -14792,11 +14798,17 @@ index c5b0cad..bff4312 100644
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
++ifndef PRISTINE_KERNEL
++# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
++# nvidia-oot camera framework, which can't be patched into a PRISTINE_KERNEL
++# vendor's precompiled tegra-camera.ko (see drivers/media/i2c/Makefile).
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 +dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
++endif
 +dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
++dtbo-y += tegra234-p3767-camera-cti-eg-cams-dione.dtbo
 +dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
 +
 +dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
@@ -20016,10 +20028,10 @@ index 0000000..fcee765
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
 new file mode 100644
-index 0000000..7cbf3e3
+index 0000000..7805b4c
 --- /dev/null
 +++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-common-eg-cams-dione.dtsi
-@@ -0,0 +1,3040 @@
+@@ -0,0 +1,3080 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 +
@@ -20640,6 +20652,7 @@ index 0000000..7cbf3e3
 +							 * Sensor embedded metadata height in units of rows.
 +							 * If sensor does not support embedded metadata value should be 0.
 +							 */
++#ifndef PRISTINE_KERNEL
 +							 mode0 { // EC_MODE_640x480_RAW16
 +								num_lanes = "2";
 +								lane_polarity = "6";
@@ -20680,7 +20693,12 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#endif
++#ifndef PRISTINE_KERNEL
 +							 mode1 { // EC_MODE_640x480_RGB888
++#else
++							 mode0 { // EC_MODE_640x480_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								lane_polarity = "6";
 +								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -20720,7 +20738,11 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#ifndef PRISTINE_KERNEL
 +							 mode2 { // EC_MODE_640x480_YUYV
++#else
++							 mode1 { // EC_MODE_640x480_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								lane_polarity = "6";
 +								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -20760,6 +20782,7 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							};
++#ifndef PRISTINE_KERNEL
 +							 mode3 { // EC_MODE_1280x1024_RAW16
 +								num_lanes = "2";
 +								lane_polarity = "6";
@@ -20800,7 +20823,12 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#endif
++#ifndef PRISTINE_KERNEL
 +							 mode4 { // EC_MODE_1280x1024_RGB888
++#else
++							 mode2 { // EC_MODE_1280x1024_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								lane_polarity = "6";
 +								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -20840,7 +20868,11 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#ifndef PRISTINE_KERNEL
 +							 mode5 { // EC_MODE_1280x1024_YUYV
++#else
++							 mode3 { // EC_MODE_1280x1024_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								lane_polarity = "6";
 +								tegra_sinterface = SENSOR_CAM0_SERIAL;
@@ -22015,6 +22047,7 @@ index 0000000..7cbf3e3
 +							 physical_h = "5.760";
 +
 +
++#ifndef PRISTINE_KERNEL
 +							 mode0 { // EC_MODE_640x480_RAW16
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
@@ -22056,7 +22089,12 @@ index 0000000..7cbf3e3
 +								default_exp_time = "2495"; /* us */
 +
 +							 };
++#endif
++#ifndef PRISTINE_KERNEL
 +							 mode1 { // EC_MODE_640x480_RGB888
++#else
++							 mode0 { // EC_MODE_640x480_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
 +								phy_mode = "DPHY";
@@ -22096,7 +22134,11 @@ index 0000000..7cbf3e3
 +								default_exp_time = "2495"; /* us */
 +
 +							 };
++#ifndef PRISTINE_KERNEL
 +							 mode2 { // EC_MODE_640x480_YUYV
++#else
++							 mode1 { // EC_MODE_640x480_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
 +								phy_mode = "DPHY";
@@ -22135,6 +22177,7 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#ifndef PRISTINE_KERNEL
 +							 mode3 { // EC_MODE_1280x1024_RAW16
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
@@ -22174,7 +22217,12 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#endif
++#ifndef PRISTINE_KERNEL
 +							 mode4 { // EC_MODE_1280x1024_RGB888
++#else
++							 mode2 { // EC_MODE_1280x1024_RGB888 (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
 +								phy_mode = "DPHY";
@@ -22213,7 +22261,11 @@ index 0000000..7cbf3e3
 +								step_exp_time = "1";
 +								default_exp_time = "2495"; /* us */
 +							 };
++#ifndef PRISTINE_KERNEL
 +							 mode5 { // EC_MODE_1280x1024_YUYV
++#else
++							 mode3 { // EC_MODE_1280x1024_YUYV (Y16 disabled: PRISTINE_KERNEL, modes renumbered)
++#endif
 +								num_lanes = "2";
 +								tegra_sinterface = "serial_c";
 +								phy_mode = "DPHY";
@@ -23059,6 +23111,38 @@ index 0000000..7cbf3e3
 +			};
 +		};
 +	};
++};
+diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-cti-eg-cams-dione.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-cti-eg-cams-dione.dts
+new file mode 100644
+index 0000000..ec7c013
+--- /dev/null
++++ b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-cti-eg-cams-dione.dts
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++
++/dts-v1/;
++/plugin/;
++
++/*
++ * Connect Tech Hadron DM ships a precompiled kernel/nvidia-oot we don't
++ * control (no source available) — Y16/Y16_BE/Y14 negotiation can't be
++ * patched into their tegra-camera.ko. PRISTINE_KERNEL disables the Y16
++ * mode(s) in eg_ec_cam below; see tegra234-p3767-camera-common-eg-cams-dione.dtsi.
++ * ilumos/microlynx (Y16-only cameras) are excluded at the Makefile level.
++ */
++#define PRISTINE_KERNEL
++
++#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
++
++/ {
++	overlay-name = "Exosens Cameras for Connect Tech Hadron DM";
++#ifdef EG_CSI_22PIN
++	jetson-header-name = "Jetson 22pin CSI Connector";
++#else
++	jetson-header-name = "Jetson 24pin CSI Connector";
++#endif
++	compatible = JETSON_COMPATIBLE_P3768;
 +};
 diff --git a/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-nx2-imx219-dual.dts b/source/hardware/nvidia/t23x/nv-public/overlay/tegra234-p3767-camera-dsboard-nx2-imx219-dual.dts
 new file mode 100644
@@ -45515,10 +45599,10 @@ index b09d95d..bb4b9ae 100644
  	{ USB_DEVICE_INTERFACE_CLASS(0x1e0e, 0x9205, 0xff) },	/* Simcom SIM7070/SIM7080/SIM7090 AT+ECM mode */
  	{ USB_DEVICE_INTERFACE_CLASS(0x1e0e, 0x9206, 0xff) },	/* Simcom SIM7070/SIM7080/SIM7090 AT-only mode */
 diff --git a/source/nvidia-oot/drivers/media/i2c/Makefile b/source/nvidia-oot/drivers/media/i2c/Makefile
-index a85d6e8..407d495 100644
+index a85d6e8..74f54bb 100644
 --- a/source/nvidia-oot/drivers/media/i2c/Makefile
 +++ b/source/nvidia-oot/drivers/media/i2c/Makefile
-@@ -21,6 +21,14 @@ obj-m += nv_ov5693.o
+@@ -21,6 +21,22 @@ obj-m += nv_ov5693.o
  obj-m += nv_ar0234.o
  obj-m += nv_hawk_owl.o
  obj-m += max929x.o
@@ -45526,9 +45610,17 @@ index a85d6e8..407d495 100644
 +dione_ir-y += dioneir.o tc358746_calculation.o
 +eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 +obj-m += eg-ec-mipi.o
++ifndef PRISTINE_KERNEL
++# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
++# nvidia-oot camera framework (sensor_common.c, vi5_formats.h...), which
++# can't be patched into a PRISTINE_KERNEL vendor's precompiled tegra-camera.ko.
 +obj-m += ilumos.o
 +microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 +obj-m += microlynx.o
++endif
++ifdef PRISTINE_KERNEL
++ccflags-y += -DPRISTINE_KERNEL
++endif
 +
  endif
  
@@ -48812,10 +48904,10 @@ index 0000000..4458e5b
 +#endif  /* __ECCTRL_I2C_COMMON__ */
 diff --git a/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c b/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c
 new file mode 100755
-index 0000000..67f841b
+index 0000000..879cc46
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/eg_ec_mipi_src.c
-@@ -0,0 +1,1026 @@
+@@ -0,0 +1,1043 @@
 +/*
 + * A V4L2 driver for Exosens MIPI EngineCore cameras.
 + *
@@ -48855,12 +48947,19 @@ index 0000000..67f841b
 +MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
 +
 +enum {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++/*
++ * PRISTINE_KERNEL vendors (e.g. cti) ship a precompiled kernel/nvidia-oot we
++ * don't control: Y16 negotiation needs patches to the shared camera
++ * framework (sensor_common.c, vi5_formats.h...) that can't be applied there,
++ * so RAW16 modes are dropped and the DT overlay is renumbered to match
++ * (see tegra234-p3767-camera-cti-eg-cams-dione.dts / the shared dtsi).
++ */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   EC_MIPI_MODE_640x480_RAW16,
 +#endif
 +   EC_MIPI_MODE_640x480_RGB888,
 +   EC_MIPI_MODE_640x480_YUYV,
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   EC_MIPI_MODE_1280x1024_RAW16,
 +#endif
 +   EC_MIPI_MODE_1280x1024_RGB888,
@@ -48876,12 +48975,12 @@ index 0000000..67f841b
 + * device tree!
 + */
 +static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RAW16},
 +#endif
 +   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RGB888},
 +   {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_YUYV},
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RAW16},
 +#endif
 +   {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RGB888},
@@ -49491,7 +49590,7 @@ index 0000000..67f841b
 +   /* Determine which mode enum value matches (width, height, pixfmt) */
 +   if (width == 640 && height == 480) {
 +      switch (pixfmt) {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +         case 20: target_mode = EC_MIPI_MODE_640x480_RAW16; break;
 +#endif
 +         case 21: target_mode = EC_MIPI_MODE_640x480_RGB888; break;
@@ -49499,7 +49598,7 @@ index 0000000..67f841b
 +      }
 +   } else if (width == 1280 && height == 1024) {
 +      switch (pixfmt) {
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
 +         case 20: target_mode = EC_MIPI_MODE_1280x1024_RAW16; break;
 +#endif
 +         case 21: target_mode = EC_MIPI_MODE_1280x1024_RGB888; break;
@@ -49530,6 +49629,17 @@ index 0000000..67f841b
 +
 +static const struct v4l2_subdev_internal_ops eg_ec_mipi_subdev_internal_ops = {
 +   .open = eg_ec_mipi_open,
++};
++
++/*
++ * eg_ec_mipi does raw i2c_master_send/recv via priv->i2c_client, never
++ * regmap_read/write. This config only exists so tegracam_core's
++ * devm_regmap_init_i2c() has a non-NULL config to work with on stock
++ * NVIDIA/vendor kernels that don't carry the EG NULL-config guard.
++ */
++static const struct regmap_config eg_ec_mipi_dummy_regmap_config = {
++   .reg_bits = 8,
++   .val_bits = 8,
 +};
 +
 +#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
@@ -49698,7 +49808,7 @@ index 0000000..67f841b
 +   priv->i2c_client = tc_dev->client = client;
 +   tc_dev->dev = dev;
 +   strncpy(tc_dev->name, "eg_ec_mipi", sizeof(tc_dev->name));
-+   tc_dev->dev_regmap_config = NULL;
++   tc_dev->dev_regmap_config = &eg_ec_mipi_dummy_regmap_config;
 +   tc_dev->sensor_ops = &eg_ec_mipi_common_ops;
 +   tc_dev->v4l2sd_internal_ops = &eg_ec_mipi_subdev_internal_ops;
 +   tc_dev->tcctrl_ops = &eg_ec_mipi_ctrl_ops;
@@ -49708,7 +49818,6 @@ index 0000000..67f841b
 +      dev_err(dev, "tegra camera driver registration failed\n");
 +      goto err_camera_register;
 +   }
-+   tc_dev->s_data->i2c_client = client;
 +   priv->tc_dev = tc_dev;
 +   priv->s_data = tc_dev->s_data;
 +   priv->subdev = &tc_dev->s_data->subdev;
@@ -51549,10 +51658,10 @@ index 0000000..be2a89e
 +int nb_timer_delete_all (void);
 diff --git a/source/nvidia-oot/drivers/media/i2c/ilumos.c b/source/nvidia-oot/drivers/media/i2c/ilumos.c
 new file mode 100644
-index 0000000..a943f5c
+index 0000000..e40f919
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/ilumos.c
-@@ -0,0 +1,833 @@
+@@ -0,0 +1,843 @@
 +/*
 + * A V4L2 driver for Exosens ilumos MIPI IR cameras.
 + *
@@ -52255,6 +52364,17 @@ index 0000000..a943f5c
 +   .open = ilumos_open,
 +};
 +
++/*
++ * ilumos does raw i2c_master_send/recv via priv->i2c_client, never
++ * regmap_read/write. This config only exists so tegracam_core's
++ * devm_regmap_init_i2c() has a non-NULL config to work with on stock
++ * NVIDIA/vendor kernels that don't carry the EG NULL-config guard.
++ */
++static const struct regmap_config ilumos_dummy_regmap_config = {
++   .reg_bits = 8,
++   .val_bits = 8,
++};
++
 +#if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
 +static int ilumos_probe(struct i2c_client *client)
 +#else
@@ -52283,7 +52403,7 @@ index 0000000..a943f5c
 +   priv->i2c_client = tc_dev->client = client;
 +   tc_dev->dev = dev;
 +   strncpy(tc_dev->name, "ilumos", sizeof(tc_dev->name));
-+   tc_dev->dev_regmap_config = NULL;
++   tc_dev->dev_regmap_config = &ilumos_dummy_regmap_config;
 +   tc_dev->sensor_ops = &ilumos_common_ops;
 +   tc_dev->v4l2sd_internal_ops = &ilumos_subdev_internal_ops;
 +   tc_dev->tcctrl_ops = &ilumos_ctrl_ops;
@@ -52294,7 +52414,6 @@ index 0000000..a943f5c
 +      return err;
 +   }
 +
-+   tc_dev->s_data->i2c_client = client;
 +   priv->tc_dev = tc_dev;
 +   priv->s_data = tc_dev->s_data;
 +   priv->subdev = &tc_dev->s_data->subdev;
@@ -52388,10 +52507,10 @@ index 0000000..a943f5c
 +MODULE_VERSION("1.0");
 diff --git a/source/nvidia-oot/drivers/media/i2c/microlynx_core.c b/source/nvidia-oot/drivers/media/i2c/microlynx_core.c
 new file mode 100644
-index 0000000..54700a8
+index 0000000..9d275e1
 --- /dev/null
 +++ b/source/nvidia-oot/drivers/media/i2c/microlynx_core.c
-@@ -0,0 +1,710 @@
+@@ -0,0 +1,721 @@
 +/*
 + * A V4L2 driver for Exosens Microlynx MIPI IR cameras.
 + *
@@ -52878,6 +52997,18 @@ index 0000000..54700a8
 +   .open = microlynx_open,
 +};
 +
++/*
++ * microlynx does raw i2c_master_send/recv (GenCP-over-I2C) via
++ * priv->i2c_client, never regmap_read/write. This config only exists so
++ * tegracam_core's devm_regmap_init_i2c() has a non-NULL config to work
++ * with on stock NVIDIA/vendor kernels that don't carry the EG NULL-config
++ * guard.
++ */
++static const struct regmap_config microlynx_dummy_regmap_config = {
++   .reg_bits = 8,
++   .val_bits = 8,
++};
++
 +/* ---- GenCP chardev file operations ------------------------------------ */
 +
 +static int microlynx_cdev_open(struct inode *inode, struct file *file)
@@ -52992,7 +53123,7 @@ index 0000000..54700a8
 +   priv->i2c_client = tc_dev->client = client;
 +   tc_dev->dev = dev;
 +   strncpy(tc_dev->name, "microlynx", sizeof(tc_dev->name));
-+   tc_dev->dev_regmap_config = NULL;
++   tc_dev->dev_regmap_config = &microlynx_dummy_regmap_config;
 +   tc_dev->sensor_ops = &microlynx_common_ops;
 +   tc_dev->v4l2sd_internal_ops = &microlynx_subdev_internal_ops;
 +   tc_dev->tcctrl_ops = &microlynx_ctrl_ops;
@@ -53003,7 +53134,6 @@ index 0000000..54700a8
 +      return err;
 +   }
 +
-+   tc_dev->s_data->i2c_client = client;
 +   priv->tc_dev = tc_dev;
 +   priv->s_data = tc_dev->s_data;
 +   priv->subdev = &tc_dev->s_data->subdev;
@@ -54337,20 +54467,6 @@ index 4baafc7..c9ba4f0
  				RGB888, RGBA32, "RGBA-8-8-8-8"),
  	TEGRA_VIDEO_FORMAT(RGB888, 24, RGB888_1X32_PADHI, 4, 1, T_A8B8G8R8,
  				RGB888, RGB32, "RGB-8-8-8-8"),
-diff --git a/source/nvidia-oot/include/media/camera_common.h b/source/nvidia-oot/include/media/camera_common.h
-old mode 100644
-new mode 100755
-index 6b5ae91..0224cae
---- a/source/nvidia-oot/include/media/camera_common.h
-+++ b/source/nvidia-oot/include/media/camera_common.h
-@@ -229,6 +229,7 @@ struct camera_common_data {
- 	/* TODO: cleanup neeeded once all the sensors adapt new framework */
- 	struct tegracam_ctrl_handler		*tegracam_ctrl_hdl;
- 	struct regmap				*regmap;
-+	struct i2c_client *i2c_client;
- 	struct camera_common_pdata		*pdata;
- 	/* TODO: cleanup needed for priv once all the sensors adapt new framework */
- 	void	*priv;
 diff --git a/source/nvidia-oot/include/media/tegra_camera_core.h b/source/nvidia-oot/include/media/tegra_camera_core.h
 old mode 100644
 new mode 100755

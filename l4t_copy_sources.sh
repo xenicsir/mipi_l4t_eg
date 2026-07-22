@@ -80,6 +80,33 @@ merge_copy() {
       local rel_path="${src_file#$src_dir/}"
       local dest_file="$dest_dir/$rel_path"
 
+      # PRISTINE_KERNEL vendors (e.g. cti) ship a precompiled kernel/nvidia-oot
+      # we don't control: skip our patches to NVIDIA's own camera framework
+      # (drivers/media/platform/tegra/camera/*, include/media/*.h) so the
+      # working tree stays byte-identical to the vendor's pristine source in
+      # these files. Our own new driver files (drivers/media/i2c/*) are
+      # untouched by this and are always copied.
+      if [[ "$PRISTINE_KERNEL" == "1" ]]; then
+         case "$rel_path" in
+            */drivers/media/platform/*|*/include/media/*)
+               [[ "$verbose" == "1" ]] && echo "  SKIP (PRISTINE_KERNEL): $rel_path"
+               continue
+               ;;
+         esac
+      fi
+
+      # Vendored binary kernel/nvidia-oot headers (tools/extract_cti.sh), tens
+      # of thousands of files (~200MB) — never git-tracked EG source, and far
+      # too many files for this per-file merge_copy/.gitignore mechanism
+      # (designed for small curated patch sets). l4t_build.sh reads them
+      # directly from sources/<ver>/Linux_for_Tegra_cti/ instead; they must
+      # never be copied into the working tree at all.
+      case "$rel_path" in
+         cti-kdir/*|cti-oot-headers/*)
+            continue
+            ;;
+      esac
+
       # Track destination path
       if [[ -n "$dest_prefix" ]]; then
          echo "${dest_prefix}/${rel_path}" >> "$DEST_PATHS_FILE"
@@ -156,6 +183,17 @@ analyze_copy() {
    find "$src_dir" \( -type f -o -type l \) | while read -r filepath; do
       # Get relative path from source dir
       local relpath="${filepath#$src_dir/}"
+
+      # Vendored binary kernel/nvidia-oot headers (tools/extract_cti.sh) — see
+      # matching skip in merge_copy(). Never tracked/copied into the working
+      # tree; excluded here too so the .gitignore-tracked-paths pass doesn't
+      # walk tens of thousands of vendor files for nothing.
+      case "$relpath" in
+         cti-kdir/*|cti-oot-headers/*)
+            continue
+            ;;
+      esac
+
       if [[ -n "$dest_prefix" ]]; then
          echo "${dest_prefix}/${relpath}" >> "$DEST_PATHS_FILE"
       else

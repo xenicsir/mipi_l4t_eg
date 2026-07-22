@@ -116,7 +116,13 @@ def main():
             for i in range(len(hws)):
               hw = hws[i]
               if hw:
-                  if ("Exosens Cameras" in hw):
+                  # /boot/eg/Image only exists on vendors that actually ship an
+                  # EG-built kernel (dual-boot -eg kernel or standard EG build).
+                  # On a PRISTINE_KERNEL vendor (e.g. CTI) that file is never
+                  # shipped, even though Exosens camera overlays are still
+                  # configured — the JetsonIO label must then point at the
+                  # target's real (vendor) kernel, not a nonexistent one.
+                  if ("Exosens Cameras" in hw) and os.path.exists("/boot/eg/Image"):
                       eg = 1
                   else :
                       eg = 0

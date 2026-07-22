@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+/dts-v1/;
+/plugin/;
+
+/*
+ * Connect Tech Hadron DM ships a precompiled kernel/nvidia-oot we don't
+ * patch (build against their real headers instead, see PRISTINE_KERNEL in
+ * eg_config.yaml) — Y16/Y16_BE/Y14 negotiation can't be patched into their
+ * tegra-camera.ko. PRISTINE_KERNEL disables the Y16 mode(s) in eg_ec_cam
+ * below; see tegra234-p3767-camera-common-eg-cams-dione.dtsi. ilumos/
+ * microlynx (Y16-only cameras) are excluded at the Makefile level.
+ */
+#define PRISTINE_KERNEL
+
+/*
+ * Hadron DM's camera connectors sit behind a real PCA9540 I2C mux chip
+ * (reg 0x70 on cam_i2c/i2c@3180000) rather than the GPIO-toggled mux used
+ * on Forecr/devkit carriers — confirmed by i2cdetect on the real board
+ * (0x70 responds on i2c-2; the GPIO-mux virtual channels saw nothing but
+ * 0x70 bleeding through — no working channel switch). Selects the
+ * chip-based tca9540@70 node instead of cam_i2cmux (i2c-mux-gpio) in the
+ * common dtsi.
+ */
+#define HADRON_DM_CAM_I2C_MUX
+
+/*
+ * CAM0's NVCSI channel@0 (both the sensor-side and VI-side endpoints) is
+ * wired to NVCSI brick A (port-index=0, CSI0_CLK) on Hadron DM — confirmed
+ * directly from the real board's own reference camera device tree: its
+ * channel@0/port@{0,1}/endpoint* and tegra-capture-vi port@0/endpoint all
+ * declare port-index=0. This matches the Forecr DSBOARD-ORNXS routing, not
+ * the plain Nvidia P3768 devkit's (port-index=1, brick B) — see
+ * docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md for the lane-swap/port-index
+ * background. Without this, NVCSI listens on the wrong physical brick and
+ * receives nothing at all (0 FS events) even though the sensor and TC358746
+ * bridge are correctly programmed and streaming.
+ */
+#define CAM0_LANE_SWAP
+
+#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
+
+/ {
+	overlay-name = "Exosens Cameras for Connect Tech Hadron DM";
+#ifdef EG_CSI_22PIN
+	jetson-header-name = "Jetson 22pin CSI Connector";
+#else
+	jetson-header-name = "Jetson 24pin CSI Connector";
+#endif
+	compatible = JETSON_COMPATIBLE_P3768;
+};

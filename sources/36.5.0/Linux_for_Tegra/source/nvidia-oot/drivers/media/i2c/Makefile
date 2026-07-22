@@ -25,9 +25,17 @@ obj-m += dione_ir.o
 dione_ir-y += dioneir.o tc358746_calculation.o
 eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 obj-m += eg-ec-mipi.o
+ifndef PRISTINE_KERNEL
+# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
+# nvidia-oot camera framework (sensor_common.c, vi5_formats.h...), which
+# can't be patched into a PRISTINE_KERNEL vendor's precompiled tegra-camera.ko.
 obj-m += ilumos.o
 microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 obj-m += microlynx.o
+endif
+ifdef PRISTINE_KERNEL
+ccflags-y += -DPRISTINE_KERNEL
+endif
 
 endif
 

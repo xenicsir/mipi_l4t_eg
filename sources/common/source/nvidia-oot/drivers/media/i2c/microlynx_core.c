@@ -484,6 +484,18 @@ static const struct v4l2_subdev_internal_ops microlynx_subdev_internal_ops = {
    .open = microlynx_open,
 };
 
+/*
+ * microlynx does raw i2c_master_send/recv (GenCP-over-I2C) via
+ * priv->i2c_client, never regmap_read/write. This config only exists so
+ * tegracam_core's devm_regmap_init_i2c() has a non-NULL config to work
+ * with on stock NVIDIA/vendor kernels that don't carry the EG NULL-config
+ * guard.
+ */
+static const struct regmap_config microlynx_dummy_regmap_config = {
+   .reg_bits = 8,
+   .val_bits = 8,
+};
+
 /* ---- GenCP chardev file operations ------------------------------------ */
 
 static int microlynx_cdev_open(struct inode *inode, struct file *file)
@@ -598,7 +610,7 @@ static int microlynx_probe(struct i2c_client *client,
    priv->i2c_client = tc_dev->client = client;
    tc_dev->dev = dev;
    strncpy(tc_dev->name, "microlynx", sizeof(tc_dev->name));
-   tc_dev->dev_regmap_config = NULL;
+   tc_dev->dev_regmap_config = &microlynx_dummy_regmap_config;
    tc_dev->sensor_ops = &microlynx_common_ops;
    tc_dev->v4l2sd_internal_ops = &microlynx_subdev_internal_ops;
    tc_dev->tcctrl_ops = &microlynx_ctrl_ops;
@@ -609,7 +621,6 @@ static int microlynx_probe(struct i2c_client *client,
       return err;
    }
 
-   tc_dev->s_data->i2c_client = client;
    priv->tc_dev = tc_dev;
    priv->s_data = tc_dev->s_data;
    priv->subdev = &tc_dev->s_data->subdev;
