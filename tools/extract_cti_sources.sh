@@ -22,8 +22,9 @@
 # TWO INDEPENDENT FILTERS ARE APPLIED (both are required — neither replaces
 # the other):
 #   1. SCOPE  — only the kernel subsystems we actually build are considered
-#               (kernel-jammy-src, nvidia-oot, hardware, kernel-devicetree);
-#               laird/nvgpu/nvdisplay/nvethernetrm/hwpm/uefi are ignored.
+#               (kernel-jammy-src, nvidia-oot); hardware, kernel-devicetree,
+#               laird/nvgpu/nvdisplay/nvethernetrm/hwpm/uefi are ignored — see
+#               the SCOPE array below for why.
 #   2. DIFF   — within that scope, only files that are NEW or MODIFIED
 #               relative to the pristine Nvidia BSP are kept. Scope alone is
 #               not enough: kernel-jammy-src alone is a full Linux tree
@@ -49,8 +50,6 @@
 # one level deeper on the Nvidia side:
 #   sources/kernel/kernel-jammy-src   -> source/kernel/kernel-jammy-src
 #   sources/kernel/nvidia-oot         -> source/nvidia-oot
-#   sources/kernel/hardware           -> source/hardware
-#   sources/kernel/kernel-devicetree  -> source/kernel-devicetree
 #
 # Usage:
 #   ./tools/extract_cti_sources.sh <L4T_VERSION> [ARCHIVE_PATH] [NVIDIA_BSP_SRC]
@@ -95,11 +94,18 @@ MANIFEST_NAME=".eg-delta-manifest"
 
 # Kernel subsystems to consider (filter 1: SCOPE).
 # Values are "<path-inside-archive>:<path-inside-nvidia-source>".
+# `hardware` and `kernel-devicetree` are deliberately NOT in scope:
+#   - every file the vendor changes under hardware/ is one of its own board
+#     device trees (cti-public/), none of which we build: the base DTB is
+#     flashed by the vendor's own BSP and our package ships overlays only,
+#     which come from sources/common/. Worse, building them fails outright —
+#     their AGX Orin boards include a Xavier (T194) binding that L4T 36.x no
+#     longer ships, breaking `make dtbs` for the whole tree.
+#   - the vendor changes nothing at all under kernel-devicetree (measured: 0
+#     new, 0 modified), so comparing it is pure cost.
 SCOPE=(
    "kernel-jammy-src:kernel/kernel-jammy-src"
    "nvidia-oot:nvidia-oot"
-   "hardware:hardware"
-   "kernel-devicetree:kernel-devicetree"
 )
 SCOPE_ID="${SCOPE[*]}"
 
@@ -217,6 +223,31 @@ if [[ -z "$NVIDIA_SRC" || ! -d "$NVIDIA_SRC" ]]; then
    echo -e "${RED}Error: pristine Nvidia BSP source not found for L4T $L4T_VERSION${NC}"
    echo "  Run ./l4t_prepare.sh first, or pass the path as 3rd argument."
    exit 1
+fi
+
+# The diff is only meaningful against a PRISTINE Nvidia BSP. If the reference
+# tree has already been through l4t_copy_sources.sh, our own EG changes are in
+# it: files where the vendor matches Nvidia but we patched then show up as
+# "modified by the vendor", silently inflating the result — and conversely, a
+# tree that already received a previous extraction makes the vendor look like
+# it changed almost nothing. Both failure modes are silent and produce a
+# plausible number, so refuse rather than guess.
+#
+# A tree that never went through copy_sources has no git repo of its own (that
+# script creates it). Careful: `git -C <dir>` walks up to an ancestor repo when
+# <dir> is not one, which would report the *outer* project's changes — hence
+# the explicit .git check first.
+_bsp_root="$(dirname "$NVIDIA_SRC")"
+if [[ -d "$_bsp_root/.git" ]]; then
+   _dirty=$(sudo git -C "$_bsp_root" status --porcelain --untracked-files=no 2>/dev/null | wc -l)
+   if [[ "$_dirty" -gt 0 ]]; then
+      echo -e "${RED}Error: reference BSP is not pristine ($_dirty tracked modifications).${NC}" >&2
+      echo "  ${_bsp_root#$ROOT_DIR/}" >&2
+      echo "  l4t_copy_sources.sh has already run on it, so a diff against it would" >&2
+      echo "  be meaningless. Use a freshly prepared tree (l4t_prepare.sh), or pass" >&2
+      echo "  another BSP source directory as the 3rd argument." >&2
+      exit 1
+   fi
 fi
 
 echo "  Archive:     $(basename "$CTI_ARCHIVE")"

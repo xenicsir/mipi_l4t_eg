@@ -4,6 +4,19 @@
 DTC_FLAGS += -@
 DTC_CPP_FLAGS += -DEG_CSI_22PIN
 
+# Propagate PRISTINE_KERNEL (exported by l4t_environment.sh from
+# vendors.<v>.pristine_kernel) to the device tree preprocessor, the same way
+# EG_CSI_22PIN is passed above.
+#
+# The -cti- overlays are shared by both Connect Tech build variants and must NOT
+# hardcode `#define PRISTINE_KERNEL`: on the pristine variant the vendor's
+# precompiled kernel cannot negotiate Y16, so those modes are dropped and the
+# remaining ones renumbered; on the source-built variant Y16 works and the
+# modes must stay as they are. Same .dts, two results, decided by the build.
+ifdef PRISTINE_KERNEL
+DTC_CPP_FLAGS += -DPRISTINE_KERNEL
+endif
+
 old-dtb := $(dtb-y)
 old-dtbo := $(dtbo-y)
 dtb-y :=

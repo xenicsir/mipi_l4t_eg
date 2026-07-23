@@ -271,7 +271,8 @@ else
    EG_SRCS=()
    while IFS= read -r f; do
       EG_SRCS+=("$(basename "$f" .c)")
-   done < <(find "$ROOT_DIR/sources" -path "*/drivers/media/i2c/*.c" 2>/dev/null)
+   done < <(find "$ROOT_DIR/sources/common" "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" \
+                  -path "*/drivers/media/i2c/*.c" 2>/dev/null)
 
    # The EG module list is always derived from the version-generic Makefile.
    # SoM/vendor/carrier layers contain NVIDIA stock Makefiles (no EG modules)

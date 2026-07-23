@@ -5,14 +5,18 @@
 /plugin/;
 
 /*
- * Connect Tech Hadron DM ships a precompiled kernel/nvidia-oot we don't
- * patch (build against their real headers instead, see PRISTINE_KERNEL in
- * eg_config.yaml) — Y16/Y16_BE/Y14 negotiation can't be patched into their
- * tegra-camera.ko. PRISTINE_KERNEL disables the Y16 mode(s) in eg_ec_cam
- * below; see tegra234-p3767-camera-common-eg-cams-dione.dtsi. ilumos/
- * microlynx (Y16-only cameras) are excluded at the Makefile level.
+ * This overlay is shared by BOTH Connect Tech build variants, so it must not
+ * define PRISTINE_KERNEL itself — the build does, via
+ * `DTC_CPP_FLAGS += -DPRISTINE_KERNEL` in the overlay Makefile, gated on the
+ * vendor's pristine_kernel flag in eg_config.yaml:
+ *   cti_pristine — the vendor's precompiled tegra-camera.ko cannot negotiate
+ *     Y16/Y16_BE/Y14, so the Y16 modes of eg_ec_cam are dropped and the
+ *     remaining ones renumbered (see
+ *     tegra234-p3767-camera-common-eg-cams-dione.dtsi); iLumos and Microlynx,
+ *     being Y16-only, are excluded at the Makefile level.
+ *   cti — kernel built from the vendor's own sources with our framework
+ *     patches applied, so Y16 works and every mode stays in place.
  */
-#define PRISTINE_KERNEL
 
 /*
  * Hadron DM's camera connectors sit behind a real PCA9540 I2C mux chip

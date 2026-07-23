@@ -522,7 +522,8 @@ verify_package() {
             local eg_srcs=()
             while IFS= read -r f; do
                 eg_srcs+=("$(basename "$f" .c)")
-            done < <(find "$SCRIPT_DIR/sources" -path "*/drivers/media/i2c/*.c" 2>/dev/null)
+            done < <(find "$SCRIPT_DIR/sources/common" "$SCRIPT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" \
+                  -path "*/drivers/media/i2c/*.c" 2>/dev/null)
 
             # Resolve ifdef/ifndef PRISTINE_KERNEL / else / endif for this vendor's
             # actual value before parsing (same fix as l4t_gen_delivery_package.sh),

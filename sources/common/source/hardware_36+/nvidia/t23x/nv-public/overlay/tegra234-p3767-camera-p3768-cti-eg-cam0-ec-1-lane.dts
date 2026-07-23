@@ -9,14 +9,13 @@
 #define HADRON_DM_CAM_I2C_MUX
 
 /*
- * Hadron DM ships a precompiled kernel/nvidia-oot we don't patch (see
- * PRISTINE_KERNEL in eg_config.yaml and tegra234-p3767-camera-cti-eg-cams-
- * dione.dts) -- the shared .dtsi below renumbers the EngineCore camera's
- * modes accordingly (Y16/RAW16 modes removed, RGB888/YUYV modes shifted
- * down) to match eg_ec_b@16/eg_ec_c@16 as actually defined by the base
- * dione overlay on this vendor.
+ * PRISTINE_KERNEL is deliberately NOT defined here: this overlay serves both
+ * Connect Tech variants and the build passes the macro via DTC_CPP_FLAGS (see
+ * tegra234-p3767-camera-cti-eg-cams-dione.dts). When it is set, the shared
+ * .dtsi below renumbers the EngineCore modes (Y16/RAW16 removed, RGB888/YUYV
+ * shifted down) to match eg_ec_b@16/eg_ec_c@16 as the base dione overlay
+ * actually defines them on that variant.
  */
-#define PRISTINE_KERNEL
 
 #include "tegra234-p3767-camera-p3768-common-eg-cam0-ec-1-lane.dtsi"
 
