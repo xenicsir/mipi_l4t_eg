@@ -209,20 +209,20 @@ else
 	# kernel/nvidia-oot, whose ABI (Module.symvers CRCs, struct layouts) does
 	# NOT match the vendor's real running kernel. Recompile just those modules
 	# against the vendor's real, precompiled kernel + nvidia-oot headers
-	# (extracted by tools/extract_cti.sh), then overwrite the ones just
+	# (extracted by tools/extract_cti_headers.sh), then overwrite the ones just
 	# installed. Everything else built above (Image, dtbs, hwpm, nvgpu,
 	# tegra-camera.ko...) is kept for pipeline consistency but never
 	# flashed/deployed for this vendor.
 	#
-	# Read straight from sources/<ver>/Linux_for_Tegra_cti/ (never copied into
+	# Read straight from sources/<ver>/Linux_for_Tegra_cti_pristine/ (never copied into
 	# the working tree — l4t_copy_sources.sh explicitly skips cti-kdir/
 	# cti-oot-headers: ~27000 vendored files, far too many for its per-file
 	# merge_copy/.gitignore-tracking mechanism, and there's nothing to gain
 	# from a working-tree copy). We do write into cti-kdir/scripts/ below
 	# (removing stale prebuilt aarch64 host tools) — harmless, re-extracted
-	# fresh by tools/extract_cti.sh whenever it's rerun.
+	# fresh by tools/extract_cti_headers.sh whenever it's rerun.
 	if [[ "$PRISTINE_KERNEL" == "1" ]]; then
-		CTI_SRC_DIR="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_cti"
+		CTI_SRC_DIR="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_cti_pristine"
 		CTI_KDIR_LINUX_HEADERS=$(find "$CTI_SRC_DIR/cti-kdir/usr/src" -maxdepth 1 -mindepth 1 -type d -iname "linux-headers-*" 2>/dev/null | head -1)
 		CTI_KDIR=""
 		[[ -n "$CTI_KDIR_LINUX_HEADERS" ]] && CTI_KDIR=$(find "$CTI_KDIR_LINUX_HEADERS" -maxdepth 4 -type d -iname "kernel-source" 2>/dev/null | head -1)
@@ -230,8 +230,8 @@ else
 		CTI_I2C_DIR="$L4T_SRC/nvidia-oot/drivers/media/i2c"
 
 		if [[ -z "$CTI_KDIR" || ! -f "$CTI_OOT_ROOT/Module.symvers" ]]; then
-			echo "ERROR: CTI headers not found under sources/$L4T_VERSION/Linux_for_Tegra_cti/."
-			echo "  Run: ./tools/extract_cti.sh $L4T_VERSION"
+			echo "ERROR: CTI headers not found under sources/$L4T_VERSION/Linux_for_Tegra_cti_pristine/."
+			echo "  Run: ./tools/extract_cti_headers.sh $L4T_VERSION"
 			exit 1
 		fi
 

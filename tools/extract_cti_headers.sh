@@ -70,7 +70,7 @@ ARCHIVE_PATH_ARG="$2"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVE_DIR="$ROOT_DIR/archives/CTI"
-DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_cti"
+DEST="$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra_cti_pristine"
 
 if [[ -n "$ARCHIVE_PATH_ARG" ]]; then
    CTI_ARCHIVE="$ARCHIVE_PATH_ARG"
@@ -144,4 +144,4 @@ fi
 
 echo ""
 echo "Done. These files will be picked up by l4t_copy_sources.sh's vendor layer"
-echo "the next time you run --copy-sources for -V cti."
+echo "the next time you run --copy-sources for -V cti_pristine."

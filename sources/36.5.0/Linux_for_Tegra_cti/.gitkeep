@@ -1,4 +1,0 @@
-Intentionally empty for now: the CTI vendor layer has no vendor-specific
-source of its own yet. The 36.5.0 CTI build currently reuses the generic
-Linux_for_Tegra tree, built with PRISTINE_KERNEL=1 (see eg_config.yaml
-vendors.cti.pristine_kernel), plus one additional CTI-specific DT overlay.

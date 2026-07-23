@@ -17,6 +17,23 @@
 . l4t_environment.sh
 l4t_init "$@"
 
+#******************************************************************************
+# DISABLED: patch generation was switched off in l4t_copy_sources.sh (see the
+# commented-out "Step 5" block there for the two reasons: vendor source
+# confidentiality, and the staleness/drift problems the patches/ directory kept
+# causing). The patches/ directory has been removed from the repository, so
+# this script has no input to work with.
+#******************************************************************************
+echo "Error: l4t_patch_sources.sh is disabled — the patches/ directory no longer exists."
+echo ""
+echo "Patch generation was intentionally switched off (see the commented-out Step 5"
+echo "block in l4t_copy_sources.sh). The source of truth is sources/<version>/ and"
+echo "sources/common/; use --copy-sources instead, which reproduces the tree exactly:"
+echo ""
+echo "  ./l4t_copy_sources.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR}${CARRIER_BOARD:+ -c $CARRIER_BOARD}"
+echo "  ./l4t_make.sh -v $L4T_VERSION${VENDOR:+ -V $VENDOR} --copy-sources"
+exit 1
+
 if [[ ! -d $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} ]]; then
    echo "Error : $L4T_VERSION/${LINUX_FOR_TEGRA_DIR} folder doesn't exist"
    echo "Run l4t_prepare.sh first."

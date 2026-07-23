@@ -10,7 +10,13 @@ git commit, extracts it to a temp directory, and verifies:
   - At least one *-cams-dione.dtbo present
   - At least one *-cam*-ilumos.dtbo present
   - At least one *-cam*-microlynx.dtbo present
-  - Expected .ko camera drivers (35.x/36.x: ilumos + microlynx; 32.x: ec + dione only)
+  - Expected .ko camera drivers (32.x: ec + dione only; all others also
+    ilumos + microlynx)
+
+Vendors with `pristine_kernel: true` in eg_config.yaml (e.g. cti) ship neither the
+iLumos nor the Microlynx driver (Y16-only cameras, unsupported on a pristine
+kernel), so both the .ko and the *-ilumos/*-microlynx DTBO checks are skipped
+for them.
 
 Runs on host. Requires: dpkg-deb, dtc, git.
 """
@@ -23,7 +29,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+EG_CONFIG = REPO_ROOT / "eg_config.yaml"
 
 GREEN = "\033[92m"
 RED   = "\033[91m"
@@ -63,6 +72,39 @@ def pick_latest_deb(debs, commit_order):
 
 
 # ---------------------------------------------------------------------------
+# Vendor identification
+# ---------------------------------------------------------------------------
+
+def load_vendors():
+    """Read eg_config.yaml, return (infix → vendor, vendor → pristine_kernel).
+
+    A non-generic package carries a "<vendor>-<carrier dir_suffix>" infix right
+    before "-eg-cams" (e.g. "forecr-dsboard-ornxs", "cti-hadron-dm"); generic
+    packages have no infix at all.
+    """
+    with open(EG_CONFIG) as f:
+        cfg = yaml.safe_load(f)
+
+    infixes = {}
+    pristine = {}
+    for vendor, spec in cfg["vendors"].items():
+        pristine[vendor] = bool(spec.get("pristine_kernel", False))
+        for carrier in spec.get("carriers", []):
+            suffix = cfg["carriers"].get(carrier, {}).get("dir_suffix", "")
+            if suffix:
+                infixes[f"{vendor}-{suffix.replace('_', '-')}"] = vendor
+    return infixes, pristine
+
+
+def extract_vendor(deb_name, vendor_infixes):
+    """Return the vendor a .deb belongs to ('generic' when it carries no infix)."""
+    for infix, vendor in vendor_infixes.items():
+        if f"-{infix}-eg-cams" in deb_name:
+            return vendor
+    return "generic"
+
+
+# ---------------------------------------------------------------------------
 # Package checks
 # ---------------------------------------------------------------------------
 
@@ -77,7 +119,7 @@ def find_ko(extract_dir, name):
     return bool(glob.glob(pattern, recursive=True))
 
 
-def check_package(deb_path, version_dir, label, som=""):
+def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
     """
     Extract deb_path and run all checks.
     Returns (passed, failed, errors) where errors is a list of strings.
@@ -87,6 +129,7 @@ def check_package(deb_path, version_dir, label, som=""):
 
     family = version_family(version_dir)
     has_dtbos = (som != "t186")  # t186 has no device tree overlays
+    has_y16_cams = not pristine_kernel  # iLumos/Microlynx are Y16-only
 
     with tempfile.TemporaryDirectory(prefix="eg_pkg_") as tmpdir:
         extract_dir = Path(tmpdir) / "pkg"
@@ -145,17 +188,18 @@ def check_package(deb_path, version_dir, label, som=""):
             else:
                 errors.append("No *-cams-dione.dtbo found in boot/")
 
-            # cam*-ilumos.dtbo present
-            if any(re.search(r"cam\d+-ilumos", n) for n in dtbo_names):
-                passed += 1
-            else:
-                errors.append("No *-cam*-ilumos.dtbo found in boot/")
+            if has_y16_cams:
+                # cam*-ilumos.dtbo present
+                if any(re.search(r"cam\d+-ilumos", n) for n in dtbo_names):
+                    passed += 1
+                else:
+                    errors.append("No *-cam*-ilumos.dtbo found in boot/")
 
-            # cam*-microlynx.dtbo present
-            if any(re.search(r"cam\d+-microlynx", n) for n in dtbo_names):
-                passed += 1
-            else:
-                errors.append("No *-cam*-microlynx.dtbo found in boot/")
+                # cam*-microlynx.dtbo present
+                if any(re.search(r"cam\d+-microlynx", n) for n in dtbo_names):
+                    passed += 1
+                else:
+                    errors.append("No *-cam*-microlynx.dtbo found in boot/")
 
         # --- Kernel modules ---
         # All families: eg-ec-mipi.ko and dione_ir.ko
@@ -165,8 +209,8 @@ def check_package(deb_path, version_dir, label, som=""):
             else:
                 errors.append(f"{ko} missing from lib/modules/")
 
-        # 35.x and 36.x only: ilumos.ko, microlynx.ko
-        if family in ("35", "36"):
+        # Everything but 32.x (no Y16 there): ilumos.ko, microlynx.ko
+        if family != "32" and has_y16_cams:
             for ko in ("ilumos.ko", "microlynx.ko"):
                 if find_ko(extract_dir, ko):
                     passed += 1
@@ -193,18 +237,21 @@ def extract_som(deb_name):
 
 def main():
     commit_order = get_commit_order()
+    vendor_infixes, pristine_by_vendor = load_vendors()
 
     # Discover all .deb files: REPO_ROOT/<version_dir>/*.deb
     # version_dirs start with digits (32.*, 35.*, 36.*)
     all_debs = sorted(REPO_ROOT.glob("[0-9]*/*.deb"))
 
-    # Group by (version_dir, som, is_forecr)
+    # Group by (version_dir, som, vendor) — the vendor must be part of the key,
+    # otherwise two vendors sharing the same version+SoM collapse into one group
+    # and only one of their .deb gets checked (under the other's label).
     groups = {}
     for deb in all_debs:
         version_dir = deb.parent.name
         som = extract_som(deb.name)
-        is_forecr = bool(re.search(r"forecr-dsboard-ornxs", deb.name))
-        key = (version_dir, som, is_forecr)
+        vendor = extract_vendor(deb.name, vendor_infixes)
+        key = (version_dir, som, vendor)
         groups.setdefault(key, []).append(str(deb))
 
     total_passed = 0
@@ -214,16 +261,18 @@ def main():
     print(f"\n{'Label':<45} {'Result'}")
     print("-" * 60)
 
-    for (version_dir, som, is_forecr), debs in sorted(groups.items()):
-        variant = "forecr" if is_forecr else "nvidia"
+    for (version_dir, som, vendor), debs in sorted(groups.items()):
         som_str = f"-{som}" if som else ""
-        label = f"{version_dir}{som_str} | {variant}"
+        label = f"{version_dir}{som_str} | {vendor}"
 
         deb_path = Path(pick_latest_deb(debs, commit_order))
         commit_m = re.search(r"\+g([0-9a-f]+)_arm64", deb_path.name)
         commit_str = commit_m.group(1) if commit_m else "?"
 
-        passed, failed, errors = check_package(deb_path, version_dir, label, som=som)
+        passed, failed, errors = check_package(
+            deb_path, version_dir, label, som=som,
+            pristine_kernel=pristine_by_vendor.get(vendor, False),
+        )
         total_passed += passed
         total_failed += failed
 

@@ -16,8 +16,7 @@
 #
 # Build Steps (at least one required):
 #   --prepare                   Run l4t_prepare.sh (download and extract)
-#   --copy-sources              Run l4t_copy_sources.sh (copies sources + generates patch)
-#   --patch-sources             Run l4t_patch_sources.sh (applies pre-generated patch)
+#   --copy-sources              Run l4t_copy_sources.sh (copies sources)
 #   --build                     Run l4t_build.sh
 #   --gen-package               Run l4t_gen_delivery_package.sh
 #
@@ -99,12 +98,12 @@ show_help() {
     head -42 "$0" | tail -n +2 | sed 's/^#//' | sed 's/^\*//g'
     echo ""
     echo "Supported configurations:"
-    printf "  %-12s %-10s %-8s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER"
+    printf "  %-12s %-13s %-8s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER"
     echo "  ------------------------------------------------"
     local configs=$(enumerate_configs "" "" "" "")
     for config in $configs; do
         parse_config "$config"
-        printf "  %-12s %-10s %-8s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "${CFG_SOM:--}" "$CFG_CARRIER"
+        printf "  %-12s %-13s %-8s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "${CFG_SOM:--}" "$CFG_CARRIER"
     done
     echo ""
     echo "  (use --list to see the build arguments for each configuration)"
@@ -250,12 +249,12 @@ config_count=$(echo "$configs" | wc -l)
 if [[ $LIST_ONLY -eq 1 ]]; then
     echo "Matching configurations ($config_count):"
     echo ""
-    printf "%-12s %-12s %-8s %-15s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER" "ARGUMENTS"
+    printf "%-12s %-13s %-8s %-15s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER" "ARGUMENTS"
     echo "-----------------------------------------------------------------------"
     for config in $configs; do
         parse_config "$config"
         args=$(build_args "$CFG_VERSION" "$CFG_VENDOR" "$CFG_SOM" "$CFG_CARRIER")
-        printf "%-12s %-12s %-8s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "${CFG_SOM:--}" "$CFG_CARRIER" "$args"
+        printf "%-12s %-13s %-8s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "${CFG_SOM:--}" "$CFG_CARRIER" "$args"
     done
     exit 0
 fi
@@ -432,28 +431,28 @@ display_status() {
         if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
             local status=$(cat "$status_file" 2>/dev/null || echo "...")
             status="${status:0:30}"
-            printf "\033[K  ${BLUE}[Running]${NC} %-12s %-10s %-6s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display" "$status"
+            printf "\033[K  ${BLUE}[Running]${NC} %-12s %-13s %-6s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display" "$status"
         else
             # Job finished or finishing - check result
             local status=$(cat "$status_file" 2>/dev/null || echo "")
             if [[ "$status" == "Done" ]]; then
-                printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
+                printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-13s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
             elif [[ "$status" == "FAILED" ]]; then
-                printf "\033[K  ${RED}[Failed]${NC}  %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
+                printf "\033[K  ${RED}[Failed]${NC}  %-12s %-13s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
             elif [[ -z "$status" ]]; then
-                printf "\033[K  ${YELLOW}[Pending]${NC} %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
+                printf "\033[K  ${YELLOW}[Pending]${NC} %-12s %-13s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
             else
                 # Process died but status file has intermediate message
                 # Check log file for final result (may still be writing)
                 local log_file="${job_logs[$i]}"
                 if grep -q "\[SUCCESS\]" "$log_file" 2>/dev/null; then
-                    printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
+                    printf "\033[K  ${GREEN}[Done]${NC}    %-12s %-13s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
                 elif grep -q "\[FAILED\]" "$log_file" 2>/dev/null; then
-                    printf "\033[K  ${RED}[Failed]${NC}  %-12s %-10s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
+                    printf "\033[K  ${RED}[Failed]${NC}  %-12s %-13s %-6s %-15s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display"
                 else
                     # Still finishing, show as running with last known status
                     status="${status:0:30}"
-                    printf "\033[K  ${BLUE}[Running]${NC} %-12s %-10s %-6s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display" "$status"
+                    printf "\033[K  ${BLUE}[Running]${NC} %-12s %-13s %-6s %-15s %s\n" "$CFG_VERSION" "$CFG_VENDOR" "$som_display" "$carrier_display" "$status"
                 fi
             fi
         fi
@@ -507,7 +506,7 @@ else
 
     # Print initial status lines (header + one per job)
     echo "Jobs status:"
-    printf "  %-10s %-12s %-10s %-6s %-15s %s\n" "STATUS" "VERSION" "VENDOR" "SOM" "CARRIER" "STEP"
+    printf "  %-10s %-12s %-13s %-6s %-15s %s\n" "STATUS" "VERSION" "VENDOR" "SOM" "CARRIER" "STEP"
     for config in "${job_configs[@]}"; do
         echo ""  # Placeholder line for each job
     done

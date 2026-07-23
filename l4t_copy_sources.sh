@@ -1,19 +1,22 @@
 #!/bin/bash
 #******************************************************************************
-# l4t_copy_sources.sh - Copy Exosens camera sources and generate patches
+# l4t_copy_sources.sh - Copy Exosens camera sources into the L4T environment
 #
-# This script copies source files to the L4T environment and automatically
-# generates patch files for all modifications.
+# Sources are copied in layers (common -> version-specific -> SoM -> vendor ->
+# carrier); when several layers touch the same file a 3-way merge is performed
+# with the pristine Nvidia BSP as common ancestor. A conflict is treated as a
+# FATAL error and aborts the run (see merge_copy()): it previously fell back to
+# `git merge-file --union`, which silently duplicated both sides — fine for
+# additive Makefiles, wrong and invisible for C sources.
 #
 # The script is FULLY GENERIC:
 #   - Git repo is created automatically if it doesn't exist
 #   - .gitignore is generated dynamically based on copied files
-#   - Patches are generated dynamically based on modified directories
 #
-# After generating patches, this script validates them by:
-#   1. Resetting git to clean state
-#   2. Applying patches using l4t_patch_sources.sh
-#   3. Verifying the result matches the original source copy
+# NOTE: patch generation (patches/<version>.patch) has been disabled — see the
+# commented-out "Step 5" block near the end of this file for the two reasons
+# (vendor source confidentiality, and staleness/drift). The source of truth is
+# sources/<version>/ + sources/common/.
 #
 # Usage:
 #   ./l4t_copy_sources.sh -v <version> [-V <vendor>] [-c <carrier-board>]
@@ -40,8 +43,28 @@ NC='\033[0m' # No Color
 
 L4T_DIR="$JETSON_DIR/${LINUX_FOR_TEGRA_DIR}"
 
+# Pre-resolved merge results for this version+vendor.
+#
+# When two layers change the same region of a file the 3-way merge conflicts
+# and aborts the run (see merge_copy). For the handful of files where the
+# overlap is genuine and must be resolved by hand, a resolved copy can be
+# placed here and it replaces the merge outright.
+#
+# These live under archives/ rather than in sources/ for two reasons: a
+# resolved file necessarily embeds the vendor's own code (confidential for
+# some vendors, hence never committable), and archives/ is both gitignored and
+# never wiped by a build — unlike the vendor source layer, which is
+# regenerated from the vendor archive on every --prepare.
+#
+# Layout: archives/<VENDOR>/merge-resolved/<version>/<path-relative-to-L4T_DIR>
+# Each resolved file has a .provenance sidecar recording the SHA-256 of the two
+# sides it was resolved from; if either side changes the resolution is stale and
+# the run aborts rather than silently using it (see merge_copy).
+RESOLVED_ROOT="$ARCHIVE_DIR/$(echo "$VENDOR" | tr '[:lower:]' '[:upper:]')/merge-resolved/$L4T_VERSION"
+
 # Temporary file to collect all destination paths
 DEST_PATHS_FILE=$(mktemp)
+
 trap "rm -f $DEST_PATHS_FILE" EXIT
 
 # Note: VENDOR_SOURCE_DIR is set by environment (e.g., Linux_for_Tegra_forecr)
@@ -72,7 +95,6 @@ merge_copy() {
 
    local merge_count=0
    local copy_count=0
-   local conflict_count=0
 
    [[ "$verbose" == "1" ]] && echo "Copying from $src_dir..."
 
@@ -95,11 +117,11 @@ merge_copy() {
          esac
       fi
 
-      # Vendored binary kernel/nvidia-oot headers (tools/extract_cti.sh), tens
+      # Vendored binary kernel/nvidia-oot headers (tools/extract_cti_headers.sh), tens
       # of thousands of files (~200MB) — never git-tracked EG source, and far
       # too many files for this per-file merge_copy/.gitignore mechanism
       # (designed for small curated patch sets). l4t_build.sh reads them
-      # directly from sources/<ver>/Linux_for_Tegra_cti/ instead; they must
+      # directly from sources/<ver>/Linux_for_Tegra_cti_pristine/ instead; they must
       # never be copied into the working tree at all.
       case "$rel_path" in
          cti-kdir/*|cti-oot-headers/*)
@@ -125,6 +147,47 @@ merge_copy() {
          if sudo git -C "$L4T_DIR" show HEAD:"$git_path" > "$base_tmp" 2>/dev/null && [[ -s "$base_tmp" ]]; then
             # Check if dest was modified from BSP by a previous layer
             if ! diff -q "$dest_file" "$base_tmp" &>/dev/null; then
+
+               # Hand-resolved override for this file? Use it instead of
+               # merging — but only if it was resolved from exactly these two
+               # sides, otherwise it is stale and must be redone.
+               local resolved="$RESOLVED_ROOT/$git_path"
+               if [[ -f "$resolved" ]]; then
+                  local prov="${resolved}.provenance"
+                  local want_ours want_theirs
+                  want_ours=$(sha256sum < "$dest_file" | cut -d' ' -f1)
+                  want_theirs=$(sha256sum < "$src_file" | cut -d' ' -f1)
+                  local got_ours got_theirs
+                  got_ours=$(sed -n 's/^ours: //p'   "$prov" 2>/dev/null)
+                  got_theirs=$(sed -n 's/^theirs: //p' "$prov" 2>/dev/null)
+
+                  if [[ "$want_ours" == "$got_ours" && "$want_theirs" == "$got_theirs" ]]; then
+                     sudo cp "$resolved" "$dest_file"
+                     merge_count=$((merge_count + 1))
+                     rm -f "$base_tmp"
+                     [[ "$verbose" == "1" ]] && echo -e "  ${BLUE}RESOLVED${NC}: $git_path"
+                     continue
+                  fi
+
+                  rm -f "$base_tmp"
+                  echo "" >&2
+                  echo -e "${RED}============================================${NC}" >&2
+                  echo -e "${RED}ERROR: stale hand-resolved merge — aborting${NC}" >&2
+                  echo -e "${RED}============================================${NC}" >&2
+                  echo "  File:     $git_path" >&2
+                  echo "  Resolved: ${resolved#$ROOT_DIR/}" >&2
+                  echo "" >&2
+                  [[ "$want_ours"   != "$got_ours"   ]] && echo "  The EG side changed since the resolution was made." >&2
+                  [[ "$want_theirs" != "$got_theirs" ]] && echo "  The vendor side changed since the resolution was made." >&2
+                  echo "" >&2
+                  echo "  Redo the resolution against the current sides, then update" >&2
+                  echo "  ${prov#$ROOT_DIR/}" >&2
+                  echo "  with:" >&2
+                  echo "    ours: $want_ours" >&2
+                  echo "    theirs: $want_theirs" >&2
+                  exit 1
+               fi
+
                # Dest has prior modifications - 3-way merge
                local merge_tmp=$(mktemp)
                cp "$dest_file" "$merge_tmp"
@@ -133,12 +196,46 @@ merge_copy() {
                   merge_count=$((merge_count + 1))
                   [[ "$verbose" == "1" ]] && echo -e "  ${GREEN}MERGED${NC}: $git_path"
                else
-                  # Merge had conflicts - retry with --union (include both sides)
-                  cp "$dest_file" "$merge_tmp"
-                  git merge-file --union -q "$merge_tmp" "$base_tmp" "$src_file" 2>/dev/null
-                  sudo cp "$merge_tmp" "$dest_file"
-                  merge_count=$((merge_count + 1))
-                  [[ "$verbose" == "1" ]] && echo -e "  ${YELLOW}MERGED (union)${NC}: $git_path"
+                  # Merge conflict → FATAL.
+                  #
+                  # This used to be force-resolved with `git merge-file
+                  # --union`, which keeps BOTH sides of the conflicting hunk
+                  # back to back with no markers. That is right for the
+                  # additive files this was designed for (a Makefile where one
+                  # layer adds `obj-m += a.o` and another `obj-m += b.o`), but
+                  # almost always WRONG for C code: the two versions get
+                  # duplicated, which usually still compiles and then misbehaves
+                  # silently (e.g. two identical entries in
+                  # camera_common_color_fmts[], where lookups return whichever
+                  # comes first). Silently shipping that is worse than failing.
+                  #
+                  # The conflicted merge (with <<<<<<< markers) is written next
+                  # to the destination file so the conflict can be inspected.
+                  # $dest_file itself is left untouched.
+                  local conflict_file="${dest_file}.merge-conflict"
+                  sudo cp "$merge_tmp" "$conflict_file"
+                  local nhunks
+                  nhunks=$(grep -c '^<<<<<<<' "$merge_tmp" 2>/dev/null || echo "?")
+                  rm -f "$merge_tmp" "$base_tmp"
+
+                  echo "" >&2
+                  echo -e "${RED}============================================${NC}" >&2
+                  echo -e "${RED}ERROR: 3-way merge conflict — aborting${NC}" >&2
+                  echo -e "${RED}============================================${NC}" >&2
+                  echo "  File:      $git_path" >&2
+                  echo "  Conflicts: $nhunks hunk(s)" >&2
+                  echo "  Incoming:  ${src_file#$ROOT_DIR/}" >&2
+                  echo "  Conflicted merge written to:" >&2
+                  echo "    ${conflict_file#$JETSON_DIR/}" >&2
+                  echo "" >&2
+                  echo "  Two layers changed the same region of this file and the change" >&2
+                  echo "  cannot be combined automatically. Resolve it by adapting the EG" >&2
+                  echo "  source so it no longer overlaps the other layer's change:" >&2
+                  echo "    sources/common/... or sources/$L4T_VERSION/..." >&2
+                  echo "" >&2
+                  echo "  Do NOT edit the build tree directly — it is regenerated on every" >&2
+                  echo "  --copy-sources run." >&2
+                  exit 1
                fi
                rm -f "$merge_tmp" "$base_tmp"
                continue
@@ -184,7 +281,7 @@ analyze_copy() {
       # Get relative path from source dir
       local relpath="${filepath#$src_dir/}"
 
-      # Vendored binary kernel/nvidia-oot headers (tools/extract_cti.sh) — see
+      # Vendored binary kernel/nvidia-oot headers (tools/extract_cti_headers.sh) — see
       # matching skip in merge_copy(). Never tracked/copied into the working
       # tree; excluded here too so the .gitignore-tracked-paths pass doesn't
       # walk tens of thousands of vendor files for nothing.
@@ -516,43 +613,65 @@ echo ""
 echo "  Copy complete"
 
 
-# For 32.x the SoM (t210/t186) is not included in L4T_VERSION_EXTENDED — add it explicitly
-PATCH_NAME="${L4T_VERSION_EXTENDED}${SOM_BOARD:+_${SOM_BOARD}}"
-PATCH_FILE="$ROOT_DIR/patches/${PATCH_NAME}.patch"
-mkdir -p "$ROOT_DIR/patches"
-
-update_status "Generating patch..."
-echo ""
-echo "============================================"
-echo "Generating patch for L4T ${L4T_VERSION_EXTENDED}"
-echo "  Output: patches/${PATCH_NAME}.patch"
-echo "============================================"
-
-cd "$L4T_DIR"
-
-# Mark new (untracked) files as intent-to-add so they appear in git diff.
-# .git/ is owned by the invoking user (chown applied in Step 3) — no sudo needed.
-git add -N .
-
-# Single unified patch: full Exosens diff vs the original Nvidia BSP commit
-git diff > "$PATCH_FILE"
-
-PATCH_FILES=$(grep -c "^diff --git" "$PATCH_FILE" 2>/dev/null || echo 0)
-PATCH_LINES=$(wc -l < "$PATCH_FILE")
-echo -e "  ${GREEN}${PATCH_NAME}.patch${NC} — ${PATCH_FILES} files, ${PATCH_LINES} lines"
-
 #******************************************************************************
-# Step 6: Show summary of Exosens modifications
-#******************************************************************************
-
-echo ""
-echo "============================================"
-echo "Exosens modifications — ${PATCH_NAME}.patch ($PATCH_FILES files):"
-echo "============================================"
-grep "^diff --git" "$PATCH_FILE" | sed 's|diff --git a/||; s| b/.*||' | head -20
-if [[ $PATCH_FILES -gt 20 ]]; then
-   echo "... and $((PATCH_FILES - 20)) more files"
-fi
+# Step 5: Patch generation — DISABLED (kept for reference, do not re-enable
+#         without addressing both points below)
+#
+# Two independent reasons this is switched off:
+#
+#  1. CONFIDENTIALITY. The generated patch is a full diff of the working tree
+#     against the pristine Nvidia BSP, so for a vendor whose sources are
+#     confidential (Connect Tech: "we generally prefer that our sources are not
+#     published") it would embed that vendor's kernel sources verbatim — in a
+#     file that then gets committed to this repository. See Scenario E in
+#     docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md.
+#
+#  2. STALENESS/DRIFT. The patches/ directory was a recurring source of
+#     problems: the files are generated from whatever sources/ happened to
+#     contain at the time, are trivially out of date afterwards, and were
+#     easily mistaken for a source of truth. The source of truth is, and has
+#     always been, sources/<version>/ + sources/common/ — a fresh
+#     l4t_copy_sources.sh run reproduces the tree exactly.
+#
+# Consequence: l4t_patch_sources.sh (and l4t_make.sh --patch-sources) no longer
+# have any input to work with — use --copy-sources instead.
+#
+# PATCH_NAME="${L4T_VERSION_EXTENDED}${SOM_BOARD:+_${SOM_BOARD}}"
+# PATCH_FILE="$ROOT_DIR/patches/${PATCH_NAME}.patch"
+# mkdir -p "$ROOT_DIR/patches"
+#
+# update_status "Generating patch..."
+# echo ""
+# echo "============================================"
+# echo "Generating patch for L4T ${L4T_VERSION_EXTENDED}"
+# echo "  Output: patches/${PATCH_NAME}.patch"
+# echo "============================================"
+#
+# cd "$L4T_DIR"
+#
+# # Mark new (untracked) files as intent-to-add so they appear in git diff.
+# # .git/ is owned by the invoking user (chown applied in Step 3) — no sudo needed.
+# git add -N .
+#
+# # Single unified patch: full Exosens diff vs the original Nvidia BSP commit
+# git diff > "$PATCH_FILE"
+#
+# PATCH_FILES=$(grep -c "^diff --git" "$PATCH_FILE" 2>/dev/null || echo 0)
+# PATCH_LINES=$(wc -l < "$PATCH_FILE")
+# echo -e "  ${GREEN}${PATCH_NAME}.patch${NC} — ${PATCH_FILES} files, ${PATCH_LINES} lines"
+#
+# #*****************************************************************************
+# # Step 6: Show summary of Exosens modifications
+# #*****************************************************************************
+#
+# echo ""
+# echo "============================================"
+# echo "Exosens modifications — ${PATCH_NAME}.patch ($PATCH_FILES files):"
+# echo "============================================"
+# grep "^diff --git" "$PATCH_FILE" | sed 's|diff --git a/||; s| b/.*||' | head -20
+# if [[ $PATCH_FILES -gt 20 ]]; then
+#    echo "... and $((PATCH_FILES - 20)) more files"
+# fi
 
 update_status "Done"
 echo ""

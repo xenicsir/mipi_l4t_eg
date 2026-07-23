@@ -90,6 +90,35 @@ get_vendor_pristine_kernel() {
     [[ "$pristine" == "true" ]] && echo "1" || echo ""
 }
 
+# Whether a vendor's required archive is available.
+#
+# Some vendors need an archive we cannot download (confidential vendor sources
+# with no url — see versions.<ver>.sources.<key> in eg_config.yaml). When it is
+# missing, the configuration is skipped by enumerate_configs rather than
+# building a package that would silently lack the vendor's sources.
+#
+# The pre-computed delta cache (<name>_eg-delta.tgz, produced by
+# tools/extract_cti_sources.sh) satisfies the requirement on its own: it is all
+# the build actually consumes, and it lets a machine build without holding the
+# multi-GB source archive.
+#
+# Args: version, vendor.  Returns 0 if usable (or if none required), 1 if not.
+vendor_archive_available() {
+    local version="$1" vendor="$2"
+    local key
+    key=$($_EGCFG "vendor.$vendor.requires_archive" "$L4T_CONFIG_FILE" 2>/dev/null)
+    [[ -z "$key" ]] && return 0
+
+    local fname
+    fname=$($_EGCFG "version.$version.sources.$key.filename" "$L4T_CONFIG_FILE" 2>/dev/null)
+    [[ -z "$fname" ]] && return 1
+
+    local dir="${ARCHIVE_DIR:-$L4T_ENV_DIR/archives}/$(echo "$key" | tr '[:lower:]' '[:upper:]')"
+    [[ -f "$dir/$fname" ]] && return 0
+    [[ -f "$dir/${fname%.tgz}_eg-delta.tgz" ]] && return 0
+    return 1
+}
+
 # Check if configuration requires standalone build
 # Args: version, vendor, carrier
 # Reads from versions.$version.standalone.$vendor.$carrier in JSON config
@@ -260,6 +289,7 @@ enumerate_configs() {
                             continue
                         fi
                     fi
+                    vendor_archive_available "$version" "$vendor" || continue
                     for carrier in $carriers; do
                         echo "${version}:${vendor}:${som}:${carrier}"
                     done
@@ -277,6 +307,16 @@ enumerate_configs() {
                     else
                         continue
                     fi
+                fi
+                if ! vendor_archive_available "$version" "$vendor"; then
+                    # Explicitly asked for by name: say why nothing came out,
+                    # instead of silently producing an empty configuration list.
+                    if [[ -n "$vendor_filter" ]]; then
+                        echo "Error: vendor '$vendor' for L4T $version requires an archive that is not present." >&2
+                        echo "  Expected under archives/$(echo "$key" | tr '[:lower:]' '[:upper:]')/ — see versions.$version.sources in eg_config.yaml." >&2
+                        echo "  This archive is confidential and never downloaded automatically; place it there manually." >&2
+                    fi
+                    continue
                 fi
                 for carrier in $carriers; do
                     echo "${version}:${vendor}::${carrier}"
@@ -647,8 +687,11 @@ load_version_config() {
     # CTI archive (vendor cti only — meaning depends on pristine_kernel, see
     # eg_config.yaml comment). Absent for every other version/vendor, so
     # default to empty rather than letting egcfg.py fail the whole call.
-    CTI_ARCHIVE=$($_EGCFG "$src_prefix.cti.filename" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
-    CTI_ARCHIVE_URL=$($_EGCFG "$src_prefix.cti.url" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+    # Keyed by vendor name: each CTI variant has its own archive
+    # (cti_pristine -> public BSP headers with a url; cti -> confidential GPL
+    # sources with none). Empty for every other version/vendor.
+    VENDOR_ARCHIVE=$($_EGCFG "$src_prefix.$VENDOR.filename" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+    VENDOR_ARCHIVE_URL=$($_EGCFG "$src_prefix.$VENDOR.url" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
 
     # Toolchain
     JETSON_TOOLCHAIN_ARCHIVE=$($_EGCFG "version.$version.toolchain.archive" "$L4T_CONFIG_FILE")

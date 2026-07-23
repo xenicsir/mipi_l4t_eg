@@ -9,7 +9,6 @@
 # Supported commands:
 #   l4t_prepare.sh
 #   l4t_copy_sources.sh
-#   l4t_patch_sources.sh
 #   l4t_build.sh
 #   l4t_gen_delivery_package.sh
 #   l4t_verify_packages.sh
@@ -32,8 +31,8 @@ _l4t_init_completion() {
     fi
     # Fallback defaults if no configuration file
     _l4t_versions="${_l4t_versions:-32.7.1 32.7.4 32.7.5 32.7.6 35.1 35.3.1 35.4.1 35.5.0 35.6.0 35.6.1 35.6.2 35.6.4 36.4 36.4.3 36.4.4 36.5.0 39.2}"
-    _l4t_vendors="${_l4t_vendors:-generic forecr}"
-    _l4t_carrier_boards="${_l4t_carrier_boards:-generic dsboard_ornxs}"
+    _l4t_vendors="${_l4t_vendors:-generic forecr cti cti_pristine}"
+    _l4t_carrier_boards="${_l4t_carrier_boards:-generic dsboard_ornxs hadron_dm}"
     _l4t_soms="${_l4t_soms:-t210 t186}"
 }
 
@@ -70,11 +69,11 @@ _l4t_common_completion() {
             ;;
         l4t_build_all.sh)
             # l4t_build_all.sh has different options
-            common_opts="-p --package-version --from-scratch --patches-only -h --help"
+            common_opts="-p --package-version --from-scratch -h --help"
             ;;
         l4t_make.sh)
             # l4t_make.sh master orchestration script
-            extra_opts="-p --package-version --standalone --no-verify-dtsi --archive-dir --delivery-dir --prepare --copy-sources --patch-sources --build --gen-package --from-scratch --abort-on-error --continue-on-error --dry-run --list"
+            extra_opts="-p --package-version --standalone --no-verify-dtsi --archive-dir --delivery-dir --prepare --copy-sources --build --gen-package --from-scratch --abort-on-error --continue-on-error --dry-run --list"
             ;;
     esac
 
@@ -123,7 +122,6 @@ _l4t_common_completion() {
 # Register completions for all l4t scripts
 complete -F _l4t_common_completion l4t_prepare.sh
 complete -F _l4t_common_completion l4t_copy_sources.sh
-complete -F _l4t_common_completion l4t_patch_sources.sh
 complete -F _l4t_common_completion l4t_build.sh
 complete -F _l4t_common_completion l4t_gen_delivery_package.sh
 complete -F _l4t_common_completion l4t_verify_packages.sh
@@ -133,7 +131,6 @@ complete -F _l4t_common_completion l4t_make.sh
 # Also support calling scripts with ./
 complete -F _l4t_common_completion ./l4t_prepare.sh
 complete -F _l4t_common_completion ./l4t_copy_sources.sh
-complete -F _l4t_common_completion ./l4t_patch_sources.sh
 complete -F _l4t_common_completion ./l4t_build.sh
 complete -F _l4t_common_completion ./l4t_gen_delivery_package.sh
 complete -F _l4t_common_completion ./l4t_verify_packages.sh
