@@ -196,22 +196,38 @@ merge_copy() {
                   merge_count=$((merge_count + 1))
                   [[ "$verbose" == "1" ]] && echo -e "  ${GREEN}MERGED${NC}: $git_path"
                else
-                  # Merge conflict → FATAL.
+                  # Merge conflict. What to do depends on the file type.
                   #
-                  # This used to be force-resolved with `git merge-file
-                  # --union`, which keeps BOTH sides of the conflicting hunk
-                  # back to back with no markers. That is right for the
-                  # additive files this was designed for (a Makefile where one
-                  # layer adds `obj-m += a.o` and another `obj-m += b.o`), but
-                  # almost always WRONG for C code: the two versions get
-                  # duplicated, which usually still compiles and then misbehaves
-                  # silently (e.g. two identical entries in
-                  # camera_common_color_fmts[], where lookups return whichever
-                  # comes first). Silently shipping that is worse than failing.
+                  # Additive list files (Makefile / Kconfig / defconfig) are
+                  # exactly what this layered copy was designed for: two layers
+                  # append to the same list (e.g. EG adds its camera dtbo-y
+                  # entries while a vendor adds its own board dtb-y entries),
+                  # and they collide only because both insert at the same spot.
+                  # `git merge-file --union` keeps BOTH sides, which is the
+                  # intended, correct result — no duplication, no overlap.
                   #
-                  # The conflicted merge (with <<<<<<< markers) is written next
-                  # to the destination file so the conflict can be inspected.
-                  # $dest_file itself is left untouched.
+                  # Everything else (C sources, headers, DTS/DTSI) is code:
+                  # union there would silently duplicate logic (e.g. two
+                  # identical entries in camera_common_color_fmts[], where
+                  # lookups return whichever comes first) — it usually still
+                  # compiles and then misbehaves. For those, a conflict is
+                  # FATAL; resolve it by hand (see the .merge-resolved
+                  # mechanism above) or by adapting the EG source.
+                  case "$git_path" in
+                     */Makefile|*/Kconfig|*/Kconfig.*|*/defconfig|*_defconfig)
+                        cp "$dest_file" "$merge_tmp"
+                        git merge-file --union -q "$merge_tmp" "$base_tmp" "$src_file" 2>/dev/null
+                        sudo cp "$merge_tmp" "$dest_file"
+                        merge_count=$((merge_count + 1))
+                        [[ "$verbose" == "1" ]] && echo -e "  ${YELLOW}MERGED (union)${NC}: $git_path"
+                        rm -f "$merge_tmp" "$base_tmp"
+                        continue
+                        ;;
+                  esac
+
+                  # Code file → fatal. The conflicted merge (with <<<<<<<
+                  # markers) is written next to the destination for
+                  # inspection; $dest_file itself is left untouched.
                   local conflict_file="${dest_file}.merge-conflict"
                   sudo cp "$merge_tmp" "$conflict_file"
                   local nhunks

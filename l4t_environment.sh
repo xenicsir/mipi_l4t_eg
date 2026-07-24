@@ -138,6 +138,19 @@ get_carrier_defconfig() {
     $_EGCFG "carrier.$carrier.defconfig" "$L4T_CONFIG_FILE"
 }
 
+# Optional per-vendor defconfig OVERRIDE. Empty for almost every vendor: the
+# defconfig is normally per-carrier (Forecr has several boards, one defconfig
+# each). This exists only for the case where two vendors share one carrier but
+# need different defconfigs — e.g. cti (builds from vendor sources, uses CTI's
+# own cti_tegra_defconfig) vs cti_pristine (precompiled kernel, headers only,
+# does NOT ship that file) both on hadron_dm. Set on the vendor, it wins over
+# the carrier; unset, the carrier value is used. See the defconfig note in
+# Scenario C of MIPI_DRIVER_DEVELOPMENT_GUIDE.md.
+get_vendor_defconfig() {
+    local vendor="$1"
+    $_EGCFG "vendor.$vendor.defconfig" "$L4T_CONFIG_FILE" 2>/dev/null || echo ""
+}
+
 # Get directory suffix for a carrier
 get_carrier_dir_suffix() {
     local carrier="$1"
@@ -777,8 +790,15 @@ compute_derived_vars() {
     PRISTINE_KERNEL=$(get_vendor_pristine_kernel "$VENDOR")
     export PRISTINE_KERNEL
 
-    # Kernel defconfig: SoM takes priority over carrier
+    # Kernel defconfig priority: SoM (32.x) > vendor override > carrier.
+    # The vendor override sits between the two so a vendor that builds from its
+    # own sources (cti) can pin its own defconfig on a carrier it shares with
+    # another vendor (cti_pristine), without disturbing the per-carrier scheme
+    # every other vendor relies on. SoM still wins (32.x t210/t186 case).
     KERNEL_DEFCONFIG=$(get_som_defconfig "$SOM_BOARD")
+    if [[ -z "$KERNEL_DEFCONFIG" ]]; then
+        KERNEL_DEFCONFIG=$(get_vendor_defconfig "$VENDOR")
+    fi
     if [[ -z "$KERNEL_DEFCONFIG" ]]; then
         KERNEL_DEFCONFIG=$(get_carrier_defconfig "$CARRIER_BOARD")
     fi

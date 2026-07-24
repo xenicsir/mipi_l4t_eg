@@ -21,6 +21,7 @@ Queries:
   vendor.NAME.default_carrier       default carrier for a vendor
   vendor.NAME.pristine_kernel       "true" or "false"
   vendor.NAME.requires_archive      sources key that must exist, or empty
+  vendor.NAME.defconfig             per-vendor defconfig override, or empty
   carrier.NAME.defconfig            defconfig for a carrier
   carrier.NAME.dir_suffix           dir_suffix for a carrier
   som.NAME.defconfig                defconfig for a SoM
@@ -113,6 +114,8 @@ def query(cfg, q):
             return 'true' if v.get('pristine_kernel', False) else 'false'
         if rest == ['requires_archive']:
             return v.get('requires_archive', '')
+        if rest == ['defconfig']:
+            return v.get('defconfig', '')
 
     # carrier.NAME.*
     if parts[0] == 'carrier' and len(parts) == 3:

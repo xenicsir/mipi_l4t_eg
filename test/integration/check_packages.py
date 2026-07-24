@@ -92,7 +92,16 @@ def load_vendors():
         for carrier in spec.get("carriers", []):
             suffix = cfg["carriers"].get(carrier, {}).get("dir_suffix", "")
             if suffix:
-                infixes[f"{vendor}-{suffix.replace('_', '-')}"] = vendor
+                # l4t_gen_delivery_package.sh maps EVERY underscore in the .deb
+                # name to a dash (DEB_PACKAGE_NAME="${PACKAGE_NAME//_/-}"), so the
+                # vendor part must be dashed too — not just the carrier suffix.
+                # A vendor whose own name has an underscore (cti_pristine) would
+                # otherwise never match its .deb ("cti-pristine-hadron-dm") and
+                # get misclassified as generic, dragging its (legitimately
+                # iLumos/Microlynx-free, being pristine) package into the generic
+                # group and failing that group's .ko checks.
+                infix = f"{vendor}-{suffix}".replace('_', '-')
+                infixes[infix] = vendor
     return infixes, pristine
 
 

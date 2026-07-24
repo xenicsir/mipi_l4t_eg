@@ -489,6 +489,15 @@ vendors:
     # than failing, or worse, silently producing a package without the vendor
     # sources). Names a key under versions.<ver>.sources.
     requires_archive: cti
+    # Build with CTI's own kernel defconfig, not the generic one. It ships in
+    # CTI's extracted sources (arch/arm64/configs/cti_tegra_defconfig) and is
+    # already in the build tree after --copy-sources. Without this, the generic
+    # defconfig leaves BLK_DEV_NVME and PCIE_TEGRA194_HOST as modules (CTI has
+    # them =y): the NVMe rootfs is then mounted by the initramfs ~26 s later
+    # than by CTI's own kernel. Per-vendor override (wins over the carrier) —
+    # NOT set on cti_pristine, which has no kernel sources and only builds a
+    # throwaway generic kernel anyway. See l4t_environment.sh / Scenario C.
+    defconfig: cti_tegra_defconfig
   # cti_pristine — CTI's precompiled kernel/nvidia-oot, which we cannot
   # rebuild: our framework patches (camera_common.c, channel.c,
   # vi5_formats.h...) can't be applied, only our own two .ko are recompiled

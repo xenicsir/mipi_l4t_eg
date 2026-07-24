@@ -516,7 +516,48 @@ dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dtbo
 # ... all camera type overlays
 ```
 
-2. **For vendor boards**: add vendor-specific defconfigs if kernel config differs
+2. **For vendor boards: build with the VENDOR's defconfig, not NVIDIA's generic one.**
+   A vendor that builds its own kernel almost always ships its own defconfig
+   (e.g. `dsboard_ornx_defconfig`, `cti_tegra_defconfig`). Building with the
+   generic `defconfig` instead produces a kernel that *boots* but behaves
+   subtly wrong — the vendor typically enables board-critical drivers as
+   **built-in** (`=y`) where the generic config leaves them as modules (`=m`).
+
+   > **Real case (CTI Hadron DM, 2026-07-24):** the `cti` build used the generic
+   > `defconfig` instead of `cti_tegra_defconfig`. CTI has `BLK_DEV_NVME=y` and
+   > `PCIE_TEGRA194_HOST=y` (built-in); the generic config has both `=m`. Result:
+   > the NVMe rootfs was ready at 4.5 s but the initramfs took until 32.5 s to
+   > mount it — **+26 s of boot time** — because the root driver was a module the
+   > initramfs had to load, instead of being in the kernel. Also diverged:
+   > AppArmor, Bluetooth, ~114 config lines total. `v4l2`/camera worked either
+   > way, which is why it passed functional tests — boot *timing* was the only
+   > visible symptom.
+
+   Where the vendor defconfig comes from depends on how its sources arrive:
+   - **Vendor ships a defconfig file you commit** (Forecr): put it under
+     `Linux_for_Tegra_<vendor>/.../configs/` and reference it by name (Step 3).
+     `l4t_build.sh` merges the EG `CONFIG_VIDEO_*` options into it.
+   - **Vendor defconfig comes from extracted vendor sources** (CTI non-pristine):
+     it is already in the build tree after `--copy-sources` (e.g.
+     `arch/arm64/configs/cti_tegra_defconfig`), so just reference it by name.
+
+   ⚠️ **The defconfig is normally PER-CARRIER — keep it that way.** Forecr has
+   several boards (dsboard_ornxs, milboard_ornx, raiboard_ornx, …), each a
+   distinct carrier with its **own** defconfig; moving that to the vendor level
+   would collapse them into one and break the multi-board builds. Do **not**
+   make the defconfig a plain per-vendor field.
+
+   The exception is one carrier built by **two vendors that need different
+   defconfigs**: CTI's `hadron_dm` is built as `cti` (from vendor sources, has
+   `cti_tegra_defconfig`) and as `cti_pristine` (precompiled kernel, headers
+   only, **does not** contain that file). Putting `cti_tegra_defconfig` on the
+   carrier would break the `cti_pristine` build (missing file). The right shape
+   is an **optional per-vendor override that wins over the carrier's defconfig
+   only when set** — forecr sets none (stays fully carrier-driven, multi-board
+   intact), `cti` sets `cti_tegra_defconfig`, `cti_pristine` sets none (falls
+   back to the carrier's generic `defconfig`, which only needs to compile a
+   throwaway kernel anyway). See `KERNEL_DEFCONFIG` resolution in
+   `l4t_environment.sh`.
 
 3. **Update `eg_config.yaml`** to register the new vendor/carrier board and its DTSI:
 
@@ -690,9 +731,27 @@ carriers:
     # arch/arm64/configs/ — don't assume "tegra_defconfig" (that's a
     # 32.x/35.x convention; 36.x kernel-jammy-src typically just uses
     # "defconfig"). Don't guess, check.
+    #
+    # The defconfig is per-carrier (Forecr: one per board). This stays the
+    # authoritative value for almost everything. The ONE exception is a carrier
+    # built by two vendors needing different defconfigs (cti vs cti_pristine on
+    # hadron_dm): that is handled by an optional per-vendor OVERRIDE that wins
+    # only when set (see Scenario C step 2), NOT by moving the field to the
+    # vendor. This carrier value remains the fallback.
+    # Verify the literal name in the real kernel's arch/arm64/configs/ — don't
+    # assume "tegra_defconfig" (32.x/35.x convention; 36.x usually "defconfig").
     defconfig: defconfig
     dir_suffix: <carrier>
 ```
+
+> **Note on the source-built counterpart.** The pristine variant above uses
+> the vendor's precompiled kernel, so its defconfig only needs to *compile* a
+> throwaway generic kernel — `defconfig` is fine. But if you also add a
+> *source-built* variant of the same board (the `cti` vendor is CTI's Hadron DM
+> built from its real kernel sources), that one MUST use the vendor's own
+> defconfig (`cti_tegra_defconfig`, already present in the extracted sources
+> after `--copy-sources`) — see Scenario C step 2 for the full rationale and
+> the CTI boot-time regression it caused.
 
 In the version entry:
 
