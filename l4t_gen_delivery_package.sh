@@ -648,7 +648,33 @@ EOT
 #******************************************************************************
 cat > "$_POSTRM" << 'EOT'
 #!/bin/bash
-depmod
+# A standalone package (e.g. cti) owns its entire /lib/modules/<ver>-eg/ tree;
+# removing it deletes that directory outright when it's the running kernel's,
+# leaving nothing for depmod to scan. Skip rather than fail the removal.
+if [ -d "/lib/modules/$(uname -r)" ]; then
+    depmod
+else
+    echo "Warning: the running kernel's module directory was removed by this uninstall." >&2
+    echo "Reboot into another kernel before running further module/dpkg operations." >&2
+fi
+
+case "$1" in
+    remove|purge)
+        # The JetsonIO entry's FDT/OVERLAYS point at this package's DTB/DTBOs
+        # (see postinst); once those files are gone, JetsonIO can no longer
+        # boot as configured. Point DEFAULT back at the first LABEL in the
+        # file (the stock boot entry) so the system still boots normally.
+        EXTLINUX_CONF="/boot/extlinux/extlinux.conf"
+        if [ -f "$EXTLINUX_CONF" ]; then
+            FIRST_LABEL=$(awk '/^LABEL /{print $2; exit}' "$EXTLINUX_CONF")
+            CURRENT_DEFAULT=$(awk '/^DEFAULT /{print $2; exit}' "$EXTLINUX_CONF")
+            if [[ -n "$FIRST_LABEL" && -n "$CURRENT_DEFAULT" && "$CURRENT_DEFAULT" != "$FIRST_LABEL" ]]; then
+                sed -i "s/^DEFAULT .*/DEFAULT $FIRST_LABEL/" "$EXTLINUX_CONF"
+                echo "Set DEFAULT boot entry to '$FIRST_LABEL' in $EXTLINUX_CONF (was '$CURRENT_DEFAULT')."
+            fi
+        fi
+        ;;
+esac
 EOT
 
 #******************************************************************************
