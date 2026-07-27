@@ -232,6 +232,8 @@ detect_carrier() {
         vendor="connecttech"; carrier="spacely"; carrier_pn="Spacely (TX2/TX1)"
     elif [[ "$model" =~ "Orbitty" ]]; then
         vendor="connecttech"; carrier="orbitty"; carrier_pn="Orbitty (TX2/TX1 compact)"
+    elif [[ "$model" =~ "Hadron Dual MIPI" ]] || [[ "$dtb" =~ [Cc][Tt][Ii]-NGX024 ]]; then
+        vendor="connecttech"; carrier="hadron-dm"; carrier_pn="Hadron Dual MIPI (Orin NX/Nano)"
     # Auvidea carrier boards
     elif [[ "$model" =~ "X230" ]] || [[ "$dtb" =~ [Aa]uvidea.*[Xx]230 ]] || [[ "$dtb" =~ [Xx]230[Dd] ]]; then
         vendor="auvidea"; carrier="x230d"; carrier_pn="X230D (AGX Orin)"
@@ -367,7 +369,11 @@ detect_board_type() {
 
     # Construct board type
     local board_type=""
-    if [[ "$vendor" == "forecr" ]]; then
+    if [[ "$vendor" == "forecr" || "$carrier" == "hadron-dm" ]]; then
+        # hadron-dm bypasses the vendor-carrier concatenation (like forecr
+        # above) to match EG_FORCE_BOARD's value in the postinst script
+        # (CARRIER_BOARD "hadron_dm" hyphenated), which eg_dt_camera_config_set.sh
+        # compares BOARD against verbatim.
         board_type="$carrier"
     elif [[ "$vendor" != "unknown" && "$vendor" != "nvidia" ]]; then
         board_type="$vendor-$carrier"

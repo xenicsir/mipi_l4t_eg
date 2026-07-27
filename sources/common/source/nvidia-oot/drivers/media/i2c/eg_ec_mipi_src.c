@@ -37,12 +37,19 @@ static const struct of_device_id eg_ec_mipi_of_match[] = {
 MODULE_DEVICE_TABLE(of, eg_ec_mipi_of_match);
 
 enum {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+/*
+ * PRISTINE_KERNEL vendors (e.g. cti) ship a precompiled kernel/nvidia-oot we
+ * don't control: Y16 negotiation needs patches to the shared camera
+ * framework (sensor_common.c, vi5_formats.h...) that can't be applied there,
+ * so RAW16 modes are dropped and the DT overlay is renumbered to match
+ * (see tegra234-p3767-camera-cti-eg-cams-dione.dts / the shared dtsi).
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
    EC_MIPI_MODE_640x480_RAW16,
 #endif
    EC_MIPI_MODE_640x480_RGB888,
    EC_MIPI_MODE_640x480_YUYV,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
    EC_MIPI_MODE_1280x1024_RAW16,
 #endif
    EC_MIPI_MODE_1280x1024_RGB888,
@@ -58,12 +65,12 @@ static const int eg_ec_mipi_60fps[] = {
  * device tree!
  */
 static const struct camera_common_frmfmt eg_ec_mipi_frmfmt[] = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
    {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RAW16},
 #endif
    {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_RGB888},
    {{640, 480},   eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_640x480_YUYV},
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
    {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RAW16},
 #endif
    {{1280, 1024}, eg_ec_mipi_60fps, 1, 0, EC_MIPI_MODE_1280x1024_RGB888},
@@ -673,7 +680,7 @@ static int eg_ec_find_native_mode(u32 width, u32 height, u32 pixfmt)
    /* Determine which mode enum value matches (width, height, pixfmt) */
    if (width == 640 && height == 480) {
       switch (pixfmt) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
          case 20: target_mode = EC_MIPI_MODE_640x480_RAW16; break;
 #endif
          case 21: target_mode = EC_MIPI_MODE_640x480_RGB888; break;
@@ -681,7 +688,7 @@ static int eg_ec_find_native_mode(u32 width, u32 height, u32 pixfmt)
       }
    } else if (width == 1280 && height == 1024) {
       switch (pixfmt) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0) && !defined(PRISTINE_KERNEL)
          case 20: target_mode = EC_MIPI_MODE_1280x1024_RAW16; break;
 #endif
          case 21: target_mode = EC_MIPI_MODE_1280x1024_RGB888; break;
@@ -704,7 +711,19 @@ static const char *eg_ec_pixel_format_name(u32 code)
 {
    switch (code) {
       case 20: return "'Y16 ' (16-bit Greyscale)";
+      /* The camera always transmits RGB888 over CSI-2 — what varies is
+       * which V4L2 fourcc gets used to report it: AB24 on L4T versions
+       * where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
+       * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4,
+       * where NVIDIA's own vi5_formats.h natively moved to RGBA32-only
+       * but EG re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack
+       * 5.x) doesn't recognize the RGBA32 V4L2 fourcc at all (see
+       * vi5_formats_mbus_fix.md in shared memory). */
+#ifdef EG_RGB888_AB24
+      case 21: return "'AB24' (32-bit RGBA 8-8-8-8)";
+#else
       case 21: return "'AR24' (32-bit BGRA 8-8-8-8)";
+#endif
       case 22: return "'YUYV' (YUYV 4:2:2)";
       default: return NULL;
    }
@@ -712,6 +731,17 @@ static const char *eg_ec_pixel_format_name(u32 code)
 
 static const struct v4l2_subdev_internal_ops eg_ec_mipi_subdev_internal_ops = {
    .open = eg_ec_mipi_open,
+};
+
+/*
+ * eg_ec_mipi does raw i2c_master_send/recv via priv->i2c_client, never
+ * regmap_read/write. This config only exists so tegracam_core's
+ * devm_regmap_init_i2c() has a non-NULL config to work with on stock
+ * NVIDIA/vendor kernels that don't carry the EG NULL-config guard.
+ */
+static const struct regmap_config eg_ec_mipi_dummy_regmap_config = {
+   .reg_bits = 8,
+   .val_bits = 8,
 };
 
 #if defined(NV_I2C_DRIVER_STRUCT_PROBE_WITHOUT_I2C_DEVICE_ID_ARG) /* Linux 6.3 */
@@ -880,7 +910,7 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
    priv->i2c_client = tc_dev->client = client;
    tc_dev->dev = dev;
    strncpy(tc_dev->name, "eg_ec_mipi", sizeof(tc_dev->name));
-   tc_dev->dev_regmap_config = NULL;
+   tc_dev->dev_regmap_config = &eg_ec_mipi_dummy_regmap_config;
    tc_dev->sensor_ops = &eg_ec_mipi_common_ops;
    tc_dev->v4l2sd_internal_ops = &eg_ec_mipi_subdev_internal_ops;
    tc_dev->tcctrl_ops = &eg_ec_mipi_ctrl_ops;
@@ -890,7 +920,6 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
       dev_err(dev, "tegra camera driver registration failed\n");
       goto err_camera_register;
    }
-   tc_dev->s_data->i2c_client = client;
    priv->tc_dev = tc_dev;
    priv->s_data = tc_dev->s_data;
    priv->subdev = &tc_dev->s_data->subdev;
@@ -919,9 +948,17 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
                eg_ec_mipi_frmfmt[m].size.height;
 
          switch (priv->native_pixfmt) {
-            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_ABGR32; break;
-            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;   break;
-            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;    break;
+            /* RGB888: force the stock RGB24 entry (same mbus code
+             * RGB888_1X24 as the alpha-padded fourccs VI actually reports
+             * over G_FMT/ENUM_FMT — that's driven solely by vi5_formats.h's
+             * table order, not by this colorfmt) instead of hardcoding an
+             * alpha fourcc that varies by L4T version (ABGR32 pre-35.4.1,
+             * RGBA32 from 35.4.1 on — see [[vi5_formats_mbus_fix]]) and
+             * isn't guaranteed to exist in camera_common_color_fmts[].
+             * Mirrors dione_ir_probe_sensor()'s equivalent force. */
+            case 21:  v4l2_pixfmt = V4L2_PIX_FMT_RGB24; break;
+            case 22:  v4l2_pixfmt = V4L2_PIX_FMT_YUYV;  break;
+            default:  v4l2_pixfmt = V4L2_PIX_FMT_Y16;   break;
          }
          colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
          if (colorfmt)

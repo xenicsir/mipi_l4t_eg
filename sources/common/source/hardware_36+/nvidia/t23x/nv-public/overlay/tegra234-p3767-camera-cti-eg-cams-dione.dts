@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+/dts-v1/;
+/plugin/;
+
+/*
+ * This overlay is shared by BOTH Connect Tech build variants, so it must not
+ * define PRISTINE_KERNEL itself — the build does, via
+ * `DTC_CPP_FLAGS += -DPRISTINE_KERNEL` in the overlay Makefile, gated on the
+ * vendor's pristine_kernel flag in eg_config.yaml:
+ *   cti_pristine — the vendor's precompiled tegra-camera.ko cannot negotiate
+ *     Y16/Y16_BE/Y14, so the Y16 modes of eg_ec_cam are dropped and the
+ *     remaining ones renumbered (see
+ *     tegra234-p3767-camera-common-eg-cams-dione.dtsi); iLumos and Microlynx,
+ *     being Y16-only, are excluded at the Makefile level.
+ *   cti — kernel built from the vendor's own sources with our framework
+ *     patches applied, so Y16 works and every mode stays in place.
+ */
+
+/*
+ * Hadron DM's camera connectors sit behind a real PCA9540 I2C mux chip
+ * (reg 0x70 on cam_i2c/i2c@3180000) rather than the GPIO-toggled mux used
+ * on Forecr/devkit carriers — confirmed by i2cdetect on the real board
+ * (0x70 responds on i2c-2; the GPIO-mux virtual channels saw nothing but
+ * 0x70 bleeding through — no working channel switch). Selects the
+ * chip-based tca9540@70 node instead of cam_i2cmux (i2c-mux-gpio) in the
+ * common dtsi.
+ */
+#define HADRON_DM_CAM_I2C_MUX
+
+/*
+ * CAM0's NVCSI channel@0 (both the sensor-side and VI-side endpoints) is
+ * wired to NVCSI brick A (port-index=0, CSI0_CLK) on Hadron DM — confirmed
+ * directly from the real board's own reference camera device tree: its
+ * channel@0/port@{0,1}/endpoint* and tegra-capture-vi port@0/endpoint all
+ * declare port-index=0. This matches the Forecr DSBOARD-ORNXS routing, not
+ * the plain Nvidia P3768 devkit's (port-index=1, brick B) — see
+ * docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md for the lane-swap/port-index
+ * background. Without this, NVCSI listens on the wrong physical brick and
+ * receives nothing at all (0 FS events) even though the sensor and TC358746
+ * bridge are correctly programmed and streaming.
+ */
+#define CAM0_LANE_SWAP
+
+#include "tegra234-p3767-camera-common-eg-cams-dione.dtsi"
+
+/ {
+	overlay-name = "Exosens Cameras for Connect Tech Hadron DM";
+#ifdef EG_CSI_22PIN
+	jetson-header-name = "Jetson 22pin CSI Connector";
+#else
+	jetson-header-name = "Jetson 24pin CSI Connector";
+#endif
+	compatible = JETSON_COMPATIBLE_P3768;
+};

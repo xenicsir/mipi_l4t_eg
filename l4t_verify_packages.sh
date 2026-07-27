@@ -441,7 +441,15 @@ verify_package() {
         echo "  --- Boot files ---"
     fi
 
-    check_dir "$package_dir/boot/eg" "Boot EG directory"
+    # PRISTINE_KERNEL vendors (e.g. cti) never ship /boot/eg/: their
+    # kernel/nvidia-oot is precompiled and not ours to replace, so that
+    # directory being absent is expected, not an error.
+    local pristine_kernel=$(get_vendor_pristine_kernel "$vendor")
+    if [[ "$pristine_kernel" == "1" ]]; then
+        check_dir "$package_dir/boot/eg" "Boot EG directory (not shipped: PRISTINE_KERNEL vendor)" 0
+    else
+        check_dir "$package_dir/boot/eg" "Boot EG directory"
+    fi
 
     if [[ -d "$package_dir/boot/eg" ]]; then
         if [[ $standalone_build -eq 1 ]]; then
@@ -514,10 +522,56 @@ verify_package() {
             local eg_srcs=()
             while IFS= read -r f; do
                 eg_srcs+=("$(basename "$f" .c)")
-            done < <(find "$SCRIPT_DIR/sources" -path "*/drivers/media/i2c/*.c" 2>/dev/null)
+            done < <(find "$SCRIPT_DIR/sources/common" "$SCRIPT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" \
+                  -path "*/drivers/media/i2c/*.c" 2>/dev/null)
+
+            # Resolve ifdef/ifndef PRISTINE_KERNEL / else / endif for this vendor's
+            # actual value before parsing (same fix as l4t_gen_delivery_package.sh),
+            # so ilumos/microlynx (guarded out for a PRISTINE_KERNEL vendor) aren't
+            # expected in the package just because their obj-m line is still
+            # textually present in the Makefile.
+            local resolved_makefile
+            resolved_makefile=$(PRISTINE_KERNEL="$pristine_kernel" python3 - "$i2c_makefile" <<'PYEOF'
+import os, re, sys
+
+path = sys.argv[1]
+pristine = os.environ.get("PRISTINE_KERNEL") == "1"
+
+IFDEF  = re.compile(r'^\s*ifdef\s+(\S+)')
+IFNDEF = re.compile(r'^\s*ifndef\s+(\S+)')
+ELSE   = re.compile(r'^\s*else\b')
+ENDIF  = re.compile(r'^\s*endif\b')
+
+out = []
+stack = []  # each frame: [tracked: bool, keep: bool]
+for line in open(path):
+    m = IFNDEF.match(line)
+    if m:
+        tracked = m.group(1) == "PRISTINE_KERNEL"
+        stack.append([tracked, (not pristine) if tracked else True])
+        continue
+    m = IFDEF.match(line)
+    if m:
+        tracked = m.group(1) == "PRISTINE_KERNEL"
+        stack.append([tracked, pristine if tracked else True])
+        continue
+    if ELSE.match(line):
+        if stack and stack[-1][0]:
+            stack[-1][1] = not stack[-1][1]
+        continue
+    if ENDIF.match(line):
+        if stack:
+            stack.pop()
+        continue
+    if any(tracked and not keep for tracked, keep in stack):
+        continue
+    out.append(line)
+sys.stdout.write("".join(out))
+PYEOF
+)
 
             local makefile_joined
-            makefile_joined=$(awk '{if(/\\$/) {printf "%s ", substr($0,1,length($0)-1)} else {print}}' "$i2c_makefile")
+            makefile_joined=$(awk '{if(/\\$/) {printf "%s ", substr($0,1,length($0)-1)} else {print}}' <<< "$resolved_makefile")
 
             declare -A _mod_srcs_v
             while IFS= read -r line; do

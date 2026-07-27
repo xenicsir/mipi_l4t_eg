@@ -210,11 +210,18 @@ echo "jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT
 #******************************************************************************
 update_status "Copying boot files..."
 
-# EG kernel and dtbo
-if [[ -d "$ROOTFS_DIR/boot/eg" ]]; then
-   mkdir -p "${PACKAGE_NAME}/boot/eg"
-   sudo rsync -a "$ROOTFS_DIR/boot/eg/"* "${PACKAGE_NAME}/boot/eg/"
-   echo "  Added /boot/eg/"
+# EG kernel and dtbo (Image + initrd-eg). Skipped for PRISTINE_KERNEL vendors
+# (e.g. cti): their kernel/nvidia-oot is precompiled and not ours to replace,
+# so we never ship our own-built Image/initrd — the target keeps booting its
+# own vendor kernel (see config-by-hardware.py's os.path.exists check).
+if [[ "$PRISTINE_KERNEL" != "1" ]]; then
+   if [[ -d "$ROOTFS_DIR/boot/eg" ]]; then
+      mkdir -p "${PACKAGE_NAME}/boot/eg"
+      sudo rsync -a "$ROOTFS_DIR/boot/eg/"* "${PACKAGE_NAME}/boot/eg/"
+      echo "  Added /boot/eg/"
+   fi
+else
+   echo "  Skipped /boot/eg/ (PRISTINE_KERNEL vendor: not shipping our own kernel Image)"
 fi
 
 # EG device tree blobs
@@ -250,14 +257,22 @@ else
    # Standard build: auto-detect Exosens camera modules by cross-referencing
    # the i2c Makefile with .c source files present in sources/ (Exosens-owned).
    # This automatically picks up any new module whose .c is added to sources/.
-   I2C_DRIVER_DIR="kernel/drivers/media/i2c"
+   # 36.x (out-of-tree nvidia-oot) installs modules under .../updates/..., while
+   # 32.x/35.x (in-tree) uses .../kernel/... — matches l4t_verify_packages.sh,
+   # which already made this same distinction.
+   if [[ $L4T_VERSION_MAJOR -ge 36 ]]; then
+      I2C_DRIVER_DIR="updates/drivers/media/i2c"
+   else
+      I2C_DRIVER_DIR="kernel/drivers/media/i2c"
+   fi
    EG_MODULES=()
 
    # Collect Exosens .c source basenames: any .c file under sources/*/drivers/media/i2c/
    EG_SRCS=()
    while IFS= read -r f; do
       EG_SRCS+=("$(basename "$f" .c)")
-   done < <(find "$ROOT_DIR/sources" -path "*/drivers/media/i2c/*.c" 2>/dev/null)
+   done < <(find "$ROOT_DIR/sources/common" "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra" \
+                  -path "*/drivers/media/i2c/*.c" 2>/dev/null)
 
    # The EG module list is always derived from the version-generic Makefile.
    # SoM/vendor/carrier layers contain NVIDIA stock Makefiles (no EG modules)
@@ -272,8 +287,53 @@ else
    if [[ ${#EG_SRCS[@]} -gt 0 && -n "$I2C_MAKEFILE" ]]; then
       echo "  Using i2c Makefile: $I2C_MAKEFILE"
 
+      # Resolve ifdef/ifndef PRISTINE_KERNEL / else / endif for THIS vendor's
+      # actual PRISTINE_KERNEL value before parsing, so e.g. ilumos/microlynx
+      # (guarded out for cti) are never mistaken for modules to package just
+      # because their obj-m line is still textually present in the Makefile.
+      # Other conditionals (ifeq/ifneq/ifdef of anything else) are left as
+      # opaque text — both their branches are kept, matching prior behavior.
+      RESOLVED_MAKEFILE=$(PRISTINE_KERNEL="$PRISTINE_KERNEL" python3 - "$I2C_MAKEFILE" <<'PYEOF'
+import os, re, sys
+
+path = sys.argv[1]
+pristine = os.environ.get("PRISTINE_KERNEL") == "1"
+
+IFDEF  = re.compile(r'^\s*ifdef\s+(\S+)')
+IFNDEF = re.compile(r'^\s*ifndef\s+(\S+)')
+ELSE   = re.compile(r'^\s*else\b')
+ENDIF  = re.compile(r'^\s*endif\b')
+
+out = []
+stack = []  # each frame: [tracked: bool, keep: bool]
+for line in open(path):
+    m = IFNDEF.match(line)
+    if m:
+        tracked = m.group(1) == "PRISTINE_KERNEL"
+        stack.append([tracked, (not pristine) if tracked else True])
+        continue
+    m = IFDEF.match(line)
+    if m:
+        tracked = m.group(1) == "PRISTINE_KERNEL"
+        stack.append([tracked, pristine if tracked else True])
+        continue
+    if ELSE.match(line):
+        if stack and stack[-1][0]:
+            stack[-1][1] = not stack[-1][1]
+        continue
+    if ENDIF.match(line):
+        if stack:
+            stack.pop()
+        continue
+    if any(tracked and not keep for tracked, keep in stack):
+        continue
+    out.append(line)
+sys.stdout.write("".join(out))
+PYEOF
+)
+
       # Join backslash-continuation lines for easier parsing
-      MAKEFILE_JOINED=$(awk '{if(/\\$/) {printf "%s ", substr($0,1,length($0)-1)} else {print}}' "$I2C_MAKEFILE")
+      MAKEFILE_JOINED=$(awk '{if(/\\$/) {printf "%s ", substr($0,1,length($0)-1)} else {print}}' <<< "$RESOLVED_MAKEFILE")
 
       # Build module→sources map from <mod>-objs and <mod>-y assignments
       declare -A _mod_srcs

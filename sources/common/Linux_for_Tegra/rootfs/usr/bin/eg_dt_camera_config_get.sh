@@ -366,6 +366,10 @@ discover_cameras() {
         "1:$dt_base/bus@0/cam_i2cmux/i2c@1"
         "2:$dt_base/bus@0/cam_i2cmux/i2c@2"
         "3:$dt_base/bus@0/cam_i2cmux/i2c@3"
+        # Connect Tech Hadron DM: real PCA9540 chip mux (reg 0x70) on cam_i2c,
+        # not a GPIO mux — see HADRON_DM_CAM_I2C_MUX in the camera dtsi.
+        "0:$dt_base/bus@0/i2c@3180000/tca9540@70/i2c@0"
+        "1:$dt_base/bus@0/i2c@3180000/tca9540@70/i2c@1"
         "0:$dt_base/bus@0/i2c@31e0000"
         "1:$dt_base/bus@0/i2c@c240000"
         "2:$dt_base/bus@0/i2c@c250000"
@@ -644,6 +648,7 @@ else
                         "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
                         "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
                         "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
+                        "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ;;
                         "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
                     esac
                     if [[ -n "$_gstfmt" ]]; then

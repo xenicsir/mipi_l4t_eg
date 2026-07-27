@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+/*
+ * Hadron DM's camera connectors sit behind a real PCA9540 I2C mux chip
+ * (reg 0x70 on cam_i2c/i2c@3180000) rather than the GPIO-toggled mux used
+ * on Forecr/devkit carriers — see
+ * tegra234-p3767-camera-cti-eg-cams-dione.dts for the full rationale.
+ */
+#define HADRON_DM_CAM_I2C_MUX
+
+/*
+ * PRISTINE_KERNEL is deliberately NOT defined here: this overlay serves both
+ * Connect Tech variants and the build passes the macro via DTC_CPP_FLAGS (see
+ * tegra234-p3767-camera-cti-eg-cams-dione.dts). When it is set, the shared
+ * .dtsi below renumbers the EngineCore modes (Y16/RAW16 removed, RGB888/YUYV
+ * shifted down) to match eg_ec_b@16/eg_ec_c@16 as the base dione overlay
+ * actually defines them on that variant.
+ */
+
+#include "tegra234-p3767-camera-p3768-common-eg-cam1-ec-2-lanes.dtsi"
+
+/ {
+	overlay-name = "Exosens Cameras for Connect Tech Hadron DM. CAM1:EC_2_lanes";
+};

@@ -1798,6 +1798,25 @@ static struct tegracam_device *dione_ir_probe_sensor(struct dione_ir *priv)
       priv->subdev = &tc_dev->s_data->subdev;
       tegracam_set_privdata(tc_dev, (void *)priv);
 
+      /* Force s_data->colorfmt to the RGB24 entry instead of leaving it to
+       * be derived later from userspace's S_FMT request. Dione only ever
+       * declares mode_type="rgb"/pixel_phase="rgb888" in DT, which
+       * sensor_common.c's extract_pixel_format() can only turn into
+       * V4L2_PIX_FMT_RGB24 (see "rgb_rgb88824" case) — but ENUM_FMT on
+       * /dev/videoX lists whatever vi5_formats.h offers for this mbus code
+       * instead (RGBA32/XRGB32/RGBX32 on a PRISTINE_KERNEL vendor's
+       * unpatched stock kernel), none of which camera_common_color_fmts[]
+       * maps back to. Forcing the known-good RGB24 entry here — matching
+       * the pattern already used in eg_ec_mipi_src.c for its own native
+       * format — avoids relying on that mismatched round-trip.
+       */
+      {
+         const struct camera_common_colorfmt *colorfmt =
+               camera_common_find_pixelfmt(V4L2_PIX_FMT_RGB24);
+         if (colorfmt)
+            tc_dev->s_data->colorfmt = colorfmt;
+      }
+
       priv->tx_regmap = devm_regmap_init_i2c(priv->tc35_client,
             &tx_regmap_config);
       if (IS_ERR(priv->tx_regmap)) {
@@ -1866,7 +1885,19 @@ static DEVICE_ATTR_RO(resolution);
 static ssize_t pixel_format_show(struct device *dev,
       struct device_attribute *attr, char *buf)
 {
+   /* Dione always transmits RGB888 over CSI-2 (see tc358746_calculation.c) —
+    * what varies is which V4L2 fourcc gets used to report it: AB24 on L4T
+    * versions where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
+    * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4, where
+    * NVIDIA's own vi5_formats.h natively moved to RGBA32-only but EG
+    * re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack 5.x) doesn't
+    * recognize the RGBA32 V4L2 fourcc at all (see vi5_formats_mbus_fix.md
+    * in shared memory). */
+#ifdef EG_RGB888_AB24
+   return scnprintf(buf, PAGE_SIZE, "'AB24' (32-bit RGBA 8-8-8-8)\n");
+#else
    return scnprintf(buf, PAGE_SIZE, "'AR24' (32-bit BGRA 8-8-8-8)\n");
+#endif
 }
 static DEVICE_ATTR_RO(pixel_format);
 
@@ -2004,6 +2035,27 @@ static int dione_ir_probe(struct i2c_client *client,
       else
          dev_err(dev, "dione-ir probe error\n");
       return -ENODEV;
+   }
+
+   /* tegracam_device_register() hard-codes mode_idx=0 (640x480) as the
+    * default. dione_ir_probe_sensor() -> dione_ir_board_setup() ->
+    * detect_dione_ir() has already detected the ACTUAL connected variant
+    * into priv->mode (e.g. 1 for a 1280x1024 "Dione 1280" module) — but
+    * nothing before this point ever propagates that into s_data's
+    * def_mode/def_width/def_height/fmt_width/fmt_height. Left unset, the
+    * bind-time s_fmt in camera_common_try_fmt() stays on mode0 regardless
+    * of what width/height userspace later requests via S_FMT (confirmed:
+    * dione_ir_set_mode() sees s_data->mode=0/fmt_width=640/fmt_height=480
+    * even after requesting 1280x1024, silently failing the s_data->mode
+    * != priv->mode check). Same fix already applied in eg_ec_mipi_src.c
+    * for the same reason — set it here too, before v4l2 registration.
+    */
+   if (priv->mode >= 0 && priv->mode < ARRAY_SIZE(dione_ir_frmfmt)) {
+      tc_dev->s_data->def_mode = dione_ir_frmfmt[priv->mode].mode;
+      tc_dev->s_data->def_width = tc_dev->s_data->fmt_width =
+            dione_ir_frmfmt[priv->mode].size.width;
+      tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
+            dione_ir_frmfmt[priv->mode].size.height;
    }
 
    err = tegracam_v4l2subdev_register(tc_dev, true);

@@ -65,6 +65,27 @@ _camera_node_active_in_dtb() {
     '
 }
 
+# Returns 0 (true) if any live /proc/device-tree node matching GLOB exists and
+# is NOT disabled. Mere existence isn't enough: our own eg-cams overlays
+# always define the alternate-sensor slots (imx219/imx477/ilumos/...) sharing
+# a port with Dione/EC, just disabled unless explicitly selected — so a naive
+# existence check flags a false conflict on every board, harmless only where
+# the disable-imx219/477 overlay's hardcoded target path happens to still
+# resolve (cam_i2cmux carriers). On a carrier with a different I2C topology
+# (e.g. Hadron DM's tca9540 chip mux) that overlay targets a path that no
+# longer exists post-merge, and fdtoverlay fails outright instead of no-op'ing.
+# Usage: _live_node_active <node_glob>
+# Example: _live_node_active "rbpcv2_imx219*"
+_live_node_active() {
+    local glob="$1"
+    local d status
+    for d in $(find -L /proc/device-tree -iname "$glob" -type d 2>/dev/null); do
+        status=$(tr -d '\0' < "$d/status" 2>/dev/null)
+        [[ "$status" != "disabled" ]] && return 0
+    done
+    return 1
+}
+
 if [[ -n "$EG_FORCE_BOARD" ]]; then
 	BOARD="$EG_FORCE_BOARD"
 elif grep -q "dsboard-ornxs" /boot/extlinux/extlinux.conf 2>/dev/null; then
@@ -72,6 +93,10 @@ elif grep -q "dsboard-ornxs" /boot/extlinux/extlinux.conf 2>/dev/null; then
 	# regardless of what detect_jetson_board.sh returns (e.g. p3767-0005 with
 	# no Forecr DTB in QSPI will wrongly return nvidia/p3768 without this check).
 	BOARD="dsboard-ornxs"
+elif grep -q "cti-eg-cams-dione" /boot/extlinux/extlinux.conf 2>/dev/null; then
+	# Same rationale as dsboard-ornxs above — if the Hadron DM overlay is
+	# already active, stay on it even if hardware detection were to fail.
+	BOARD="hadron-dm"
 else
 	BOARD=$(detect_jetson_board.sh --short)
 fi
@@ -96,6 +121,9 @@ case "$BOARD" in
   seeed-recomputer-j4012)
 	  echo "Seeed Studio reComputer J4012 detected: CAM0 lane swap corrected on carrier"
 	  ;;
+  hadron-dm)
+	  echo "Connect Tech board detected: $BOARD"
+	  ;;
   nvidia-*)
 	  echo "Nvidia official board"
 	  ;;
@@ -109,6 +137,8 @@ if [[ x$BOARD == xdsboard-ornxs ]]; then
    base_devicetree="Exosens Cameras for DSBOARD-ORNXS"
 elif [[ x$BOARD == xseeed-recomputer-j4012 ]]; then
    base_devicetree="Exosens Cameras - CAM0 lane swap"
+elif [[ x$BOARD == xhadron-dm ]]; then
+   base_devicetree="Exosens Cameras for Connect Tech Hadron DM"
 else
    base_devicetree="Exosens Cameras"
 fi
@@ -154,13 +184,21 @@ disable_imx219_arg=""
 disable_imx477_arg=""
 _jetson_io_overlays=$(sudo /opt/eg/jetson-io/config-by-hardware.py -l 2>/dev/null)
 
+# jetson-io header index of the CSI camera connector — NOT necessarily "2".
+# Nvidia devkit / Forecr boards expose 2 headers (40-pin GPIO + CSI connector
+# as header 2); Connect Tech Hadron DM exposes only the CSI connector, as the
+# board's sole header (header 1). Detect it from the "-l" listing instead of
+# hardcoding "2", so both layouts work.
+HEADER_IDX=$(echo "$_jetson_io_overlays" | grep -oP '^Header \K[0-9]+(?=.*CSI Connector)' | head -1)
+[[ -z "$HEADER_IDX" ]] && HEADER_IDX=2
+
 # IMX219/IMX477 detection: check both the live DT and the primary boot DTB.
 # The live DT may not reflect active nodes if a previous user-custom.dtb already
 # disabled them; the kernel DTB is the authoritative source for what will be in
 # the new merged DTB.
 _imx219_active=0
 _imx477_active=0
-if [[ -n "$(find -L /proc/device-tree -name "rbpcv2_imx219*" -type d 2>/dev/null | head -1)" ]]; then
+if _live_node_active "rbpcv2_imx219*"; then
    _imx219_active=1
 fi
 if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv2_imx219"; then
@@ -173,11 +211,11 @@ if [[ $_imx219_active -eq 1 ]]; then
    # and would fail fdtoverlay with FDT_ERR_NOTFOUND.
    if [[ $base_devicetree != "Exosens Cameras - 2 ports" ]] && \
       echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx219"; then
-      disable_imx219_arg="2=Exosens Cameras. Disable imx219"
+      disable_imx219_arg="$HEADER_IDX=Exosens Cameras. Disable imx219"
    fi
 fi
 
-if [[ -n "$(find -L /proc/device-tree -name "rbpcv3_imx477*" -type d 2>/dev/null | head -1)" ]]; then
+if _live_node_active "rbpcv3_imx477*"; then
    _imx477_active=1
 fi
 if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv3_imx477"; then
@@ -185,7 +223,7 @@ if [[ -n "$_primary_dtb" ]] && _camera_node_active_in_dtb "$_primary_dtb" "rbpcv
 fi
 if [[ $_imx477_active -eq 1 ]]; then
    if echo "$_jetson_io_overlays" | grep -q "Exosens Cameras. Disable imx477"; then
-      disable_imx477_arg="2=Exosens Cameras. Disable imx477"
+      disable_imx477_arg="$HEADER_IDX=Exosens Cameras. Disable imx477"
    fi
 fi
 
@@ -234,7 +272,15 @@ for arg in "$@"; do
 
 	lanes="${CAMERA_LANES[$camera_type]}"
 	if [[ -n "$lanes" ]]; then
-		dtboarg+=("2=Exosens Cameras. CAM$port_number:$lanes")
+		# Hadron DM's real PCA9540 I2C mux needs its own EC overlay variant
+		# (different target-path than the plain cam_i2cmux one — see
+		# tegra234-p3767-camera-p3768-cti-eg-cam*-ec-*.dts), selected via a
+		# distinct overlay-name so jetson-io doesn't ambiguously match both.
+		if [[ x$BOARD == xhadron-dm ]]; then
+			dtboarg+=("$HEADER_IDX=Exosens Cameras for Connect Tech Hadron DM. CAM$port_number:$lanes")
+		else
+			dtboarg+=("$HEADER_IDX=Exosens Cameras. CAM$port_number:$lanes")
+		fi
 	fi
 
     echo "Port number : $port_number"
@@ -264,7 +310,7 @@ fi
 cmd="python /opt/eg/jetson-io/config-by-hardware.py -n"
 
 # Build command arguments dynamically
-cmd_args=("2=$base_devicetree")
+cmd_args=("$HEADER_IDX=$base_devicetree")
 [[ -n "$disable_imx219_arg" ]] && cmd_args+=("$disable_imx219_arg")
 [[ -n "$disable_imx477_arg" ]] && cmd_args+=("$disable_imx477_arg")
 cmd_args+=("${dtboarg[@]}")

@@ -79,10 +79,82 @@ def extract_field(block_text, field):
     return None
 
 
+# Preprocessor macros this static check treats as undefined by default,
+# matching the generic/forecr build (only a PRISTINE_KERNEL vendor build,
+# e.g. cti, ever defines these). resolve_conditionals() below fully drops
+# the unreachable branch's lines up front so brace-balance and mode
+# counting downstream see a plain, consistent line list — no per-check
+# awareness of the conditional needed elsewhere.
+ASSUMED_UNDEFINED_MACROS = {"PRISTINE_KERNEL", "HADRON_DM_CAM_I2C_MUX"}
+
+_IFDEF_RE  = re.compile(r'^\s*#\s*ifdef\s+(\S+)')
+_IFNDEF_RE = re.compile(r'^\s*#\s*ifndef\s+(\S+)')
+_ELSE_RE   = re.compile(r'^\s*#\s*else\b')
+_ENDIF_RE  = re.compile(r'^\s*#\s*endif\b')
+
+
+def resolve_conditionals(lines):
+    """
+    Returns a new line list with #ifdef/#ifndef/#else/#endif blocks for
+    ASSUMED_UNDEFINED_MACROS fully resolved (as if those macros are
+    undefined): only the reachable branch's lines are kept, directives
+    themselves dropped. This mirrors what a vendor overlay .dts that
+    #defines PRISTINE_KERNEL before #include-ing this dtsi would NOT do
+    (the default/generic build never defines it), so it lets a single
+    #ifndef line pick between two different node names sharing one body
+    (see eg_ec_camN modes) without duplicating the body.
+
+    Blocks for any other macro (CAM0_LANE_SWAP, EG_CSI_22PIN...) are left
+    completely untouched (directives and both branches kept as literal
+    text) since their state isn't modeled here — matches prior behavior.
+    """
+    out = []
+    stack = []  # each frame: {"tracked": bool, "keep": bool}
+    for line in lines:
+        m = _IFNDEF_RE.match(line)
+        if m:
+            tracked = m.group(1) in ASSUMED_UNDEFINED_MACROS
+            if tracked:
+                stack.append({"tracked": True, "keep": True})  # undefined -> ifndef branch active
+            else:
+                stack.append({"tracked": False, "keep": True})
+                out.append(line)
+            continue
+        m = _IFDEF_RE.match(line)
+        if m:
+            tracked = m.group(1) in ASSUMED_UNDEFINED_MACROS
+            if tracked:
+                stack.append({"tracked": True, "keep": False})  # undefined -> ifdef branch inactive
+            else:
+                stack.append({"tracked": False, "keep": True})
+                out.append(line)
+            continue
+        if _ELSE_RE.match(line):
+            if stack and stack[-1]["tracked"]:
+                stack[-1]["keep"] = not stack[-1]["keep"]
+            else:
+                out.append(line)
+            continue
+        if _ENDIF_RE.match(line):
+            if stack:
+                frame = stack.pop()
+                if not frame["tracked"]:
+                    out.append(line)
+            else:
+                out.append(line)
+            continue
+        if any(f["tracked"] and not f["keep"] for f in stack):
+            continue
+        out.append(line)
+    return out
+
+
 def parse_sensor_nodes(lines):
     """
     Returns dict: label → list of mode dicts (extracted DT fields).
     E.g.: {"microlynx_cam0": [{"active_w": "1024", ...}, ...], ...}
+
+    `lines` is expected to already be resolve_conditionals()-ed.
     """
     LABEL_RE = re.compile(r'((?:dione_ir|eg_ec|ilumos|microlynx)_cam\d)\s*:')
     MODE_RE  = re.compile(r'\bmode\d+\s*\{')
@@ -127,12 +199,32 @@ def parse_sensor_nodes(lines):
 # Parsing overlay DTS (bus-width)
 # ---------------------------------------------------------------------------
 
+_INCLUDE_RE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
+
+
+def _read_overlay_text(overlay_path):
+    """
+    Reads an overlay DTS, following one level of local #include "foo.dtsi"
+    (thin-wrapper pattern: a per-vendor .dts #define's a macro then includes
+    a shared .dtsi body — see tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dts
+    and its common .dtsi). Concatenates the wrapper + included body so the
+    regex-based parsers below can find fragments regardless of which file
+    they actually live in.
+    """
+    text = overlay_path.read_text()
+    for inc in _INCLUDE_RE.findall(text):
+        inc_path = overlay_path.parent / inc
+        if inc_path.exists():
+            text += "\n" + inc_path.read_text()
+    return text
+
+
 def parse_overlay_bus_width(overlay_path):
     """
     Returns the bus-width found in the overlay DTS (sensor endpoint).
     Finds the last occurrence of bus-width=<N> in the file.
     """
-    text = overlay_path.read_text()
+    text = _read_overlay_text(overlay_path)
     matches = re.findall(r'bus-width\s*=\s*<(\d+)>', text)
     if not matches:
         return None
@@ -146,7 +238,7 @@ def parse_overlay_mode_overrides(overlay_path):
     Possible fields: pix_clk_hz, num_lanes.
     Searches for fragments targeting .../modeN.
     """
-    text = overlay_path.read_text()
+    text = _read_overlay_text(overlay_path)
     result = {}
     for frag in re.finditer(r'fragment@\d+\s*\{(.*?)\n\s*\}', text, re.DOTALL):
         frag_text = frag.group(1)
@@ -247,7 +339,7 @@ def verify(quiet=False):
             errors.append(f"[{plat_key}] FILE NOT FOUND: {dtsi_path}")
             continue
 
-        lines = read_lines(dtsi_path)
+        lines = resolve_conditionals(read_lines(dtsi_path))
 
         # 1. Accolades
         bal = sum(l.count("{") - l.count("}") for l in lines)

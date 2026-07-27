@@ -81,6 +81,44 @@ get_default_carrier() {
     $_EGCFG "vendor.$vendor.default_carrier" "$L4T_CONFIG_FILE"
 }
 
+# Whether a vendor ships a precompiled kernel/nvidia-oot we don't control
+# (no source available for our framework patches). Reads
+# vendors.$vendor.pristine_kernel from eg_config.yaml. Echoes "1" or "".
+get_vendor_pristine_kernel() {
+    local vendor="$1"
+    local pristine=$($_EGCFG "vendor.$vendor.pristine_kernel" "$L4T_CONFIG_FILE" 2>/dev/null)
+    [[ "$pristine" == "true" ]] && echo "1" || echo ""
+}
+
+# Whether a vendor's required archive is available.
+#
+# Some vendors need an archive we cannot download (confidential vendor sources
+# with no url — see versions.<ver>.sources.<key> in eg_config.yaml). When it is
+# missing, the configuration is skipped by enumerate_configs rather than
+# building a package that would silently lack the vendor's sources.
+#
+# The pre-computed delta cache (<name>_eg-delta.tgz, produced by
+# tools/extract_cti_sources.sh) satisfies the requirement on its own: it is all
+# the build actually consumes, and it lets a machine build without holding the
+# multi-GB source archive.
+#
+# Args: version, vendor.  Returns 0 if usable (or if none required), 1 if not.
+vendor_archive_available() {
+    local version="$1" vendor="$2"
+    local key
+    key=$($_EGCFG "vendor.$vendor.requires_archive" "$L4T_CONFIG_FILE" 2>/dev/null)
+    [[ -z "$key" ]] && return 0
+
+    local fname
+    fname=$($_EGCFG "version.$version.sources.$key.filename" "$L4T_CONFIG_FILE" 2>/dev/null)
+    [[ -z "$fname" ]] && return 1
+
+    local dir="${ARCHIVE_DIR:-$L4T_ENV_DIR/archives}/$(echo "$key" | tr '[:lower:]' '[:upper:]')"
+    [[ -f "$dir/$fname" ]] && return 0
+    [[ -f "$dir/${fname%.tgz}_eg-delta.tgz" ]] && return 0
+    return 1
+}
+
 # Check if configuration requires standalone build
 # Args: version, vendor, carrier
 # Reads from versions.$version.standalone.$vendor.$carrier in JSON config
@@ -98,6 +136,19 @@ config_requires_standalone() {
 get_carrier_defconfig() {
     local carrier="$1"
     $_EGCFG "carrier.$carrier.defconfig" "$L4T_CONFIG_FILE"
+}
+
+# Optional per-vendor defconfig OVERRIDE. Empty for almost every vendor: the
+# defconfig is normally per-carrier (Forecr has several boards, one defconfig
+# each). This exists only for the case where two vendors share one carrier but
+# need different defconfigs — e.g. cti (builds from vendor sources, uses CTI's
+# own cti_tegra_defconfig) vs cti_pristine (precompiled kernel, headers only,
+# does NOT ship that file) both on hadron_dm. Set on the vendor, it wins over
+# the carrier; unset, the carrier value is used. See the defconfig note in
+# Scenario C of MIPI_DRIVER_DEVELOPMENT_GUIDE.md.
+get_vendor_defconfig() {
+    local vendor="$1"
+    $_EGCFG "vendor.$vendor.defconfig" "$L4T_CONFIG_FILE" 2>/dev/null || echo ""
 }
 
 # Get directory suffix for a carrier
@@ -251,6 +302,7 @@ enumerate_configs() {
                             continue
                         fi
                     fi
+                    vendor_archive_available "$version" "$vendor" || continue
                     for carrier in $carriers; do
                         echo "${version}:${vendor}:${som}:${carrier}"
                     done
@@ -268,6 +320,16 @@ enumerate_configs() {
                     else
                         continue
                     fi
+                fi
+                if ! vendor_archive_available "$version" "$vendor"; then
+                    # Explicitly asked for by name: say why nothing came out,
+                    # instead of silently producing an empty configuration list.
+                    if [[ -n "$vendor_filter" ]]; then
+                        echo "Error: vendor '$vendor' for L4T $version requires an archive that is not present." >&2
+                        echo "  Expected under archives/$(echo "$key" | tr '[:lower:]' '[:upper:]')/ — see versions.$version.sources in eg_config.yaml." >&2
+                        echo "  This archive is confidential and never downloaded automatically; place it there manually." >&2
+                    fi
+                    continue
                 fi
                 for carrier in $carriers; do
                     echo "${version}:${vendor}::${carrier}"
@@ -635,6 +697,15 @@ load_version_config() {
     SAMPLE_FS_PACKAGE=$($_EGCFG "$src_prefix.sample_fs.filename" "$L4T_CONFIG_FILE")
     SAMPLE_FS_PACKAGE_URL=$($_EGCFG "$src_prefix.sample_fs.url" "$L4T_CONFIG_FILE")
 
+    # CTI archive (vendor cti only — meaning depends on pristine_kernel, see
+    # eg_config.yaml comment). Absent for every other version/vendor, so
+    # default to empty rather than letting egcfg.py fail the whole call.
+    # Keyed by vendor name: each CTI variant has its own archive
+    # (cti_pristine -> public BSP headers with a url; cti -> confidential GPL
+    # sources with none). Empty for every other version/vendor.
+    VENDOR_ARCHIVE=$($_EGCFG "$src_prefix.$VENDOR.filename" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+    VENDOR_ARCHIVE_URL=$($_EGCFG "$src_prefix.$VENDOR.url" "$L4T_CONFIG_FILE" 2>/dev/null || echo "")
+
     # Toolchain
     JETSON_TOOLCHAIN_ARCHIVE=$($_EGCFG "version.$version.toolchain.archive" "$L4T_CONFIG_FILE")
     JETSON_TOOLCHAIN_ARCHIVE_URL=$($_EGCFG "version.$version.toolchain.url" "$L4T_CONFIG_FILE")
@@ -713,8 +784,21 @@ compute_derived_vars() {
         L4T_VERSION_EXTENDED=${L4T_VERSION}_${VENDOR}
     fi
 
-    # Kernel defconfig: SoM takes priority over carrier
+    # PRISTINE_KERNEL: vendor ships a precompiled kernel/nvidia-oot we don't
+    # control (e.g. cti). Exported so l4t_copy_sources.sh and l4t_build.sh
+    # can skip/gate the nvidia-oot framework patches accordingly.
+    PRISTINE_KERNEL=$(get_vendor_pristine_kernel "$VENDOR")
+    export PRISTINE_KERNEL
+
+    # Kernel defconfig priority: SoM (32.x) > vendor override > carrier.
+    # The vendor override sits between the two so a vendor that builds from its
+    # own sources (cti) can pin its own defconfig on a carrier it shares with
+    # another vendor (cti_pristine), without disturbing the per-carrier scheme
+    # every other vendor relies on. SoM still wins (32.x t210/t186 case).
     KERNEL_DEFCONFIG=$(get_som_defconfig "$SOM_BOARD")
+    if [[ -z "$KERNEL_DEFCONFIG" ]]; then
+        KERNEL_DEFCONFIG=$(get_vendor_defconfig "$VENDOR")
+    fi
     if [[ -z "$KERNEL_DEFCONFIG" ]]; then
         KERNEL_DEFCONFIG=$(get_carrier_defconfig "$CARRIER_BOARD")
     fi

@@ -4,6 +4,19 @@
 DTC_FLAGS += -@
 DTC_CPP_FLAGS += -DEG_CSI_22PIN
 
+# Propagate PRISTINE_KERNEL (exported by l4t_environment.sh from
+# vendors.<v>.pristine_kernel) to the device tree preprocessor, the same way
+# EG_CSI_22PIN is passed above.
+#
+# The -cti- overlays are shared by both Connect Tech build variants and must NOT
+# hardcode `#define PRISTINE_KERNEL`: on the pristine variant the vendor's
+# precompiled kernel cannot negotiate Y16, so those modes are dropped and the
+# remaining ones renumbered; on the source-built variant Y16 works and the
+# modes must stay as they are. Same .dts, two results, decided by the build.
+ifdef PRISTINE_KERNEL
+DTC_CPP_FLAGS += -DPRISTINE_KERNEL
+endif
+
 old-dtb := $(dtb-y)
 old-dtbo := $(dtbo-y)
 dtb-y :=
@@ -79,12 +92,25 @@ dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
+ifndef PRISTINE_KERNEL
+# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
+# nvidia-oot camera framework, which can't be patched into a PRISTINE_KERNEL
+# vendor's precompiled tegra-camera.ko (see drivers/media/i2c/Makefile).
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
+endif
 dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
+dtbo-y += tegra234-p3767-camera-cti-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
+# Hadron DM's real PCA9540 I2C mux (tca9540@70) means the plain EC overlays
+# above (targeting cam_i2cmux) don't apply — see
+# tegra234-p3767-camera-p3768-common-eg-cam{0,1}-ec-*.dtsi.
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-1-lane.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-1-lane.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-2-lanes.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-2-lanes.dtbo
 
 dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo
