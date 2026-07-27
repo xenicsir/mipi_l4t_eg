@@ -415,7 +415,7 @@ case "$1" in
         # Forecr:   "jetson-l4t-35.6.2_forecr_eg ..." -> L4T=35.6.2, VENDOR=forecr
 
         # Extract version_extended (35.6.2 or 35.6.2_forecr)
-        EXPECTED_VERSION_EXTENDED=$(echo "$PACKAGE_VERSION_LINE" | sed 's/^jetson-l4t-\([^_]*\(_[^_]*\)\?\)_eg.*/\1/')
+        EXPECTED_VERSION_EXTENDED=$(echo "$PACKAGE_VERSION_LINE" | sed 's/^jetson-l4t-\(.*\)_eg .*/\1/')
 
         # Extract L4T version (first part before vendor suffix)
         EXPECTED_L4T=$(echo "$EXPECTED_VERSION_EXTENDED" | sed 's/_.*$//')

@@ -15,6 +15,7 @@ Requirements
 - Dependencies: pyserial, numpy
 
     pip install pyserial numpy
+or  sudo apt install python3-serial
 
 Installation
 ------------
@@ -913,4 +914,17 @@ class dioneCtrl(object):
 
     return Status
 
+
+if __name__ == "__main__":
+  import code
+  try:
+    import readline  # noqa: F401 - enables arrow keys / history in the console
+  except ImportError:
+    pass
+
+  banner = (
+      "Xenics Dione camera control console\n"
+      "Example: cam = dioneCtrl(dev_addr=0x5b, bus=9, device_type=\"I2C\", gencp_enable=False)"
+  )
+  code.interact(banner=banner, local=dict(globals(), **locals()))
 

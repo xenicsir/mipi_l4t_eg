@@ -164,6 +164,26 @@ def read_string(dev_path, addr, length=64):
 
 
 # ---------------------------------------------------------------------------
+# Interactive console
+# ---------------------------------------------------------------------------
+
+def console(dev_path):
+    """Drop into an interactive Python console with dev_path and the
+    read_reg32/write_reg32/read_string helpers already in scope."""
+    import code
+    try:
+        import readline  # noqa: F401 - enables arrow keys / history in the console
+    except ImportError:
+        pass
+
+    banner = (
+        f"Microlynx camera control console (dev_path = {dev_path!r})\n"
+        "Example: read_reg32(dev_path, 0x50FF0010)"
+    )
+    code.interact(banner=banner, local=dict(globals(), **locals()))
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -182,7 +202,7 @@ def main():
             sys.exit(1)
 
     if not args:
-        print(__doc__)
+        console(dev_path)
         sys.exit(0)
 
     cmd = args[0]
