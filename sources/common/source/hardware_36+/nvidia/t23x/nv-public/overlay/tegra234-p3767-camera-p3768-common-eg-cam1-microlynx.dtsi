@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+/*
+ * Shared body for tegra234-p3767-camera-p3768-eg-cam1-microlynx.dts (generic/Forecr/devkit
+ * topology, cam_i2cmux GPIO mux) and its Hadron DM counterpart
+ * tegra234-p3767-camera-p3768-cti-eg-cam1-microlynx.dts (chip-based tca9540@70 I2C mux
+ * instead of cam_i2cmux) — same HADRON_DM_CAM_I2C_MUX distinction as
+ * tegra234-p3767-camera-common-eg-cams-dione.dtsi.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/tegra234-p3767-0000-common.h>
+
+/ {
+#ifdef EG_CSI_22PIN
+	jetson-header-name = "Jetson 22pin CSI Connector";
+#else
+	jetson-header-name = "Jetson 24pin CSI Connector";
+#endif
+	compatible = JETSON_COMPATIBLE_P3768;
+
+	fragment@10 {
+		target-path = "/tegra-capture-vi/ports/port@1/endpoint";
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@11 {
+		target-path = "/bus@0/host1x@13e00000/nvcsi@15a00000/channel@1/ports/port@0/endpoint@2";
+		__overlay__ {
+			bus-width=<2>;
+         remote-endpoint = <&microlynx_out1>;
+		};
+	};
+
+   // Disable Dione cameras
+	fragment@12 {
+		#ifdef HADRON_DM_CAM_I2C_MUX
+		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/xenics_dione_ir_c@0e";
+		#else
+		target-path = "/bus@0/cam_i2cmux/i2c@1/xenics_dione_ir_c@0e";
+		#endif
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+	// Enable Microlynx
+	fragment@13 {
+		#ifdef HADRON_DM_CAM_I2C_MUX
+		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/microlynx_c@51";
+		#else
+		target-path = "/bus@0/cam_i2cmux/i2c@1/microlynx_c@51";
+		#endif
+		__overlay__ {
+         status = "okay";
+		};
+	};
+
+	fragment@20 {
+		#ifdef HADRON_DM_CAM_I2C_MUX
+		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/microlynx_c@51/ports/port@0/endpoint";
+		#else
+		target-path = "/bus@0/cam_i2cmux/i2c@1/microlynx_c@51/ports/port@0/endpoint";
+		#endif
+		__overlay__ {
+			bus-width=<2>;
+		};
+	};
+
+	fragment@21 {
+		target-path = "/tegra-camera-platform/modules/module1/drivernode0";
+		__overlay__ {
+         devname = "microlynx 10-0051";
+			#ifdef HADRON_DM_CAM_I2C_MUX
+			proc-device-tree = "/proc/device-tree/i2c@3180000/tca9540@70/i2c@1/microlynx_c@51";
+			#else
+			proc-device-tree = "/proc/device-tree/cam_i2cmux/i2c@1/microlynx_c@51";
+			#endif
+		};
+	};
+
+  // Disable other cameras
+	fragment@30 {
+		#ifdef HADRON_DM_CAM_I2C_MUX
+		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/rbpcv3_imx477_c@1a";
+		#else
+		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv3_imx477_c@1a";
+		#endif
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+	fragment@31 {
+		#ifdef HADRON_DM_CAM_I2C_MUX
+		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/rbpcv2_imx219_c@10";
+		#else
+		target-path = "/bus@0/cam_i2cmux/i2c@1/rbpcv2_imx219_c@10";
+		#endif
+		__overlay__ {
+         status = "disabled";
+		};
+	};
+
+
+};

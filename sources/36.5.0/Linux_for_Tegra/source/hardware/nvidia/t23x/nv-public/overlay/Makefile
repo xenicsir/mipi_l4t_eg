@@ -111,6 +111,15 @@ dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-1-lane.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-1-lane.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ec-2-lanes.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ec-2-lanes.dtbo
+ifndef PRISTINE_KERNEL
+# Same PCA9540 chip-mux distinction as the EC entries above — ilumos/microlynx
+# are excluded from PRISTINE_KERNEL builds regardless (see the ifndef block
+# earlier in this file), so no PRISTINE_KERNEL branch is needed here.
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-ilumos.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-ilumos.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam0-microlynx.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-cti-eg-cam1-microlynx.dtbo
+endif
 
 dtbo-y += tegra234-p3737-camera-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cams-disable-imx219.dtbo

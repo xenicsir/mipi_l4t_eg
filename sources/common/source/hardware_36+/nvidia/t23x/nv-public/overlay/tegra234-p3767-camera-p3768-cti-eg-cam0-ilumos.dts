@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+/*
+ * Hadron DM's camera connectors sit behind a real PCA9540 I2C mux chip
+ * (reg 0x70 on cam_i2c/i2c@3180000) rather than the GPIO-toggled mux used
+ * on Forecr/devkit carriers — see
+ * tegra234-p3767-camera-cti-eg-cams-dione.dts for the full rationale.
+ */
+#define HADRON_DM_CAM_I2C_MUX
+
+#include "tegra234-p3767-camera-p3768-common-eg-cam0-ilumos.dtsi"
+
+/ {
+	overlay-name = "Exosens Cameras for Connect Tech Hadron DM. CAM0:iLumos";
+};
