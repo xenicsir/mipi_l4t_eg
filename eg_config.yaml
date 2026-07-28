@@ -623,7 +623,6 @@ cameras:
           - pixel_format: "RGB888"
             line_length: 694
             pix_clk_hz: 20000000
-            csi_clock_mhz: 120
       - res: "1280x1024"
         active_w: 1280
         active_h: 1024
@@ -633,7 +632,6 @@ cameras:
           - pixel_format: "RGB888"
             line_length: 1334
             pix_clk_hz: 83000000
-            csi_clock_mhz: 498
       - res: "320x240"
         active_w: 320
         active_h: 240
@@ -643,7 +641,6 @@ cameras:
           - pixel_format: "RGB888"
             line_length: 1404
             pix_clk_hz: 20000000
-            csi_clock_mhz: 120
       - res: "1024x768"
         active_w: 1024
         active_h: 768
@@ -653,7 +650,6 @@ cameras:
           - pixel_format: "RGB888"
             line_length: 1079
             pix_clk_hz: 83000000
-            csi_clock_mhz: 498
 
   microcube:
     name: "MicroCube"
@@ -671,15 +667,12 @@ cameras:
           - pixel_format: "Y16"
             line_length: 640
             pix_clk_hz: 20000000    # overridden by ec-1-lane overlay (DTSI has 100MHz)
-            csi_clock_mhz: 160
           - pixel_format: "RGB888"
             line_length: 640
             pix_clk_hz: 20000000    # overridden by ec-1-lane overlay
-            csi_clock_mhz: 240
           - pixel_format: "YUYV"
             line_length: 640
             pix_clk_hz: 20000000    # overridden by ec-1-lane overlay
-            csi_clock_mhz: 160
 
   smartir640:
     name: "SmartIR640"
@@ -696,15 +689,12 @@ cameras:
           - pixel_format: "Y16"
             line_length: 640
             pix_clk_hz: 100000000
-            csi_clock_mhz: 400
           - pixel_format: "RGB888"
             line_length: 640
             pix_clk_hz: 100000000
-            csi_clock_mhz: 600
           - pixel_format: "YUYV"
             line_length: 640
             pix_clk_hz: 100000000
-            csi_clock_mhz: 400
 
   crius1280:
     name: "Crius1280"
@@ -721,15 +711,12 @@ cameras:
           - pixel_format: "Y16"
             line_length: 1280
             pix_clk_hz: 100000000
-            csi_clock_mhz: 400
           - pixel_format: "RGB888"
             line_length: 1280
             pix_clk_hz: 133333336
-            csi_clock_mhz: 800
           - pixel_format: "YUYV"
             line_length: 1280
             pix_clk_hz: 100000000
-            csi_clock_mhz: 400
 
   ilumos:
     name: "iLumos"
@@ -744,11 +731,9 @@ cameras:
           - pixel_format: "Y16 -BE"
             line_length: 2048
             pix_clk_hz: 148750000
-            csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 2048
             pix_clk_hz: 148750000
-            csi_clock_mhz: 595
       - res: "2048x1088"
         active_w: 2048
         active_h: 1088
@@ -758,11 +743,9 @@ cameras:
           - pixel_format: "Y16 -BE"
             line_length: 2048
             pix_clk_hz: 148750000
-            csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 2048
             pix_clk_hz: 148750000
-            csi_clock_mhz: 595
       - res: "1280x1024"
         active_w: 1280
         active_h: 1024
@@ -772,11 +755,9 @@ cameras:
           - pixel_format: "Y16 -BE"
             line_length: 1280
             pix_clk_hz: 148750000
-            csi_clock_mhz: 595
           - pixel_format: "Y14"
             line_length: 1280
             pix_clk_hz: 148750000
-            csi_clock_mhz: 595
 
   microlynx:
     name: "Microlynx"
@@ -790,9 +771,7 @@ cameras:
         modes:
           - pixel_format: "Y16"
             line_length: 1024
-            pix_clk_hz: 90000000    # 90 MHz → 360 MHz CSI / (2 lanes × 2 DDR / 16 bits)
-            csi_clock_mhz: 350
+            pix_clk_hz: 90000000
           - pixel_format: "Y14"
             line_length: 1024
             pix_clk_hz: 100000000
-            csi_clock_mhz: 350

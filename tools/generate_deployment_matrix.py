@@ -110,6 +110,11 @@ class DeploymentMatrixGenerator:
         with open(camera_db_path, 'r') as f:
             self.camera_db = yaml.safe_load(f)
 
+    def _csi_clock_mhz(self, pixel_format, pix_clk_hz, lanes):
+        """MIPI D-PHY HS clock (MHz): pix_clk_hz × bits/pixel / lanes, halved for DDR."""
+        bpp = self.camera_db['pixel_format_map'][pixel_format]['csi_pixel_bit_depth']
+        return pix_clk_hz * bpp / lanes / 2 / 1e6
+
     def parse_entry(self, entry_str):
         """Parse 'status|git_branch|deb_package' format"""
         if not entry_str or isinstance(entry_str, dict):
@@ -525,7 +530,8 @@ class DeploymentMatrixGenerator:
                     for mode in res_entry['modes']:
                         pix_mhz = mode['pix_clk_hz'] / 1e6
                         pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
-                        f.write(f"| {mode['pixel_format']} | {pix_str} MHz | {mode['csi_clock_mhz']} MHz |\n")
+                        csi_mhz = self._csi_clock_mhz(mode['pixel_format'], mode['pix_clk_hz'], lanes)
+                        f.write(f"| {mode['pixel_format']} | {pix_str} MHz | {csi_mhz:.0f} MHz |\n")
                 f.write("\n")
 
             # Flex cable appendix
@@ -876,7 +882,8 @@ class DeploymentMatrixGenerator:
                 for mode in res_entry['modes']:
                     pix_mhz = mode['pix_clk_hz'] / 1e6
                     pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
-                    resolutions_html += f'<tr><td>{mode["pixel_format"]}</td><td>{pix_str} MHz</td><td>{mode["csi_clock_mhz"]} MHz</td></tr>\n'
+                    csi_mhz = self._csi_clock_mhz(mode['pixel_format'], mode['pix_clk_hz'], lanes)
+                    resolutions_html += f'<tr><td>{mode["pixel_format"]}</td><td>{pix_str} MHz</td><td>{csi_mhz:.0f} MHz</td></tr>\n'
                 resolutions_html += '</tbody></table>\n'
 
             html_content += f"""            <div class="camera-card">
@@ -1041,9 +1048,10 @@ class DeploymentMatrixGenerator:
                 for mode in res_entry['modes']:
                     pix_mhz = mode['pix_clk_hz'] / 1e6
                     pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
+                    csi_mhz = self._csi_clock_mhz(mode['pixel_format'], mode['pix_clk_hz'], lanes)
                     lines.append(f"<tr><td style='font-size:6.5pt;'>{mode['pixel_format']}</td>"
                                  f"<td style='font-size:6.5pt;'>{pix_str} MHz</td>"
-                                 f"<td style='font-size:6.5pt;'>{mode['csi_clock_mhz']} MHz</td></tr>")
+                                 f"<td style='font-size:6.5pt;'>{csi_mhz:.0f} MHz</td></tr>")
                 lines.append("</tbody></table>")
 
             lines.append("</div>")

@@ -307,8 +307,10 @@ cameras:
           - pixel_format: "<FORMAT>"       # must exist in pixel_format_map
             line_length: <value>
             pix_clk_hz: <value>
-            csi_clock_mhz: <value>
 ```
+
+The CSI (MIPI D-PHY HS) clock shown in the deployment matrix is derived automatically from
+`pix_clk_hz`, `data_lanes`, and the format's `csi_pixel_bit_depth` — no field to fill in here.
 
 For EC-based cameras (EngineCore), also add:
 ```yaml
