@@ -35,16 +35,40 @@ l4t_init "$@"
 # Guard variable: set to ROOTFS_DIR just before mounting, cleared after unmounting.
 # The trap uses it to clean up bind-mounts if the script is interrupted mid-chroot.
 _CHROOT_ROOTFS_DIR=""
+
+# Repeatedly umount $1 until it's no longer a mountpoint. A single umount only
+# pops the topmost layer — if a previous run left N stale binds stacked here
+# (e.g. the SSH session died mid-chroot with no signal to trigger the EXIT
+# trap below), one call isn't enough to actually free the target.
+_umount_all() {
+    local target="$1" tries=0
+    while mountpoint -q "$target" 2>/dev/null; do
+        sudo umount "$target" 2>/dev/null || break
+        tries=$((tries + 1))
+        [[ $tries -ge 20 ]] && break   # safety cap, not expected to ever hit
+    done
+}
+
+# Bind-mount $1 onto $2, first clearing any stale bind already stacked there
+# from an interrupted previous run — otherwise repeated interrupted builds
+# keep stacking duplicate binds on the same target forever (only a reboot,
+# or a manual cleanup, clears them; see l4t_build.sh pty-exhaustion incident).
+_bind_mount_clean() {
+    local src="$1" dst="$2"
+    _umount_all "$dst"
+    sudo mount --bind "$src" "$dst" 2>/dev/null || true
+}
+
 _cleanup_chroot() {
     [[ -z "$_CHROOT_ROOTFS_DIR" ]] && return
     local rdir="$_CHROOT_ROOTFS_DIR"
-    sudo umount "$rdir/dev/pts"       2>/dev/null || true
-    sudo umount "$rdir/dev/shm"       2>/dev/null || true
-    sudo umount "$rdir/dev/mqueue"    2>/dev/null || true
-    sudo umount "$rdir/dev/hugepages" 2>/dev/null || true
-    sudo umount "$rdir/dev"           2>/dev/null || true
-    sudo umount "$rdir/sys"           2>/dev/null || true
-    sudo umount "$rdir/proc"          2>/dev/null || true
+    _umount_all "$rdir/dev/pts"
+    _umount_all "$rdir/dev/shm"
+    _umount_all "$rdir/dev/mqueue"
+    _umount_all "$rdir/dev/hugepages"
+    _umount_all "$rdir/dev"
+    _umount_all "$rdir/sys"
+    _umount_all "$rdir/proc"
 }
 trap _cleanup_chroot EXIT
 
@@ -348,10 +372,10 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
          # Mount required filesystems for chroot
          update_status "Mounting chroot filesystems..."
          _CHROOT_ROOTFS_DIR="$ROOTFS_DIR"
-         sudo mount --bind /proc "$ROOTFS_DIR/proc" 2>/dev/null || true
-         sudo mount --bind /sys "$ROOTFS_DIR/sys" 2>/dev/null || true
-         sudo mount --bind /dev "$ROOTFS_DIR/dev" 2>/dev/null || true
-         sudo mount --bind /dev/pts "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
+         _bind_mount_clean /proc     "$ROOTFS_DIR/proc"
+         _bind_mount_clean /sys      "$ROOTFS_DIR/sys"
+         _bind_mount_clean /dev      "$ROOTFS_DIR/dev"
+         _bind_mount_clean /dev/pts  "$ROOTFS_DIR/dev/pts"
 
          # Generate initramfs in chroot
          update_status "Running update-initramfs..."
@@ -363,13 +387,13 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
 
          # Unmount filesystems (order: sub-mounts of /dev first, then /dev, sys, proc)
          update_status "Unmounting chroot filesystems..."
-         sudo umount "$ROOTFS_DIR/dev/pts"       2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/dev/shm"       2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/dev/mqueue"    2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/dev/hugepages" 2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/dev"           2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/sys"           2>/dev/null || true
-         sudo umount "$ROOTFS_DIR/proc"          2>/dev/null || true
+         _umount_all "$ROOTFS_DIR/dev/pts"
+         _umount_all "$ROOTFS_DIR/dev/shm"
+         _umount_all "$ROOTFS_DIR/dev/mqueue"
+         _umount_all "$ROOTFS_DIR/dev/hugepages"
+         _umount_all "$ROOTFS_DIR/dev"
+         _umount_all "$ROOTFS_DIR/sys"
+         _umount_all "$ROOTFS_DIR/proc"
          _CHROOT_ROOTFS_DIR=""
 
          # Move initramfs to boot/eg/initrd-eg
