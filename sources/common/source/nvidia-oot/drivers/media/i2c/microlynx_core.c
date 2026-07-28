@@ -79,7 +79,7 @@ static DEFINE_MUTEX(microlynx_gencp_lock);
 #define REG_IMG_HEIGHT_RW 0x500E000C
 #define REG_IMG_WIDTH_R   0x500E0008
 #define REG_MIPI_ENA_R    0x50ff0010
-#define REG_FIRW_VER_R    0x50FF0000
+#define REG_FIRW_VER_R    0xB0000000
 #define REG_SERIAL_R      0x00000144
 #define REG_MODEL_NAME_R  0x00000044
 #define REG_PIX_ENDIAN_R  0x00040018  /* 0=LE (Y16), 1=BE (Y16_BE) */
@@ -165,14 +165,16 @@ static int microlynx_sensor_check(struct microlynx *priv)
    }
 
    /* FPGA firmware read */
-   status = GENCPCLIENT_ReadRegister(REG_FIRW_VER_R, &read_data);
+   status = GENCPCLIENT_ReadString(REG_FIRW_VER_R,
+         (u8 *)priv->firmware_version, sizeof(priv->firmware_version));
    if (status == 0) {
-      PRINT_INFO("FPGA firmware version = %#08x\n", read_data);
-      snprintf(priv->firmware_version, sizeof(priv->firmware_version),
-            "0x%08x", read_data);
+      int i;
+      for (i = sizeof(priv->firmware_version) - 1; i >= 0 &&
+            (priv->firmware_version[i] == (char)0xff || priv->firmware_version[i] == '\0'); i--)
+         priv->firmware_version[i] = '\0';
    } else {
+      priv->firmware_version[0] = '\0';
       PRINT_INFO("FPGA firmware read failed\n");
-      goto error_exit;
    }
 
    /* Resolution - Set Height */
@@ -249,7 +251,22 @@ static int microlynx_sensor_check(struct microlynx *priv)
          PRINT_INFO("Pixel format: Y16 (CSI little-endian)\n");
       }
    }
-   
+
+   /* tegracam_device_register() already ran and set s_data->colorfmt from
+    * microlynx_frmfmt[0] (RAW16) unconditionally — updating sensor_mode_id/
+    * def_mode above doesn't re-resolve it, so V4L2 G_FMT would keep
+    * reporting Y16 even after detecting Y14 here. Force it explicitly,
+    * same pattern as eg_ec_mipi_src.c's probe. */
+   {
+      const struct camera_common_colorfmt *colorfmt;
+      u32 v4l2_pixfmt = (priv->tc_dev->s_data->def_mode == MICROLYNX_MODE_1024x128_RAW14)
+                        ? V4L2_PIX_FMT_Y14 : V4L2_PIX_FMT_Y16;
+
+      colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
+      if (colorfmt)
+         priv->tc_dev->s_data->colorfmt = colorfmt;
+   }
+
    priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 
    priv->gencp_initialized = true;
