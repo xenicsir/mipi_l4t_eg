@@ -644,37 +644,44 @@ else
                     _code="${_raw%%\'*}"       # take everything up to next '
                     _v4l2fmt="" ; _gstfmt=""
                     case "$_code" in
-                        "Y14 "|"Y14") _v4l2fmt='"Y14 "' ; _gstfmt="GRAY14_LE" ;;
+                        # GStreamer has no GRAY14_LE (no 14-bit raw video format exists in
+                        # GstVideoFormat, any version) — leave _gstfmt empty so only the
+                        # v4l2-ctl command is shown. Spoofing GRAY16_LE while the camera is
+                        # actually in Y14 corrupts the capture (mismatched DT pix_clk_hz
+                        # between the Y14/Y16 modes) — see microlynx_y14_colorfmt_gstreamer.
+                        "Y14 "|"Y14") _v4l2fmt='"Y14 "' ;;
                         "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
                         "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
                         "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
                         "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ;;
                         "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
                     esac
-                    if [[ -n "$_gstfmt" ]]; then
+                    if [[ -n "$_v4l2fmt" ]]; then
                         if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_gstfmt" == GRAY16* ]]; then
                             echo "    Warning: 16-bit greyscale is not supported on Jetson Nano (t210). Use AR24 or YUYV."
                         else
                             echo "    Streaming:"
-                            if [[ -n "$_v4l2fmt" ]]; then
-                                echo "      v4l2-ctl -d $video_dev \\"
-                                echo "        --stream-mmap \\"
-                                echo "        --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
-                            fi
-                            echo "      gst-launch-1.0 -v \\"
-                            echo "        v4l2src device=$video_dev \\"
-                            echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
-                            echo "        ! videoconvert \\"
-                            echo "        ! $GST_DISPLAY_SINK sync=false"
-                            if [[ "$cam_type" == "Microlynx" ]]; then
-                                echo "      # Single line (first):"
+                            echo "      v4l2-ctl -d $video_dev \\"
+                            echo "        --stream-mmap \\"
+                            echo "        --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            if [[ -z "$_gstfmt" ]]; then
+                                echo "      Note: GStreamer has no 14-bit greyscale format — use v4l2-ctl (above) or a custom V4L2 application."
+                            else
                                 echo "      gst-launch-1.0 -v \\"
                                 echo "        v4l2src device=$video_dev \\"
                                 echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
-                                echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
-                                echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
                                 echo "        ! videoconvert \\"
                                 echo "        ! $GST_DISPLAY_SINK sync=false"
+                                if [[ "$cam_type" == "Microlynx" ]]; then
+                                    echo "      # Single line (first):"
+                                    echo "      gst-launch-1.0 -v \\"
+                                    echo "        v4l2src device=$video_dev \\"
+                                    echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
+                                    echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
+                                    echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
+                                    echo "        ! videoconvert \\"
+                                    echo "        ! $GST_DISPLAY_SINK sync=false"
+                                fi
                             fi
                         fi
                     fi
