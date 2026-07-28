@@ -774,4 +774,4 @@ cameras:
             pix_clk_hz: 90000000
           - pixel_format: "Y14"
             line_length: 1024
-            pix_clk_hz: 100000000
+            pix_clk_hz: 102857142
