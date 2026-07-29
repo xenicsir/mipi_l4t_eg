@@ -336,10 +336,28 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 
 	dev_dbg(csi->dev, "camera mipi_clock_rate %d\n", cil_config.mipi_clock_rate);
 
-	/* error config -- see EG workaround note at top of file */
+	/* error config -- see EG workaround note at top of file.
+	 *
+	 * MINIMAL VARIANT UNDER TEST (2026-07-29): only status2vi_notify_mask is
+	 * forced, which is the one that stops VI from flagging every buffer with
+	 * V4L2_BUF_FLAG_ERROR. The other two are deliberately left alone:
+	 *
+	 *   stream_intr_mask_lic -> kept at NVIDIA's default 0. Its doc says it
+	 *     masks NVCSI stream errors "reported locally in RCE", which is the
+	 *     path feeding the rtcpu_nvcsi_intr trace events. With the full
+	 *     workaround (all three masks set) that trace went silent -- 0 events
+	 *     instead of ~155k PD_CRC_ERR per 2 s -- so we lost any way to watch
+	 *     CSI-2 link health. Leaving it at 0 should keep the trace usable.
+	 *
+	 *   stream_intr_mask_hsm -> dropped: 0xFF is already NVIDIA's documented
+	 *     default (NVCSI_ERROR_CFG_DFLT_STREAM_HSM = NVCSI_INTR_CONFIG_MASK_
+	 *     STREAM = 0xff), so forcing it changed nothing.
+	 *
+	 * Goal: keep v4l2-ctl working AND keep the errors visible in the trace.
+	 * If the trace is still silent, then status2vi_notify_mask alone also cuts
+	 * the RCE path and there is nothing to gain -- revert to the full set.
+	 */
 	memset(&err_config, 0, sizeof(err_config));
-	err_config.stream_intr_mask_lic = 0xFF;
-	err_config.stream_intr_mask_hsm = 0xFF;
 	err_config.status2vi_notify_mask = 0xFFFF;
 
 	/* Set NVCSI stream config */
