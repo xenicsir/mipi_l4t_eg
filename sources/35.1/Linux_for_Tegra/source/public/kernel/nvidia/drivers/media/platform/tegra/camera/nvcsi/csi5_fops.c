@@ -9,6 +9,36 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+/*
+ * ---------------------------------------------------------------------------
+ * EG workaround: NVCSI error-reporting masks
+ *
+ *     err_config.stream_intr_mask_lic  = 0xFF;
+ *     err_config.stream_intr_mask_hsm  = 0xFF;
+ *     err_config.status2vi_notify_mask = 0xFFFF;
+ *
+ * Mind the inverted polarity: in status2vi_notify_mask, a bit set to 1
+ * DISABLES the reporting of that virtual channel's NVCSI errors to VI at
+ * frame-end. NVIDIA's default (NVCSI_ERROR_CFG_DFLT_STATUS2VI) is 0, i.e.
+ * reporting enabled -- so these lines deliberately turn it off.
+ *
+ * Why: without them, VI marks buffers with V4L2_BUF_FLAG_ERROR and v4l2-ctl
+ * refuses to count or write them, even though the frames themselves are
+ * usable. The images produced with these masks in place are correct -- that
+ * has been the case for Dione and EngineCore since 2024 (added while porting
+ * 32.x -> 35.x, which started surfacing these reports).
+ *
+ * It is a workaround, not a fix: it silences the reporting path, it does not
+ * change what happens on the CSI-2 link. Two things worth keeping in mind:
+ *   - with reporting off, a successful capture is not by itself evidence that
+ *     the link is error-free;
+ *   - there is a known underlying issue on iLumos (payload CRC errors, recent
+ *     FPGA MIPI firmware), to be looked at with the FPGA developer.
+ *
+ * Background, history and measurements: memory note nvcsi_error_masks_history.
+ * ---------------------------------------------------------------------------
+ */
 #include <linux/log2.h>
 #include <media/csi.h>
 #include <media/mc_common.h>
@@ -269,7 +299,7 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	else
 		cil_config.mipi_clock_rate = csi->clk_freq / 1000;
 
-       /* error config */
+       /* error config -- see EG workaround note at top of file */
        memset(&error_config, 0, sizeof(error_config));
        error_config.stream_intr_mask_lic = 0xFF;
        error_config.stream_intr_mask_hsm = 0xFF;

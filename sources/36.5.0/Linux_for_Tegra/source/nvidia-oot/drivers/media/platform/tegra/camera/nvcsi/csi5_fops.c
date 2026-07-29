@@ -1,13 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (c) 2016-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * Tegra CSI5 device common APIs
- *
- * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
- *
- * Author: Frank Chen <frankc@nvidia.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 /*
@@ -39,14 +34,14 @@
  * Background, history and measurements: memory note nvcsi_error_masks_history.
  * ---------------------------------------------------------------------------
  */
-#include <linux/log2.h>
+
 #include <media/csi.h>
 #include <media/mc_common.h>
 #include <media/csi5_registers.h>
-#include "nvhost_acm.h"
 #include "nvcsi/nvcsi.h"
 #include "csi5_fops.h"
 #include <linux/nospec.h>
+#include <linux/nvhost.h>
 #include <linux/tegra-capture-ivc.h>
 #include "soc/tegra/camrtc-capture-messages.h"
 #include <media/fusa-capture/capture-vi.h>
@@ -243,13 +238,12 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 
 	unsigned int cil_settletime = 0;
 	unsigned int lane_polarity = 0;
-	unsigned int index = 0;
 	int vi_port = 0;
 
 	struct CAPTURE_CONTROL_MSG msg;
 	struct nvcsi_brick_config brick_config;
 	struct nvcsi_cil_config cil_config;
-	struct nvcsi_error_config error_config;
+	struct nvcsi_error_config err_config;
 	u32 phy_mode = read_phy_mode_from_dt(chan);
 	bool is_cphy = (phy_mode == CSI_PHY_MODE_CPHY);
 	dev_dbg(csi->dev, "%s: stream_id=%u, csi_port=%u\n",
@@ -271,7 +265,7 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 		}
 	} else if (chan->of_node) {
 		int err = 0;
-		const char *str;
+		const char *str = NULL;
 
 		dev_dbg(csi->dev,
 			"cil_settletime is pulled from device of_node");
@@ -293,7 +287,7 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 			err = kstrtou32(str, 10, &lane_polarity);
 			if (err) {
 				dev_dbg(csi->dev,
-					"no cil_settletime in of_node");
+					"no lane_polarity in of_node");
 				lane_polarity = 0;
 			}
 		}
@@ -306,6 +300,7 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 
 	/* Lane polarity */
 	if (!is_cphy) {
+		unsigned int index = 0;
 		for (index = 0; index < NVCSI_BRICK_NUM_LANES; index++)
 			brick_config.lane_polarity[index] = (lane_polarity >> index) & (0x1);
 	}
@@ -321,11 +316,11 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	else
 		cil_config.mipi_clock_rate = csi->clk_freq / 1000;
 
-       /* error config -- see EG workaround note at top of file */
-       memset(&error_config, 0, sizeof(error_config));
-       error_config.stream_intr_mask_lic = 0xFF;
-       error_config.stream_intr_mask_hsm = 0xFF;
-       error_config.status2vi_notify_mask = 0xFFFF;
+	/* error config -- see EG workaround note at top of file */
+	memset(&err_config, 0, sizeof(err_config));
+	err_config.stream_intr_mask_lic = 0xFF;
+	err_config.stream_intr_mask_hsm = 0xFF;
+	err_config.status2vi_notify_mask = 0xFFFF;
 
 	/* Set NVCSI stream config */
 	memset(&msg, 0, sizeof(msg));
@@ -335,8 +330,9 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	msg.csi_stream_set_config_req.csi_port = csi_port;
 	msg.csi_stream_set_config_req.brick_config = brick_config;
 	msg.csi_stream_set_config_req.cil_config = cil_config;
-        msg.csi_stream_set_config_req.error_config = error_config;
-        msg.csi_stream_set_config_req.config_flags = NVCSI_CONFIG_FLAG_BRICK | NVCSI_CONFIG_FLAG_CIL | NVCSI_CONFIG_FLAG_ERROR;
+	msg.csi_stream_set_config_req.error_config = err_config;
+	msg.csi_stream_set_config_req.config_flags = NVCSI_CONFIG_FLAG_BRICK |
+						NVCSI_CONFIG_FLAG_CIL | NVCSI_CONFIG_FLAG_ERROR;
 
 	if (tegra_chan->valid_ports > 1)
 		vi_port = (stream_id > 0) ? 1 : 0;
@@ -427,8 +423,10 @@ static void csi5_stream_tpg_stop(struct tegra_csi_channel *chan, u32 stream_id,
  * gain setting by 8, before v4l2 ioctl call. It is tranformed before
  * IVC message
  */
-static uint32_t get_tpg_gain_ratio_setting(int gain_ratio_tpg)
+static int get_tpg_gain_ratio_setting(int gain_ratio_tpg,
+					uint32_t *apply_gain_ratio)
 {
+	uint8_t idx;
 	const uint32_t tpg_gain_ratio_settings[] = {
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_ONE_EIGHTH,
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_ONE_FOURTH,
@@ -438,7 +436,12 @@ static uint32_t get_tpg_gain_ratio_setting(int gain_ratio_tpg)
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_FOUR_TO_ONE,
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_EIGHT_TO_ONE};
 
-	return tpg_gain_ratio_settings[order_base_2(gain_ratio_tpg)];
+	idx = order_base_2(gain_ratio_tpg);
+	if (idx >= ARRAY_SIZE(tpg_gain_ratio_settings))
+		return -EINVAL;
+
+	*apply_gain_ratio = tpg_gain_ratio_settings[idx];
+	return 0;
 }
 
 int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
@@ -448,7 +451,6 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 	struct tegra_channel *tegra_chan =
 		v4l2_get_subdev_hostdata(&chan->subdev);
 	int err = 0;
-	int vi_port = 0;
 	struct CAPTURE_CONTROL_MSG msg;
 
 	if (!chan->pg_mode) {
@@ -456,7 +458,7 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 		return -EINVAL;
 	}
 
-	if (tegra_chan->tegra_vi_channel == NULL) {
+	if (tegra_chan->tegra_vi_channel[0] == NULL) {
 		/* We come here during initial v4l2 ctrl setup during TPG LKM
 		 * loading
 		 */
@@ -469,11 +471,15 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 	msg.csi_stream_tpg_apply_gain_req.stream_id = port->stream_id;
 	msg.csi_stream_tpg_apply_gain_req.virtual_channel_id =
 		port->virtual_channel_id;
-	msg.csi_stream_tpg_apply_gain_req.gain_ratio =
-		get_tpg_gain_ratio_setting(gain_ratio_tpg);
-	vi_port = (tegra_chan->valid_ports > 1) ? port->stream_id : 0;
+	err = get_tpg_gain_ratio_setting(gain_ratio_tpg,
+		&msg.csi_stream_tpg_apply_gain_req.gain_ratio);
+	if (err < 0) {
+		dev_err(csi->dev, "%s: Error in setting TPG gain ratio\n",
+			__func__);
+		return err;
+	}
 
-	err = csi5_send_control_message(tegra_chan->tegra_vi_channel[vi_port], &msg,
+	err = csi5_send_control_message(tegra_chan->tegra_vi_channel[0], &msg,
 			&msg.csi_stream_tpg_apply_gain_resp.result);
 	if (err < 0) {
 		dev_err(csi->dev, "%s: Error in setting TPG gain stream_id=%u, csi_port=%u\n",
@@ -585,3 +591,4 @@ struct tegra_csi_fops csi5_fops = {
 	.hw_init = csi5_hw_init,
 	.tpg_set_gain = csi5_tpg_set_gain,
 };
+EXPORT_SYMBOL(csi5_fops);

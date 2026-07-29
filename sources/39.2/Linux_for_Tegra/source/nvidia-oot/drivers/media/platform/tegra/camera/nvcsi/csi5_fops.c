@@ -1,52 +1,13 @@
-/*
- * Tegra CSI5 device common APIs
- *
- * Copyright (c) 2016-2022, NVIDIA CORPORATION.  All rights reserved.
- *
- * Author: Frank Chen <frankc@nvidia.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
+// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-FileCopyrightText: Copyright (c) 2016-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+/* Tegra CSI5 device common APIs */
 
-/*
- * ---------------------------------------------------------------------------
- * EG workaround: NVCSI error-reporting masks
- *
- *     err_config.stream_intr_mask_lic  = 0xFF;
- *     err_config.stream_intr_mask_hsm  = 0xFF;
- *     err_config.status2vi_notify_mask = 0xFFFF;
- *
- * Mind the inverted polarity: in status2vi_notify_mask, a bit set to 1
- * DISABLES the reporting of that virtual channel's NVCSI errors to VI at
- * frame-end. NVIDIA's default (NVCSI_ERROR_CFG_DFLT_STATUS2VI) is 0, i.e.
- * reporting enabled -- so these lines deliberately turn it off.
- *
- * Why: without them, VI marks buffers with V4L2_BUF_FLAG_ERROR and v4l2-ctl
- * refuses to count or write them, even though the frames themselves are
- * usable. The images produced with these masks in place are correct -- that
- * has been the case for Dione and EngineCore since 2024 (added while porting
- * 32.x -> 35.x, which started surfacing these reports).
- *
- * It is a workaround, not a fix: it silences the reporting path, it does not
- * change what happens on the CSI-2 link. Two things worth keeping in mind:
- *   - with reporting off, a successful capture is not by itself evidence that
- *     the link is error-free;
- *   - there is a known underlying issue on iLumos (payload CRC errors, recent
- *     FPGA MIPI firmware), to be looked at with the FPGA developer.
- *
- * Background, history and measurements: memory note nvcsi_error_masks_history.
- * ---------------------------------------------------------------------------
- */
-#include <linux/log2.h>
 #include <media/csi.h>
 #include <media/mc_common.h>
 #include <media/csi5_registers.h>
-#include "nvhost_acm.h"
-#include "nvcsi/nvcsi.h"
 #include "csi5_fops.h"
 #include <linux/nospec.h>
+#include <linux/nvhost.h>
 #include <linux/tegra-capture-ivc.h>
 #include "soc/tegra/camrtc-capture-messages.h"
 #include <media/fusa-capture/capture-vi.h>
@@ -242,14 +203,16 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	const struct sensor_mode_properties *mode = NULL;
 
 	unsigned int cil_settletime = 0;
+	unsigned int cil_clksettletime = 0;
+
 	unsigned int lane_polarity = 0;
-	unsigned int index = 0;
+	unsigned int lane_polarities[NVCSI_BRICK_NUM_LANES] = {0};
 	int vi_port = 0;
 
 	struct CAPTURE_CONTROL_MSG msg;
 	struct nvcsi_brick_config brick_config;
 	struct nvcsi_cil_config cil_config;
-	struct nvcsi_error_config error_config;
+	struct nvcsi_error_config err_config;
 	u32 phy_mode = read_phy_mode_from_dt(chan);
 	bool is_cphy = (phy_mode == CSI_PHY_MODE_CPHY);
 	dev_dbg(csi->dev, "%s: stream_id=%u, csi_port=%u\n",
@@ -259,11 +222,23 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	if (s_data) {
 		int idx = s_data->mode_prop_idx;
 
-		dev_dbg(csi->dev, "cil_settingtime is pulled from device");
+		dev_dbg(csi->dev, "from device s_data\n");
 		if (idx < s_data->sensor_props.num_modes) {
 			mode = &s_data->sensor_props.sensor_modes[idx];
 			cil_settletime = mode->signal_properties.cil_settletime;
 			lane_polarity = mode->signal_properties.lane_polarity;
+			cil_clksettletime = mode->signal_properties.cil_clksettletime;
+
+			for (int i = 0; i < NVCSI_BRICK_NUM_LANES; i++) {
+				/*
+				 * brick_config.lane_polarity[i] is used for the i-th CPHY trio
+				 * e.g. i=0 for POLARITY_SWIZZLE_CPHY0_A
+				 *      i=1 for POLARITY_SWIZZLE_CPHY1_A, etc.
+				 */
+				dev_dbg(csi->dev, "lane_polarity[%d] = %d\n",
+						i, mode->signal_properties.lane_polarities[i]);
+				lane_polarities[i] = mode->signal_properties.lane_polarities[i];
+			}
 		} else {
 			dev_dbg(csi->dev, "mode not listed in DT, use default");
 			cil_settletime = 0;
@@ -271,10 +246,9 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 		}
 	} else if (chan->of_node) {
 		int err = 0;
-		const char *str;
+		const char *str = NULL;
 
-		dev_dbg(csi->dev,
-			"cil_settletime is pulled from device of_node");
+		dev_dbg(csi->dev, "from device of_node");
 		err = of_property_read_string(chan->of_node, "cil_settletime",
 			&str);
 		if (!err) {
@@ -287,13 +261,25 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 		}
 		/* Reset string pointer for the next property */
 		str = NULL;
+		err = of_property_read_string(chan->of_node, "cil_clksettletime",
+			&str);
+		if (!err) {
+			err = kstrtou32(str, 10, &cil_clksettletime);
+			if (err) {
+				dev_dbg(csi->dev,
+					"no cil_clksettletime in of_node");
+				cil_clksettletime = 0;
+			}
+		}
+		/* Reset string pointer for the next property */
+		str = NULL;
 		err = of_property_read_string(chan->of_node, "lane_polarity",
 			&str);
 		if (!err) {
 			err = kstrtou32(str, 10, &lane_polarity);
 			if (err) {
 				dev_dbg(csi->dev,
-					"no cil_settletime in of_node");
+					"no lane_polarity in of_node");
 				lane_polarity = 0;
 			}
 		}
@@ -306,8 +292,26 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 
 	/* Lane polarity */
 	if (!is_cphy) {
+		unsigned int index = 0;
 		for (index = 0; index < NVCSI_BRICK_NUM_LANES; index++)
 			brick_config.lane_polarity[index] = (lane_polarity >> index) & (0x1);
+	} else {
+		/*
+		 * CPHY lane polarity handling:
+		 * brick_config.lane_polarity[0]:
+		 *   NVCSI_PHY_0_NVCSI_CIL_A_POLARITY_SWIZZLE_CTRL_0 POLARITY_SWIZZLE_CPHY0_A,
+		 * brick_config.lane_polarity[1]:
+		 *   NVCSI_PHY_0_NVCSI_CIL_A_POLARITY_SWIZZLE_CTRL_0 POLARITY_SWIZZLE_CPHY1_A,
+		 * brick_config.lane_polarity[2]:
+		 *   NVCSI_PHY_0_NVCSI_CIL_B_POLARITY_SWIZZLE_CTRL_0 POLARITY_SWIZZLE_CPHY0_B,
+		 * brick_config.lane_polarity[3]:
+		 *   NVCSI_PHY_0_NVCSI_CIL_B_POLARITY_SWIZZLE_CTRL_0 POLARITY_SWIZZLE_CPHY1_B.
+		 */
+		for (int i = 0; i < NVCSI_BRICK_NUM_LANES; i++) {
+			brick_config.lane_polarity[i] = lane_polarities[i] & 0x7;
+			dev_dbg(csi->dev, "lane_polarity[%d] = %d\n",
+					i, brick_config.lane_polarity[i]);
+		}
 	}
 
 	/* CIL config */
@@ -315,17 +319,28 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	cil_config.num_lanes = csi_lanes;
 	cil_config.lp_bypass_mode = is_cphy ? 0 : 1;
 	cil_config.t_hs_settle = cil_settletime;
+	cil_config.t_clk_settle = cil_clksettletime;
+
+	if (mode && mode->signal_properties.shmoo_enable) {
+		cil_config.tuning.control = true;
+		cil_config.tuning.afe_hf_gain = mode->signal_properties.afe_hf_gain;
+		cil_config.tuning.edge_delay = mode->signal_properties.edge_delay;
+		dev_dbg(csi->dev, "Trying to override hfgain %d and edge-delay %d to RCE\n",
+				cil_config.tuning.afe_hf_gain, cil_config.tuning.edge_delay);
+	}
 
 	if (s_data && !chan->pg_mode)
 		cil_config.mipi_clock_rate = read_mipi_clk_from_dt(chan) / 1000;
 	else
 		cil_config.mipi_clock_rate = csi->clk_freq / 1000;
 
-       /* error config -- see EG workaround note at top of file */
-       memset(&error_config, 0, sizeof(error_config));
-       error_config.stream_intr_mask_lic = 0xFF;
-       error_config.stream_intr_mask_hsm = 0xFF;
-       error_config.status2vi_notify_mask = 0xFFFF;
+	dev_dbg(csi->dev, "camera mipi_clock_rate %d\n", cil_config.mipi_clock_rate);
+
+	/* error config -- see EG workaround note at top of file */
+	memset(&err_config, 0, sizeof(err_config));
+	err_config.stream_intr_mask_lic = 0xFF;
+	err_config.stream_intr_mask_hsm = 0xFF;
+	err_config.status2vi_notify_mask = 0xFFFF;
 
 	/* Set NVCSI stream config */
 	memset(&msg, 0, sizeof(msg));
@@ -335,8 +350,9 @@ static int csi5_stream_set_config(struct tegra_csi_channel *chan, u32 stream_id,
 	msg.csi_stream_set_config_req.csi_port = csi_port;
 	msg.csi_stream_set_config_req.brick_config = brick_config;
 	msg.csi_stream_set_config_req.cil_config = cil_config;
-        msg.csi_stream_set_config_req.error_config = error_config;
-        msg.csi_stream_set_config_req.config_flags = NVCSI_CONFIG_FLAG_BRICK | NVCSI_CONFIG_FLAG_CIL | NVCSI_CONFIG_FLAG_ERROR;
+	msg.csi_stream_set_config_req.error_config = err_config;
+	msg.csi_stream_set_config_req.config_flags = NVCSI_CONFIG_FLAG_BRICK |
+						NVCSI_CONFIG_FLAG_CIL | NVCSI_CONFIG_FLAG_ERROR;
 
 	if (tegra_chan->valid_ports > 1)
 		vi_port = (stream_id > 0) ? 1 : 0;
@@ -427,8 +443,40 @@ static void csi5_stream_tpg_stop(struct tegra_csi_channel *chan, u32 stream_id,
  * gain setting by 8, before v4l2 ioctl call. It is tranformed before
  * IVC message
  */
-static uint32_t get_tpg_gain_ratio_setting(int gain_ratio_tpg)
+
+/*
+ * ---------------------------------------------------------------------------
+ * EG workaround: NVCSI error-reporting masks
+ *
+ *     err_config.stream_intr_mask_lic  = 0xFF;
+ *     err_config.stream_intr_mask_hsm  = 0xFF;
+ *     err_config.status2vi_notify_mask = 0xFFFF;
+ *
+ * Mind the inverted polarity: in status2vi_notify_mask, a bit set to 1
+ * DISABLES the reporting of that virtual channel's NVCSI errors to VI at
+ * frame-end. NVIDIA's default (NVCSI_ERROR_CFG_DFLT_STATUS2VI) is 0, i.e.
+ * reporting enabled -- so these lines deliberately turn it off.
+ *
+ * Why: without them, VI marks buffers with V4L2_BUF_FLAG_ERROR and v4l2-ctl
+ * refuses to count or write them, even though the frames themselves are
+ * usable. The images produced with these masks in place are correct -- that
+ * has been the case for Dione and EngineCore since 2024 (added while porting
+ * 32.x -> 35.x, which started surfacing these reports).
+ *
+ * It is a workaround, not a fix: it silences the reporting path, it does not
+ * change what happens on the CSI-2 link. Two things worth keeping in mind:
+ *   - with reporting off, a successful capture is not by itself evidence that
+ *     the link is error-free;
+ *   - there is a known underlying issue on iLumos (payload CRC errors, recent
+ *     FPGA MIPI firmware), to be looked at with the FPGA developer.
+ *
+ * Background, history and measurements: memory note nvcsi_error_masks_history.
+ * ---------------------------------------------------------------------------
+ */
+static int get_tpg_gain_ratio_setting(int gain_ratio_tpg,
+					uint32_t *apply_gain_ratio)
 {
+	uint8_t idx;
 	const uint32_t tpg_gain_ratio_settings[] = {
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_ONE_EIGHTH,
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_ONE_FOURTH,
@@ -438,7 +486,12 @@ static uint32_t get_tpg_gain_ratio_setting(int gain_ratio_tpg)
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_FOUR_TO_ONE,
 		CAPTURE_CSI_STREAM_TPG_GAIN_RATIO_EIGHT_TO_ONE};
 
-	return tpg_gain_ratio_settings[order_base_2(gain_ratio_tpg)];
+	idx = order_base_2(gain_ratio_tpg);
+	if (idx >= ARRAY_SIZE(tpg_gain_ratio_settings))
+		return -EINVAL;
+
+	*apply_gain_ratio = tpg_gain_ratio_settings[idx];
+	return 0;
 }
 
 int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
@@ -448,7 +501,6 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 	struct tegra_channel *tegra_chan =
 		v4l2_get_subdev_hostdata(&chan->subdev);
 	int err = 0;
-	int vi_port = 0;
 	struct CAPTURE_CONTROL_MSG msg;
 
 	if (!chan->pg_mode) {
@@ -456,7 +508,7 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 		return -EINVAL;
 	}
 
-	if (tegra_chan->tegra_vi_channel == NULL) {
+	if (tegra_chan->tegra_vi_channel[0] == NULL) {
 		/* We come here during initial v4l2 ctrl setup during TPG LKM
 		 * loading
 		 */
@@ -469,11 +521,15 @@ int csi5_tpg_set_gain(struct tegra_csi_channel *chan, int gain_ratio_tpg)
 	msg.csi_stream_tpg_apply_gain_req.stream_id = port->stream_id;
 	msg.csi_stream_tpg_apply_gain_req.virtual_channel_id =
 		port->virtual_channel_id;
-	msg.csi_stream_tpg_apply_gain_req.gain_ratio =
-		get_tpg_gain_ratio_setting(gain_ratio_tpg);
-	vi_port = (tegra_chan->valid_ports > 1) ? port->stream_id : 0;
+	err = get_tpg_gain_ratio_setting(gain_ratio_tpg,
+		&msg.csi_stream_tpg_apply_gain_req.gain_ratio);
+	if (err < 0) {
+		dev_err(csi->dev, "%s: Error in setting TPG gain ratio\n",
+			__func__);
+		return err;
+	}
 
-	err = csi5_send_control_message(tegra_chan->tegra_vi_channel[vi_port], &msg,
+	err = csi5_send_control_message(tegra_chan->tegra_vi_channel[0], &msg,
 			&msg.csi_stream_tpg_apply_gain_resp.result);
 	if (err < 0) {
 		dev_err(csi->dev, "%s: Error in setting TPG gain stream_id=%u, csi_port=%u\n",
@@ -585,3 +641,4 @@ struct tegra_csi_fops csi5_fops = {
 	.hw_init = csi5_hw_init,
 	.tpg_set_gain = csi5_tpg_set_gain,
 };
+EXPORT_SYMBOL(csi5_fops);
