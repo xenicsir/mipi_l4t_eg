@@ -66,6 +66,9 @@ platforms:
     l4t_series: "35.x, 36.x, 39.x"
     som: "Tegra234"
     csi_lanes: 4
+    variants:
+      - "Jetson Orin NX / Orin Nano developer kit (p3768) (tested)"
+      - "Waveshare JETSON-ORIN-IO-BASE (tested)"
 
   - id: forecr_ornxs
     name: "Forecr DSBOARD ORNXS"

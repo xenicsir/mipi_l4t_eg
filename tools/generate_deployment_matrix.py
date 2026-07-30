@@ -458,6 +458,15 @@ class DeploymentMatrixGenerator:
                 if 'description' in platform:
                     f.write(f"**{platform['description']}**\n\n")
 
+                if 'variants' in platform:
+                    variants = platform['variants']
+                    if not isinstance(variants, list):
+                        variants = [variants]
+                    f.write("**Carrier boards:**\n\n")
+                    for variant in variants:
+                        f.write(f"- {variant}\n")
+                    f.write("\n")
+
                 if 'notes' in platform:
                     notes = platform['notes']
                     if isinstance(notes, list):
@@ -605,6 +614,19 @@ class DeploymentMatrixGenerator:
             border-left: 4px solid #3498db;
             margin: 10px 0;
             border-radius: 3px;
+        }}
+
+        .platform-variants {{
+            background: #f1f8e9;
+            padding: 10px;
+            border-left: 4px solid #7cb342;
+            margin: 10px 0;
+            border-radius: 3px;
+        }}
+
+        .platform-variants ul {{
+            margin: 5px 0 0 20px;
+            padding: 0;
         }}
 
         table {{
@@ -766,6 +788,13 @@ class DeploymentMatrixGenerator:
 
             if 'description' in platform:
                 html_content += f"        <p><strong>{platform['description']}</strong></p>\n"
+
+            if 'variants' in platform:
+                variants = platform['variants']
+                if not isinstance(variants, list):
+                    variants = [variants]
+                variants_html = ''.join(f'<li>{v}</li>' for v in variants)
+                html_content += f'        <div class="platform-variants">🔌 <strong>Carrier boards:</strong><ul>{variants_html}</ul></div>\n'
 
             if 'notes' in platform:
                 notes = platform['notes']
@@ -981,6 +1010,11 @@ class DeploymentMatrixGenerator:
             if 'csi_lanes' in platform:   meta.append(f"CSI lanes: {platform['csi_lanes']}")
             if meta:
                 lines.append(f"<div class='plat-meta'>{' | '.join(meta)}</div>")
+            if 'variants' in platform:
+                variants = platform['variants']
+                if not isinstance(variants, list):
+                    variants = [variants]
+                lines.append(f"<div class='plat-meta'>🔌 <b>Carrier boards:</b> {' | '.join(variants)}</div>")
             if 'notes' in platform:
                 notes = platform['notes']
                 if isinstance(notes, list):

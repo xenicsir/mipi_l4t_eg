@@ -20,6 +20,12 @@
 #include "gencp-over-i2c/libunio.h"
 #include "gencp-over-i2c/gencp_client.h"
 
+/* kernel 4.9 (T210/Nano) videodev2.h predates this fourcc — same #ifndef
+ * compat pattern already used in vi5_formats.h for missing mbus codes. */
+#ifndef V4L2_PIX_FMT_Y14
+#define V4L2_PIX_FMT_Y14 v4l2_fourcc('Y', '1', '4', ' ')
+#endif
+
 #define PREFIX "microlynx"
 #include "gencp-over-i2c/liblogger.h"
 

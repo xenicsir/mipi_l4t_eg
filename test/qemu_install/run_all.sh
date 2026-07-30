@@ -9,6 +9,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 IMAGE="eg-camera-test-aarch64"
+CONTAINER_NAME="eg-camera-test-aarch64-run"
+
+# A Ctrl-C that has to be repeated (client not responding fast enough under
+# qemu) can kill the `docker run` client without ever signalling the
+# container to stop — `--rm` then never fires and the container (plus its
+# qemu-translated dpkg/postinst processes) keeps running and competing for
+# CPU with the next attempt, making it look hung too. Clear any such leftover
+# before starting, and make sure this run's own container can't survive an
+# interrupt either.
+if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    echo "⚠  Removing leftover '$CONTAINER_NAME' container from a previous interrupted run..."
+    docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+fi
+trap 'docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true' EXIT INT TERM
 
 # Check that the kernel can run aarch64 binaries (binfmt_misc + qemu-aarch64-static)
 if ! docker run --rm --platform=linux/arm64 arm64v8/ubuntu:22.04 /bin/true >/dev/null 2>&1; then
@@ -30,6 +44,7 @@ fi
 
 echo "=== Running Phase 3 dpkg -i integration tests (aarch64/qemu) ==="
 docker run --rm \
+    --name "$CONTAINER_NAME" \
     --platform=linux/arm64 \
     --privileged \
     -v "$REPO_ROOT:/repo:ro" \
