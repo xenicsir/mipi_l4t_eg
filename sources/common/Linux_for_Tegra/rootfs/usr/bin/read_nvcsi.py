@@ -58,13 +58,38 @@ if "--enable" in sys.argv:
 # ---------------------------------------------------------------------------
 
 # rtcpu_nvcsi_intr type:STREAM_VC  status field
-NVCSI_VC_ERR_BITS = {
+#
+# ⚠️ THIS FIELD CANNOT BE NAMED WITH CERTAINTY. The kernel decodes nothing:
+# TRACE_EVENT(rtcpu_nvcsi_intr) copies `status` straight from the RCE (closed
+# camera firmware). And camrtc-capture.h defines TWO bit layouts for a field of
+# this name, offset by 2 bits:
+#
+#   NVCSI_VC_ERR_INTR_STAT_*        bit 0 PPFSM_TIMEOUT ... bit 2 PD_CRC_ERR
+#   NVCSI_INTR_FLAG_STREAM_VC_ERR_* bit 2 PPFSM_TIMEOUT ... bit 4 PD_CRC
+#
+# So status=0x04 is *either* a payload CRC error *or* a parser FSM timeout, and
+# we cannot tell which. Both readings are printed; never report one as fact.
+# Naming it for real needs a MIPI analyser. See
+# ilumos_pattern_bit_corruption_35.6.0.md in the shared memory.
+NVCSI_VC_ERR_BITS_STAT = {
     0: ("PPFSM_TIMEOUT",        "Packet parser FSM timeout — no FS/FE received within timeout window"),
     1: ("PH_ECC_SINGLE_BIT",    "Packet header single-bit ECC error (corrected)"),
     2: ("PD_CRC_ERR",           "Payload data CRC error — data corruption in CSI-2 payload"),
     3: ("PD_WC_SHORT_ERR",      "Payload word count short — fewer bytes than header WC field"),
     4: ("PH_SINGLE_CRC_ERR",    "Packet header single CRC error"),
 }
+
+NVCSI_VC_ERR_BITS_FLAG = {
+    2: ("PPFSM_TIMEOUT",        "VC pixel parser FSM timeout for a pixel line"),
+    3: ("PH_ECC_SINGLE_BIT",    "Packet header single-bit ECC error (corrected)"),
+    4: ("PD_CRC_ERR",           "Payload data CRC error — data corruption in CSI-2 payload"),
+    5: ("PD_WC_SHORT_ERR",      "Packet terminated before the expected word count"),
+    6: ("PH_SINGLE_CRC_ERR",    "One of the CPHY packet header CRC checks failed"),
+}
+
+# Kept as the "first reading" so the per-bit listing stays readable; the
+# ambiguity is always spelled out next to it.
+NVCSI_VC_ERR_BITS = NVCSI_VC_ERR_BITS_STAT
 
 # rtcpu_nvcsi_intr type:STREAM  status field (stream-level, not VC-specific)
 NVCSI_STREAM_ERR_BITS = {
@@ -559,9 +584,27 @@ else:
         label_str = " | ".join(labels) if labels else "unknown"
         print(f"\n    [{cls}] type={typ} phy={phy} cil={cil} stream={st} vc={vc}"
               f"  status=0x{status:08x}  ×{cnt}")
-        for bit, (name, desc) in sorted(bit_table.items()):
-            if status & (1 << bit):
-                print(f"      [bit{bit}] {name:<28s}  {desc}")
+        if typ != "STREAM_VC":
+            for bit, (name, desc) in sorted(bit_table.items()):
+                if status & (1 << bit):
+                    print(f"      [bit{bit}] {name:<28s}  {desc}")
+        else:
+            # Two possible bit layouts in NVIDIA's own header, and the kernel
+            # decodes neither. Print both readings side by side and assert
+            # nothing — an assertive line first would be read as the answer.
+            def _read(table):
+                hits = [f"bit{b} {table[b][0]}" for b in sorted(table)
+                        if status & (1 << b)]
+                return " | ".join(hits) if hits else "no bit assigned"
+            print(f"      ⚠️  status=0x{status:08x} CANNOT BE NAMED — NVIDIA's header")
+            print( "          defines two layouts for this field, offset by 2 bits:")
+            print(f"            NVCSI_VC_ERR_INTR_STAT_*        → {_read(NVCSI_VC_ERR_BITS_STAT)}")
+            print(f"            NVCSI_INTR_FLAG_STREAM_VC_ERR_* → {_read(NVCSI_VC_ERR_BITS_FLAG)}")
+            print( "          The kernel copies `status` raw from the RCE (closed) firmware")
+            print( "          and decodes nothing, so neither reading can be confirmed here.")
+            print( "          These two point at DIFFERENT causes. Telling them apart needs")
+            print( "          a MIPI analyser; to know whether the PIXELS are wrong, compare")
+            print( "          a test-pattern capture against its expected values instead.")
 
 # --- Parse rtcpu_vinotify_error and rtcpu_vinotify_event ---
 # Example:
@@ -788,9 +831,14 @@ if not any([corr_total, uncorr_total, all_nvcsi_errors, vinotify_total]):
     print("  OK — no errors detected during the observation window.")
 else:
     if has_pd_crc:
-        print("  [ERR] PD_CRC_ERR — CSI-2 payload data CRC mismatch")
+        print("  [ERR] STREAM_VC status bit 2 set — AMBIGUOUS, cannot be named:")
+        print("        PD_CRC_ERR (payload CRC) if the field uses NVCSI_VC_ERR_INTR_STAT_*,")
+        print("        PPFSM_TIMEOUT (parser FSM) if it uses NVCSI_INTR_FLAG_STREAM_VC_ERR_*.")
+        print("        The kernel decodes nothing — `status` comes raw from the RCE firmware.")
     if has_ppfsm:
-        print("  [ERR] PPFSM_TIMEOUT — no frame start/end within timeout")
+        print("  [ERR] STREAM_VC status bit 0 set — PPFSM_TIMEOUT under the")
+        print("        NVCSI_VC_ERR_INTR_STAT_* reading (no frame start/end within timeout);")
+        print("        unassigned under the NVCSI_INTR_FLAG_STREAM_VC_ERR_* reading.")
     if has_ph_ecc:
         print("  [ERR] PH_ECC error — packet header bit error")
     if has_cil_sot:
@@ -826,13 +874,21 @@ diag = []
 
 if has_pd_crc and not has_cil_sot and not has_cil_align:
     diag.append(
-        "[!] PD_CRC_ERR with no D-PHY SOT/alignment errors\n"
-        "    → Signal integrity issue at CSI-2 protocol level (not D-PHY level).\n"
-        "    Likely causes:\n"
+        "[!] STREAM_VC status bit 2 set, with no D-PHY SOT/alignment errors\n"
+        "    ⚠️ This bit cannot be named: PD_CRC_ERR (payload CRC) under one of\n"
+        "       NVIDIA's two bit layouts, PPFSM_TIMEOUT (parser FSM) under the\n"
+        "       other. The two point at DIFFERENT causes, so treat the list below\n"
+        "       as leads to check, not as a diagnosis.\n"
+        "    If it is a payload CRC error — CSI-2 protocol level, not D-PHY:\n"
         "      1. Marginal MIPI signal: cable too long, poor connector, bad impedance\n"
         "      2. Wrong D-PHY settling time (mipi_cal, tclk_settle, ths_settle in DT)\n"
         "      3. MIPI clock too high for this cable length — try reducing pix_clk_hz\n"
-        "      4. Wrong num-lanes in DT (e.g. 1 lane configured, camera sends 2)"
+        "      4. Wrong num-lanes in DT (e.g. 1 lane configured, camera sends 2)\n"
+        "    If it is a parser FSM timeout — line/frame framing, sensor side:\n"
+        "      5. Line length or word count not matching what the sensor announces\n"
+        "      6. Missing/extra short packets at line or frame boundaries\n"
+        "    A test pattern compared against its expected values tells you whether\n"
+        "    the PIXELS are actually wrong — that is independent of this label."
     )
 
 if has_cil_sot:
