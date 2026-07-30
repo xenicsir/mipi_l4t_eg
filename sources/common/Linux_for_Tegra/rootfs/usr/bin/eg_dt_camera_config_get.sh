@@ -660,27 +660,40 @@ else
                         if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_gstfmt" == GRAY16* ]]; then
                             echo "    Warning: 16-bit greyscale is not supported on Jetson Nano (t210). Use AR24 or YUYV."
                         else
-                            echo "    Streaming:"
-                            echo "      v4l2-ctl -d $video_dev \\"
-                            echo "        --stream-mmap \\"
-                            echo "        --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            # Each example is printed as ONE line, numbered, and — unlike the
+                            # rest of this report — flush at column 0. Two deliberate choices:
+                            #  * No backslash continuations: with them the reader has to work
+                            #    out where one command ends and the next begins, and a partial
+                            #    selection pastes as a silently truncated command. One line =
+                            #    one command = one triple-click. Long lines just wrap.
+                            #  * No leading indentation: Ubuntu defaults to
+                            #    HISTCONTROL=ignoreboth (includes ignorespace), so a pasted
+                            #    command that starts with a space is dropped from the shell
+                            #    history and cannot be recalled with the up arrow or Ctrl-R.
+                            #    The comment lines are flush too, so selecting the comment
+                            #    plus its command still pastes cleanly.
+                            _cmdno=0
+                            _caps="\"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\""
+                            echo "    Streaming (one command per line — triple-click to copy):"
+                            _cmdno=$((_cmdno + 1))
+                            echo "# $_cmdno. Capture only, no display — check the stream is alive:"
+                            echo "v4l2-ctl -d $video_dev --stream-mmap --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
+                            # No -f/-W/-H needed: with no --fmt, rt_frame_monitor reads the
+                            # device's currently active pixel format and resolution itself.
+                            _cmdno=$((_cmdno + 1))
+                            echo "# $_cmdno. Live display + frame-rate/drop monitoring:"
+                            echo "rt_frame_monitor.py -d $video_dev --display"
                             if [[ -z "$_gstfmt" ]]; then
-                                echo "      Note: GStreamer has no 14-bit greyscale format — use v4l2-ctl (above) or a custom V4L2 application."
+                                echo "    Note: GStreamer has no 14-bit greyscale format — use command 1 or 2"
+                                echo "          above (rt_frame_monitor.py needs python3-opencv) to display Y14."
                             else
-                                echo "      gst-launch-1.0 -v \\"
-                                echo "        v4l2src device=$video_dev \\"
-                                echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
-                                echo "        ! videoconvert \\"
-                                echo "        ! $GST_DISPLAY_SINK sync=false"
+                                _cmdno=$((_cmdno + 1))
+                                echo "# $_cmdno. Live display through GStreamer:"
+                                echo "gst-launch-1.0 -v v4l2src device=$video_dev ! $_caps ! videoconvert ! $GST_DISPLAY_SINK sync=false"
                                 if [[ "$cam_type" == "Microlynx" ]]; then
-                                    echo "      # Single line (first):"
-                                    echo "      gst-launch-1.0 -v \\"
-                                    echo "        v4l2src device=$video_dev \\"
-                                    echo "        ! \"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\" \\"
-                                    echo "        ! videocrop top=0 bottom=$((_h - 1)) \\"
-                                    echo "        ! \"video/x-raw, width=$_w, height=1\" \\"
-                                    echo "        ! videoconvert \\"
-                                    echo "        ! $GST_DISPLAY_SINK sync=false"
+                                    _cmdno=$((_cmdno + 1))
+                                    echo "# $_cmdno. Live display through GStreamer, first line only:"
+                                    echo "gst-launch-1.0 -v v4l2src device=$video_dev ! $_caps ! videocrop top=0 bottom=$((_h - 1)) ! \"video/x-raw, width=$_w, height=1\" ! videoconvert ! $GST_DISPLAY_SINK sync=false"
                                 fi
                             fi
                         fi
