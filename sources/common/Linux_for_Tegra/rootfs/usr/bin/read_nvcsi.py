@@ -22,6 +22,11 @@ import sys
 import time
 from collections import defaultdict
 
+# Gate on the RCE firmware side: at 0 it emits no trace record at all, whatever
+# the ftrace event group says. Both --enable and the full diagnostic must raise
+# it, or the trace reads back empty on a link that is flooding with errors.
+CAMRTC_LOG_LEVEL = "/sys/kernel/debug/camrtc/log-level"
+
 # ---------------------------------------------------------------------------
 # --enable mode: equivalent of former nvcsi_traces.sh
 # ---------------------------------------------------------------------------
@@ -35,7 +40,7 @@ if "--enable" in sys.argv:
         (f"{TRACE}/buffer_size_kb",                          "30720"),
         (f"{TRACE}/events/tegra_rtcpu/enable",               "1"),
         (f"{TRACE}/events/freertos/enable",                  "1"),
-        (f"/sys/kernel/debug/camrtc/log-level",              "3"),
+        (CAMRTC_LOG_LEVEL,                                   "3"),
         (f"{TRACE}/events/camera_common/enable",             "1"),
         (f"{TRACE}/trace",                                   ""),
     ]:
@@ -308,7 +313,7 @@ for clk_name in ("nvcsilp", "nvcsi", "vi", "nafll_vi"):
 sep("CAMRTC")
 # ---------------------------------------------------------------------------
 camrtc_ver = read_file("/sys/kernel/debug/camrtc/version")
-camrtc_log = read_file("/sys/kernel/debug/camrtc/log-level")
+camrtc_log = read_file(CAMRTC_LOG_LEVEL)
 if camrtc_ver:
     print(f"  version     : {camrtc_ver}")
 if camrtc_log is not None:
@@ -531,8 +536,19 @@ if read_only:
     trace_raw = read_file(f"{TRACE_BASE}/trace") or ""
 else:
     sep("RTCPU NVCSI TRACE  (1 s capture)")
-    # Load rtcpu_debug module (optional, provides more detail)
+    # Load rtcpu_debug module (optional, provides more detail). Absent on 35.x,
+    # where the camera drivers are built into the kernel rather than modules --
+    # harmless, the tegra_rtcpu event group is there either way.
     os.system("modprobe rtcpu_debug 2>/dev/null")
+
+    # Raise the camrtc log level. Enabling the ftrace event group is NOT enough:
+    # at log-level 0 the RCE firmware emits nothing at all, so the trace comes
+    # back empty and the tool reports "no NVCSI interrupts" on a link that is in
+    # fact flooding with them. Measured on 35.6.0: 0 events at level 0 versus
+    # 217408 rtcpu_nvcsi_intr + 213 rtcpu_vinotify_error over 3 s at level 3.
+    # Restored afterwards so a diagnostic run leaves no lasting side effect.
+    camrtc_log_saved = read_file(CAMRTC_LOG_LEVEL)
+    write_trace(CAMRTC_LOG_LEVEL, 3)
 
     # Setup tracing
     write_trace(f"{TRACE_BASE}/tracing_on", 1)
@@ -548,6 +564,8 @@ else:
     # Stop tracing to avoid filling buffer
     write_trace(f"{TRACE_BASE}/events/tegra_rtcpu/enable", 0)
     write_trace(f"{TRACE_BASE}/events/camera_common/enable", 0)
+    if camrtc_log_saved is not None:
+        write_trace(CAMRTC_LOG_LEVEL, camrtc_log_saved)
 
 # --- Parse rtcpu_nvcsi_intr lines ---
 # Example: rtcpu_nvcsi_intr: tstamp:... class:CORRECTABLE_ERR type:STREAM_VC phy:0 cil:0 st:1 vc:0 status:0x00000004
@@ -694,12 +712,22 @@ if fs_hw:
 else:
     print(f"  {'    frames seen by VI         (FS )':<46}: {'—':>5}  (no FS events in trace)")
 
+# cap_ref falls back to the driver-side count so the ratios below still have a
+# reference, but it must NEVER be printed as CHANSEL_PXL_SOF: that tag names a
+# VI-channel-selector event coming from the RCE trace. Printing the driver count
+# under it makes the display look like "frames start but none complete" when the
+# truth is that the whole rtcpu side is silent -- the two numbers then come from
+# different sources and cannot be compared at all.
 cap_ref = pxl_sof if pxl_sof else frame_count
 dropped  = (fs_hw - cap_ref) if fs_hw > 0 and cap_ref > 0 else None
 
 print(f"  [VI channel selector]")
-prow("    captures started  (CHANSEL_PXL_SOF)", cap_ref,
-     f"{dropped} dropped (no buffer)" if dropped and dropped > 0 else "")
+if pxl_sof:
+    prow("    captures started  (CHANSEL_PXL_SOF)", cap_ref,
+         f"{dropped} dropped (no buffer)" if dropped and dropped > 0 else "")
+else:
+    print(f"  {'    captures started  (CHANSEL_PXL_SOF)':<46}: {'—':>5}"
+          f"  ← no rtcpu event in trace (is camrtc log-level > 0?)")
 if pxl_eof:
     heights_s = "/".join(str(h) for h in sorted(pxl_eof_heights)) if pxl_eof_heights else "?"
     prow("    captures ended    (CHANSEL_PXL_EOF)", pxl_eof,
@@ -718,8 +746,14 @@ if atomp_fe:
          f"{inc} DMA incomplete" if inc > 0 else "")
 ref = atomp_fe or atomp_fs or cap_ref
 nd = ref - atomp_done if ref and atomp_done and ref > atomp_done else 0
-prow("    frames complete   (ATOMP_FRAME_DONE)", atomp_done,
-     f"{nd} not delivered to app" if nd > 0 else "")
+if pxl_sof or atomp_done or atomp_fs or atomp_fe:
+    prow("    frames complete   (ATOMP_FRAME_DONE)", atomp_done,
+         f"{nd} not delivered to app" if nd > 0 else "")
+else:
+    # Same trap as CHANSEL_PXL_SOF above: a bare 0 here reads as "no frame ever
+    # completed", when it only means the RCE emitted nothing to count.
+    print(f"  {'    frames complete   (ATOMP_FRAME_DONE)':<46}: {'—':>5}"
+          f"  ← not measured (no rtcpu event in trace)")
 
 print(f"  [Driver]")
 prow("    frames reported   (capture_frame SOF)", frame_count)
