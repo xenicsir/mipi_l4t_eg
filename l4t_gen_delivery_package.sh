@@ -665,8 +665,10 @@ if [[ -n "$_MISSING" ]]; then
    echo ""
    echo "sudo apt install$_MISSING"
    echo ""
-   echo "  (a FIRST-TIME 'apt install ./<package>.deb' pulls them in on its own;"
-   echo "   'dpkg -i' and 'apt install --reinstall' never do)"
+   echo "  (if that reports no candidate, the package lists are empty:"
+   echo "   run 'sudo apt update' first -- a freshly flashed board has none."
+   echo "   apt pulls these in by itself on a first install once the lists are"
+   echo "   populated; 'dpkg -i' and 'apt install --reinstall' never do)"
    echo ""
 fi
 
