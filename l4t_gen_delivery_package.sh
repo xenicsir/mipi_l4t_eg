@@ -638,6 +638,38 @@ if [[ -n "$_OLD_PKGS" ]]; then
     disown $!
 fi
 
+# Warn about missing optional runtime dependencies for the shipped camera tools.
+# They are declared as Recommends/Suggests, which apt installs on its own -- but
+# dpkg ignores those fields entirely, so `dpkg -i` leaves them missing with no
+# diagnostic at all and the gap only shows up as "command not found" at the first
+# streaming command. Pure echo, deliberately: a missing optional tool must never
+# affect the exit code, so this block stays clear of _CONFIG_RC.
+_MISSING=""
+command -v v4l2-ctl > /dev/null 2>&1 || _MISSING="$_MISSING v4l-utils"
+python3 -c 'import cv2' > /dev/null 2>&1 || _MISSING="$_MISSING python3-opencv"
+if [[ -n "$_MISSING" ]]; then
+   echo ""
+   echo "WARNING: optional package(s) not installed:$_MISSING"
+   for _p in $_MISSING; do
+      case "$_p" in
+         v4l-utils)
+            echo "  v4l-utils      needed by eg_dt_camera_config_get.sh, read_nvcsi.py, rt_frame_monitor.py"
+            ;;
+         python3-opencv)
+            echo "  python3-opencv needed by rt_frame_monitor.py --display"
+            ;;
+      esac
+   done
+   echo "  The camera drivers themselves are installed and fully functional."
+   echo "  Install the missing tool(s) with:"
+   echo ""
+   echo "sudo apt install$_MISSING"
+   echo ""
+   echo "  (a FIRST-TIME 'apt install ./<package>.deb' pulls them in on its own;"
+   echo "   'dpkg -i' and 'apt install --reinstall' never do)"
+   echo ""
+fi
+
 # Propagate a fresh-install camera-config failure. The best-effort cleanup above
 # must not mask it; _CONFIG_RC is 0 on success and for best-effort upgrades.
 exit $_CONFIG_RC
@@ -699,6 +731,19 @@ if ! command -v fpm &> /dev/null; then
    exit 1
 fi
 
+# Optional runtime dependencies for the tools shipped in /usr/bin. Deliberately
+# NOT Depends: a missing tool must never stop the drivers from installing, and a
+# hard dependency would make dpkg leave the package unconfigured -- the postinst
+# would never run, so no DTB, no JetsonIO entry, no camera at all.
+#   - Recommends (v4l-utils, python3-opencv): apt installs them automatically and
+#     skips them with a note if unavailable. Note python3-opencv (Ubuntu, 4.2.0)
+#     and NOT libopencv-python (NVIDIA repo, 4.5.4), which would pull a second
+#     OpenCV alongside the libopencv-*4.2 already on the board.
+#   - Suggests (ecswctrl): private package, in no public repo. Suggests documents
+#     the link without apt warning about it on every install. It ships alongside
+#     the driver in the delivery directory and is named explicitly on the apt
+#     command line at install time (see DEPENDENCIES.txt there, and the README).
+# dpkg honours neither field, so the postinst warns when the tools are missing.
 fpm -v ${DEB_VERSION} \
    -C ${PACKAGE_NAME} \
    -a arm64 \
@@ -707,6 +752,9 @@ fpm -v ${DEB_VERSION} \
    -n ${PACKAGE_NAME} \
    --provides "${CANONICAL_NAME}" \
    --replaces "${CANONICAL_NAME}" \
+   --deb-recommends v4l-utils \
+   --deb-recommends python3-opencv \
+   --deb-suggests ecswctrl \
    --before-install "$_PREINST" \
    --after-install "$_POSTINST" \
    --after-remove "$_POSTRM" \
@@ -724,6 +772,75 @@ if [[ $? -eq 0 ]]; then
    mkdir -p "$DELIVERY_SUBDIR"
    cp "$DEB_PACKAGE" "$DELIVERY_SUBDIR/"
    echo "Copied to: $DELIVERY_SUBDIR/$DEB_PACKAGE"
+
+   #***************************************************************************
+   # Delivery-only extras: private dependency packages and their manifest.
+   #
+   # This runs AFTER fpm on purpose. Nothing here can influence the driver .deb,
+   # so the same commit produces a byte-identical package whether or not the
+   # private packages are available locally. Their absence is the normal case
+   # for a public rebuild.
+   #
+   # One copy of each private package, and one manifest, serve the whole
+   # delivery directory: it accumulates one driver package per L4T version AND
+   # per carrier board (30+), while the private packages carry no L4T version at
+   # all -- verified, their binaries need only GLIBC_2.17 / GLIBCXX_3.4.21 (the
+   # aarch64 baseline), so a single copy is valid from Ubuntu 18.04 to 24.04.
+   #
+   # Deliberately NO installer script here: the user copies one driver package
+   # plus these three onto the board and names them explicitly on the apt
+   # command line (see README). An auto-detecting installer would have to
+   # duplicate the preinst's L4T version comparison, and two copies of that rule
+   # drifting apart is exactly how install-time bugs appear.
+   #
+   # The manifest is rewritten identically by every build -- idempotent.
+   #***************************************************************************
+   DEP_PKG_DIR="$ARCHIVE_DIR/dependency_packages"
+   DEP_MANIFEST="$DELIVERY_SUBDIR/DEPENDENCIES.txt"
+   _DEP_COPIED=""
+
+   {
+      echo "Optional private dependency packages"
+      echo "===================================="
+      echo ""
+      echo "Delivery : jetson-l4t-eg-${DEB_VERSION}"
+      echo "Generated: $(date '+%Y-%m-%d %H:%M:%S %z')"
+      echo ""
+      echo "These packages are NOT required to build or use the MIPI camera drivers."
+      echo "The driver package is identical with or without them."
+      echo ""
+      echo "Copy them onto the board next to the ONE driver package matching its"
+      echo "L4T version, then install them together in a single apt transaction:"
+      echo ""
+      echo "  sudo apt install ./<driver-package>.deb \\"
+      echo "      ./libecctrl-i2c_*_arm64.deb ./libecctrl-uart_*_arm64.deb ./ecswctrl_*_arm64.deb"
+      echo ""
+   } > "$DEP_MANIFEST"
+
+   if [[ -d "$DEP_PKG_DIR" ]]; then
+      for _dep in "$DEP_PKG_DIR"/libecctrl-i2c_*_arm64.deb \
+                  "$DEP_PKG_DIR"/libecctrl-uart_*_arm64.deb \
+                  "$DEP_PKG_DIR"/ecswctrl_*_arm64.deb; do
+         [[ -f "$_dep" ]] || continue
+         cp "$_dep" "$DELIVERY_SUBDIR/"
+         _DEP_COPIED="$_DEP_COPIED $(basename "$_dep")"
+         {
+            echo "File: $(basename "$_dep")"
+            dpkg-deb -f "$_dep" Package Version Architecture Depends 2>/dev/null | sed 's/^/  /'
+            echo "  MD5: $(md5sum "$_dep" | cut -d' ' -f1)"
+            echo ""
+         } >> "$DEP_MANIFEST"
+      done
+   fi
+
+   if [[ -n "$_DEP_COPIED" ]]; then
+      echo "Private dependency packages copied:$_DEP_COPIED"
+   else
+      echo "" >> "$DEP_MANIFEST"
+      echo "None included in this delivery." >> "$DEP_MANIFEST"
+      echo "Note: no private dependency package found in $DEP_PKG_DIR"
+      echo "      (expected for a public build -- the driver package is unaffected)"
+   fi
 else
    echo ""
    echo "Error: Package generation failed"

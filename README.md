@@ -387,8 +387,26 @@ The package was either delivered (see [MIPI deployment matrix](MIPI_DEPLOYMENT_M
 **Standard install** (matching L4T version, no previous package or same-version reinstall):
 
 ```bash
-sudo dpkg -i jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
 ```
+
+The leading `./` is required — without it, apt looks for a package name in the repositories instead of a local file.
+
+Prefer `apt` over `dpkg -i` here: the package declares its optional tool dependencies as `Recommends`, and only apt installs those (see [Optional tools](#optional-tools) below).
+
+**Reinstalling the same version.** Unlike `dpkg -i`, apt compares *version numbers*, not file contents. The package version is derived from the git commit (`0~develop+g<sha>`), so rebuilding the same commit — with uncommitted changes, for instance — produces a different file carrying the *same* version. apt then reports `already the newest version` and does nothing at all:
+
+```bash
+sudo apt install --reinstall ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+```
+
+Note that `--reinstall` does **not** install the `Recommends` (verified): the package is already in the installed set, so its recommendations are not re-evaluated. Only a first-time install pulls them in. Add them explicitly:
+
+```bash
+sudo apt install --fix-policy
+```
+
+A `--reinstall` from a local file also ends with `W: Repository is broken: <package> has no Size information`. It is specific to `--reinstall` (a normal install does not produce it), harmless, and nothing the package can fix: `Size` is a *repository index* field, not a `.deb` control field. The install itself completes normally — unpack, configure and `postinst` all run.
 
 **Cross-L4T-version install** (e.g. installing a 35.6.1 package on a 35.6.0 board):
 
@@ -409,6 +427,8 @@ sudo FORCE_INSTALL_EG_CAMS=1 dpkg -i --force-overwrite \
 - `FORCE_INSTALL_EG_CAMS=1` — bypasses the L4T version check (verified against kernel instead)
 - `--force-overwrite` — allows dpkg to overwrite files from the previously installed package
 
+This exceptional path stays on `dpkg -i`, since `--force-overwrite` is a dpkg concern. Consequence: the optional tools are not pulled in — add them afterwards with `sudo apt install --fix-policy` (see [Optional tools](#optional-tools)).
+
 The previously installed package is automatically removed from the dpkg database a few seconds after installation completes.
 
 **If a package with version ≤ 2.0.0 is already installed**, it does not carry the package-family metadata (`Provides`) needed for automatic cleanup. You must uninstall it manually first:
@@ -418,8 +438,46 @@ The previously installed package is automatically removed from the dpkg database
 sudo dpkg --purge <old-package-name>
 
 # Then install normally (or with FORCE if L4T version differs)
-sudo dpkg -i jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
 ```
+
+#### Optional tools
+
+The camera drivers have no runtime dependency of their own, but the tools installed in `/usr/bin` do:
+
+| Package | Needed by | Declared as |
+|---|---|---|
+| `v4l-utils` | `eg_dt_camera_config_get.sh`, `read_nvcsi.py`, `rt_frame_monitor.py` | `Recommends` |
+| `python3-opencv` | `rt_frame_monitor.py --display` | `Recommends` |
+| `ecswctrl` | EC software control (private package, delivered alongside) | `Suggests` |
+
+Neither is a hard dependency: the drivers install and work without them, and a missing tool can never block the installation.
+
+**Note that a fresh L4T flash does not include `v4l-utils` nor `python3-opencv`** — so on a new board the streaming examples fail with `v4l2-ctl: command not found` unless these are installed.
+
+- A **first-time** `apt install ./<package>.deb` installs the `Recommends` automatically, and proceeds with a note if they are unavailable.
+- `dpkg -i` ignores `Recommends` and `Suggests` entirely — silently. So does `apt install --reinstall`, since the package is already in the installed set (both verified on a board). The post-install script therefore prints a warning listing whatever is missing; the drivers themselves are installed and functional.
+
+To add the missing tools to an already-installed package:
+
+```bash
+sudo apt install --fix-policy
+```
+
+`apt --fix-broken install` is *not* enough — it only resolves `Depends`.
+
+**Private packages.** `ecswctrl`, `libecctrl-i2c` and `libecctrl-uart` are delivered as separate `.deb` files next to the driver, and listed in `DEPENDENCIES.txt` (name, version, MD5) in the same directory. They are not required to build or use the MIPI drivers, and a rebuild without them produces an identical driver package.
+
+Copy them onto the board next to the **one** driver package matching its L4T version, then install them together in a single apt transaction, naming each file explicitly:
+
+```bash
+sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb \
+    ./libecctrl-i2c_<version>_arm64.deb ./libecctrl-uart_<version>_arm64.deb ./ecswctrl_<version>_arm64.deb
+```
+
+apt resolves the order on its own (`libecctrl-i2c` and `libecctrl-uart` before `ecswctrl`, which `Depends` on them).
+
+> ⚠️ Never run `apt install ./*.deb` **inside a delivery directory**. It holds one driver package per L4T version *and* per carrier board (30+ of them), all declaring `Replaces` on each other, and only one may ever be installed. Pick the single package matching the board's L4T version and copy that one across.
 
 #### Configuring camera ports
 
