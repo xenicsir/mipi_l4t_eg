@@ -40,13 +40,44 @@ _CHROOT_ROOTFS_DIR=""
 # pops the topmost layer — if a previous run left N stale binds stacked here
 # (e.g. the SSH session died mid-chroot with no signal to trigger the EXIT
 # trap below), one call isn't enough to actually free the target.
+#
+# ⚠️ Refuses any target that resolves to a filesystem of the HOST. Once
+# "$rootfs/dev" is a bind of /dev, the path "$rootfs/dev/pts" resolves to the
+# host's own /dev/pts -- same superblock, verified with stat -c %d -- so an
+# umount there is an `umount /dev/pts` in disguise. It normally fails EBUSY
+# (ptys in use) and the old `|| break` swallowed that silently; on an idle
+# machine it would succeed and detach the host's devpts. This guard is why the
+# function can be called on paths under a chroot without that risk.
 _umount_all() {
     local target="$1" tries=0
+    # Never a host path, whatever the caller passed.
+    case "$target" in
+        /|/dev|/dev/pts|/proc|/sys)
+            echo "  refuse umount $target (host path)" >&2; return 1 ;;
+    esac
+    # The aliasing trap: only "<rootfs>/dev/pts" is affected. It sits INSIDE the
+    # bind of /dev, so it resolves to the host's own /dev/pts -- same superblock.
+    # "<rootfs>/proc", "<rootfs>/sys" and "<rootfs>/dev" are mountpoints in their
+    # own right, so they share the host superblock too and must NOT be refused on
+    # that basis; only the /dev/pts case is.
+    # Superblock equality is the whole test, with no condition on the parent: if
+    # the parent /dev is bound the path IS the host's devpts and must be refused,
+    # and if it is not bound the path is a plain directory on the rootfs
+    # filesystem, whose superblock differs, so this never fires spuriously.
+    if [[ "$target" == */dev/pts ]] \
+       && [[ "$(stat -c %d "$target" 2>/dev/null)" == "$(stat -c %d /dev/pts 2>/dev/null)" ]]; then
+        echo "  refuse umount $target: resolves to the host's /dev/pts" >&2
+        return 1
+    fi
     while mountpoint -q "$target" 2>/dev/null; do
-        sudo umount "$target" 2>/dev/null || break
+        if ! sudo umount "$target" 2>&1; then
+            echo "  umount $target failed after $tries layer(s) removed" >&2
+            return 1
+        fi
         tries=$((tries + 1))
-        [[ $tries -ge 20 ]] && break   # safety cap, not expected to ever hit
+        [[ $tries -ge 20 ]] && { echo "  umount $target: 20-layer cap hit" >&2; return 1; }
     done
+    return 0
 }
 
 # Bind-mount $1 onto $2, first clearing any stale bind already stacked there
@@ -59,13 +90,14 @@ _bind_mount_clean() {
     sudo mount --bind "$src" "$dst" 2>/dev/null || true
 }
 
+# Only /proc, /sys and /dev are ever bound (see below), so only those three are
+# unmounted. The previous version also unmounted dev/pts, dev/shm, dev/mqueue and
+# dev/hugepages -- none of which this script ever mounts. Since they live INSIDE
+# the /dev bind, those calls were umounts of the host's own filesystems; they
+# failed EBUSY and the silent `|| break` hid it, leaving the real cleanup undone.
 _cleanup_chroot() {
     [[ -z "$_CHROOT_ROOTFS_DIR" ]] && return
     local rdir="$_CHROOT_ROOTFS_DIR"
-    _umount_all "$rdir/dev/pts"
-    _umount_all "$rdir/dev/shm"
-    _umount_all "$rdir/dev/mqueue"
-    _umount_all "$rdir/dev/hugepages"
     _umount_all "$rdir/dev"
     _umount_all "$rdir/sys"
     _umount_all "$rdir/proc"
@@ -375,7 +407,12 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
          _bind_mount_clean /proc     "$ROOTFS_DIR/proc"
          _bind_mount_clean /sys      "$ROOTFS_DIR/sys"
          _bind_mount_clean /dev      "$ROOTFS_DIR/dev"
-         _bind_mount_clean /dev/pts  "$ROOTFS_DIR/dev/pts"
+         # NO separate bind of /dev/pts. Binding /dev already makes pts visible
+         # in the chroot, and "$ROOTFS_DIR/dev/pts" resolves to the host's own
+         # /dev/pts through that bind -- so this line used to stack a bind onto
+         # the HOST's devpts, once per build, while its own pre-umount silently
+         # failed EBUSY. That is what accumulated 7 stacked mounts on /dev/pts
+         # and up to 9 per rootfs (found 2026-08-04).
 
          # Generate initramfs in chroot
          update_status "Running update-initramfs..."
@@ -385,12 +422,9 @@ if [[ $STANDALONE_BUILD -eq 1 ]]; then
             sudo chroot "$ROOTFS_DIR" /usr/sbin/mkinitramfs -o "/boot/initrd.img-$EG_KERNEL_VERSION" "$EG_KERNEL_VERSION" 2>/dev/null || true
          }
 
-         # Unmount filesystems (order: sub-mounts of /dev first, then /dev, sys, proc)
+         # Unmount only what we mounted. Anything under "$ROOTFS_DIR/dev/" is the
+         # host's, reached through the /dev bind -- see _cleanup_chroot.
          update_status "Unmounting chroot filesystems..."
-         _umount_all "$ROOTFS_DIR/dev/pts"
-         _umount_all "$ROOTFS_DIR/dev/shm"
-         _umount_all "$ROOTFS_DIR/dev/mqueue"
-         _umount_all "$ROOTFS_DIR/dev/hugepages"
          _umount_all "$ROOTFS_DIR/dev"
          _umount_all "$ROOTFS_DIR/sys"
          _umount_all "$ROOTFS_DIR/proc"
