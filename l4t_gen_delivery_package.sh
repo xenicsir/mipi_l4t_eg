@@ -644,9 +644,36 @@ fi
 # diagnostic at all and the gap only shows up as "command not found" at the first
 # streaming command. Pure echo, deliberately: a missing optional tool must never
 # affect the exit code, so this block stays clear of _CONFIG_RC.
+#
+# A functional probe alone is NOT enough. On `apt install ./<pkg>.deb` apt unpacks
+# the whole transaction and only then configures it, and since Recommends are not
+# dependencies there is nothing forcing the recommended packages to be configured
+# before us. Our postinst therefore runs while they are merely *unpacked*, their
+# probes fail, and we used to tell the user to install tools apt was installing in
+# that very transaction -- a false alarm on the install path the README documents.
+# So also ask dpkg: a package it already knows as unpacked or installed must not be
+# reported missing. dpkg-query is read-only and takes no lock, unlike dpkg itself
+# (see the deferred cleanup above).
+_pkg_known() {
+   case "$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null)" in
+      "install ok installed"|"install ok unpacked"|\
+      "install ok half-configured"|"install ok half-installed") return 0 ;;
+      *) return 1 ;;
+   esac
+}
+# $1 = package name, rest = probe command. Silent when the tool works OR when
+# dpkg is already carrying it.
+_needs() {
+   local _p="$1"; shift
+   "$@" > /dev/null 2>&1 && return 1
+   _pkg_known "$_p" && return 1
+   return 0
+}
 _MISSING=""
-command -v v4l2-ctl > /dev/null 2>&1 || _MISSING="$_MISSING v4l-utils"
-python3 -c 'import cv2' > /dev/null 2>&1 || _MISSING="$_MISSING python3-opencv"
+_needs v4l-utils      command -v v4l2-ctl        && _MISSING="$_MISSING v4l-utils"
+_needs python3-opencv python3 -c 'import cv2'    && _MISSING="$_MISSING python3-opencv"
+_needs python3-serial python3 -c 'import serial' && _MISSING="$_MISSING python3-serial"
+_needs python3-numpy  python3 -c 'import numpy'  && _MISSING="$_MISSING python3-numpy"
 if [[ -n "$_MISSING" ]]; then
    echo ""
    echo "WARNING: optional package(s) not installed:$_MISSING"
@@ -658,6 +685,12 @@ if [[ -n "$_MISSING" ]]; then
          python3-opencv)
             echo "  python3-opencv needed by rt_frame_monitor.py --display"
             ;;
+         python3-serial)
+            echo "  python3-serial needed by dioneCtrl.py (module-level import: it will not start)"
+            ;;
+         python3-numpy)
+            echo "  python3-numpy  needed by dioneCtrl.py, rt_frame_monitor.py"
+            ;;
       esac
    done
    echo "  The camera drivers themselves are installed and fully functional."
@@ -667,8 +700,8 @@ if [[ -n "$_MISSING" ]]; then
    echo ""
    echo "  (if that reports no candidate, the package lists are empty:"
    echo "   run 'sudo apt update' first -- a freshly flashed board has none."
-   echo "   apt pulls these in by itself on a first install once the lists are"
-   echo "   populated; 'dpkg -i' and 'apt install --reinstall' never do)"
+   echo "   Once the lists are populated apt pulls these in by itself, on a first"
+   echo "   install and on an upgrade alike; 'dpkg -i' and 'apt --reinstall' never do)"
    echo ""
 fi
 
@@ -737,10 +770,15 @@ fi
 # NOT Depends: a missing tool must never stop the drivers from installing, and a
 # hard dependency would make dpkg leave the package unconfigured -- the postinst
 # would never run, so no DTB, no JetsonIO entry, no camera at all.
-#   - Recommends (v4l-utils, python3-opencv): apt installs them automatically and
-#     skips them with a note if unavailable. Note python3-opencv (Ubuntu, 4.2.0)
-#     and NOT libopencv-python (NVIDIA repo, 4.5.4), which would pull a second
-#     OpenCV alongside the libopencv-*4.2 already on the board.
+#   - Recommends: apt installs them automatically and skips them with a note if
+#     unavailable. Note python3-opencv (Ubuntu, 4.2.0) and NOT libopencv-python
+#     (NVIDIA repo, 4.5.4), which would pull a second OpenCV alongside the
+#     libopencv-*4.2 already on the board. python3-serial and python3-numpy are
+#     module-level imports in dioneCtrl.py, so it does not even start without
+#     them -- they happen to ship with the L4T rootfs, but that is not something
+#     to rely on. Deliberately NOT declared: python3-gi, imported lazily inside
+#     rt_frame_monitor.py's GStreamer backend behind a try/except that already
+#     prints what to install, and EURESYS, a proprietary SDK that is in no repo.
 #   - Suggests (ecswctrl): private package, in no public repo. Suggests documents
 #     the link without apt warning about it on every install. It ships alongside
 #     the driver in the delivery directory and is named explicitly on the apt
@@ -756,6 +794,8 @@ fpm -v ${DEB_VERSION} \
    --replaces "${CANONICAL_NAME}" \
    --deb-recommends v4l-utils \
    --deb-recommends python3-opencv \
+   --deb-recommends python3-serial \
+   --deb-recommends python3-numpy \
    --deb-suggests ecswctrl \
    --before-install "$_PREINST" \
    --after-install "$_POSTINST" \
