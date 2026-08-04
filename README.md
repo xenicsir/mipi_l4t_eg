@@ -394,19 +394,21 @@ The leading `./` is required — without it, apt looks for a package name in the
 
 Prefer `apt` over `dpkg -i` here: the package declares its optional tool dependencies as `Recommends`, and only apt installs those (see [Optional tools](#optional-tools) below).
 
+Installing from your home directory prints a `N: Download is performed unsandboxed…` notice at the very end. It is harmless and the install has already succeeded; put the `.deb` in `/var/tmp` to avoid it.
+
 **Reinstalling the same version.** Unlike `dpkg -i`, apt compares *version numbers*, not file contents. The package version is derived from the git commit (`0~develop+g<sha>`), so rebuilding the same commit — with uncommitted changes, for instance — produces a different file carrying the *same* version. apt then reports `already the newest version` and does nothing at all:
 
 ```bash
 sudo apt install --reinstall ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
 ```
 
-Note that `--reinstall` does **not** install the `Recommends` (verified): the package is already in the installed set, so its recommendations are not re-evaluated. Only a first-time install pulls them in. Add them explicitly:
+Note that `--reinstall` does **not** install the `Recommends` (verified): the package is already in the installed set, so its recommendations are not re-evaluated. A first install and an upgrade both do pull them in. Add them explicitly:
 
 ```bash
 sudo apt install --fix-policy
 ```
 
-A `--reinstall` from a local file also ends with `W: Repository is broken: <package> has no Size information`. It is specific to `--reinstall` (a normal install does not produce it), harmless, and nothing the package can fix: `Size` is a *repository index* field, not a `.deb` control field. The install itself completes normally — unpack, configure and `postinst` all run.
+A `--reinstall` may end with `W: Repository is broken: <package> has no Size information` (seen on JetPack 5, not on JetPack 6). Harmless — the install completes normally.
 
 **Cross-L4T-version install** (e.g. installing a 35.6.1 package on a 35.6.0 board):
 
@@ -449,14 +451,18 @@ The camera drivers have no runtime dependency of their own, but the tools instal
 |---|---|---|
 | `v4l-utils` | `eg_dt_camera_config_get.sh`, `read_nvcsi.py`, `rt_frame_monitor.py` | `Recommends` |
 | `python3-opencv` | `rt_frame_monitor.py --display` | `Recommends` |
+| `python3-serial` | `dioneCtrl.py` (module-level import — it will not start without it) | `Recommends` |
+| `python3-numpy` | `dioneCtrl.py`, `rt_frame_monitor.py` | `Recommends` |
 | `ecswctrl` | EC software control (private package, delivered alongside) | `Suggests` |
 
-Neither is a hard dependency: the drivers install and work without them, and a missing tool can never block the installation.
+`python3-gi` and `EURESYS` are deliberately not declared: both are imported lazily, and `EURESYS` is a proprietary SDK that is in no repository.
 
-**Note that a fresh L4T flash does not include `v4l-utils` nor `python3-opencv`** — so on a new board the streaming examples fail with `v4l2-ctl: command not found` unless these are installed.
+None of these is a hard dependency — the drivers install and work without them, and a missing tool can never block the installation.
 
-- A **first-time** `apt install ./<package>.deb` installs the `Recommends` automatically, and proceeds with a note if they are unavailable.
-- `dpkg -i` ignores `Recommends` and `Suggests` entirely — silently. So does `apt install --reinstall`, since the package is already in the installed set (both verified on a board). The post-install script therefore prints a warning listing whatever is missing; the drivers themselves are installed and functional.
+**A fresh L4T flash includes none of them**, so the streaming examples fail with `v4l2-ctl: command not found` until they are installed.
+
+- `apt install ./<package>.deb` pulls them in by itself, on a first install and on an upgrade alike.
+- `dpkg -i` and `apt install --reinstall` never do. The post-install script then lists what is missing; the drivers themselves are installed and functional.
 
 To add the missing tools to an already-installed package:
 
