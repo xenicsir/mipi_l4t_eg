@@ -1095,6 +1095,42 @@ def to_luma(frame, fmt):
     raise ValueError(f"Unknown format: {fmt}")
 
 
+def to_display_bgr(frame, fmt):
+    """Return an 8-bit BGR image for cv2.imshow, or None if there is no colour.
+
+    The metrics deliberately run on luma (to_luma) — a frame monitor measures
+    intensity. The *display* is a different question: it must show what the
+    camera actually sends, the way the reference pipeline does
+
+        gst-launch-1.0 v4l2src ! video/x-raw,format=BGRA ! videoconvert ! ximagesink
+
+    A Dione IR is a greyscale sensor, but false colour is applied in-camera, so
+    the wire really does carry three distinct channels. Feeding the luma array to
+    imshow (what this did until 2026-08-04) averaged them away and showed a
+    black-and-white image while gst-launch showed colour — the frames were fine
+    all along, only the preview was lying.
+
+    Returns None for Y16-like formats, where there is nothing to preserve and the
+    caller's normalize() path is the right one.
+    """
+    if fmt in ("AR24", "AB24"):
+        if frame.ndim == 3 and frame.shape[2] == 4:
+            # AR24 is BGRA on the wire, AB24 is RGBA — here the channel order
+            # matters, unlike in to_luma() where the average is order-independent.
+            return cv2.cvtColor(
+                frame, cv2.COLOR_BGRA2BGR if fmt == "AR24" else cv2.COLOR_RGBA2BGR)
+        if frame.ndim == 3 and frame.shape[2] == 3:
+            return frame        # already BGR (OpenCV/MSMF capture path)
+        return None
+    if fmt == "YUYV":
+        if frame.ndim == 3 and frame.shape[2] == 2:
+            return cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUY2)
+        if frame.ndim == 3 and frame.shape[2] == 3:
+            return frame
+        return None
+    return None
+
+
 def frame_to_gray(frame, fmt, width, height):
     """Return a float32 2D grayscale array for metric computation."""
     if platform.system() == "Linux":
@@ -1643,21 +1679,28 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
 
             # ── Live display (optional) ───────────────────────────────────
             if show_video:
-                if gray is not None:
-                    if fmt in Y16_LIKE_FMTS or gray.dtype == np.uint16:
-                        _disp = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                # Colour formats: show the camera's actual pixels, not the luma
+                # the metrics run on (see to_display_bgr). None → fall through to
+                # the greyscale path, which is correct for Y16-like.
+                _disp = to_display_bgr(frame, fmt)
+                if _disp is None:
+                    if gray is not None:
+                        if fmt in Y16_LIKE_FMTS or gray.dtype == np.uint16:
+                            _disp = cv2.normalize(gray, None, 0, 255,
+                                                  cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                        else:
+                            _disp = gray.clip(0, 255).astype(np.uint8)
                     else:
-                        _disp = gray.clip(0, 255).astype(np.uint8)
-                else:
-                    # Fast path: gray was skipped (need_gray False — Y16/Y10,
-                    # nothing else needs the float32 cast). Feed cv2.normalize
-                    # the raw capture directly, same reinterpretation as
-                    # to_luma() but without the astype(float32) copy.
-                    if frame.ndim == 3 and frame.shape[2] == 2:
-                        _raw = frame.view(np.uint16).reshape(height, width)
-                    else:
-                        _raw = frame
-                    _disp = cv2.normalize(_raw, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                        # Fast path: gray was skipped (need_gray False — Y16/Y10,
+                        # nothing else needs the float32 cast). Feed cv2.normalize
+                        # the raw capture directly, same reinterpretation as
+                        # to_luma() but without the astype(float32) copy.
+                        if frame.ndim == 3 and frame.shape[2] == 2:
+                            _raw = frame.view(np.uint16).reshape(height, width)
+                        else:
+                            _raw = frame
+                        _disp = cv2.normalize(_raw, None, 0, 255,
+                                              cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                 cv2.imshow(_win_title, _disp)
                 if cv2.waitKey(1) == 27:   # ESC → stop
                     break
@@ -1745,7 +1788,8 @@ if __name__ == "__main__":
 
     # Display
     parser.add_argument("--display", action="store_true", default=run_cfg.show_video,
-                        help="Show live video window (ESC to quit); Y16/Y10 auto-normalized to 8-bit")
+                        help="Show live video window (ESC to quit); Y16/Y10 auto-normalized to 8-bit, "
+                             "AR24/AB24/YUYV shown in colour")
     parser.add_argument("--no-resize", action="store_true", default=run_cfg.window_autosize,
                         help="Fixed-size, non-resizable display window (WINDOW_AUTOSIZE) instead of "
                              "the default resizable one — restores the full capture framerate on "
