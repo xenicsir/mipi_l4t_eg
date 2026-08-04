@@ -37,16 +37,32 @@ if ! docker run --rm --platform=linux/arm64 arm64v8/ubuntu:22.04 /bin/true >/dev
     exit 0
 fi
 
-if [[ "$1" != "--no-build" ]]; then
+# --no-build : reuse the existing image. --apt-only : skip P3 (dpkg -i, 74 tests
+# under qemu) and run only P3b, the apt-path tests. Order-independent.
+DO_BUILD=1
+APT_ONLY=0
+for arg in "$@"; do
+    case "$arg" in
+        --no-build) DO_BUILD=0 ;;
+        --apt-only) APT_ONLY=1 ;;
+    esac
+done
+
+if [[ $DO_BUILD -eq 1 ]]; then
     echo "=== Building aarch64 test container ==="
     docker build --platform=linux/arm64 -t "$IMAGE" "$SCRIPT_DIR"
 fi
 
-echo "=== Running Phase 3 dpkg -i integration tests (aarch64/qemu) ==="
+if [[ $APT_ONLY -eq 1 ]]; then
+    echo "=== Running Phase 3b only — apt install ./pkg.deb (aarch64/qemu) ==="
+else
+    echo "=== Running Phase 3 dpkg -i integration tests (aarch64/qemu) ==="
+fi
 docker run --rm \
     --name "$CONTAINER_NAME" \
     --platform=linux/arm64 \
     --privileged \
+    -e APT_ONLY="$APT_ONLY" \
     -v "$REPO_ROOT:/repo:ro" \
     -v "$SCRIPT_DIR:/repo/test/qemu_install" \
     -v "$REPO_ROOT/test/mocks:/tmp/mocks:ro" \
@@ -72,5 +88,18 @@ docker run --rm \
         chmod +x /usr/local/bin/depmod
         # Full PATH: /sbin + /usr/sbin for dpkg (ldconfig, start-stop-daemon).
         export PATH=/usr/local/egmocks:/usr/local/sbin:/usr/local/bin:/usr/sbin:/sbin:/usr/bin:/bin
-        python3 /repo/test/qemu_install/test_dpkg_install.py
+        _RC_DPKG=0
+        if [ "${APT_ONLY:-0}" != "1" ]; then
+            python3 /repo/test/qemu_install/test_dpkg_install.py
+            _RC_DPKG=$?
+        fi
+        # P3b — the apt path. dpkg -i honours neither Recommends nor Suggests, so
+        # the optional-dependency mechanism needs its own transactions. Runs after
+        # P3 and purges what it installs, but it does mutate apt state (stub repo
+        # in sources.list.d, package lists) — hence last, and in a throwaway
+        # container either way.
+        python3 /repo/test/qemu_install/test_apt_install.py
+        _RC_APT=$?
+        [ $_RC_DPKG -ne 0 ] && exit $_RC_DPKG
+        exit $_RC_APT
     '
