@@ -112,6 +112,29 @@ class _MSMFY16FallbackCapture:
         return self._cap.isOpened()
 
 
+class _MSMFCapture:
+    """Thin wrapper around cv2.VideoCapture (MSMF) exposing .width/.height/.pixel_fmt.
+
+    cv2.VideoCapture is a C extension type with no __dict__, so attributes
+    cannot be set on it directly; this wrapper carries them alongside the cap.
+    """
+
+    def __init__(self, cap: "cv2.VideoCapture", width: int, height: int, pixel_fmt: str) -> None:
+        self._cap      = cap
+        self.width     = width
+        self.height    = height
+        self.pixel_fmt = pixel_fmt
+
+    def read(self):
+        return self._cap.read()
+
+    def release(self):
+        self._cap.release()
+
+    def isOpened(self):
+        return self._cap.isOpened()
+
+
 # ---------------------------------------------------------------------------
 # _EuresysCLCapture  — CameraLink via Euresys GrabLink (camera_Euresys submodule)
 # ---------------------------------------------------------------------------
@@ -865,7 +888,8 @@ def _v4l2_get_fmt(device):
     Any of the three is None if its line couldn't be parsed."""
     out = subprocess.run(
         ["v4l2-ctl", f"--device={device}", "--get-fmt-video"],
-        capture_output=True, text=True, check=True
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        universal_newlines=True, check=True
     ).stdout
     m = re.search(r"Width/Height\s*:\s*(\d+)/(\d+)", out)
     width, height = (int(m.group(1)), int(m.group(2))) if m else (None, None)
@@ -1053,13 +1077,13 @@ def _open_capture_windows(cam_index, fmt, width, height, fps, multicam_file=None
     )
     # MSMF may silently negotiate a different size than requested (fixed-resolution
     # sensors) — query back what was actually granted, same as the Linux v4l2 path.
-    cap.width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  or width
-    cap.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or height
+    actual_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  or width
+    actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or height
     log.info("%dx%d @ %dfps  FOURCC=%r%s",
-             cap.width, cap.height,
+             actual_width, actual_height,
              int(cap.get(cv2.CAP_PROP_FPS)),
              fourcc_str, note)
-    return cap
+    return _MSMFCapture(cap, actual_width, actual_height, fmt)
 
 
 def open_capture(cam_index, device, fmt, width, height, fps, multicam_file=None):
@@ -1067,6 +1091,31 @@ def open_capture(cam_index, device, fmt, width, height, fps, multicam_file=None)
         return _open_capture_linux(device, fmt, width, height, fps, multicam_file)
     else:
         return _open_capture_windows(cam_index, fmt, width, height, fps, multicam_file)
+
+
+def _frame_reader(cap_ref, frame_queue, stop_event):
+    """Dedicated capture thread: calls cap.read() in a tight loop.
+
+    Runs independently of the main loop so read() is never delayed by frame
+    processing, display or CSV writes.  Only the reference cap_ref[0] is used
+    so the main loop can swap in a new capture object on reopen without
+    restarting the thread.
+
+    On queue full the oldest entry is evicted — the main loop always sees the
+    most recent frame.
+    """
+    while not stop_event.is_set():
+        ret, frame = cap_ref[0].read()
+        now = time.perf_counter()
+        if frame_queue.full():
+            try:
+                frame_queue.get_nowait()
+            except queue.Empty:
+                pass
+        try:
+            frame_queue.put_nowait((now, ret, frame))
+        except queue.Full:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -1305,6 +1354,29 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     if cap is not None and hasattr(cap, 'width'):
         width, height = cap.width, cap.height
 
+    # Dedicated capture thread — only when a real camera is open (not _frame_iter).
+    # Keeps cap.read() running at full speed regardless of main-loop processing time.
+    _cap_ref        = [cap]
+    _frame_queue    = queue.Queue(maxsize=2)
+    _stop_reader    = threading.Event()
+    _reader_thread  = None
+    if cap is not None:
+        _reader_thread = threading.Thread(
+            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
+        _reader_thread.start()
+
+    def _restart_reader(new_cap):
+        nonlocal _reader_thread
+        # Signal reader to stop, release old cap (interrupts blocking read()),
+        # then wait for the thread to exit before handing it a new cap.
+        _stop_reader.set()
+        _reader_thread.join(timeout=4.0)
+        _stop_reader.clear()
+        _cap_ref[0] = new_cap
+        _reader_thread = threading.Thread(
+            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
+        _reader_thread.start()
+
     if _frame_iter is not None:
         device_tag = ""
     elif platform.system() == "Linux":
@@ -1450,7 +1522,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     grab_fail_since    = None
     freeze_count       = 0
     spike_count        = 0   # local mirror of detector.spike_count for the display line
-    fps_smooth         = float(target_fps)
+    fps_window         = deque(maxlen=target_fps)   # 1-second sliding window
+    fps_smooth         = 0.0
 
     pending_event = None
 
@@ -1495,8 +1568,10 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                     dt = float(dt_override)
                     ts += dt / 1000.0
             else:
-                ret, frame = cap.read()
-                now = time.perf_counter()
+                try:
+                    now, ret, frame = _frame_queue.get(timeout=5.0)
+                except queue.Empty:
+                    now, ret, frame = time.perf_counter(), False, None
 
                 if not ret:
                     if grab_fail_since is None:
@@ -1516,12 +1591,15 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                     elif now - grab_fail_since >= cfg.reopen_interval_s:
                         grab_fail_since = now
                         try:
+                            _stop_reader.set()
                             cap.release()
                             cap = open_capture(cam_index, device, fmt, width, height, target_fps, multicam_file)
                             if hasattr(cap, 'pixel_fmt'):
                                 fmt = cap.pixel_fmt
+                            _restart_reader(cap)
                         except Exception as exc:
                             log.warning("Reopen failed: %s", exc)
+                            _stop_reader.clear()
                     continue
 
                 # Successful grab: clear failure state (in_freeze cleared by normal dt logic)
@@ -1535,8 +1613,9 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                 ts = now - t0
                 dt = (now - prev_time) * 1000  # ms
                 prev_time = now
-                if dt > 0:
-                    fps_smooth = 0.9 * fps_smooth + 0.1 * (1000.0 / dt)
+                fps_window.append(now)
+                if len(fps_window) >= 2:
+                    fps_smooth = (len(fps_window) - 1) / (fps_window[-1] - fps_window[0])
 
             if need_stats:
                 row_means = gray.mean(axis=1)
@@ -1735,6 +1814,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         dispatch_pending()      # flush any in-progress drop event collection
         save_queue.put(None)    # signal save thread to stop
         save_thread.join()      # wait for all frames to be written to disk
+        _stop_reader.set()      # stop the capture thread before releasing cap
         if cap is not None:
             cap.release()
         if show_video:
