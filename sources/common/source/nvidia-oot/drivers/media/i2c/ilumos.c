@@ -222,7 +222,6 @@ static int ilumos_i2c_write_register(struct i2c_client *client, u32 reg, u32 val
 }
 
 
-/*
 static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
                                               u32 reg, u32 *val)
 {
@@ -240,7 +239,6 @@ static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
    return ilumos_i2c_read_register(client, REG_CROSSLINK_DATA,
                                    (u8 *)val, sizeof(*val));
 }
-*/
 
 /*
 static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
@@ -346,7 +344,7 @@ static int ilumos_sensor_check(struct ilumos *priv)
    struct device *dev = &priv->i2c_client->dev;
    int i, mode;
    u8 buf[64];
-//   u32 read_data;
+   u32 read_data;
    u32 width, height;
    bool is_raw14 = false;
 
@@ -364,7 +362,6 @@ static int ilumos_sensor_check(struct ilumos *priv)
    }
 
    /* Pixel format via Crosslink */
-/*
    if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
                                           REG_CROSSLINK_PIXEL_FORMAT,
                                           &read_data) == 0) {
@@ -377,7 +374,6 @@ static int ilumos_sensor_check(struct ilumos *priv)
    } else {
       dev_warn(dev, "PIXEL_FORMAT read failed, assuming RAW16\n");
    }
-*/
    /* Read Width and Height via Crosslink FRAME_SIZE */
 /*
    if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
@@ -443,6 +439,19 @@ static int ilumos_sensor_check(struct ilumos *priv)
    priv->tc_dev->s_data->def_height = height;
    priv->tc_dev->s_data->fmt_width  = width;
    priv->tc_dev->s_data->fmt_height = height;
+   /* tegracam_device_register() set colorfmt from frmfmt[0]; updating def_mode
+    * does not re-resolve it. Same fix as microlynx_core.c. */
+   {
+      const struct camera_common_colorfmt *colorfmt;
+      u32 v4l2_pixfmt = is_raw14 ? V4L2_PIX_FMT_Y14 : V4L2_PIX_FMT_Y16_BE;
+
+      colorfmt = camera_common_find_pixelfmt(v4l2_pixfmt);
+      if (colorfmt)
+         priv->tc_dev->s_data->colorfmt = colorfmt;
+      else
+         dev_warn(dev, "no colorfmt entry for 0x%08x, V4L2 will report the default\n",
+                  v4l2_pixfmt);
+   }
 
    if (is_raw14)
       strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
