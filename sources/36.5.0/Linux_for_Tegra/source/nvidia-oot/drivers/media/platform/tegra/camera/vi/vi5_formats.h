@@ -130,7 +130,17 @@ static const struct tegra_video_format vi5_video_formats[] = {
 	TEGRA_VIDEO_FORMAT(RAW12, 12, SBGGR12_1X12, 2, 1, T_R16,
 				RAW12, SBGGR12, "BGBG.. GRGR.."),
 
-	/* RAW 14: packed 14-bit (CSI-2 DT=0x2d), unpacked to 16-bit via pad0_en=1 */
+	/*
+	 * RAW 14: packed on the bus (CSI-2 DT=0x2d, 4 pixels per 7 bytes, spec v4.0
+	 * Table 56). PIXFMT unpacks it into a 16-bit container; that part is not
+	 * optional, no packed memory format exists (Orin TRM Table 7.25). The
+	 * alignment inside the container is optional, though:
+	 * VI_CHn_PIXFMT_FORMAT.T_R16_R32_PAD0_EN (Orin TRM, printed p. 1928) resets to
+	 * 0 = legacy MSB replication, so memory holds (v << 2) | (v >> 12) at full
+	 * 16-bit scale -- not the right-aligned value V4L2_PIX_FMT_Y14 implies. We
+	 * never program that field; pad0_en=1 yields conforming Y14 (measured
+	 * 2026-03-16 on Microlynx).
+	 */
    TEGRA_VIDEO_FORMAT(RAW14, 14, Y14_1X14, 2, 1, T_R16,
             RAW14, Y14, "RAW14"),
  

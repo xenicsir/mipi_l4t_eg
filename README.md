@@ -27,6 +27,7 @@ The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of 
 - [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
   - [Linux boot configuration](#linux-boot-configuration)
   - [Orin NX/Nano CSI lanes issues](#orin-nxnano-csi-lanes-issues)
+  - [Y14 pixel layout](#y14-pixel-layout)
 - [Shell completion](#shell-completion)
 - [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
 - [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
@@ -690,6 +691,40 @@ Consult the support team for assistance with custom modifications.
 The Orin NX/Nano SoM has a CSI differential pair swap (P/N inversion) inherent to the module, and the Nvidia devkit carrier board has an additional CSI data lane swap on CAM0. Some third-party carrier boards correct the lane swap, which requires a different device tree overlay.
 
 See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical details, and the [Configuring camera ports](#configuring-camera-ports) section for the practical workaround for boards not handled automatically.
+
+### Y14 pixel layout
+
+A Y14 frame carries 14 significant bits in a 16-bit little-endian word. **Where those bits sit inside the word is not the same on every SoM**, and V4L2 only defines one of the two possibilities.
+
+| SoM | Y14 available | Layout of a Y14 pixel | Configurable |
+| --- | --- | --- | --- |
+| Orin (T234) | yes | right-aligned with high bits 0, **or** full-scale | **yes**, per sensor mode |
+| Xavier (T194) | yes | full-scale: 14 bits left-aligned, top 2 bits copied into the low 2 | no |
+| TX2 (T186) | no | — | — |
+| Nano (T210) | no | — | — |
+
+On TX2 and Nano — L4T 32.x only — the VI format table carries no 14-bit greyscale entry, so `Y14` never appears in `VIDIOC_ENUM_FMT` and cannot be selected, whatever the device tree declares. Use Y8 or YUYV there.
+
+`V4L2_PIX_FMT_Y14` is defined as 14 bits **right-aligned, padding set to 0**. A full-scale buffer holds the same information, but every value is 4× larger — in practice it is a Y16 with 14 bits of resolution.
+
+This changes nothing about the image content and everything about the numbers. A viewer that converts 16-bit to 8-bit with a fixed shift renders a full-scale buffer normally and a right-aligned one 4× too dark. `rt_frame_monitor.py --display` normalizes every frame, so both look identical — trust the values, not your eyes.
+
+**Checking what you get** (both stay silent if the SoM is not recognised):
+
+```bash
+eg_dt_camera_config_get.sh          # "Y14 layout:" line, per camera
+dmesg | grep "RAW in 16-bit"        # printed once per stream start
+```
+
+Or measure it — a right-aligned buffer never exceeds 16383:
+
+```bash
+v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=1024,pixelformat="Y14 " \
+         --stream-mmap --stream-count=1 --stream-to=frame.y14
+python3 -c "import numpy as np; print(np.fromfile('frame.y14', dtype='<u2').max())"
+```
+
+**Changing it on Orin**: add `pad0_en` next to `csi_pixel_bit_depth` in the camera's device-tree mode node — `"1"` for a V4L2-conformant Y14, `"0"` for full-scale, `"2"` for left-aligned with zeros. When the property is absent the VI keeps its own default, which is full-scale on Orin. Our overlays ship `"1"` on every Y14 mode; rebuild and reinstall the overlay after changing it.
 
 ---
 

@@ -1071,6 +1071,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
 
@@ -1112,6 +1113,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
 
@@ -1153,6 +1155,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
 
@@ -1265,6 +1268,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 /*								pix_clk_hz = "128571428"; */   /* 450 MHz CSI clock */
 /*								pix_clk_hz = "100000000"; */   /* 350 MHz CSI clock */
 								pix_clk_hz = "102857142";  /* 360 MHz CSI clock */
@@ -2457,6 +2461,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
 
@@ -2497,6 +2502,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
 
@@ -2537,6 +2543,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 								pix_clk_hz = "148750000";
 								embedded_metadata_height = "0";
 
@@ -2642,6 +2649,7 @@
 								mode_type = "raw";
 								pixel_phase = "grey";
 								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
 /*								pix_clk_hz = "128571428"; */   /* 450 MHz CSI clock */
 /*								pix_clk_hz = "100000000"; */   /* 350 MHz CSI clock */
 								pix_clk_hz = "102857142";  /* 360 MHz CSI clock */

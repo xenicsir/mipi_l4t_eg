@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/kthread.h>
 #include <linux/nvhost.h>
+#include <linux/of.h>
 #include <linux/pm_runtime.h>
 #include <linux/semaphore.h>
 #include <linux/syscalls.h>
@@ -384,6 +385,124 @@ static int tegra_channel_capture_setup(struct tegra_channel *chan, unsigned int 
 	return 0;
 }
 
+/* Read one of NVIDIA's string-typed DT mode properties as an integer. */
+static int vi5_of_str_u32(struct device_node *np, const char *name, u32 *out)
+{
+	const char *str;
+
+	if (of_property_read_string(np, name, &str))
+		return -ENODATA;
+
+	return kstrtou32(str, 10, out);
+}
+
+/*
+ * Padding mode for sub-16-bit RAW written into a T_R16 container, read from the
+ * "pad0_en" property of the sensor's DT mode node:
+ *   "0" -- legacy: MSBs replicated into the low bits, full-scale 16-bit value
+ *   "1" -- data right-aligned, high bits zeroed: what V4L2 Y10/Y12/Y14 mean
+ *   "2" -- data left-aligned, low bits zeroed
+ * Returns -1 when no mode node matches or the property is absent, in which case
+ * the caller leaves the field alone and the VI keeps its own default -- which
+ * depends on the SoC: VI6 (T234) resets to legacy MSB replication, VI5 (T194) has
+ * no such register field at all, and VI2/VI3 (T210) settles it with
+ * BYPASS_PXL_TRANSFORM instead. Saying nothing in the device tree therefore means
+ * "whatever this silicon does", not "conformant".
+ *
+ * The property sits in the mode node next to csi_pixel_bit_depth because the
+ * answer differs per mode: a Y14 mode needs it, a Y16 mode has nothing to pad.
+ *
+ * We must find that node ourselves. s_data->mode_prop_idx cannot be used:
+ * camera_common_try_fmt() selects the mode by matching width and height only and
+ * breaks on the first hit, so for cameras that expose the same resolutions in
+ * several pixel formats -- all of ours do, Y16 and Y14 -- it always lands on the
+ * first, and the Y14 node is never reached. Match on resolution AND bit depth,
+ * which is exactly what distinguishes those entries.
+ *
+ * Reading the tree rather than routing through sensor_common is deliberate:
+ * struct sensor_image_properties is a userspace ABI blob with no free field, and
+ * this keeps the change to one file. Cost is a handful of property lookups per
+ * capture descriptor, negligible against a frame.
+ */
+static int vi5_pad0_en(struct tegra_channel *chan)
+{
+	struct device_node *sensor;
+	struct device_node *mode;
+	char mode_name[16];
+	u32 depth, w, h, parsed;
+	int i, val = -1;
+
+	if (!chan->subdev_on_csi || !chan->subdev_on_csi->dev)
+		return val;
+
+	sensor = chan->subdev_on_csi->dev->of_node;
+	if (!sensor)
+		return val;
+
+	for (i = 0; ; i++) {
+		snprintf(mode_name, sizeof(mode_name), "mode%d", i);
+		mode = of_get_child_by_name(sensor, mode_name);
+		if (!mode)
+			break;
+
+		if (!vi5_of_str_u32(mode, "csi_pixel_bit_depth", &depth) &&
+		    depth == chan->fmtinfo->width &&
+		    !vi5_of_str_u32(mode, "active_w", &w) &&
+		    w == chan->format.width &&
+		    !vi5_of_str_u32(mode, "active_h", &h) &&
+		    h == chan->format.height) {
+			if (!vi5_of_str_u32(mode, "pad0_en", &parsed) && parsed <= 2)
+				val = parsed;
+			of_node_put(mode);
+			break;
+		}
+
+		of_node_put(mode);
+	}
+
+	return val;
+}
+
+/*
+ * One line at streamon saying what a sub-16-bit RAW buffer actually holds: the 10,
+ * 12 or 14 bits sit in a 16-bit word, but where depends on the SoC and, on T234,
+ * on the DT. Nothing is printed for a SoC we have not verified -- silence beats a
+ * wrong description. Called once per stream, not from the descriptor path.
+ */
+static void vi5_log_raw_layout(struct tegra_channel *chan)
+{
+	const char *layout;
+
+	if (!chan->fmtinfo ||
+	    chan->fmtinfo->img_fmt != TEGRA_IMAGE_FORMAT_T_R16 ||
+	    chan->fmtinfo->width >= 16)
+		return;
+
+	if (of_machine_is_compatible("nvidia,tegra234")) {
+		switch (vi5_pad0_en(chan)) {
+		case 1:
+			layout = "right-aligned, high bits 0 (V4L2 conformant)";
+			break;
+		case 2:
+			layout = "left-aligned, low bits 0";
+			break;
+		case 0:
+			layout = "full-scale 16-bit, MSBs replicated into the low bits (pad0_en=0)";
+			break;
+		default:
+			layout = "full-scale 16-bit, MSBs replicated into the low bits (VI default, no pad0_en in DT)";
+			break;
+		}
+	} else if (of_machine_is_compatible("nvidia,tegra194")) {
+		layout = "full-scale 16-bit, MSBs replicated into the low bits (VI5 has no padding control)";
+	} else {
+		return;
+	}
+
+	dev_info(chan->vi->dev, "%u-bit RAW in 16-bit words: %s\n",
+		 chan->fmtinfo->width, layout);
+}
+
 static void vi5_setup_surface(struct tegra_channel *chan,
 	struct tegra_channel_buffer *buf, unsigned int descr_index, unsigned int vi_port)
 {
@@ -417,6 +536,26 @@ static void vi5_setup_surface(struct tegra_channel *chan,
 	desc->ch_cfg.match.datatype_mask = 0x3f;
 	desc->ch_cfg.pixfmt_enable = 1;
 	desc->ch_cfg.pixfmt.format = format;
+
+	/*
+	 * Sub-16-bit RAW in a T_R16 container: the VI's reset behaviour replicates
+	 * the MSBs into the low bits, giving a full-scale 16-bit value, whereas
+	 * V4L2_PIX_FMT_Y14 and friends mean N significant bits right-aligned in a
+	 * 16-bit LE word with the padding set to 0. Which of the two we get is the
+	 * "pad0_en" property of the sensor's DT mode node; when it says nothing the
+	 * field is left untouched and the silicon's own default stands -- see
+	 * vi5_pad0_en().
+	 * Restricted to T_R16 below 16 bits: RAW8 goes to T_R8, RAW16 has nothing
+	 * to pad, and the field must read 0 outside T_R16/T_R32 (Orin TRM, printed
+	 * p. 1928). T234/VI6 only -- T194/VI5 has no such register field, so this
+	 * is inert on Xavier; harmless there, but Y14 stays full-scale.
+	 */
+	if (format == TEGRA_IMAGE_FORMAT_T_R16 && chan->fmtinfo->width < 16) {
+		int pad0_en = vi5_pad0_en(chan);
+
+		if (pad0_en >= 0)
+			desc->ch_cfg.pixfmt.pad0_en = pad0_en;
+	}
 
 	desc_memoryinfo->surface[0].base_address = offset;
 	desc_memoryinfo->surface[0].size = chan->format.bytesperline * height;
@@ -888,6 +1027,8 @@ static int vi5_channel_start_streaming(struct vb2_queue *vq, u32 count)
 
 	/* Skip in bypass mode */
 	if (!chan->bypass) {
+		vi5_log_raw_layout(chan);
+
 		chan->timeout = MIPI_NO_TIMEOUT;
 		for (vi_port = 0; vi_port < chan->valid_ports; vi_port++) {
 			int err = vi5_channel_open(chan, vi_port);

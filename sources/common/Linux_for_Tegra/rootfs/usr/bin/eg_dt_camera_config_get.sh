@@ -344,6 +344,47 @@ get_camera_type_from_node() {
 }
 
 #******************************************************************************
+# Function: Describe where the 14 bits of a Y14 buffer actually sit
+#
+# They always occupy a 16-bit word, but the position depends on the SoC — and on
+# Orin it is set per sensor mode by the "pad0_en" device-tree property. Prints
+# nothing for a SoC we have not verified: silence beats a wrong description.
+# See the "Y14 pixel layout" section of the README.
+#******************************************************************************
+describe_y14_layout() {
+    local sysfs="$1" w="$2" h="$3"
+    local mode pad=""
+
+    case "$TEGRA_SOC" in
+        t234)
+            # Same match as the kernel: bit depth AND resolution, because the Y16
+            # and Y14 modes of our cameras share their resolutions.
+            for mode in "$sysfs"/of_node/mode*; do
+                [[ -d "$mode" ]] || continue
+                [[ "$(tr -d '\0' < "$mode/csi_pixel_bit_depth" 2>/dev/null)" == "14" ]] || continue
+                [[ "$(tr -d '\0' < "$mode/active_w" 2>/dev/null)" == "$w" ]] || continue
+                [[ "$(tr -d '\0' < "$mode/active_h" 2>/dev/null)" == "$h" ]] || continue
+                pad="$(tr -d '\0' < "$mode/pad0_en" 2>/dev/null)"
+                break
+            done
+            case "$pad" in
+                1) echo "    Y14 layout:   14 bits right-aligned, high bits 0 — as V4L2 defines Y14" ;;
+                2) echo "    Y14 layout:   14 bits left-aligned, low bits 0 — NOT as V4L2 defines Y14" ;;
+                *) echo "    Y14 layout:   full-scale 16-bit, top 2 bits copied into the low 2 — NOT as V4L2 defines Y14"
+                   echo "                  (VI default; set pad0_en = \"1\" on this DT mode node for a conformant Y14)" ;;
+            esac
+            ;;
+        t194)
+            echo "    Y14 layout:   full-scale 16-bit, top 2 bits copied into the low 2 — NOT as V4L2 defines Y14"
+            echo "                  (fixed on this SoC: its VI has no padding control)"
+            ;;
+        # t186 (TX2) and t210 (Nano) are deliberately absent: their VI format table
+        # has no 14-bit greyscale entry, so Y14 cannot be selected there at all and
+        # this function is never reached with a Y14 format. Silence beats guessing.
+    esac
+}
+
+#******************************************************************************
 # Function: Discover cameras in specific device tree locations
 #******************************************************************************
 discover_cameras() {
@@ -635,6 +676,9 @@ else
                 [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
                 [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
                 [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
+                if [[ "$pixfmt" == "'Y14 '"* ]] && [[ -n "$sysfs_path" ]] && [[ -n "$resolution" ]]; then
+                    describe_y14_layout "$sysfs_path" "${resolution%%[x/]*}" "${resolution##*[x/]}"
+                fi
                 if [[ -n "$video_dev" ]] && [[ -n "$resolution" ]] && [[ -n "$pixfmt" ]]; then
                     _w="${resolution%%[x/]*}"
                     _h="${resolution##*[x/]}"
