@@ -115,6 +115,11 @@ class DeploymentMatrixGenerator:
         bpp = self.camera_db['pixel_format_map'][pixel_format]['csi_pixel_bit_depth']
         return pix_clk_hz * bpp / lanes / 2 / 1e6
 
+    def _data_rates_mbps(self, csi_mhz, lanes):
+        """Data rate per lane and aggregate (Mbps): DDR clock × 2, then × lanes."""
+        per_lane = csi_mhz * 2
+        return per_lane, per_lane * lanes
+
     def parse_entry(self, entry_str):
         """Parse 'status|git_branch|deb_package' format"""
         if not entry_str or isinstance(entry_str, dict):
@@ -534,13 +539,15 @@ class DeploymentMatrixGenerator:
                 for res_entry in db_cam.get('resolutions', []):
                     lanes = res_entry['data_lanes']
                     f.write(f"\n**{res_entry['res']}** — {lanes} CSI lane(s)\n\n")
-                    f.write("| Pixel Format | Pixel Clock | CSI Clock |\n")
-                    f.write("| --- | --- | --- |\n")
+                    f.write("| Pixel Format | Pixel Clock | CSI Clock | Data Rate / Lane | Data Rate Total |\n")
+                    f.write("| --- | --- | --- | --- | --- |\n")
                     for mode in res_entry['modes']:
                         pix_mhz = mode['pix_clk_hz'] / 1e6
                         pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
                         csi_mhz = self._csi_clock_mhz(mode['pixel_format'], mode['pix_clk_hz'], lanes)
-                        f.write(f"| {mode['pixel_format']} | {pix_str} MHz | {csi_mhz:.0f} MHz |\n")
+                        lane_mbps, total_mbps = self._data_rates_mbps(csi_mhz, lanes)
+                        f.write(f"| {mode['pixel_format']} | {pix_str} MHz | {csi_mhz:.0f} MHz "
+                                f"| {lane_mbps:.0f} Mbps | {total_mbps:.0f} Mbps |\n")
                 f.write("\n")
 
             # Flex cable appendix
@@ -907,12 +914,17 @@ class DeploymentMatrixGenerator:
             for res_entry in db_cam.get('resolutions', []):
                 lanes = res_entry['data_lanes']
                 resolutions_html += f'<p class="res-title">{res_entry["res"]} — {lanes} CSI lane(s)</p>\n'
-                resolutions_html += '<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th><th>CSI Clock</th></tr></thead><tbody>\n'
+                resolutions_html += ('<table><thead><tr><th>Pixel Format</th><th>Pixel Clock</th>'
+                                    '<th>CSI Clock</th><th>Data Rate / Lane</th>'
+                                    '<th>Data Rate Total</th></tr></thead><tbody>\n')
                 for mode in res_entry['modes']:
                     pix_mhz = mode['pix_clk_hz'] / 1e6
                     pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
                     csi_mhz = self._csi_clock_mhz(mode['pixel_format'], mode['pix_clk_hz'], lanes)
-                    resolutions_html += f'<tr><td>{mode["pixel_format"]}</td><td>{pix_str} MHz</td><td>{csi_mhz:.0f} MHz</td></tr>\n'
+                    lane_mbps, total_mbps = self._data_rates_mbps(csi_mhz, lanes)
+                    resolutions_html += (f'<tr><td>{mode["pixel_format"]}</td><td>{pix_str} MHz</td>'
+                                         f'<td>{csi_mhz:.0f} MHz</td><td>{lane_mbps:.0f} Mbps</td>'
+                                         f'<td>{total_mbps:.0f} Mbps</td></tr>\n')
                 resolutions_html += '</tbody></table>\n'
 
             html_content += f"""            <div class="camera-card">
@@ -1078,14 +1090,19 @@ class DeploymentMatrixGenerator:
                 lines.append("<th style='font-size:6.5pt;'>Format</th>")
                 lines.append("<th style='font-size:6.5pt;'>Pix clock</th>")
                 lines.append("<th style='font-size:6.5pt;'>CSI clock</th>")
+                lines.append("<th style='font-size:6.5pt;'>Rate/lane</th>")
+                lines.append("<th style='font-size:6.5pt;'>Rate total</th>")
                 lines.append("</tr></thead><tbody>")
                 for mode in res_entry['modes']:
                     pix_mhz = mode['pix_clk_hz'] / 1e6
                     pix_str = f"{pix_mhz:.1f}".rstrip('0').rstrip('.')
                     csi_mhz = self._csi_clock_mhz(mode['pixel_format'], mode['pix_clk_hz'], lanes)
+                    lane_mbps, total_mbps = self._data_rates_mbps(csi_mhz, lanes)
                     lines.append(f"<tr><td style='font-size:6.5pt;'>{mode['pixel_format']}</td>"
                                  f"<td style='font-size:6.5pt;'>{pix_str} MHz</td>"
-                                 f"<td style='font-size:6.5pt;'>{csi_mhz:.0f} MHz</td></tr>")
+                                 f"<td style='font-size:6.5pt;'>{csi_mhz:.0f} MHz</td>"
+                                 f"<td style='font-size:6.5pt;'>{lane_mbps:.0f} Mbps</td>"
+                                 f"<td style='font-size:6.5pt;'>{total_mbps:.0f} Mbps</td></tr>")
                 lines.append("</tbody></table>")
 
             lines.append("</div>")
