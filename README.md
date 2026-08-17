@@ -347,7 +347,7 @@ This generates: `jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams_<debian_version>_arm64.d
 
 **Note:** For L4T 35.x and 36.x, the `-s/--som` flag is not needed — those versions target Orin-family SoMs and the SoM is implicit.
 
-Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi, ilumos, microlynx) and device tree overlays (`tegra186-camera-eg-*` / `tegra210-camera-eg-*`).
+Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi) and device tree overlays (`tegra186-camera-eg-*` / `tegra210-camera-eg-*`). iLumos and Microlynx are not part of the 32.x packages — see [Y14 pixel layout](#y14-pixel-layout).
 
 **The `-c/--carrier-board` option** selects a specific carrier board within a vendor. It has three effects compared to a generic build:
 

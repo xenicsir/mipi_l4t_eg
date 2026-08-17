@@ -23,7 +23,8 @@ platforms:
     som: "Tegra X1"
     csi_lanes: 2
     notes:
-      - "⚠️ Y16 pixel format is not supported on this platform (T210 / Tegra X1 hardware limitation)."
+      - "⚠️ Y16 pixel format is not supported — **SoM hardware limitation**."
+      - "⚠️ Y14 pixel format is not supported — **L4T 32.x software limitation**."
       - "⚠️ Yocto builds (32.5.1, 32.6.1, 32.7.1) are legacy and no longer maintained. No Debian packages are provided for these versions."
 
   - id: tx2_t186
@@ -32,7 +33,9 @@ platforms:
     l4t_series: "32.x"
     som: "Tegra186"
     csi_lanes: 2
-    notes: "Platform not tested with EG cameras"
+    notes:
+      - "Platform not tested with EG cameras — no hardware available."
+      - "⚠️ Neither Y14 nor Y16 is supported — **L4T 32.x software limitation**."
 
   - id: xavier_nx
     name: "Xavier NX (T194)"
@@ -193,8 +196,18 @@ deployment_matrix:
         32.7.4: "tested|l4t-32.7.4|smartir640-l4t-32.7.4.deb"
         32.7.5: "tested|l4t-32.7.5|smartir640-l4t-32.7.5.deb"
         32.7.6: "tested|l4t-32.7.6|smartir640-l4t-32.7.6.deb"
-      ilumos: {}
-      microlynx: {}
+      # Y14/Y16 have no entry in the T210 VI format table and we do not add one
+      # (obsolete L4T, decision 2026-08-17) — these two cameras cannot stream here.
+      ilumos:
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
+      microlynx:
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
 
   # ========== Jetson TX2 (T186) ==========
   - platform: tx2_t186
@@ -220,15 +233,15 @@ deployment_matrix:
         32.7.5: "theoretically_supported|l4t-32.7.5|smartir640-tx2-l4t-32.7.5.deb"
         32.7.6: "theoretically_supported|l4t-32.7.6|smartir640-tx2-l4t-32.7.6.deb"
       ilumos:
-        32.7.1: "theoretically_supported|l4t-32.7.1|ilumos-tx2-l4t-32.7.1.deb"
-        32.7.4: "theoretically_supported|l4t-32.7.4|ilumos-tx2-l4t-32.7.4.deb"
-        32.7.5: "theoretically_supported|l4t-32.7.5|ilumos-tx2-l4t-32.7.5.deb"
-        32.7.6: "theoretically_supported|l4t-32.7.6|ilumos-tx2-l4t-32.7.6.deb"
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
       microlynx:
-        32.7.1: "theoretically_supported|l4t-32.7.1|microlynx-tx2-l4t-32.7.1.deb"
-        32.7.4: "theoretically_supported|l4t-32.7.4|microlynx-tx2-l4t-32.7.4.deb"
-        32.7.5: "theoretically_supported|l4t-32.7.5|microlynx-tx2-l4t-32.7.5.deb"
-        32.7.6: "theoretically_supported|l4t-32.7.6|microlynx-tx2-l4t-32.7.6.deb"
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
 
   # ========== Xavier NX ==========
   - platform: xavier_nx

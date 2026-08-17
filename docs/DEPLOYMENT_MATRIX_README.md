@@ -190,14 +190,16 @@ A blank cell means:
 
 `theoretically_supported` cells are **automatically generated** by `generate_deployment_matrix.py` for any (platform, camera, version) combination where the version's `platform_ids` in `eg_config.yaml` includes that platform. You only need to add explicit entries to `deployment_matrix_data.yaml` for `tested` results (or `not_supported` exceptions).
 
-### Hardware Constraints
+### Hardware and software constraints
 
 Some combinations are impossible:
 
-- **T210 (Nano) cannot support Y16** — but Y14 works, so iLumos and Microlynx appear as theoretically supported (Y14 modes only)
+- **T210 (Nano) cannot support Y16** — *hardware*: the Tegra X1 video input has no 16-bit RAW format (TRM tables 184/185 stop at RAW14)
+- **T210 and T186 do not support Y14 either** — *software*: the L4T 32.x kernel has no Y14 entry in its VI format table (`vi2_formats.h`, `vi4_formats.h`) and we deliberately do not add one (obsolete L4T, decision 2026-08-17). On T210 the hardware would handle RAW14; on T186 that is undetermined (no Parker TRM available)
+- **iLumos and Microlynx therefore cannot stream on 32.x at all** — every one of their modes is Y14 or Y16. They are marked `not_supported` on `nano_t210` and `tx2_t186`, and their device-tree overlays are not built for those SoMs
 - **32.x L4T cannot support 36.x cameras** — Different driver architecture (in-tree vs out-of-tree)
 
-These are marked as empty cells (no data) rather than `not_supported`.
+A combination ruled out by `platform_restrictions` needs an explicit `not_supported` entry in `deployment_matrix_data.yaml`: without it the generator would auto-fill `theoretically_supported` from `platform_ids`. Combinations that were simply never exercised stay as empty cells (no data).
 
 ### Testing vs. Theoretical Support
 

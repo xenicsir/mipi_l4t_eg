@@ -13,6 +13,14 @@ declare -A CAMERA_LANES=(
 	[microlynx]="Microlynx"
 )
 
+# Cameras that only ever stream 14/16-bit greyscale (no RGB or YUV mode)
+declare -A CAMERA_GREY_ONLY=(
+	[iLumos]=1
+	[ilumos]=1
+	[Microlynx]=1
+	[microlynx]=1
+)
+
 # Cameras requiring x4 MIPI lanes
 declare -A CAMERA_X4=(
 #   [iLumos]=1
@@ -100,6 +108,8 @@ elif grep -q "cti-eg-cams-dione" /boot/extlinux/extlinux.conf 2>/dev/null; then
 else
 	BOARD=$(detect_jetson_board.sh --short)
 fi
+
+TEGRA_SOC=$(detect_jetson_board.sh --json 2>/dev/null | grep -oP '"tegra":\s*"\K[^"]+')
 
 # Detect number of camera ports from device tree
 CAMERA_PORTS=$(detect_jetson_board.sh --camera-ports 2>/dev/null)
@@ -253,6 +263,15 @@ for arg in "$@"; do
 	if [[ -z "${CAMERA_LANES[$camera_type]+x}" ]]; then
 		echo "Error: unknown camera type '$camera_type' (from argument '$arg')."
 		echo "Supported cameras: $SUPPORTED_CAMERAS"
+		exit 1
+	fi
+
+	# These cameras only ever stream Y14 or Y16, and the T210/T186 VI has no 14- or
+	# 16-bit greyscale memory format, so no overlay is built for them there.
+	if [[ -n "${CAMERA_GREY_ONLY[$camera_type]+x}" ]] && \
+	   [[ "$TEGRA_SOC" == "t210" || "$TEGRA_SOC" == "t186" ]]; then
+		echo "Error: $camera_type is not supported on this SoM ($TEGRA_SOC): it streams"
+		echo "only 14/16-bit greyscale, which the video input of this chip cannot store."
 		exit 1
 	fi
 

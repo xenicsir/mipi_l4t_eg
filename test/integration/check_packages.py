@@ -138,7 +138,10 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
 
     family = version_family(version_dir)
     has_dtbos = (som != "t186")  # t186 has no device tree overlays
-    has_y16_cams = not pristine_kernel  # iLumos/Microlynx are Y16-only
+    # iLumos/Microlynx are Y14/Y16-only: absent from a pristine kernel, and absent
+    # from 32.x altogether — the T210/T186 VI format tables have no 14- or 16-bit
+    # greyscale entry, so neither their drivers nor their overlays are built there.
+    has_y16_cams = (not pristine_kernel) and family != "32"
 
     with tempfile.TemporaryDirectory(prefix="eg_pkg_") as tmpdir:
         extract_dir = Path(tmpdir) / "pkg"
@@ -218,8 +221,8 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
             else:
                 errors.append(f"{ko} missing from lib/modules/")
 
-        # Everything but 32.x (no Y16 there): ilumos.ko, microlynx.ko
-        if family != "32" and has_y16_cams:
+        # ilumos.ko, microlynx.ko — see has_y16_cams above
+        if has_y16_cams:
             for ko in ("ilumos.ko", "microlynx.ko"):
                 if find_ko(extract_dir, ko):
                     passed += 1

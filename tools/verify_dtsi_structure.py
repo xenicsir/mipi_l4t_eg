@@ -361,6 +361,22 @@ def verify(quiet=False):
             )
             expected_count = len(expected_modes)
 
+            # Every mode of this camera uses a format the platform cannot produce
+            # (platform_restrictions): the camera is not supported there, so its
+            # node must be ABSENT. Checked in that direction — a leftover node
+            # would advertise a camera that can never stream.
+            if expected_count == 0:
+                for cam_idx in range(plat["num_cams"]):
+                    node_label = f"{prefix}{cam_idx}"
+                    if node_label in nodes:
+                        errors.append(
+                            f"[{plat_key}] node {node_label} present, but every "
+                            f"{cam_key} format is unsupported on {primary_platform_id}"
+                        )
+                    else:
+                        plat_ok += 1
+                continue
+
             # Overlay for EC cameras
             overlay_path = None
             overlay_overrides = {}  # mode_idx → {pix_clk_hz, num_lanes, ...}

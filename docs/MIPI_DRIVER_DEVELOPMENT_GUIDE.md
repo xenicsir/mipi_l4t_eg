@@ -62,8 +62,10 @@ When multiple layers modify the same file (e.g., a Makefile), a **3-way merge** 
 - Only add files to `Linux_for_Tegra_<som>/` or `Linux_for_Tegra_<vendor>/` when the SoM or vendor needs **different** content (e.g., SoM-specific BSP archives, vendor defconfigs, device trees).
 
 **SoM support (32.x only):** L4T 32.x targets two SoMs via the `-s/--som` flag:
-- `t210` — Jetson Nano / porg (tegra210): has device tree overlays, supports all cameras except Y16
-- `t186` — Jetson TX2 / TX2i / TX2 NX (tegra186): has device tree overlays (`tegra186-camera-eg-*`) and kernel modules (ilumos, microlynx, dione_ir, eg-ec-mipi)
+- `t210` — Jetson Nano / porg (tegra210): has device tree overlays
+- `t186` — Jetson TX2 / TX2i / TX2 NX (tegra186): has device tree overlays (`tegra186-camera-eg-*`)
+
+Neither SoM supports 14- or 16-bit greyscale: their VI format tables (`vi2_formats.h`, `vi4_formats.h`) carry no such entry and we deliberately do not add one (obsolete L4T). **iLumos and Microlynx are therefore not supported on 32.x at all** — no overlays, no kernel modules. The 32.x kernel modules are `dione_ir` and `eg-ec-mipi` only.
 
 For L4T 35.x and 36.x, the SoM is always Orin-family and no `-s` flag is needed.
 
@@ -78,7 +80,7 @@ For L4T 35.x and 36.x, the SoM is always Orin-family and no `-s` flag is needed.
 | `vendors` | Vendor definitions: list of carriers, default carrier |
 | `carriers` | Carrier board definitions: defconfig name, directory suffix |
 | `pixel_format_map` | Maps pixel format names (`Y16`, `RGB888`, …) to DT field values (`mode_type`, `pixel_phase`, `csi_pixel_bit_depth`) |
-| `platform_restrictions` | Per-platform unsupported formats (e.g. `nano_t210` cannot do `Y16`) |
+| `platform_restrictions` | Per-platform unsupported formats (e.g. `nano_t210` cannot do `Y16` or `Y14`). A camera whose *every* mode uses a restricted format is not supported on that platform at all: its node must be absent from the platform DTSI, and the deployment matrix shows `not_supported` |
 | `dtsi_platforms` | DTSI files to verify: path relative to `sources/common/source/`, `num_cams`, associated `platform_ids`, EC overlay pattern |
 | `cameras` | Camera specifications: resolutions, data lanes, modes, DT timing fields (`line_length`, `pix_clk_hz`, …) |
 
@@ -594,7 +596,7 @@ platform_restrictions:
     unsupported_formats: [Y16]
 ```
 
-Finally, add the new `platform_id` to the `platform_ids` list of each supported L4T version in `versions:`. This automatically populates `theoretically_supported` cells in the deployment matrix for all cameras on this platform.
+Finally, add the new `platform_id` to the `platform_ids` list of each supported L4T version in `versions:`. This automatically populates `theoretically_supported` cells in the deployment matrix for all cameras on this platform — except cameras ruled out entirely by `platform_restrictions`, which need an explicit `not_supported` entry in `deployment_matrix_data.yaml`.
 
 ### Step 4: Update target scripts
 

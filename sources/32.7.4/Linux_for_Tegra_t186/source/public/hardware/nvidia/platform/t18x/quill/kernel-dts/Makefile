@@ -49,12 +49,8 @@ dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-c03-00-base-hdr30
 dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cams-dione.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam0-ec-1-lane.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam0-ec-2-lanes.dtbo
-dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam0-ilumos.dtbo
-dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam0-microlynx.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam1-ec-1-lane.dtbo
 dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam1-ec-2-lanes.dtbo
-dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam1-ilumos.dtbo
-dtbo-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-camera-eg-cam1-microlynx.dtbo
 
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))

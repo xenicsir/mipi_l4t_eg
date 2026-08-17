@@ -545,10 +545,23 @@ pixel_format_map:
 
 # ---------------------------------------------------------------------------
 # Platform restrictions
+#
+# A camera whose EVERY mode uses a restricted format is not supported on that
+# platform at all: its node must be absent from the platform's DTSI, and the
+# deployment matrix marks it not_supported. verify_dtsi_structure.py checks both
+# directions.
+#
+# The 32.x SoMs (T210 Nano, T186 TX2) have no 14- or 16-bit greyscale entry in
+# their VI format table (vi2_formats.h / vi4_formats.h), and we do not add one —
+# those L4T versions are obsolete and it is not worth the effort (decision
+# 2026-08-17). Y14/Y16 therefore cannot be selected there whatever the device
+# tree declares, which rules out iLumos and Microlynx entirely on both SoMs.
 # ---------------------------------------------------------------------------
 platform_restrictions:
   nano_t210:
-    unsupported_formats: [Y16, "Y16 -BE"]   # Y14 is supported on T210; 16-bit greyscale (LE and BE) is excluded
+    unsupported_formats: [Y16, "Y16 -BE", Y14]
+  tx2_t186:
+    unsupported_formats: [Y16, "Y16 -BE", Y14]
 
 # ---------------------------------------------------------------------------
 # DTSI platforms

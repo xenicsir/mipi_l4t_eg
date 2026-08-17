@@ -42,43 +42,29 @@
 			status = "okay";
 		};
 	};
-	fragment@14 {
+	fragment@15 {
 		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode0";
 		__overlay__ {
 			num_lanes = "1";
 			pix_clk_hz = "20000000";
 		};
 	};
-	fragment@15 {
+	fragment@16 {
 		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode1";
 		__overlay__ {
 			num_lanes = "1";
 			pix_clk_hz = "20000000";
 		};
 	};
-	fragment@16 {
-		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode2";
-		__overlay__ {
-			num_lanes = "1";
-			pix_clk_hz = "20000000";
-		};
-	};
-	fragment@17 {
-		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode3";
-		__overlay__ {
-			num_lanes = "1";
-			pix_clk_hz = "100000000";
-		};
-	};
 	fragment@18 {
-		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode4";
+		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode2";
 		__overlay__ {
 			num_lanes = "1";
 			pix_clk_hz = "133333336";
 		};
 	};
 	fragment@19 {
-		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode5";
+		target-path = "/cam_i2cmux/i2c@0/eg_ec_a@16/mode3";
 		__overlay__ {
 			num_lanes = "1";
 			pix_clk_hz = "100000000";
