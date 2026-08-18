@@ -335,6 +335,22 @@ PYEOF
       # Join backslash-continuation lines for easier parsing
       MAKEFILE_JOINED=$(awk '{if(/\\$/) {printf "%s ", substr($0,1,length($0)-1)} else {print}}' <<< "$RESOLVED_MAKEFILE")
 
+# A driver whose CONFIG symbol is disabled in the version's defconfig is not
+# built, so it must not be expected in the package either. That is the case of
+# ilumos and microlynx on 32.x: the video input of those SoCs has no 14- or
+# 16-bit greyscale memory format, so those cameras cannot stream there at all.
+# When no defconfig is found (36.x builds its out-of-tree modules differently)
+# the driver is assumed enabled, which preserves the previous behaviour.
+_eg_config_enabled() {
+   local _sym="$1" _dc
+   for _dc in "$SCRIPT_DIR"/sources/"$_EG_CFG_VERSION"/Linux_for_Tegra/source/public/kernel/kernel-*/arch/arm64/configs/tegra_defconfig; do
+      [[ -f "$_dc" ]] || continue
+      grep -q "^${_sym}=[my]" "$_dc" && return 0
+      grep -q "^# ${_sym} is not set" "$_dc" && return 1
+   done
+   return 0
+}
+
       # Build module→sources map from <mod>-objs and <mod>-y assignments
       declare -A _mod_srcs
       while IFS= read -r line; do
@@ -347,21 +363,28 @@ PYEOF
          fi
       done <<< "$MAKEFILE_JOINED"
 
-      # For each obj- module: check if any source file belongs to Exosens
+      # For each obj- module: check if any source file belongs to Exosens, and
+      # that the driver is actually enabled in this version's defconfig.
+      _EG_CFG_VERSION="$L4T_VERSION"
       while IFS= read -r line; do
          line="${line%%#*}"
-         if [[ "$line" =~ ^obj-[^+]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
+         if [[ "$line" =~ ^obj-\$\((CONFIG_[A-Z0-9_]+)\)[[:space:]]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
+            _eg_config_enabled "${BASH_REMATCH[1]}" || continue
+            mod="${BASH_REMATCH[2]}"
+         elif [[ "$line" =~ ^obj-[^+]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
             mod="${BASH_REMATCH[1]}"
-            srcs="${_mod_srcs[$mod]:-$mod}"
-            for src in $srcs; do
-               for eg in "${EG_SRCS[@]}"; do
-                  if [[ "$src" == "$eg" ]]; then
-                     EG_MODULES+=("${mod}.ko")
-                     break 2
-                  fi
-               done
-            done
+         else
+            continue
          fi
+         srcs="${_mod_srcs[$mod]:-$mod}"
+         for src in $srcs; do
+            for eg in "${EG_SRCS[@]}"; do
+               if [[ "$src" == "$eg" ]]; then
+                  EG_MODULES+=("${mod}.ko")
+                  break 2
+               fi
+            done
+         done
       done <<< "$MAKEFILE_JOINED"
       unset _mod_srcs
    else

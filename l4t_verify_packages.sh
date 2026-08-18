@@ -347,6 +347,23 @@ check_files_exist() {
 #******************************************************************************
 # Verify a single package
 #******************************************************************************
+# A driver whose CONFIG symbol is disabled in the version's defconfig is not
+# built, so the package must not be expected to carry it. That is the case of
+# ilumos and microlynx on 32.x: the video input of those SoCs has no 14- or
+# 16-bit greyscale memory format, so those cameras cannot stream there at all.
+# When no defconfig is found (36.x builds its out-of-tree modules differently)
+# the driver is assumed enabled, which preserves the previous behaviour.
+# $1 = CONFIG_ symbol, $2 = L4T version
+_eg_config_enabled() {
+    local _sym="$1" _ver="$2" _dc
+    for _dc in "$SCRIPT_DIR"/sources/"$_ver"/Linux_for_Tegra/source/public/kernel/kernel-*/arch/arm64/configs/tegra_defconfig; do
+        [[ -f "$_dc" ]] || continue
+        grep -q "^${_sym}=[my]" "$_dc" && return 0
+        grep -q "^# ${_sym} is not set" "$_dc" && return 1
+    done
+    return 0
+}
+
 verify_package() {
     local version="$1"
     local vendor="$2"
@@ -586,8 +603,14 @@ PYEOF
 
             while IFS= read -r line; do
                 line="${line%%#*}"
-                if [[ "$line" =~ ^obj-[^+]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
-                    local _mod="${BASH_REMATCH[1]}"
+                local _mod=""
+                if [[ "$line" =~ ^obj-\$\((CONFIG_[A-Z0-9_]+)\)[[:space:]]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
+                    _eg_config_enabled "${BASH_REMATCH[1]}" "$version" || continue
+                    _mod="${BASH_REMATCH[2]}"
+                elif [[ "$line" =~ ^obj-[^+]*\+=[[:space:]]*([a-zA-Z0-9_-]+)\.o ]]; then
+                    _mod="${BASH_REMATCH[1]}"
+                fi
+                if [[ -n "$_mod" ]]; then
                     local _srcs="${_mod_srcs_v[$_mod]:-$_mod}"
                     for _src in $_srcs; do
                         for _eg in "${eg_srcs[@]}"; do
