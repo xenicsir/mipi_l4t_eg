@@ -613,11 +613,12 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
 				dev_err(vi->dev, "uncorr_err: flags %d, err_data %d\n",
 					descr->status.flags, descr->status.err_data);
 			} else {
-//				dev_warn(vi->dev,
-//					"corr_err: discarding frame %d, flags: %d, "
-//					"err_data %d\n",
-//					descr->status.frame_id, descr->status.flags,
-//					descr->status.err_data);
+				/* Rate-limited: every frame can land here at 60 fps. */
+				dev_warn_ratelimited(vi->dev,
+					"corr_err: discarding frame %d, flags: %d, "
+					"err_data %d\n",
+					descr->status.frame_id, descr->status.flags,
+					descr->status.err_data);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 					buf->vb2_state = VB2_BUF_STATE_REQUEUEING;
 #else

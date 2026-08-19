@@ -158,9 +158,12 @@ static const struct tegra_video_format vi5_video_formats[] = {
 	 * alignment inside the container is optional, though:
 	 * VI_CHn_PIXFMT_FORMAT.T_R16_R32_PAD0_EN (Orin TRM, printed p. 1928) resets to
 	 * 0 = legacy MSB replication, so memory holds (v << 2) | (v >> 12) at full
-	 * 16-bit scale -- not the right-aligned value V4L2_PIX_FMT_Y14 implies. We
-	 * never program that field; pad0_en=1 yields conforming Y14 (measured
-	 * 2026-03-16 on Microlynx).
+	 * 16-bit scale -- not the right-aligned value V4L2_PIX_FMT_Y14 implies.
+	 * vi5_fops.c programs that field from the "pad0_en" property of the
+	 * sensor's DT mode node (see vi5_pad0_en()); absent that property the field
+	 * is left alone and each SoC's default stands -- T194/VI5 has no such field
+	 * at all. pad0_en=1 yields conforming Y14: (v >> 14) == 0 on 100.000 % of
+	 * 39.3 M pixels, measured on iLumos / Orin Nano 36.5.0.
 	 */
 	TEGRA_VIDEO_FORMAT(RAW14, 14, Y14_1X14, 2, 1, T_R16,
 				RAW14, Y14, "RAW14"),
