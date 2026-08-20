@@ -124,6 +124,20 @@ NVCSI_CIL_ERR_BITS = {
 }
 
 # VI corr_err / uncorr_err  err_data field  (CAPTURE_CHANNEL_ERROR_* bits)
+#
+# Three things to know before reading a value with this table:
+#
+#  - camrtc-capture.h documents err_data as "Extended error data. The content
+#    depends on the value in status" -- so this table only applies to the status
+#    codes that carry a channel error mask. Always read `status` alongside.
+#  - the Orin TRM numbers the same tags DIFFERENTLY (VI_CHn_NOTIFY_MASK_*,
+#    printed p. 2151): PIXEL_MISSING_LE is bit 2 there and bit 5 here,
+#    PIXEL_LONG_LINE bit 5 there and bit 8 here. camrtc keeps only the error
+#    tags -- dropping PIXEL_SOF/EOF/LINE_TIMER -- and renumbers them from bit 5.
+#    Decoding a value with the wrong table silently yields plausible nonsense.
+#  - bits 0-4 have no CAPTURE_CHANNEL_ERROR_* definition at all. A value with
+#    one of them set (measured on iLumos/Forecr 35.6.0: err_data 0x400062,
+#    bit 1 set) is not fully decodable -- say so rather than guessing.
 VI_ERR_DATA_BITS = {
     5:  ("PIXEL_MISSING_LE",      "Pixel line end not received — line cut short by camera"),
     6:  ("PIXEL_RUNAWAY",         "Excessive pixel data (runaway) — camera sent too many pixels"),
@@ -142,7 +156,9 @@ VI_ERR_DATA_BITS = {
     19: ("STALE_FRAME",           "Stale frame — buffer reused before frame completed"),
     20: ("INCOMPLETE",            "Incomplete frame"),
     21: ("ERROR_EMBED_INCOMPLETE","Embedded data incomplete"),
-    22: ("VI_PFSD_FAULT",         "VI pixel format/stride detector fault"),
+    22: ("VI_PFSD_FAULT",         "Permanent Fault Software Diagnostic fault — RCE safety "
+                                  "mechanism, unrelated to the MIPI link (absent from the "
+                                  "Orin TRM camera chapter)"),
     23: ("VI_FRAME_START_TIMEOUT","VI frame start timeout — no SOF received"),
 }
 

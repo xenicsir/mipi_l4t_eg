@@ -714,12 +714,18 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
 				dev_err(vi->dev, "uncorr_err: flags %d, err_data %d\n",
 					descr->status.flags, descr->status.err_data);
 			} else {
-				/* Rate-limited: every frame can land here at 60 fps. */
+				/*
+				 * Rate-limited: every frame can land here at 60 fps.
+				 * status is printed too: err_data's layout depends on it -- see
+				 * camrtc-capture.h, "Extended error data. The content depends on
+				 * the value in status". Hex keeps the CAPTURE_CHANNEL_ERROR_*
+				 * bits readable without converting by hand.
+				 */
 				dev_warn_ratelimited(vi->dev,
-					"corr_err: discarding frame %d, flags: %d, "
-					"err_data %d\n",
-					descr->status.frame_id, descr->status.flags,
-					descr->status.err_data);
+					"corr_err: discarding frame %d, status %u, flags: %d, "
+					"err_data 0x%08x\n",
+					descr->status.frame_id, descr->status.status,
+					descr->status.flags, descr->status.err_data);
 				frame_err = true;
 			}
 		} else if (!vi_port) {
