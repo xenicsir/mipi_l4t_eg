@@ -1,77 +1,85 @@
 # Exosens cameras MIPI CSI-2 driver for NVIDIA Jetson boards
 
-This document describes how to build and install the MIPI drivers for different Jetson SoM (System On Module) and carrier boards, based on Nvidia BSP (L4T, Linux For Tegra).
+Drivers and device-tree overlays that make Exosens MIPI CSI-2 cameras work on NVIDIA Jetson
+boards.
 
-It also provides guidance for integrating the drivers on other L4T versions and carrier boards.
+**If you were given a board and a `.deb` package, you only need Part 1.** Part 2 and the
+appendices are for building the drivers from source and porting them to new hardware.
 
-The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) presents an overview of the supported cameras/SoM/carrier boards/L4T versions.
+The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) lists which cameras are supported on
+which SoM, carrier board and L4T version.
+
+---
+
+## Quick start
+
+On a board already flashed with a supported L4T version, with the package copied onto it:
+
+```bash
+# 1. Install the driver package — the leading ./ is required
+sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+
+# 2. Reboot: cameras are set up at boot time
+sudo reboot
+
+# 3. See what the board detects
+eg_dt_camera_config_get.sh
+```
+
+`eg_dt_camera_config_get.sh` is the command to remember. For each port it prints the camera
+model, whether it is connected, its `/dev/videoX` device, its pixel format — and
+ready-to-paste streaming commands for that exact camera. Start there whenever something
+looks wrong.
+
+After a first install both ports expect **Dione** cameras. For anything else, set them and
+reboot:
+
+```bash
+eg_dt_camera_config_set.sh 0/iLumos 1/SmartIR640
+sudo reboot
+```
 
 ---
 
 ## Table of Contents
 
-- [Acronyms](#acronyms)
+**Part 1 — Using the cameras on a board**
+
+- [Quick start](#quick-start)
 - [Flashing JetPack on Jetson Orin NX/Nano](#flashing-jetpack-on-jetson-orin-nxnano)
-- [Prerequisites for cross-compiling](#prerequisites-for-cross-compiling)
-  - [Host PC requirements](#host-pc-requirements)
-- [Building, installing, configuring and testing MIPI drivers](#building-installing-configuring-and-testing-mipi-drivers)
-  - [Supported L4T versions, SoMs, vendors and carrier boards](#supported-l4t-versions-soms-vendors-and-carrier-boards)
-  - [Building the L4T environment](#building-the-l4t-environment)
-    - [Source code organization](#source-code-organization)
-    - [Building workflow](#building-workflow)
-  - [Building MIPI drivers for specific SoMs or carrier boards](#building-mipi-drivers-for-specific-soms-or-carrier-boards)
-  - [Installing and configuring the MIPI drivers on the board](#installing-and-configuring-the-mipi-drivers-on-the-board)
-    - [Package installation](#package-installation)
-    - [Configuring camera ports](#configuring-camera-ports)
-  - [Quick start - Testing the camera](#quick-start---testing-the-camera)
-- [Notes about Linux boot and device trees](#notes-about-linux-boot-and-device-trees)
-  - [Linux boot configuration](#linux-boot-configuration)
-  - [Orin NX/Nano CSI lanes issues](#orin-nxnano-csi-lanes-issues)
-  - [Y14 pixel layout](#y14-pixel-layout)
+- [Installing the driver package](#installing-the-driver-package)
+  - [Optional tools](#optional-tools)
+  - [Reinstalling, upgrading, version mismatches](#reinstalling-upgrading-version-mismatches)
+- [Configuring camera ports](#configuring-camera-ports)
+- [Testing the camera](#testing-the-camera)
+- [Boot configuration and device trees](#boot-configuration-and-device-trees)
+- [Y14 pixel layout](#y14-pixel-layout)
+- [Choosing a pixel format](#choosing-a-pixel-format)
+
+**Part 2 — Building the drivers from source**
+
+- [Prerequisites (host PC)](#prerequisites-host-pc)
+- [Supported L4T versions, SoMs, vendors and carrier boards](#supported-l4t-versions-soms-vendors-and-carrier-boards)
+- [Building the L4T environment](#building-the-l4t-environment)
+- [Building MIPI drivers for specific SoMs or carrier boards](#building-mipi-drivers-for-specific-soms-or-carrier-boards)
 - [Shell completion](#shell-completion)
-- [Camera Format Performance Benchmark](#camera-format-performance-benchmark)
+
+**Appendices**
+
 - [Appendix A: Integrating drivers on other L4T versions and carrier boards](#appendix-a-integrating-drivers-on-other-l4t-versions-and-carrier-boards)
 - [Appendix B: Adding a new camera type](#appendix-b-adding-a-new-camera-type)
 - [Appendix C: Configuring camera ports manually with config-by-hardware.py](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy)
 - [Appendix D: Integrating with Vision Components (VC) MIPI patches](#appendix-d-integrating-with-vision-components-vc-mipi-patches)
 - [Appendix E: Device tree adaptation for the Forecr DSADDON-MIPI-AGX-6CH](#appendix-e-device-tree-adaptation-for-the-forecr-dsaddon-mipi-agx-6ch)
+- [Appendix F: Acronyms](#appendix-f-acronyms)
 
 ---
 
-## Acronyms
-
-| Acronym | Full form | Description |
-|---------|-----------|-------------|
-| **AR24** | — | 32-bit BGRA pixel format code in V4L2 (Blue, Green, Red, Alpha — 8 bits each) |
-| **BSP** | Board Support Package | Nvidia's software bundle for a given hardware platform (kernel, bootloader, device trees, tools) |
-| **CSI / CSI-2** | Camera Serial Interface (version 2) | MIPI standard defining the electrical and protocol interface between image sensors and host processors |
-| **DT** | Device Tree | Hardware description mechanism used by the Linux kernel to enumerate peripherals |
-| **DTB** | Device Tree Blob | Compiled binary form of a Device Tree source file |
-| **DTBO** | Device Tree Blob Overlay | Partial DTB applied at boot to enable or configure optional hardware (e.g., a camera) |
-| **DTS** | Device Tree Source | Human-readable source file describing hardware, compiled into a DTB |
-| **DTSI** | Device Tree Source Include | Reusable device tree fragment included by one or more DTS files |
-| **EG** | Exosens Group | Exosens — the manufacturer of the cameras referenced in this project |
-| **FDT** | Flattened Device Tree | Binary format for device trees passed by the bootloader to the Linux kernel |
-| **GPIO** | General Purpose Input/Output | Configurable digital pin used to control or sense external hardware signals |
-| **I2C** | Inter-Integrated Circuit | Two-wire serial protocol used to communicate with camera control registers |
-| **INITRD** | Initial RAM Disk | Compressed root filesystem image loaded by the bootloader before the real root is mounted |
-| **initramfs** | Initial RAM Filesystem | Compressed archive used as an early root filesystem during kernel boot (successor to INITRD) |
-| **L4T** | Linux for Tegra | Nvidia's BSP distribution for Jetson platforms, versioned as e.g. 35.5.0 or 36.4.4 |
-| **LTS** | Long-Term Support | Ubuntu release designation with an extended security update period (5 years) |
-| **MIPI** | Mobile Industry Processor Interface | Industry consortium defining hardware interfaces including CSI-2, D-PHY, and others |
-| **PCB** | Printed Circuit Board | The physical board carrying electronic components |
-| **PTY** | Pseudo-Terminal | Software interface that emulates a hardware terminal; allocated by `sudo` for each invocation |
-| **SoC** | System on Chip | Integrated circuit combining CPU, GPU, memory controllers, and peripheral interfaces |
-| **SoM** | System on Module | Compact board embedding a SoC and memory, plugged into a carrier board |
-| **V4L2** | Video for Linux 2 | Linux kernel API for video capture and output devices (controls formats, modes, streaming) |
-| **Y16** | — | 16-bit greyscale pixel format code in V4L2; used by infrared cameras |
-| **YUYV** | — | YUV 4:2:2 packed pixel format (alternating Y, U, Y, V bytes); also written YCbCr 4:2:2 |
-
----
+# Part 1 — Using the cameras on a board
 
 ## Flashing JetPack on Jetson Orin NX/Nano
 
-Before building and installing the MIPI drivers, the board must be flashed with a
+Before installing the MIPI drivers, the board must be flashed with a
 supported L4T version (35.6.0 or 36.4.4). Flashing, upgrading and **downgrading** Orin
 NX/Nano boards — on NVIDIA devkits and Forecr DSBOARD-ORNXS carriers, SD card or NVMe —
 each needs a specific command sequence (downgrading from 36.x to 35.x in particular).
@@ -81,9 +89,359 @@ command reference, host prerequisites, and flashing troubleshooting.
 
 ---
 
-## Prerequisites for cross-compiling
+## Installing the driver package
 
-### Host PC requirements
+The package is named `jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb`,
+with the carrier board added to the name for vendor-specific builds. Copy **the one** matching
+your board's L4T version onto the board, then:
+
+```bash
+sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
+sudo reboot
+```
+
+Two details that catch people out:
+
+- **the leading `./` is required.** Without it, apt looks for a package by that name in the
+  online repositories instead of using your file.
+- **use `apt`, not `dpkg -i`.** The package lists the tools it needs (`v4l-utils` and
+  friends) as `Recommends`, and only apt installs those. A freshly flashed board has none of
+  them, so after a `dpkg -i` the examples below fail with `v4l2-ctl: command not found`.
+
+A `N: Download is performed unsandboxed...` notice at the end is harmless: the install has
+already succeeded. Reboot, then check the result with `eg_dt_camera_config_get.sh`.
+
+> ⚠️ Never run `apt install ./*.deb` inside a delivery directory. It holds one package per
+> L4T version and per carrier board, and only one of them may be installed at a time.
+
+### Optional tools
+
+The drivers themselves need nothing extra. The helper scripts installed in `/usr/bin` do:
+
+| Package | Needed by |
+|---|---|
+| `v4l-utils` | `eg_dt_camera_config_get.sh`, `read_nvcsi.py`, `rt_frame_monitor.py` |
+| `python3-opencv` | `rt_frame_monitor.py --display` |
+| `python3-numpy` | `rt_frame_monitor.py`, `dioneCtrl.py` |
+| `python3-serial` | `dioneCtrl.py` — it will not start without it |
+| `ecswctrl` | EC software control (private package, delivered alongside) |
+
+A plain `apt install ./<package>.deb` pulls them in, on a first install and on an upgrade
+alike. If you used `dpkg -i` or `apt install --reinstall` — neither of which installs
+`Recommends` — add them afterwards:
+
+```bash
+sudo apt install --fix-policy
+```
+
+`apt --fix-broken install` is **not** enough: it only resolves hard dependencies.
+
+**Private packages.** `ecswctrl`, `libecctrl-i2c` and `libecctrl-uart` are delivered as
+separate `.deb` files next to the driver, listed with their versions in `DEPENDENCIES.txt`.
+They are optional. Install them together with the driver in a single command, naming each
+file:
+
+```bash
+sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb \
+    ./libecctrl-i2c_<version>_arm64.deb ./libecctrl-uart_<version>_arm64.deb ./ecswctrl_<version>_arm64.deb
+```
+
+apt works out the order by itself.
+
+### Reinstalling, upgrading, version mismatches
+
+**Reinstalling the same version.** apt compares version *numbers*, not file contents, and the
+version comes from the git commit. Rebuilding the same commit therefore produces a different
+file carrying the same version, and apt answers `already the newest version` without doing
+anything. Force it:
+
+```bash
+sudo apt install --reinstall ./<package>.deb
+sudo apt install --fix-policy      # --reinstall skips the optional tools
+```
+
+**Installing a package built for another L4T version.** This is not a supported upgrade path
+— normally, use the package matching your board. It is only justified when two L4T releases
+share the exact same kernel (35.6.0 and 35.6.1 both run `5.10.216-tegra`) and no matching
+package exists yet:
+
+```bash
+sudo FORCE_INSTALL_EG_CAMS=1 dpkg -i --force-overwrite <package>.deb
+sudo apt install --fix-policy
+```
+
+`FORCE_INSTALL_EG_CAMS=1` skips the L4T version check. The **kernel** version must still
+match, so modules can never be loaded into a kernel they were not built for.
+
+**Upgrading from a package older than 2.0.0.** Those do not carry the metadata used for
+automatic cleanup, so remove the old one first:
+
+```bash
+dpkg -l | grep eg-cams             # find the exact name
+sudo dpkg --purge <old-package-name>
+```
+
+
+---
+
+## Configuring camera ports
+**Note on port numbers:**
+- Jetson carrier boards typically include 2 camera ports: "CAM0" and "CAM1"
+- For the AGX Orin Auvidea X230D carrier board, port 0 is "CD" and port 1 is "AB" on the PCB
+- The `/dev/videoX` device number is NOT the camera port number, but the registration order. Carefully check with the eg_dt_camera_config_get script.
+
+**Note on CAM0 lane swap (Orin NX/Nano):**
+
+Some Orin NX/Nano carrier boards have a CSI data lane swap on the CAM0 connector.
+See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical background.
+
+- **Nvidia Orin NX/Nano devkit**: the lane swap affects CAM0 — handled automatically by `eg_dt_camera_config_set.sh`.
+- **Forecr DSBOARD-ORNXS**: the lane swap is corrected on the carrier board — handled automatically by `eg_dt_camera_config_set.sh`.
+- **Seeed Studio reComputer J4012**: the lane swap is corrected on the carrier board but **not** detected automatically by `eg_dt_camera_config_set.sh`. Additionally, the silkscreen labeling differs from the Nvidia devkit: the J4012 "CAM0" connector corresponds to "CAM1" on the devkit, and vice-versa.
+
+  To apply the lane-swap fix (support not tested), edit `/boot/extlinux/extlinux.conf` and replace:
+
+  > **Warning: this must be repeated after every use of `eg_dt_camera_config_set.sh`**, as the script overwrites the overlay line.
+  ```
+  OVERLAYS /boot/tegra234-p3767-camera-eg-cams-dione.dtbo
+  ```
+  with:
+  ```
+  OVERLAYS /boot/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
+  ```
+  Then reboot.
+
+- **Other carrier boards with corrected lane swap**: if CAM0 produces no video while CAM1 works normally, the carrier board likely corrects the lane swap without automatic detection. Apply the same manual procedure as for the reComputer J4012.
+
+**Default configuration:**
+
+After first installation, both ports are configured for Dione cameras.
+
+**Changing the configuration:**
+
+```bash
+eg_dt_camera_config_set.sh <port>/<cam_type> [<port>/<cam_type>] ...
+```
+
+Where:
+- `<port>` = `0` or `1` (camera port number)
+- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, `Crius1280`, `iLumos`, or `Microlynx`
+
+Example :
+```bash
+eg_dt_camera_config_set.sh 1/SmartIR640 0/Dione
+```
+
+**Note:** Ports not specified in the command are configured for Dione by default. So the above command is equivalent to this one :
+```bash
+eg_dt_camera_config_set.sh 1/SmartIR640
+```
+
+**After changing configuration, reboot is required:**
+
+```bash
+sudo reboot
+```
+
+**Getting the current configuration:**
+
+After a configuration change and reboot, check the current status:
+
+```bash
+eg_dt_camera_config_get.sh
+```
+
+This displays:
+- **Board:** The detected board, SoM and SoC
+- **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format
+  - The **I2C device** is the character device used to send read/write commands to the camera's control registers (firmware updates, configuration, diagnostics)
+- **Total configured:** Number of configured cameras
+
+**Example output:**
+```
+=== Exosens Camera Configuration ===
+
+Board: nvidia-devkit (orin-nx, t234)
+
+Camera ports:
+  Port 0: SmartIR640 (connected)
+    Video device: /dev/video0
+    I2C device:   /dev/eg-ec-mipi-10-0016
+    Serial:       21456
+    Resolution:   640x480
+    Pixel format: 'Y16 ' (16-bit Greyscale)
+  Port 1: Dione 640 (connected)
+    Video device: /dev/video1
+    I2C device:   /dev/dioneir-i2c-9-000e-5a
+    Serial:       20823
+    Resolution:   640x480
+    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+
+Total configured: 2 camera(s)
+```
+
+**Note:** For some boards with multiple camera ports, it is possible to mix Exosens cameras with sensors originally supported by Jetson boards (IMX219, IMX477). Consult the support team if needed.
+
+**Advanced / manual configuration:**
+
+`eg_dt_camera_config_set.sh` calls `config-by-hardware.py` internally. For cases not handled automatically (e.g. the Seeed Studio reComputer J4012 CAM0 lane swap) or for manual control over individual overlays, you can invoke `config-by-hardware.py` directly. See [Appendix C](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy) for the full list of available overlays and examples.
+
+---
+
+## Testing the camera
+
+After installing the package and rebooting, verify camera detection:
+
+```bash
+ls /dev/video*
+```
+
+A `/dev/videoX` device should appear for each connected camera.
+
+**Check camera information:**
+
+```bash
+v4l2-ctl -d /dev/video0 --all
+```
+
+**Capture a single frame:**
+
+- **MicroCube/SmartIR640** (YCbCr format, 640x480):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=640,height=480,pixelformat="YUYV" \
+  --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=frame.raw
+```
+
+- **Crius1280** (YCbCr format, 1280x1024):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" \
+  --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=frame.raw
+```
+
+- **Dione** (ARGB format, 640x480):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=640,height=480,pixelformat="AR24" \
+  --stream-count=1 --stream-to=frame.raw
+```
+
+- **iLumos** (RAW16 format, 2048x2048):
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap \
+  --set-fmt-video=width=2048,height=2048,pixelformat="RG16" \
+  --set-ctrl=sensor_mode=0 --stream-count=1 --stream-to=frame.raw
+```
+
+For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.
+
+---
+
+## Boot configuration and device trees
+
+### Linux boot configuration
+
+The `/boot/extlinux/extlinux.conf` file contains Linux boot configuration. A "JetsonIO" entry is added at first package installation and set as default.
+
+**Example from Orin NX:**
+
+```
+DEFAULT JetsonIO
+[...]
+LABEL JetsonIO
+    MENU LABEL Custom Header Config: <CSI Exosens Cameras. CAM0:EC_1_lane> <CSI Exosens Cameras. CAM1:EC_1_lane>
+    LINUX /boot/eg/Image
+    FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
+    INITRD /boot/initrd
+    APPEND [...]
+    OVERLAYS /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
+    [...]
+```
+
+**Description:**
+- **LINUX:** Path to the kernel Image
+  - `/boot/eg/Image` - The Exosens kernel
+- **FDT:** Base device tree file
+- **INITRD:** Initial ramdisk
+  - `/boot/initrd` for L4T 32.x/35.x
+  - **`/boot/eg/initrd-eg` for L4T 36.x standalone builds**
+- **OVERLAYS:** Comma-separated list of device tree overlay files to apply
+
+**Important note for L4T 36.x:**
+
+For standalone builds (L4T 36.x), the INITRD line must use the standalone initramfs:
+
+```
+INITRD /boot/eg/initrd-eg
+```
+
+The package post-install script automatically updates this when installing on a system with JetsonIO configuration.
+
+**Custom kernel patches:**
+
+Customers can add their own kernel patches in:
+- `sources/<l4t_version>/Linux_for_Tegra/` (full sources)
+
+Consult the support team for assistance with custom modifications.
+
+### Orin NX/Nano CSI lanes issues
+
+The Orin NX/Nano SoM has a CSI differential pair swap (P/N inversion) inherent to the module, and the Nvidia devkit carrier board has an additional CSI data lane swap on CAM0. Some third-party carrier boards correct the lane swap, which requires a different device tree overlay.
+
+See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical details, and the [Configuring camera ports](#configuring-camera-ports) section for the practical workaround for boards not handled automatically.
+
+---
+
+## Y14 pixel layout
+
+A Y14 frame carries 14 significant bits in a 16-bit little-endian word. **Where those bits sit inside the word is not the same on every SoM**, and V4L2 only defines one of the two possibilities.
+
+| SoM | Y14 available | Layout of a Y14 pixel | Configurable |
+| --- | --- | --- | --- |
+| Orin (T234) | yes | right-aligned with high bits 0, **or** full-scale | **yes**, per sensor mode |
+| Xavier (T194) | yes | full-scale: 14 bits left-aligned, top 2 bits copied into the low 2 | no |
+| TX2 (T186) | no | — | — |
+| Nano (T210) | no | — | — |
+
+On TX2 and Nano — L4T 32.x only — the VI format table carries no 14-bit greyscale entry, so `Y14` never appears in `VIDIOC_ENUM_FMT` and cannot be selected, whatever the device tree declares. Use Y8 or YUYV there.
+
+`V4L2_PIX_FMT_Y14` is defined as 14 bits **right-aligned, padding set to 0**. A full-scale buffer holds the same information, but every value is 4× larger — in practice it is a Y16 with 14 bits of resolution.
+
+This changes nothing about the image content and everything about the numbers. A viewer that converts 16-bit to 8-bit with a fixed shift renders a full-scale buffer normally and a right-aligned one 4× too dark. `rt_frame_monitor.py --display` normalizes every frame, so both look identical — trust the values, not your eyes.
+
+**Checking what you get** (both stay silent if the SoM is not recognised):
+
+```bash
+eg_dt_camera_config_get.sh          # "Y14 layout:" line, per camera
+dmesg | grep "RAW in 16-bit"        # printed once per stream start
+```
+
+Or measure it — a right-aligned buffer never exceeds 16383:
+
+```bash
+v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=1024,pixelformat="Y14 " \
+         --stream-mmap --stream-count=1 --stream-to=frame.y14
+python3 -c "import numpy as np; print(np.fromfile('frame.y14', dtype='<u2').max())"
+```
+
+**Changing it on Orin**: add `pad0_en` next to `csi_pixel_bit_depth` in the camera's device-tree mode node — `"1"` for a V4L2-conformant Y14, `"0"` for full-scale, `"2"` for left-aligned with zeros. When the property is absent the VI keeps its own default, which is full-scale on Orin. Our overlays ship `"1"` on every Y14 mode; rebuild and reinstall the overlay after changing it.
+
+---
+
+## Choosing a pixel format
+
+If a camera offers several pixel formats, the choice affects CPU load, GPU use and power
+draw — sometimes a lot. The **[camera format benchmark](tools/camera-format-benchmark/)**
+measures YUYV, Y16 and AR24 on an Orin NX (JetPack 6.2.1 / L4T 36.4.4), for display only,
+H.264 recording, and both at once. It gives per-scenario recommendations and the matching
+GStreamer command lines.
+
+---
+
+# Part 2 — Building the drivers from source
+
+## Prerequisites (host PC)
 
 **Recommended OS:** Ubuntu 22.04 LTS. This version is used for development and compiles all supported L4T versions (32.x, 35.x, 36.x).
 
@@ -131,9 +489,7 @@ sudo apt install python3-libfdt
 
 ---
 
-## Building, installing, configuring and testing MIPI drivers
-
-### Supported L4T versions, SoMs, vendors and carrier boards
+## Supported L4T versions, SoMs, vendors and carrier boards
 
 Refer to the [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) for the complete list of supported configurations.
 Also use the `l4t_make.sh --help` command to display this list.
@@ -143,11 +499,12 @@ For the rest of this document:
 - `<jp_version>` refers to the JetPack version (e.g., `5.1.3`, `6.2.1`). It is related to the L4T version, and is only mentionned for convenience in the debian package name.
 - `<vendor>` refers to the carrier board vendor (`generic` for Nvidia boards, or vendor-specific like `forecr`)
 
-### Building the L4T environment
+
+## Building the L4T environment
 
 This section describes the build process using the unified `l4t_make.sh` orchestration script.
 
-#### Source code organization
+### Source code organization
 
 The Exosens camera driver modifications are organized under `sources/`, split into a shared layer and per-version layers:
 
@@ -170,7 +527,7 @@ sources/
 
 When `l4t_copy_sources.sh` copies files to the build environment, it applies these layers in order: `common/` first, then version-specific generic, then SoM-specific (32.x only), then vendor-specific. When two layers modify the same file (typically a Makefile), a **3-way merge** is performed against the original Nvidia BSP, so generic changes propagate automatically to vendor variants.
 
-#### Building workflow
+### Building workflow
 
 The `l4t_make.sh` script orchestrates the entire build process. It uses individual scripts for each build step.
 
@@ -318,7 +675,7 @@ Because for Nvidia SDK version from L4T 36.x some kernel modules are built "out 
 - A dedicated initramfs (`/boot/eg/initrd-eg`) is generated
 - The Debian package is larger (~150MB) due to all modules and initramfs being included
 
-### Building MIPI drivers for specific SoMs or carrier boards
+## Building MIPI drivers for specific SoMs or carrier boards
 
 Some hardware variants require a `-s/--som` or `-V/--vendor` flag to select the correct BSP and device trees.
 
@@ -379,353 +736,6 @@ When a vendor has a single carrier (e.g., `forecr` has only `dsboard_ornxs`), th
 
 This generates: `jetson-l4t-<l4t_version>-jp<jp_version>-forecr-dsboard-ornxs-eg-cams_<debian_version>_arm64.deb`
 
-### Installing and configuring the MIPI drivers on the board
-
-#### Package installation
-
-The package was either delivered (see [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md)) or built locally following the previous steps.
-
-**Standard install** (matching L4T version, no previous package or same-version reinstall):
-
-```bash
-sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
-```
-
-The leading `./` is required — without it, apt looks for a package name in the repositories instead of a local file.
-
-Prefer `apt` over `dpkg -i` here: the package declares its optional tool dependencies as `Recommends`, and only apt installs those (see [Optional tools](#optional-tools) below).
-
-Installing from your home directory prints a `N: Download is performed unsandboxed…` notice at the very end. It is harmless and the install has already succeeded; put the `.deb` in `/var/tmp` to avoid it.
-
-**Reinstalling the same version.** Unlike `dpkg -i`, apt compares *version numbers*, not file contents. The package version is derived from the git commit (`0~develop+g<sha>`), so rebuilding the same commit — with uncommitted changes, for instance — produces a different file carrying the *same* version. apt then reports `already the newest version` and does nothing at all:
-
-```bash
-sudo apt install --reinstall ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
-```
-
-Note that `--reinstall` does **not** install the `Recommends` (verified): the package is already in the installed set, so its recommendations are not re-evaluated. A first install and an upgrade both do pull them in. Add them explicitly:
-
-```bash
-sudo apt install --fix-policy
-```
-
-A `--reinstall` may end with `W: Repository is broken: <package> has no Size information` (seen on JetPack 5, not on JetPack 6). Harmless — the install completes normally.
-
-**Cross-L4T-version install** (e.g. installing a 35.6.1 package on a 35.6.0 board):
-
-> ⚠️ **This must remain exceptional.** Installing a package built for a different L4T version than the one running on the target is not a supported upgrade path. It is only justified in specific situations — for example, when two L4T patch releases share the exact same kernel (e.g. 35.6.0 and 35.6.1 both use `5.10.216-tegra`) and no matching package is yet available. In all other cases, **use the package that matches the target's L4T version**.
-
-The package contains kernel modules compiled for a specific kernel. Two safety checks are enforced:
-
-- **Without `FORCE_INSTALL_EG_CAMS`**: the L4T version must match exactly (strict check).
-- **With `FORCE_INSTALL_EG_CAMS=1`**: the L4T check is bypassed, but the kernel version (`uname -r`, stripping any `-eg` suffix) must match the kernel the package was built for. This prevents loading modules built for an incompatible kernel.
-
-When the L4T version differs from the running system and the kernel version matches, use:
-
-```bash
-sudo FORCE_INSTALL_EG_CAMS=1 dpkg -i --force-overwrite \
-    jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
-```
-
-- `FORCE_INSTALL_EG_CAMS=1` — bypasses the L4T version check (verified against kernel instead)
-- `--force-overwrite` — allows dpkg to overwrite files from the previously installed package
-
-This exceptional path stays on `dpkg -i`, since `--force-overwrite` is a dpkg concern. Consequence: the optional tools are not pulled in — add them afterwards with `sudo apt install --fix-policy` (see [Optional tools](#optional-tools)).
-
-The previously installed package is automatically removed from the dpkg database a few seconds after installation completes.
-
-**If a package with version ≤ 2.0.0 is already installed**, it does not carry the package-family metadata (`Provides`) needed for automatic cleanup. You must uninstall it manually first:
-
-```bash
-# Find and remove the old package (check exact name with: dpkg -l | grep eg-cams)
-sudo dpkg --purge <old-package-name>
-
-# Then install normally (or with FORCE if L4T version differs)
-sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb
-```
-
-#### Optional tools
-
-The camera drivers have no runtime dependency of their own, but the tools installed in `/usr/bin` do:
-
-| Package | Needed by | Declared as |
-|---|---|---|
-| `v4l-utils` | `eg_dt_camera_config_get.sh`, `read_nvcsi.py`, `rt_frame_monitor.py` | `Recommends` |
-| `python3-opencv` | `rt_frame_monitor.py --display` | `Recommends` |
-| `python3-serial` | `dioneCtrl.py` (module-level import — it will not start without it) | `Recommends` |
-| `python3-numpy` | `dioneCtrl.py`, `rt_frame_monitor.py` | `Recommends` |
-| `ecswctrl` | EC software control (private package, delivered alongside) | `Suggests` |
-
-`python3-gi` and `EURESYS` are deliberately not declared: both are imported lazily, and `EURESYS` is a proprietary SDK that is in no repository.
-
-None of these is a hard dependency — the drivers install and work without them, and a missing tool can never block the installation.
-
-**A fresh L4T flash includes none of them**, so the streaming examples fail with `v4l2-ctl: command not found` until they are installed.
-
-- `apt install ./<package>.deb` pulls them in by itself, on a first install and on an upgrade alike.
-- `dpkg -i` and `apt install --reinstall` never do. The post-install script then lists what is missing; the drivers themselves are installed and functional.
-
-To add the missing tools to an already-installed package:
-
-```bash
-sudo apt install --fix-policy
-```
-
-`apt --fix-broken install` is *not* enough — it only resolves `Depends`.
-
-**Private packages.** `ecswctrl`, `libecctrl-i2c` and `libecctrl-uart` are delivered as separate `.deb` files next to the driver, and listed in `DEPENDENCIES.txt` (name, version, MD5) in the same directory. They are not required to build or use the MIPI drivers, and a rebuild without them produces an identical driver package.
-
-Copy them onto the board next to the **one** driver package matching its L4T version, then install them together in a single apt transaction, naming each file explicitly:
-
-```bash
-sudo apt install ./jetson-l4t-<l4t_version>-jp<jp_version>-eg-cams_<version>_arm64.deb \
-    ./libecctrl-i2c_<version>_arm64.deb ./libecctrl-uart_<version>_arm64.deb ./ecswctrl_<version>_arm64.deb
-```
-
-apt resolves the order on its own (`libecctrl-i2c` and `libecctrl-uart` before `ecswctrl`, which `Depends` on them).
-
-> ⚠️ Never run `apt install ./*.deb` **inside a delivery directory**. It holds one driver package per L4T version *and* per carrier board (30+ of them), all declaring `Replaces` on each other, and only one may ever be installed. Pick the single package matching the board's L4T version and copy that one across.
-
-#### Configuring camera ports
-
-**Note on port numbers:**
-- Jetson carrier boards typically include 2 camera ports: "CAM0" and "CAM1"
-- For the AGX Orin Auvidea X230D carrier board, port 0 is "CD" and port 1 is "AB" on the PCB
-- The `/dev/videoX` device number is NOT the camera port number, but the registration order. Carefully check with the eg_dt_camera_config_get script.
-
-**Note on CAM0 lane swap (Orin NX/Nano):**
-
-Some Orin NX/Nano carrier boards have a CSI data lane swap on the CAM0 connector.
-See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical background.
-
-- **Nvidia Orin NX/Nano devkit**: the lane swap affects CAM0 — handled automatically by `eg_dt_camera_config_set.sh`.
-- **Forecr DSBOARD-ORNXS**: the lane swap is corrected on the carrier board — handled automatically by `eg_dt_camera_config_set.sh`.
-- **Seeed Studio reComputer J4012**: the lane swap is corrected on the carrier board but **not** detected automatically by `eg_dt_camera_config_set.sh`. Additionally, the silkscreen labeling differs from the Nvidia devkit: the J4012 "CAM0" connector corresponds to "CAM1" on the devkit, and vice-versa.
-
-  To apply the lane-swap fix (support not tested), edit `/boot/extlinux/extlinux.conf` and replace:
-
-  > **Warning: this must be repeated after every use of `eg_dt_camera_config_set.sh`**, as the script overwrites the overlay line.
-  ```
-  OVERLAYS /boot/tegra234-p3767-camera-eg-cams-dione.dtbo
-  ```
-  with:
-  ```
-  OVERLAYS /boot/tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
-  ```
-  Then reboot.
-
-- **Other carrier boards with corrected lane swap**: if CAM0 produces no video while CAM1 works normally, the carrier board likely corrects the lane swap without automatic detection. Apply the same manual procedure as for the reComputer J4012.
-
-**Default configuration:**
-
-After first installation, both ports are configured for Dione cameras.
-
-**Changing the configuration:**
-
-```bash
-eg_dt_camera_config_set.sh <port>/<cam_type> [<port>/<cam_type>] ...
-```
-
-Where:
-- `<port>` = `0` or `1` (camera port number)
-- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, `Crius1280`, `iLumos`, or `Microlynx`
-
-Example :
-```bash
-eg_dt_camera_config_set.sh 1/SmartIR640 0/Dione
-```
-
-**Note:** Ports not specified in the command are configured for Dione by default. So the above command is equivalent to this one :
-```bash
-eg_dt_camera_config_set.sh 1/SmartIR640
-```
-
-**After changing configuration, reboot is required:**
-
-```bash
-sudo reboot
-```
-
-**Getting the current configuration:**
-
-After a configuration change and reboot, check the current status:
-
-```bash
-eg_dt_camera_config_get.sh
-```
-
-This displays:
-- **Board:** The detected board, SoM and SoC
-- **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format
-  - The **I2C device** is the character device used to send read/write commands to the camera's control registers (firmware updates, configuration, diagnostics)
-- **Total configured:** Number of configured cameras
-
-**Example output:**
-```
-=== Exosens Camera Configuration ===
-
-Board: nvidia-devkit (orin-nx, t234)
-
-Camera ports:
-  Port 0: SmartIR640 (connected)
-    Video device: /dev/video0
-    I2C device:   /dev/eg-ec-mipi-10-0016
-    Serial:       21456
-    Resolution:   640x480
-    Pixel format: 'Y16 ' (16-bit Greyscale)
-  Port 1: Dione 640 (connected)
-    Video device: /dev/video1
-    I2C device:   /dev/dioneir-i2c-9-000e-5a
-    Serial:       20823
-    Resolution:   640x480
-    Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
-
-Total configured: 2 camera(s)
-```
-
-**Note:** For some boards with multiple camera ports, it is possible to mix Exosens cameras with sensors originally supported by Jetson boards (IMX219, IMX477). Consult the support team if needed.
-
-**Advanced / manual configuration:**
-
-`eg_dt_camera_config_set.sh` calls `config-by-hardware.py` internally. For cases not handled automatically (e.g. the Seeed Studio reComputer J4012 CAM0 lane swap) or for manual control over individual overlays, you can invoke `config-by-hardware.py` directly. See [Appendix C](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy) for the full list of available overlays and examples.
-
-### Quick start - Testing the camera
-
-After installing the package and rebooting, verify camera detection:
-
-```bash
-ls /dev/video*
-```
-
-A `/dev/videoX` device should appear for each connected camera.
-
-**Check camera information:**
-
-```bash
-v4l2-ctl -d /dev/video0 --all
-```
-
-**Capture a single frame:**
-
-- **MicroCube/SmartIR640** (YCbCr format, 640x480):
-```bash
-v4l2-ctl -d /dev/video0 --stream-mmap \
-  --set-fmt-video=width=640,height=480,pixelformat="YUYV" \
-  --set-ctrl=sensor_mode=2 --stream-count=1 --stream-to=frame.raw
-```
-
-- **Crius1280** (YCbCr format, 1280x1024):
-```bash
-v4l2-ctl -d /dev/video0 --stream-mmap \
-  --set-fmt-video=width=1280,height=1024,pixelformat="YUYV" \
-  --set-ctrl=sensor_mode=5 --stream-count=1 --stream-to=frame.raw
-```
-
-- **Dione** (ARGB format, 640x480):
-```bash
-v4l2-ctl -d /dev/video0 --stream-mmap \
-  --set-fmt-video=width=640,height=480,pixelformat="AR24" \
-  --stream-count=1 --stream-to=frame.raw
-```
-
-- **iLumos** (RAW16 format, 2048x2048):
-```bash
-v4l2-ctl -d /dev/video0 --stream-mmap \
-  --set-fmt-video=width=2048,height=2048,pixelformat="RG16" \
-  --set-ctrl=sensor_mode=0 --stream-count=1 --stream-to=frame.raw
-```
-
-For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.
-
----
-
-## Notes about Linux boot and device trees
-
-### Linux boot configuration
-
-The `/boot/extlinux/extlinux.conf` file contains Linux boot configuration. A "JetsonIO" entry is added at first package installation and set as default.
-
-**Example from Orin NX:**
-
-```
-DEFAULT JetsonIO
-[...]
-LABEL JetsonIO
-    MENU LABEL Custom Header Config: <CSI Exosens Cameras. CAM0:EC_1_lane> <CSI Exosens Cameras. CAM1:EC_1_lane>
-    LINUX /boot/eg/Image
-    FDT /boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb
-    INITRD /boot/initrd
-    APPEND [...]
-    OVERLAYS /boot/tegra234-p3767-camera-p3768-eg-cams-dione.dtbo,/boot/tegra234-p3767-camera-p3768-eg-cam0-ec-1-lane.dtbo
-    [...]
-```
-
-**Description:**
-- **LINUX:** Path to the kernel Image
-  - `/boot/eg/Image` - The Exosens kernel
-- **FDT:** Base device tree file
-- **INITRD:** Initial ramdisk
-  - `/boot/initrd` for L4T 32.x/35.x
-  - **`/boot/eg/initrd-eg` for L4T 36.x standalone builds**
-- **OVERLAYS:** Comma-separated list of device tree overlay files to apply
-
-**Important note for L4T 36.x:**
-
-For standalone builds (L4T 36.x), the INITRD line must use the standalone initramfs:
-
-```
-INITRD /boot/eg/initrd-eg
-```
-
-The package post-install script automatically updates this when installing on a system with JetsonIO configuration.
-
-**Custom kernel patches:**
-
-Customers can add their own kernel patches in:
-- `sources/<l4t_version>/Linux_for_Tegra/` (full sources)
-
-Consult the support team for assistance with custom modifications.
-
-### Orin NX/Nano CSI lanes issues
-
-The Orin NX/Nano SoM has a CSI differential pair swap (P/N inversion) inherent to the module, and the Nvidia devkit carrier board has an additional CSI data lane swap on CAM0. Some third-party carrier boards correct the lane swap, which requires a different device tree overlay.
-
-See [docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md](docs/CSI_LANE_AND_POLARITY_SWAP_P3768.md) for technical details, and the [Configuring camera ports](#configuring-camera-ports) section for the practical workaround for boards not handled automatically.
-
-### Y14 pixel layout
-
-A Y14 frame carries 14 significant bits in a 16-bit little-endian word. **Where those bits sit inside the word is not the same on every SoM**, and V4L2 only defines one of the two possibilities.
-
-| SoM | Y14 available | Layout of a Y14 pixel | Configurable |
-| --- | --- | --- | --- |
-| Orin (T234) | yes | right-aligned with high bits 0, **or** full-scale | **yes**, per sensor mode |
-| Xavier (T194) | yes | full-scale: 14 bits left-aligned, top 2 bits copied into the low 2 | no |
-| TX2 (T186) | no | — | — |
-| Nano (T210) | no | — | — |
-
-On TX2 and Nano — L4T 32.x only — the VI format table carries no 14-bit greyscale entry, so `Y14` never appears in `VIDIOC_ENUM_FMT` and cannot be selected, whatever the device tree declares. Use Y8 or YUYV there.
-
-`V4L2_PIX_FMT_Y14` is defined as 14 bits **right-aligned, padding set to 0**. A full-scale buffer holds the same information, but every value is 4× larger — in practice it is a Y16 with 14 bits of resolution.
-
-This changes nothing about the image content and everything about the numbers. A viewer that converts 16-bit to 8-bit with a fixed shift renders a full-scale buffer normally and a right-aligned one 4× too dark. `rt_frame_monitor.py --display` normalizes every frame, so both look identical — trust the values, not your eyes.
-
-**Checking what you get** (both stay silent if the SoM is not recognised):
-
-```bash
-eg_dt_camera_config_get.sh          # "Y14 layout:" line, per camera
-dmesg | grep "RAW in 16-bit"        # printed once per stream start
-```
-
-Or measure it — a right-aligned buffer never exceeds 16383:
-
-```bash
-v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=1024,pixelformat="Y14 " \
-         --stream-mmap --stream-count=1 --stream-to=frame.y14
-python3 -c "import numpy as np; print(np.fromfile('frame.y14', dtype='<u2').max())"
-```
-
-**Changing it on Orin**: add `pad0_en` next to `csi_pixel_bit_depth` in the camera's device-tree mode node — `"1"` for a V4L2-conformant Y14, `"0"` for full-scale, `"2"` for left-aligned with zeros. When the property is absent the VI keeps its own default, which is full-scale on Orin. Our overlays ship `"1"` on every Y14 mode; rebuild and reinstall the overlay after changing it.
-
 ---
 
 ## Shell completion
@@ -751,20 +761,7 @@ This provides tab-completion for:
 
 ---
 
-## Camera Format Performance Benchmark
-
-For applications requiring specific video format support or optimization, refer to the **[Camera Format Performance Benchmark](tools/camera-format-benchmark/)** for comprehensive performance analysis and automation scripts.
-
-This benchmark compares three camera formats (YUYV, Y16, AR24) across real-time display and H.264 encoding scenarios on NVIDIA Jetson Orin NX with JetPack 6.2.1 (L4T 36.4.4). It includes:
-
-- **Performance metrics:** CPU load, GPU utilization, power consumption
-- **Use case recommendations:** Display-only, recording, simultaneous display+recording
-- **GStreamer command examples** for each scenario
-- **Technical analysis** of format selection trade-offs
-
-The benchmark provides objective performance data to guide format selection based on your specific application requirements.
-
----
+# Appendices
 
 ## Appendix A: Integrating drivers on other L4T versions and carrier boards
 
@@ -1186,3 +1183,34 @@ changes are needed in Exosens sensor nodes for GPIO handling.
 ---
 
 **For additional support or questions, contact the Exosens support team.**
+
+---
+
+## Appendix F: Acronyms
+
+| Acronym | Full form | Description |
+|---------|-----------|-------------|
+| **AR24** | — | 32-bit BGRA pixel format code in V4L2 (Blue, Green, Red, Alpha — 8 bits each) |
+| **BSP** | Board Support Package | Nvidia's software bundle for a given hardware platform (kernel, bootloader, device trees, tools) |
+| **CSI / CSI-2** | Camera Serial Interface (version 2) | MIPI standard defining the electrical and protocol interface between image sensors and host processors |
+| **DT** | Device Tree | Hardware description mechanism used by the Linux kernel to enumerate peripherals |
+| **DTB** | Device Tree Blob | Compiled binary form of a Device Tree source file |
+| **DTBO** | Device Tree Blob Overlay | Partial DTB applied at boot to enable or configure optional hardware (e.g., a camera) |
+| **DTS** | Device Tree Source | Human-readable source file describing hardware, compiled into a DTB |
+| **DTSI** | Device Tree Source Include | Reusable device tree fragment included by one or more DTS files |
+| **EG** | Exosens Group | Exosens — the manufacturer of the cameras referenced in this project |
+| **FDT** | Flattened Device Tree | Binary format for device trees passed by the bootloader to the Linux kernel |
+| **GPIO** | General Purpose Input/Output | Configurable digital pin used to control or sense external hardware signals |
+| **I2C** | Inter-Integrated Circuit | Two-wire serial protocol used to communicate with camera control registers |
+| **INITRD** | Initial RAM Disk | Compressed root filesystem image loaded by the bootloader before the real root is mounted |
+| **initramfs** | Initial RAM Filesystem | Compressed archive used as an early root filesystem during kernel boot (successor to INITRD) |
+| **L4T** | Linux for Tegra | Nvidia's BSP distribution for Jetson platforms, versioned as e.g. 35.5.0 or 36.4.4 |
+| **LTS** | Long-Term Support | Ubuntu release designation with an extended security update period (5 years) |
+| **MIPI** | Mobile Industry Processor Interface | Industry consortium defining hardware interfaces including CSI-2, D-PHY, and others |
+| **PCB** | Printed Circuit Board | The physical board carrying electronic components |
+| **PTY** | Pseudo-Terminal | Software interface that emulates a hardware terminal; allocated by `sudo` for each invocation |
+| **SoC** | System on Chip | Integrated circuit combining CPU, GPU, memory controllers, and peripheral interfaces |
+| **SoM** | System on Module | Compact board embedding a SoC and memory, plugged into a carrier board |
+| **V4L2** | Video for Linux 2 | Linux kernel API for video capture and output devices (controls formats, modes, streaming) |
+| **Y16** | — | 16-bit greyscale pixel format code in V4L2; used by infrared cameras |
+| **YUYV** | — | YUV 4:2:2 packed pixel format (alternating Y, U, Y, V bytes); also written YCbCr 4:2:2 |

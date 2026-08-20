@@ -639,6 +639,17 @@ else
     # Human-readable output
     echo "=== Exosens Camera Configuration ==="
     echo ""
+
+    # Installed driver package, without the trailing "(branch, sha)" — the
+    # version string already carries the commit. Silent if the file is missing.
+    if [[ -r /etc/version_eg_cams ]]; then
+        pkg_version=$(head -1 /etc/version_eg_cams | sed 's/[[:space:]]*(.*)[[:space:]]*$//')
+        if [[ -n "$pkg_version" ]]; then
+            echo "Driver package: $pkg_version"
+            echo ""
+        fi
+    fi
+
     echo "Board: $BOARD_TYPE ($SOM_TYPE, $TEGRA_SOC)"
     echo ""
 
