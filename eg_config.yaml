@@ -612,6 +612,24 @@ dtsi_platforms:
     ec_overlay_cam0_pattern: "hardware_32+/nvidia/platform/t18x/quill/kernel-dts/tegra186-camera-eg-cam0-ec-{variant}.dts"
 
 # ---------------------------------------------------------------------------
+# Cameras that may be NAMED in the generic documentation — README.md and
+# docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md.
+#
+# Those two documents are meant to stay put when a product ships or is dropped:
+# they teach by example, using cameras that have been released, and a reader is
+# expected to generalise from them to a newer one. Anything not listed here must
+# not appear in them by name — enforced by verify_dtsi_structure.py, so a
+# mention added by hand fails the build instead of quietly outliving the product
+# decision that removed it.
+#
+# This is NOT the `enabled` flag below. A camera can be perfectly usable, shipped
+# and listed in the deployment matrix, yet still have no place in generic
+# documentation — a beta delivered to one customer, for instance. The matrix is
+# the exhaustive, per-package truth; the README is the stable, generic one.
+# ---------------------------------------------------------------------------
+doc_example_cameras: [Dione, MicroCube, MicroCube640, SmartIR640, Crius1280]
+
+# ---------------------------------------------------------------------------
 # Cameras
 #
 # dt_node_label_prefix: label prefix in DTSI (e.g. "microlynx_cam" → microlynx_cam0)
@@ -621,6 +639,27 @@ dtsi_platforms:
 #   - data_lanes: physical lane count (from overlay bus-width for EC cameras)
 #   - discontinuous_clk: from DTSI
 #   - modes: list of pixel formats with DT fields + display metadata
+#
+# enabled: false — hide something from the CUSTOMER. Accepted on a camera, on a
+# resolution, and on a mode; **absent means enabled**, so only the exclusions are
+# ever written here and no existing entry needs touching.
+#
+# This is a PRODUCT decision ("not ready to ship yet"), deliberately kept apart
+# from platform_restrictions above, which states a TECHNICAL impossibility
+# ("Y14/Y16 cannot work on t210/t186 whatever we do"). Do not merge the two: the
+# reason behind each is what makes them re-readable in a year.
+#
+# What it does and does not do:
+#   - the deployment matrix skips it (all three levels)
+#   - a disabled CAMERA is left out of /etc/eg_cameras, so
+#     eg_dt_camera_config_set.sh refuses to configure a port for it
+#   - kernel modules, device trees and packages are built and shipped
+#     UNCHANGED. Flipping a flag never triggers a rebuild and never alters the
+#     test matrix — that invariance is the whole point of doing it this way.
+#   - a disabled resolution/mode is matrix-only: the DT still declares it, so it
+#     can still show up in VIDIOC_ENUM_FMT. The driver picks the active format
+#     from what the camera reports, so an unimplemented mode stays unreachable
+#     in practice, but do not read these flags as a hard block.
 # ---------------------------------------------------------------------------
 cameras:
   dione_ir:
@@ -736,6 +775,7 @@ cameras:
     dt_node_label_prefix: "ilumos_cam"
     resolutions:
       - res: "2048x2048"
+        enabled: false          # not shipped yet (2026-08-21)
         active_w: 2048
         active_h: 2048
         data_lanes: 2
@@ -745,9 +785,11 @@ cameras:
             line_length: 2048
             pix_clk_hz: 148750000
           - pixel_format: "Y14"
+            enabled: false      # not shipped yet (2026-08-21)
             line_length: 2048
             pix_clk_hz: 148750000
       - res: "2048x1088"
+        enabled: false          # not shipped yet (2026-08-21)
         active_w: 2048
         active_h: 1088
         data_lanes: 2
@@ -757,6 +799,7 @@ cameras:
             line_length: 2048
             pix_clk_hz: 148750000
           - pixel_format: "Y14"
+            enabled: false      # not shipped yet (2026-08-21)
             line_length: 2048
             pix_clk_hz: 148750000
       - res: "1280x1024"
@@ -769,11 +812,13 @@ cameras:
             line_length: 1280
             pix_clk_hz: 148750000
           - pixel_format: "Y14"
+            enabled: false      # not shipped yet (2026-08-21)
             line_length: 1280
             pix_clk_hz: 148750000
 
   microlynx:
     name: "Microlynx"
+    enabled: false              # development on hold (2026-08-21)
     dt_node_label_prefix: "microlynx_cam"
     resolutions:
       - res: "1024x128"

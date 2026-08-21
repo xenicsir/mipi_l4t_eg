@@ -256,6 +256,11 @@ def run_script(entry: Entry, port: int, camera: str,
         "TEST_CBH_LOG":          cbh_log,
         "TEST_OVERLAYS_FILE":    overlays_file,
         "TEST_PROC_DT":          PROC_DT,
+        # The camera manifest gates which cameras may be configured. Point it at
+        # a path that cannot exist so the matrix behaves identically whether or
+        # not the machine running the tests happens to have a package installed;
+        # the manifest itself is covered by its own cases below.
+        "EG_CAMERA_MANIFEST":    "/nonexistent/eg_cameras",
     })
     env.update(env_overrides)
 
@@ -605,7 +610,6 @@ def run_provoked_failures(entry: Entry, overlay_map: dict, result: Result) -> No
         # ─── Camera validation ───────────────────────────────────────────────
         ("camera_unknown_typo",     ["0/Dion"],             "unknown camera",    True),
         ("camera_unknown_bogus",    ["0/BogusCam"],         "unknown camera",    True),
-        ("camera_wrong_case",       ["0/DIONE"],            "unknown camera",    True),
         ("camera_empty",            ["0/"],                 "unknown camera",    True),
     ]
 
@@ -631,6 +635,7 @@ def run_provoked_failures(entry: Entry, overlay_map: dict, result: Result) -> No
             "TEST_CBH_LOG":           cbh_log,
             "TEST_OVERLAYS_FILE":     overlays_file,
             "TEST_PROC_DT":           PROC_DT,
+            "EG_CAMERA_MANIFEST":     "/nonexistent/eg_cameras",
         })
         r = subprocess.run(["bash", SCRIPT] + args, env=env,
                            capture_output=True, text=True)
@@ -644,6 +649,76 @@ def run_provoked_failures(entry: Entry, overlay_map: dict, result: Result) -> No
                   f"(output: {(r.stdout+r.stderr)[:160]!r})")
             result.failed += 1
             result.failures.append(label)
+
+    # ─── Camera name is case-insensitive ─────────────────────────────────────
+    # Replaces the former "camera_wrong_case" rejection case: 0/DIONE used to be
+    # refused, and is now expected to resolve to the canonical "Dione". Asserted
+    # on the canonical spelling appearing in the output, not merely on rc, so a
+    # script that accepted the input without normalising it would still fail.
+    base_env = os.environ.copy()
+    base_env.update({
+        "TEST_BOARD_SHORT":       entry.board_short,
+        "TEST_CAMERA_PORTS":      str(entry.ports),
+        "TEST_L4T_MODE":          entry.l4t_mode,
+        "TEST_BASE_DTB":          entry.base_dtb,
+        "TEST_BOOT_DIR":          BOOT_DIR,
+        "TEST_OVERLAY_DTBO_JSON": json.dumps(overlay_map),
+        "TEST_CBH_LOG":           f"{BOOT_DIR}/cbh_calls.log",
+        "TEST_OVERLAYS_FILE":     f"{BOOT_DIR}/overlays.txt",
+        "TEST_PROC_DT":           PROC_DT,
+        "EG_CAMERA_MANIFEST":     "/nonexistent/eg_cameras",
+    })
+    write_overlays_file(overlay_map, f"{BOOT_DIR}/overlays.txt")
+
+    for spelling in ("DIONE", "dione", "dIoNe"):
+        label = f"{entry.version}/{entry.platform_id}/case/{spelling}"
+        r = subprocess.run(["bash", SCRIPT, f"0/{spelling}"], env=base_env,
+                           capture_output=True, text=True)
+        if r.returncode == 0 and "Camera type : Dione" in r.stdout:
+            _pass(f"{label}: accepted and normalised to Dione")
+            result.passed += 1
+        else:
+            _fail(f"{label}: rc={r.returncode}, expected acceptance as 'Dione' "
+                  f"(output: {(r.stdout+r.stderr)[:160]!r})")
+            result.failed += 1
+            result.failures.append(label)
+
+    # ─── Camera manifest gates configuration ─────────────────────────────────
+    # The whole point of `enabled: false` in eg_config.yaml: a camera that is
+    # built and shipped must still be refused here. Written with a manifest this
+    # test controls, so it asserts the mechanism rather than whatever the
+    # current product decision happens to be.
+    with tempfile.NamedTemporaryFile("w", suffix="_eg_cameras", delete=False) as mf:
+        mf.write("ENABLED=Dione MicroCube\n")
+        manifest_path = mf.name
+    try:
+        gated_env = dict(base_env, EG_CAMERA_MANIFEST=manifest_path)
+
+        label = f"{entry.version}/{entry.platform_id}/manifest/excluded_refused"
+        r = subprocess.run(["bash", SCRIPT, "0/iLumos"], env=gated_env,
+                           capture_output=True, text=True)
+        if r.returncode != 0 and "not available in this package" in (r.stdout + r.stderr):
+            _xfail(f"{label}: iLumos refused, absent from manifest")
+            result.xfailed += 1
+        else:
+            _fail(f"{label}: rc={r.returncode}, expected refusal "
+                  f"(output: {(r.stdout+r.stderr)[:160]!r})")
+            result.failed += 1
+            result.failures.append(label)
+
+        label = f"{entry.version}/{entry.platform_id}/manifest/listed_allowed"
+        r = subprocess.run(["bash", SCRIPT, "0/Dione"], env=gated_env,
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            _pass(f"{label}: Dione accepted, listed in manifest")
+            result.passed += 1
+        else:
+            _fail(f"{label}: rc={r.returncode}, expected acceptance "
+                  f"(output: {(r.stdout+r.stderr)[:160]!r})")
+            result.failed += 1
+            result.failures.append(label)
+    finally:
+        os.unlink(manifest_path)
 
 
 def main() -> int:

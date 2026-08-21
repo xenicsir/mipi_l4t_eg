@@ -205,6 +205,23 @@ update_status "Generating version info..."
 mkdir -p "${PACKAGE_NAME}/etc"
 echo "jetson-l4t-${L4T_VERSION_EXTENDED}_eg ${DEB_VERSION} (${GIT_BRANCH}, ${GIT_COMMIT})" > "${PACKAGE_NAME}/etc/version_eg_cams"
 
+# Camera manifest — the only thing in the package that a disabled camera
+# changes. Modules, device trees and every other file are built and shipped
+# regardless, so flipping `enabled` in eg_config.yaml never triggers a rebuild
+# and never shifts a test expectation; only this one line moves.
+#
+# The target has no access to eg_config.yaml (build configuration, not for
+# customers) and no YAML parser to rely on, so the enabled list is resolved here
+# and shipped as plain text that eg_dt_camera_config_set.sh can grep.
+_ENABLED_CAMERAS=$($_EGCFG cameras.enabled)
+{
+   echo "# Cameras available in this package, generated from eg_config.yaml."
+   echo "# eg_dt_camera_config_set.sh refuses to configure a port for anything"
+   echo "# not listed here. Absent file = no restriction (older packages)."
+   echo "ENABLED=${_ENABLED_CAMERAS}"
+} > "${PACKAGE_NAME}/etc/eg_cameras"
+echo "  Cameras enabled: ${_ENABLED_CAMERAS}"
+
 #******************************************************************************
 # Step 4: Copy boot files (kernel, dtb, dtbo)
 #******************************************************************************

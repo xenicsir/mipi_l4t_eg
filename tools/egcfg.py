@@ -26,6 +26,8 @@ Queries:
   carrier.NAME.dir_suffix           dir_suffix for a carrier
   som.NAME.defconfig                defconfig for a SoM
   som.NAME.dir_suffix               dir_suffix for a SoM
+  cameras.enabled                   display names of cameras shipped to customers
+  cameras.disabled                  display names of cameras hidden (enabled: false)
 
 Exit codes: 0 = ok, 1 = key not found or error
 """
@@ -128,6 +130,16 @@ def query(cfg, q):
         name = parts[1]
         field = parts[2]
         return cfg.get('soms', {}).get(name, {}).get(field, '')
+
+    # cameras.enabled / cameras.disabled — display names, `enabled: false` aware.
+    # Absent flag means enabled, so a camera is only ever listed as disabled when
+    # someone said so explicitly.
+    if q in ('cameras.enabled', 'cameras.disabled'):
+        want_enabled = q.endswith('enabled')
+        names = [c.get('name', cid)
+                 for cid, c in cfg.get('cameras', {}).items()
+                 if c.get('enabled', True) == want_enabled]
+        return ' '.join(sorted(names))
 
     return None
 

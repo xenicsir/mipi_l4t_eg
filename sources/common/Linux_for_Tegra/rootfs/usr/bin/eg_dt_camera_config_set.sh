@@ -1,35 +1,117 @@
 #!/bin/bash
 
 # Camera database: camera_name -> MIPI lane overlay suffix (empty = no overlay needed)
+#
+# Spell each camera ONCE, in its canonical form. What the user types is matched
+# case-insensitively by _canonical_camera(), so "ilumos", "iLumos" and "ILUMOS"
+# all resolve to the [iLumos] entry -- no need for a lowercase twin per camera,
+# which is how the earlier duplicated entries came about and how they drifted
+# (CAMERA_X4 had them commented out one way, CAMERA_GREY_ONLY the other).
+#
+# One entry per camera, so this table doubles as the list shown to the user.
 declare -A CAMERA_LANES=(
 	[Dione]=""
-	[MicroCube640]="EC_1_lane"
 	[MicroCube]="EC_1_lane"
 	[SmartIR640]="EC_2_lanes"
 	[Crius1280]="EC_2_lanes"
 	[iLumos]="iLumos"
-	[ilumos]="iLumos"
 	[Microlynx]="Microlynx"
-	[microlynx]="Microlynx"
+)
+
+# Obsolete names, kept working for backward compatibility and mapped to the
+# camera they used to designate. Not case variants (those are handled on their
+# own): these are former product names still living in customer scripts and
+# notes. Deliberately absent from "Supported cameras" -- the list advertises the
+# current name only, one line per camera, while an old script keeps running.
+declare -A CAMERA_ALIASES=(
+	[MicroCube640]="MicroCube"      # obsolete name for MicroCube
 )
 
 # Cameras that only ever stream 14/16-bit greyscale (no RGB or YUV mode)
 declare -A CAMERA_GREY_ONLY=(
 	[iLumos]=1
-	[ilumos]=1
 	[Microlynx]=1
-	[microlynx]=1
 )
 
 # Cameras requiring x4 MIPI lanes
 declare -A CAMERA_X4=(
 #   [iLumos]=1
-#   [ilumos]=1
 )
 
-SUPPORTED_CAMERAS=$(IFS=,; echo "${!CAMERA_LANES[*]}" | tr ' ' '\n' | sort | paste -sd', ')
+# Cameras this package actually ships, from /etc/eg_cameras (generated at build
+# time from eg_config.yaml). A camera can be built and installed yet withheld
+# from customers -- development on hold, mode not validated -- and this is where
+# that decision lands on the target.
+#
+# No manifest means no restriction: an older package, or a hand-assembled
+# rootfs, must keep working exactly as before rather than refuse every camera.
+EG_CAMERA_MANIFEST="${EG_CAMERA_MANIFEST:-/etc/eg_cameras}"
+ENABLED_CAMERAS=""
+if [[ -r "$EG_CAMERA_MANIFEST" ]]; then
+	ENABLED_CAMERAS=$(sed -n 's/^ENABLED=//p' "$EG_CAMERA_MANIFEST" | head -1)
+fi
+
+# Resolve user input to the canonical spelling used by the tables above: any
+# capitalisation, and any alternate name. Everything downstream -- lane lookup,
+# grey-only and x4 restrictions, manifest check, messages -- then works on that
+# single spelling, so an alias can never take a different path from the camera
+# it names. Prints nothing and returns 1 when the camera is unknown.
+_canonical_camera() {
+	local want="${1,,}" name
+	for name in "${!CAMERA_LANES[@]}"; do
+		if [[ "${name,,}" == "$want" ]]; then
+			printf '%s' "$name"
+			return 0
+		fi
+	done
+	for name in "${!CAMERA_ALIASES[@]}"; do
+		if [[ "${name,,}" == "$want" ]]; then
+			printf '%s' "${CAMERA_ALIASES[$name]}"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# Is <canonical name> shipped in this package? Always called with the output of
+# _canonical_camera(), so the manifest only ever needs the canonical names that
+# eg_config.yaml carries -- no alias handling here.
+_camera_enabled() {
+	[[ -z "$ENABLED_CAMERAS" ]] && return 0     # no manifest: everything allowed
+	local cam
+	for cam in $ENABLED_CAMERAS; do
+		[[ "${cam,,}" == "${1,,}" ]] && return 0
+	done
+	return 1
+}
+
+# Only advertise what this package ships -- a disabled camera must not show up
+# in the usage message either. Aliases are intentionally left out: one line per
+# camera, not per accepted spelling.
+_supported_camera_list() {
+	local name out=()
+	for name in "${!CAMERA_LANES[@]}"; do
+		_camera_enabled "$name" && out+=("$name")
+	done
+	# paste -sd takes a LIST of delimiters and cycles through them, so ', '
+	# would alternate comma and space between entries. Join on a single
+	# character, then space it out.
+	printf '%s\n' "${out[@]}" | sort | paste -sd, | sed 's/,/, /g'
+}
+
+SUPPORTED_CAMERAS=$(_supported_camera_list)
 
 DEFAULT_CAMERA="Dione"
+
+# Ports left unnamed on the command line fall back to DEFAULT_CAMERA, which
+# would quietly configure a camera the package no longer ships. Fail loudly
+# instead: this can only happen through an eg_config.yaml edit, and the person
+# who made it is the one who needs to hear about it.
+if ! _camera_enabled "$DEFAULT_CAMERA"; then
+	echo "Error: the default camera ($DEFAULT_CAMERA) is not available in this package." >&2
+	echo "Set DEFAULT_CAMERA to one of: $SUPPORTED_CAMERAS" >&2
+	exit 1
+fi
 
 usage() {
 	echo "Usage: $(basename "$0") [<port/camera_type>] ..."
@@ -47,7 +129,7 @@ usage() {
 	echo "  $(basename "$0")                                              # all ports with $DEFAULT_CAMERA"
 	echo "  $(basename "$0") 0/Dione"
 	echo "  $(basename "$0") 0/MicroCube 1/SmartIR640"
-	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/iLumos"
+	echo "  $(basename "$0") 0/Dione 1/MicroCube 2/SmartIR640 3/Crius1280"
 }
 
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
@@ -260,8 +342,20 @@ for arg in "$@"; do
 		exit 1
 	fi
 
-	if [[ -z "${CAMERA_LANES[$camera_type]+x}" ]]; then
-		echo "Error: unknown camera type '$camera_type' (from argument '$arg')."
+	# Accept any capitalisation, then work with the canonical spelling from here
+	# on so every lookup below (lanes, grey-only, x4, manifest) agrees.
+	if ! camera_type=$(_canonical_camera "$camera_type"); then
+		echo "Error: unknown camera type '${arg#*/}' (from argument '$arg')."
+		echo "Supported cameras: $SUPPORTED_CAMERAS"
+		exit 1
+	fi
+
+	# Withheld from customers in this package -- distinct from the SoM
+	# restriction below, which is a hardware impossibility rather than a
+	# decision. Keep the two messages apart: one may change tomorrow, the
+	# other never will.
+	if ! _camera_enabled "$camera_type"; then
+		echo "Error: $camera_type is not available in this package."
 		echo "Supported cameras: $SUPPORTED_CAMERAS"
 		exit 1
 	fi

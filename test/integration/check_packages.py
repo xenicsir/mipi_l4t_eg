@@ -75,6 +75,13 @@ def pick_latest_deb(debs, commit_order):
 # Vendor identification
 # ---------------------------------------------------------------------------
 
+def load_camera_db():
+    """Read the cameras section of eg_config.yaml, the source of truth the
+    package manifest is generated from."""
+    with open(EG_CONFIG) as f:
+        return yaml.safe_load(f)
+
+
 def load_vendors():
     """Read eg_config.yaml, return (infix → vendor, vendor → pristine_kernel).
 
@@ -168,6 +175,33 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
             passed += 1
         else:
             errors.append("etc/version_eg_cams missing")
+
+        # --- Camera manifest matches eg_config.yaml ---
+        # The manifest is the only package content an `enabled: false` flag
+        # changes, so it is also the only place the flag can silently fail to
+        # take effect. Compare it against the source of truth rather than
+        # merely checking the file exists.
+        man_file = extract_dir / "etc" / "eg_cameras"
+        if not man_file.exists():
+            errors.append("etc/eg_cameras missing")
+        else:
+            listed = ""
+            for line in man_file.read_text().splitlines():
+                if line.startswith("ENABLED="):
+                    listed = line[len("ENABLED="):].strip()
+                    break
+            expected = " ".join(sorted(
+                c.get("name", cid)
+                for cid, c in load_camera_db().get("cameras", {}).items()
+                if c.get("enabled", True)
+            ))
+            if listed == expected:
+                passed += 1
+            else:
+                errors.append(
+                    f"etc/eg_cameras ENABLED mismatch: package has {listed!r}, "
+                    f"eg_config.yaml says {expected!r}"
+                )
 
         # --- DTBOs: collect all ---
         boot_dir = extract_dir / "boot"

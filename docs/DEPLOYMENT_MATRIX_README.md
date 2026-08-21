@@ -44,8 +44,9 @@ Each cell shows the support status:
 - **MicroCube640** — VGA thermal camera
 - **Crius1280** — LWIR thermal camera
 - **SmartIR640** — SmartIR thermal camera
-- **iLumos** — Multi-object thermal (core + GenCP architecture)
-- **Microlynx** — Multi-object thermal (core + GenCP architecture)
+
+The generated matrix is the authoritative list — it is built from `eg_config.yaml` and always
+reflects what the current packages actually ship, including cameras not named here.
 
 ## 🔧 Maintaining the Matrix
 
@@ -79,7 +80,7 @@ deployment_matrix:
         35.4.1: tested
         36.4: tested
         36.4.3: tested
-      ilumos:
+      newcam:
         35.3.1: tested
         35.4.1: tested
 ```
@@ -196,7 +197,7 @@ Some combinations are impossible:
 
 - **T210 (Nano) cannot support Y16** — *hardware*: the Tegra X1 video input has no 16-bit RAW format (TRM tables 184/185 stop at RAW14)
 - **T210 and T186 do not support Y14 either** — *software*: the L4T 32.x kernel has no Y14 entry in its VI format table (`vi2_formats.h`, `vi4_formats.h`) and we deliberately do not add one (obsolete L4T, decision 2026-08-17). On T210 the hardware would handle RAW14; on T186 that is undetermined (no Parker TRM available)
-- **iLumos and Microlynx therefore cannot stream on 32.x at all** — every one of their modes is Y14 or Y16. They are marked `not_supported` on `nano_t210` and `tx2_t186`, and their device-tree overlays are not built for those SoMs
+- **Greyscale-only cameras therefore cannot stream on 32.x at all** — every one of their modes is Y14 or Y16. They are marked `not_supported` on `nano_t210` and `tx2_t186`, and their device-tree overlays are not built for those SoMs
 - **32.x L4T cannot support 36.x cameras** — Different driver architecture (in-tree vs out-of-tree)
 
 A combination ruled out by `platform_restrictions` needs an explicit `not_supported` entry in `deployment_matrix_data.yaml`: without it the generator would auto-fill `theoretically_supported` from `platform_ids`. Combinations that were simply never exercised stay as empty cells (no data).
@@ -209,7 +210,7 @@ A combination ruled out by `platform_restrictions` needs an explicit `not_suppor
 
 ## 🔄 Workflow for Adding New Camera Support
 
-When you add a new camera (e.g., "iLumos"):
+When you add a new camera — "NewCam" in this example:
 
 1. **Add the version's `platform_ids`** in `eg_config.yaml` — all compatible platforms appear automatically as ⚠️
 2. **Test on primary platforms** (e.g., Auvidea X230D, Orin NX devkit)
@@ -226,9 +227,9 @@ Example progression:
 # deployment_matrix_data.yaml — only tested results to add explicitly
 - platform: orin_nx_nano_devkit
   cameras:
-    ilumos:
-      36.4.3: "tested|l4t-36.4.3|ilumos-ornx-l4t-36.4.3.deb"
-      36.4.4: "tested|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
+    newcam:
+      36.4.3: "tested|l4t-36.4.3|newcam-ornx-l4t-36.4.3.deb"
+      36.4.4: "tested|l4t-36.4.4|newcam-ornx-l4t-36.4.4.deb"
 ```
 
 ## 🎯 For Clients
@@ -244,7 +245,7 @@ Example progression:
 Looking at the matrix:
 - Platform: **Orin NX / Nano devkit**
 - L4T version: **35.6.0**
-- Available cameras: All ✅ Tested (Dione, MicroCube640, Crius1280, SmartIR640, iLumos, Microlynx)
+- Available cameras: every camera listed on that row, each with its own status icon
 
 ## 📚 Related Documentation
 

@@ -110,6 +110,74 @@ class DeploymentMatrixGenerator:
         with open(camera_db_path, 'r') as f:
             self.camera_db = yaml.safe_load(f)
 
+        self._apply_enabled_flags()
+
+    def _apply_enabled_flags(self):
+        """Drop everything eg_config.yaml marks `enabled: false`.
+
+        Filtering happens once, here, rather than at each point of use: the
+        matrix is rendered three times (Markdown, HTML, PDF) from several
+        iteration sites, and a filter repeated per site is a filter that will
+        eventually be forgotten at one of them. After this runs, no downstream
+        code can see a disabled camera, resolution or mode at all.
+
+        A camera disabled at the top level takes its resolutions and modes with
+        it, whatever their own flags say. Both data sources are filtered
+        together: eg_config.yaml carries the flag and the technical details,
+        deployment_matrix_data.yaml the display metadata and the per-platform
+        support grid — a camera left in only one of them would still surface in
+        half the document.
+        """
+        cams = self.camera_db.get('cameras', {})
+
+        disabled = {cid for cid, c in cams.items() if not c.get('enabled', True)}
+        # Display names are needed after the entries are gone, to strip disabled
+        # cameras out of the hand-written grouped labels — see _enabled_label().
+        self._disabled_names = {
+            self.cameras_by_id[cid]['name'] for cid in disabled if cid in self.cameras_by_id
+        }
+        for cid in disabled:
+            cams.pop(cid, None)
+            self.cameras_by_id.pop(cid, None)
+            self.data.get('cameras', {}).pop(cid, None)
+
+        dropped_res = dropped_modes = 0
+        for cam in cams.values():
+            kept_res = []
+            for res in cam.get('resolutions', []):
+                if not res.get('enabled', True):
+                    dropped_res += 1
+                    continue
+                modes = res.get('modes', [])
+                kept_modes = [m for m in modes if m.get('enabled', True)]
+                dropped_modes += len(modes) - len(kept_modes)
+                # A resolution whose every mode is disabled has nothing left to
+                # describe — drop it rather than render an empty details table.
+                if not kept_modes:
+                    dropped_res += 1
+                    continue
+                res['modes'] = kept_modes
+                kept_res.append(res)
+            cam['resolutions'] = kept_res
+
+        if disabled or dropped_res or dropped_modes:
+            print(f"  enabled flags: {len(disabled)} camera(s), {dropped_res} resolution(s), "
+                  f"{dropped_modes} mode(s) hidden from the matrix"
+                  + (f" — cameras: {', '.join(sorted(disabled))}" if disabled else ""))
+
+    def _enabled_label(self, label):
+        """Strip disabled cameras from a hand-written "A / B / C" grouped label.
+
+        The cable-adapter table groups every 15-pin camera under one column
+        heading, written out by hand in the three renderers. Those names are not
+        driven by the camera list, so a camera disabled in eg_config.yaml would
+        still be advertised there — the exact kind of leftover that makes a
+        customer ask about a product we are not shipping.
+        """
+        names = [n.strip() for n in label.split('/')]
+        kept = [n for n in names if n.split('(')[0].strip() not in self._disabled_names]
+        return ' / '.join(kept)
+
     def _csi_clock_mhz(self, pixel_format, pix_clk_hz, lanes):
         """MIPI D-PHY HS clock (MHz): pix_clk_hz × bits/pixel / lanes, halved for DDR."""
         bpp = self.camera_db['pixel_format_map'][pixel_format]['csi_pixel_bit_depth']
@@ -348,7 +416,9 @@ class DeploymentMatrixGenerator:
             "## Appendix — CSI Flex Cable Selection Guide\n",
             "Select the correct flex cable based on the Jetson board's CSI connector pitch "
             "and the camera connector pitch.\n",
-            "| Board | CSI connector | Dione (22-pin) | MicroCube / Crius1280 / SmartIR640 / Microlynx (15-pin) | iLumos (22-pin) |",
+            "| Board | CSI connector | Dione (22-pin) | "
+            + self._enabled_label("MicroCube / Crius1280 / SmartIR640 / Microlynx")
+            + " (15-pin) | iLumos (22-pin) |",
             "| --- | --- | --- | --- | --- |",
         ]
         for row in d["table"]:
@@ -422,7 +492,7 @@ class DeploymentMatrixGenerator:
                 <th>Board</th>
                 <th>CSI connector</th>
                 <th>Dione (22-pin)</th>
-                <th>MicroCube / Crius1280 / SmartIR640 / Microlynx (15-pin)</th>
+                <th>{self._enabled_label("MicroCube / Crius1280 / SmartIR640 / Microlynx")} (15-pin)</th>
                 <th>iLumos (22-pin)</th>
             </tr></thead>
             <tbody>
@@ -1153,7 +1223,7 @@ class DeploymentMatrixGenerator:
         lines.append("<table style='width:auto; margin-bottom:10px;'><thead><tr>")
         lines.append("<th>Board</th><th>CSI connector</th>"
                      "<th>Dione (22-pin)</th>"
-                     "<th>MicroCube / Crius1280 / SmartIR640 / Microlynx (15-pin)</th>"
+                     f"<th>{self._enabled_label('MicroCube / Crius1280 / SmartIR640 / Microlynx')} (15-pin)</th>"
                      "<th>iLumos (22-pin)</th>")
         lines.append(f"</tr></thead><tbody>{rows_html}</tbody></table>")
         lines.append(f"<div style='margin-bottom:8px;'>"

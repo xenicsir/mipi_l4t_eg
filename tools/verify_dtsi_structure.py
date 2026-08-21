@@ -522,12 +522,59 @@ def verify(quiet=False):
     return errors, total_ok
 
 
+GENERIC_DOCS = [
+    "README.md",
+    "docs/MIPI_DRIVER_DEVELOPMENT_GUIDE.md",
+    "docs/DEPLOYMENT_MATRIX_README.md",
+]
+
+
+def verify_generic_docs(cfg, repo_root):
+    """No camera may be named in the generic docs unless it is a documented example.
+
+    README.md and the development guide are written to survive a product
+    shipping or being withdrawn: they illustrate with released cameras and let
+    the reader generalise. Naming anything else there means the document now has
+    to be edited every time a product decision changes — and, in practice, means
+    a withdrawn product keeps being advertised because nobody remembered the
+    mention. Checked here so it fails at build time rather than in a customer's
+    hands.
+
+    Deliberately independent of the `enabled` flag: a camera can be enabled,
+    shipped and listed in the deployment matrix while still having no place in
+    generic documentation.
+    """
+    allowed = {n.lower() for n in cfg.get("doc_example_cameras", [])}
+    names = {c.get("name", cid) for cid, c in cfg.get("cameras", {}).items()}
+    forbidden = sorted(n for n in names if n.lower() not in allowed)
+
+    errors = []
+    for rel in GENERIC_DOCS:
+        path = Path(repo_root) / rel
+        if not path.exists():
+            continue
+        for lineno, line in enumerate(path.read_text().splitlines(), 1):
+            low = line.lower()
+            for name in forbidden:
+                if name.lower() in low:
+                    errors.append(
+                        f"{rel}:{lineno}: names '{name}', which is not in "
+                        f"doc_example_cameras — keep generic docs product-neutral"
+                    )
+    return errors
+
+
 def main():
     quiet = "--quiet" in sys.argv
     if not quiet:
         print("=== DTSI structure verification ===")
 
     errors, total_ok = verify(quiet=quiet)
+
+    doc_errors = verify_generic_docs(load_db(), REPO_ROOT)
+    errors.extend(doc_errors)
+    if not quiet and not doc_errors:
+        print(f"  [OK] generic docs name no camera outside doc_example_cameras")
 
     if not quiet:
         print(f"\n{total_ok} nodes OK, {len(errors)} errors")

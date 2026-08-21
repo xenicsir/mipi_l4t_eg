@@ -6,8 +6,12 @@ boards.
 **If you were given a board and a `.deb` package, you only need Part 1.** Part 2 and the
 appendices are for building the drivers from source and porting them to new hardware.
 
-The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) lists which cameras are supported on
-which SoM, carrier board and L4T version.
+**This document does not list every camera.** It stays deliberately generic and illustrates
+with a few established models, so that it remains valid as the range evolves. The
+[MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) is the authoritative list: which cameras
+are supported, on which SoM, carrier board and L4T version, and with which resolutions and
+pixel formats. On a board, `eg_dt_camera_config_set.sh --help` names the cameras that the
+installed package accepts.
 
 ---
 
@@ -35,7 +39,7 @@ After a first install both ports expect **Dione** cameras. For anything else, se
 reboot:
 
 ```bash
-eg_dt_camera_config_set.sh 0/iLumos 1/SmartIR640
+eg_dt_camera_config_set.sh 0/MicroCube 1/SmartIR640
 sudo reboot
 ```
 
@@ -225,7 +229,17 @@ eg_dt_camera_config_set.sh <port>/<cam_type> [<port>/<cam_type>] ...
 
 Where:
 - `<port>` = `0` or `1` (camera port number)
-- `<cam_type>` = `Dione`, `MicroCube`, `SmartIR640`, `Crius1280`, `iLumos`, or `Microlynx`
+- `<cam_type>` = a camera name, spelled in any capitalisation
+
+The camera names your package accepts are the ones it can actually configure, so
+ask it rather than a list printed here:
+
+```bash
+eg_dt_camera_config_set.sh --help
+```
+
+The [MIPI deployment matrix](MIPI_DEPLOYMENT_MATRIX.md) lists the same cameras with
+the resolutions and pixel formats each one supports.
 
 Example :
 ```bash
@@ -325,13 +339,6 @@ v4l2-ctl -d /dev/video0 --stream-mmap \
 v4l2-ctl -d /dev/video0 --stream-mmap \
   --set-fmt-video=width=640,height=480,pixelformat="AR24" \
   --stream-count=1 --stream-to=frame.raw
-```
-
-- **iLumos** (RAW16 format, 2048x2048):
-```bash
-v4l2-ctl -d /dev/video0 --stream-mmap \
-  --set-fmt-video=width=2048,height=2048,pixelformat="RG16" \
-  --set-ctrl=sensor_mode=0 --stream-count=1 --stream-to=frame.raw
 ```
 
 For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.
@@ -704,7 +711,7 @@ This generates: `jetson-l4t-32.7.1-jp4.6.1-t210-eg-cams_<debian_version>_arm64.d
 
 **Note:** For L4T 35.x and 36.x, the `-s/--som` flag is not needed — those versions target Orin-family SoMs and the SoM is implicit.
 
-Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi) and device tree overlays (`tegra186-camera-eg-*` / `tegra210-camera-eg-*`). iLumos and Microlynx are not part of the 32.x packages — see [Y14 pixel layout](#y14-pixel-layout).
+Both t186 and t210 packages include kernel modules (dione_ir, eg-ec-mipi) and device tree overlays (`tegra186-camera-eg-*` / `tegra210-camera-eg-*`). Cameras that only ever stream 14- or 16-bit greyscale are not part of the 32.x packages: those SoMs cannot store that format — see [Y14 pixel layout](#y14-pixel-layout).
 
 **The `-c/--carrier-board` option** selects a specific carrier board within a vendor. It has three effects compared to a generic build:
 
@@ -865,12 +872,13 @@ Dione cameras do not require a per-port overlay — they are fully covered by th
 |---|---|---|
 | `"Exosens Cameras. CAM0:EC_1_lane"` | MicroCube, MicroCube640 | CAM0 |
 | `"Exosens Cameras. CAM0:EC_2_lanes"` | SmartIR640, Crius1280 | CAM0 |
-| `"Exosens Cameras. CAM0:iLumos"` | iLumos | CAM0 |
-| `"Exosens Cameras. CAM0:Microlynx"` | Microlynx | CAM0 |
 | `"Exosens Cameras. CAM1:EC_1_lane"` | MicroCube, MicroCube640 | CAM1 |
 | `"Exosens Cameras. CAM1:EC_2_lanes"` | SmartIR640, Crius1280 | CAM1 |
-| `"Exosens Cameras. CAM1:iLumos"` | iLumos | CAM1 |
-| `"Exosens Cameras. CAM1:Microlynx"` | Microlynx | CAM1 |
+
+Cameras that are not EngineCore-based carry their own name instead of a lane
+suffix, following the same pattern — `"Exosens Cameras. CAM<N>:<CameraName>"`.
+`eg_dt_camera_config_set.sh --help` lists the names this package accepts, and
+`config-by-hardware.py -l` (below) the overlays actually installed.
 
 **Disable overlays — add when the base DTB has active IMX nodes:**
 
@@ -942,7 +950,7 @@ The patches concerned are:
 ### Changes required in `media/i2c` drivers
 
 Apply the following two modifications to each Exosens driver source file
-(`eg_ec_mipi_src.c`, `dione_ir_src.c`, `ilumos.c`, `microlynx_src.c`).
+(`eg_ec_mipi_src.c`, `dione_ir_src.c`, and the other `media/i2c` sensor drivers).
 
 #### 1 — Remove `const` from the `frmfmt` table
 

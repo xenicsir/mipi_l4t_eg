@@ -65,7 +65,7 @@ When multiple layers modify the same file (e.g., a Makefile), a **3-way merge** 
 - `t210` — Jetson Nano / porg (tegra210): has device tree overlays
 - `t186` — Jetson TX2 / TX2i / TX2 NX (tegra186): has device tree overlays (`tegra186-camera-eg-*`)
 
-Neither SoM supports 14- or 16-bit greyscale: their VI format tables (`vi2_formats.h`, `vi4_formats.h`) carry no such entry and we deliberately do not add one (obsolete L4T). **iLumos and Microlynx are therefore not supported on 32.x at all** — no overlays, no kernel modules. The 32.x kernel modules are `dione_ir` and `eg-ec-mipi` only.
+Neither SoM supports 14- or 16-bit greyscale: their VI format tables (`vi2_formats.h`, `vi4_formats.h`) carry no such entry and we deliberately do not add one (obsolete L4T). **Greyscale-only cameras are therefore not supported on 32.x at all** — no overlays, no kernel modules. The 32.x kernel modules are `dione_ir` and `eg-ec-mipi` only.
 
 For L4T 35.x and 36.x, the SoM is always Orin-family and no `-s` flag is needed.
 
@@ -111,14 +111,15 @@ The Forecr variant DTS defines `DSBOARD_ORNXS` before including the common DTSI,
 
 ## Scenario A: Adding a new camera to an existing BSP version
 
-This scenario covers adding an entirely new camera type (e.g., "Microlynx") that has never been supported.
+This scenario covers adding an entirely new camera type — called "NewCam" throughout this
+section — that has never been supported.
 
 ### Step 1: Kernel driver
 
 Create the V4L2 sensor driver in `sources/common/source/nvidia-oot/drivers/media/i2c/<camera>.c`.
 
 The driver must:
-- Register with a unique compatible string (e.g., `"exosens,microlynx"`)
+- Register with a unique compatible string (e.g., `"exosens,newcam"`)
 - Implement V4L2 subdev operations via the tegracam framework
 - Expose sysfs attributes for `eg_dt_camera_config_get.sh`:
   - `model` — camera model name
@@ -126,7 +127,9 @@ The driver must:
   - `resolution` — native resolution (e.g., "1024x128")
   - `pixel_format` — pixel format string (e.g., "'Y16 ' (16-bit Greyscale)")
 
-Use an existing driver as template: `ilumos.c` (simple I2C), `microlynx_core.c` (GenCP protocol), `eg_ec_mipi_src.c` (EngineCore).
+Use an existing driver as template: `dione_ir.c` (I2C register access) or `eg_ec_mipi_src.c`
+(EngineCore). Other sensor drivers in `media/i2c` cover further transports — GenCP over I2C
+among them — if the new camera needs one.
 
 ### Step 2: Driver build integration (per version)
 
@@ -226,7 +229,7 @@ tegra234-p3767-camera-p3768-eg-cam1-<camera>.dts   # Port 1
 
 Place them in the same directory as the common DTSI.
 
-The `overlay-name` must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"` (e.g., `"Exosens Cameras. CAM0:Microlynx"`).
+The `overlay-name` must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"` (e.g., `"Exosens Cameras. CAM0:NewCam"`).
 
 Each overlay must:
 1. Set `bus-width` on the VI capture endpoint
@@ -492,7 +495,7 @@ cp tegra234-p3767-camera-p3768-eg-cam0-ec-2-lanes.dts \
    tegra234-pXXXX-camera-pYYYY-eg-cam0-ec-2-lanes.dts
 cp tegra234-p3767-camera-p3768-eg-cam1-ec-1-lane.dts \
    tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-1-lane.dts
-# ... repeat for all camera types (iLumos, Microlynx, etc.)
+# ... repeat for every camera type the platform carries
 ```
 
 3. **Vendor variant DTS** (if needed): Create a file that defines a preprocessor macro before including the common DTSI:
@@ -804,12 +807,13 @@ dione_ir-y += dioneir.o tc358746_calculation.o
 eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 obj-m += eg-ec-mipi.o
 ifndef PRISTINE_KERNEL
-# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
+# Greyscale sensors need Y16/Y16_BE/Y14 negotiation support in the shared
 # nvidia-oot camera framework (sensor_common.c, vi5_formats.h...), which
-# can't be patched into a PRISTINE_KERNEL vendor's precompiled tegra-camera.ko.
-obj-m += ilumos.o
-microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o ...
-obj-m += microlynx.o
+# can't be patched into a PRISTINE_KERNEL vendor's precompiled tegra-camera.ko,
+# so they are built only when we control the kernel.
+obj-m += newcam.o
+othercam-objs := othercam_core.o gencp-over-i2c/libunio.o ...
+obj-m += othercam.o
 endif
 ifdef PRISTINE_KERNEL
 ccflags-y += -DPRISTINE_KERNEL
@@ -818,7 +822,7 @@ endif
 
 `PRISTINE_KERNEL` is exported by `l4t_environment.sh`'s `l4t_init` (from `eg_config.yaml`'s flag) into the process environment — `make` (even under `sudo -E`) imports it automatically as a Make variable, so plain `ifdef`/`ifndef` works with no extra plumbing in `l4t_build.sh`.
 
-Do the same in the overlay Makefile (`hardware/.../overlay/Makefile`, 36.x — or the per-platform Kconfig/dtb-y for 32+/35.x) around any `dtbo-y` that depends on a framework-only feature (e.g. iLumos/Microlynx overlays), and add an **unconditional** `dtbo-y` line for the new vendor's own camera overlay (every vendor compiles every `dtbo-y`; selection happens at flash/config time, not compile time).
+Do the same in the overlay Makefile (`hardware/.../overlay/Makefile`, 36.x — or the per-platform Kconfig/dtb-y for 32+/35.x) around any `dtbo-y` that depends on a framework-only feature (greyscale-only camera overlays, for instance), and add an **unconditional** `dtbo-y` line for the new vendor's own camera overlay (every vendor compiles every `dtbo-y`; selection happens at flash/config time, not compile time).
 
 ### Step 4: Shared driver C code — guard framework-dependent code paths
 
