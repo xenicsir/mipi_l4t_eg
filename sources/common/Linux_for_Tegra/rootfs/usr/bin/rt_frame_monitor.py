@@ -635,6 +635,10 @@ class _GstAppSinkCapture:
         "RGBA":      (np.dtype("u1"), 4),
     }
 
+    # Interval between non-blocking appsink polls in _pull_sample() -- see there
+    # for why a single blocking emit() call cannot be used.
+    _POLL_INTERVAL_S = 0.001
+
     def __init__(self, device, gst_fmt, width, height, pull_timeout_s=3.0, pixel_fmt=None):
         try:
             import gi
@@ -690,7 +694,7 @@ class _GstAppSinkCapture:
         # Prime the pipeline with an actual pull — this is the only reliable way to
         # observe a downstream negotiation failure, which GStreamer reports
         # asynchronously via the bus shortly after the state reaches PLAYING.
-        sample = self._sink.emit("try-pull-sample", self._pull_timeout)
+        sample = self._pull_sample()
         if sample is None:
             detail = ""
             err_msg = self._bus.timed_pop_filtered(0, Gst.MessageType.ERROR)
@@ -710,6 +714,38 @@ class _GstAppSinkCapture:
             self._capture_times.append(time.monotonic())
             self._capture_total += 1
         return self._Gst.PadProbeReturn.OK
+
+    def _pull_sample(self):
+        """Poll appsink for a sample instead of one blocking
+        emit("try-pull-sample", timeout) call.
+
+        PyGObject 3.26.1 (Ubuntu 18.04, shipped with every L4T 32.x image) does
+        not release the GIL for the duration of that call. _on_src_buffer above
+        runs on GStreamer's own streaming thread and needs the GIL to execute —
+        so with the GIL held by this thread for the whole timeout, that buffer
+        probe can never run, the buffer it's attached to never finishes being
+        pushed downstream, appsink never receives it, and the call times out
+        every single time regardless of the timeout value or the camera/format
+        in use. Confirmed on hardware (Nano, L4T 32.7.1): a bare
+        emit("try-pull-sample", 3s) stalls for the full 3 s and returns None;
+        PyGObject 3.36.0 (Ubuntu 20.04, L4T 35.x+) does not have this problem.
+
+        A tight loop of non-blocking peeks (timeout=0, returns immediately) with
+        an actual Python-level sleep() in between — which *does* release the
+        GIL — gives the streaming thread the opening it needs, on every
+        PyGObject build. Verified fix on the same L4T 32.7.1 hardware: first
+        sample after ~50 polls (~55 ms), steady state ~14 polls/frame at the
+        camera's 60 fps. Overhead elsewhere is negligible: samples normally
+        arrive in 15-50 ms, against a 1 ms poll granularity.
+        """
+        deadline = time.monotonic() + self._pull_timeout / self._Gst.SECOND
+        while True:
+            sample = self._sink.emit("try-pull-sample", 0)
+            if sample is not None:
+                return sample
+            if time.monotonic() >= deadline:
+                return None
+            time.sleep(self._POLL_INTERVAL_S)
 
     @property
     def width(self):
@@ -765,7 +801,7 @@ class _GstAppSinkCapture:
         if self._first_sample is not None:
             sample, self._first_sample = self._first_sample, None
         else:
-            sample = self._sink.emit("try-pull-sample", self._pull_timeout)
+            sample = self._pull_sample()
         if sample is None:
             return False, None
         arr = self._sample_to_array(sample)
