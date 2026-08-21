@@ -194,6 +194,14 @@ class FAC_SEL(IntEnum):
         return self.name
 
 
+class CameraError(Exception):
+  """The camera answered and refused the request.
+
+  Distinct from OSError, which means the transport itself failed (no such bus,
+  address rejected, permission denied). IOError is not usable here: in Python 3
+  it is an alias of OSError, so the two cases could not be told apart."""
+
+
 class dioneCtrl(object):
 
   # Maximum I2C status read attempts when the camera returns 0xFFFF (request in progress)
@@ -232,6 +240,24 @@ class dioneCtrl(object):
     if (self.device_type == "USB") :
         self.ser.close()
 
+  def close(self):
+    """Release the I2C file descriptors. Idempotent, and safe to call twice.
+
+    open_device()/close_device() only ever acted on the serial port; in I2C mode
+    the two descriptors opened by __init__ used to live until the process died,
+    which leaks one pair per instance in a console or a loop."""
+    for attr in ("fr", "fw"):
+      f = getattr(self, attr, None)
+      if f is not None and not f.closed:
+        f.close()
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc, tb):
+    self.close()
+    return False
+
   def write_device(self, out):
     if (self.device_type == "USB") :
         ret = self.ser.write(out)
@@ -240,12 +266,12 @@ class dioneCtrl(object):
         ret = self.fw.write(out)
     return ret
 
-  def read_device(self, len):
+  def read_device(self, nbytes):
     if (self.device_type == "USB") :
-        ret = self.ser.read(len)
+        ret = self.ser.read(nbytes)
         self.ser.flush()
     else :
-        ret = self.fr.read(len)
+        ret = self.fr.read(nbytes)
     return ret
 
   def _poll_read(self, nbytes):
@@ -259,152 +285,108 @@ class dioneCtrl(object):
       data = self.read_device(nbytes)
     return data
 
-  def read_reg32(self, reg_addr):
+  # -------------------------------------------------------------------------
+  # Transport -- one place where the GenCP / raw split and the endianness live.
+  # The six public accessors below are thin wrappers over _read_raw/_write_raw;
+  # keep it that way, a fix applied to one accessor only is a fix half made.
+  # -------------------------------------------------------------------------
+
+  def _gencp_endpoints(self):
+    """The (write, read) endpoints the GenCP helpers expect."""
+    if self.device_type == "USB":
+      return self.ser, self.ser
+    return self.fw, self.fr
+
+  def _u32_fmt(self):
+    """struct format for a 32-bit word: GenCP is big-endian on the wire, the
+    raw protocol little-endian."""
+    return '>I' if self.gencp_enable else '<I'
+
+  def _f32_fmt(self):
+    return '>f' if self.gencp_enable else '<f'
+
+  def _check_status(self, status, what):
+    """Raise on a camera error. Reads used to ignore this entirely and hand back
+    whatever bytes came in, so a failed transfer was indistinguishable from a
+    real value."""
+    if status is None:
+      raise CameraError(f"{what}: GenCP transfer aborted")
+    if status:
+      name = next((k for k, v in GencpStatus.items() if v == status), None)
+      raise CameraError(f"{what} failed with status 0x{status:04X}"
+                    + (f" ({name})" if name else ""))
+
+  def _read_raw(self, reg_addr, nbytes):
+    """Read <nbytes> at <reg_addr> and return them in wire order. Raises
+    CameraError if the camera reports an error."""
     self.open_device()
+    try:
+      if self.gencp_enable:
+        write_dev, read_dev = self._gencp_endpoints()
+        status, data = self.ReadGencpReg(write_dev, read_dev, reg_addr, nbytes)
+      else:
+        self.write_device(bytearray(reg_addr.to_bytes(4, 'little'))
+                          + bytearray(nbytes.to_bytes(2, 'little')))
+        raw = self._poll_read(2 + nbytes)
+        status = struct.unpack_from('<H', raw)[0]
+        data = bytes(raw[2:])
+    finally:
+      self.close_device()
 
-    if self.gencp_enable:
-        if self.device_type == "USB":
-            write_dev = self.ser
-            read_dev = self.ser
-        else:  # I2C
-            write_dev = self.fw
-            read_dev = self.fr
-        Status, Data = self.ReadGencpReg(write_dev, read_dev, reg_addr, 4)
-        ret = b'\x00\x00' + Data  # Add 2-byte prefix for compatibility
-    else:
-        out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
-        self.write_device(out)
-        ret = self._poll_read(6)
+    self._check_status(status, f"read of 0x{reg_addr:08X}")
+    return bytes(data)
 
-    self.close_device()
-    if self.gencp_enable:
-        val=struct.unpack('>L', ret[2:])
-    else:
-        val=struct.unpack('<L', ret[2:])
+  def _write_raw(self, reg_addr, payload):
+    """Write <payload> at <reg_addr>. Returns the camera status word, 0 = OK.
+    Writes return their status rather than raising: upload_file() drives the
+    camera through states where a non-zero status is expected and handled."""
+    self.open_device()
+    try:
+      if self.gencp_enable:
+        write_dev, read_dev = self._gencp_endpoints()
+        status = self.WriteGencpReg(write_dev, read_dev, reg_addr, payload)
+      else:
+        self.write_device(bytearray(reg_addr.to_bytes(4, 'little'))
+                          + bytearray(len(payload).to_bytes(2, 'little'))
+                          + bytearray(payload))
+        status = struct.unpack_from('<H', self._poll_read(2))[0]
+    finally:
+      self.close_device()
+    return status
 
-    return val[0]
+  # -------------------------------------------------------------------------
+  # Public API
+  # -------------------------------------------------------------------------
+
+  def read_reg32(self, reg_addr):
+    return struct.unpack(self._u32_fmt(), self._read_raw(reg_addr, 4))[0]
 
   def read_reg32f(self, reg_addr):
-    self.open_device()
+    """Read a 32-bit IEEE-754 float.
 
-    if self.gencp_enable:
-        if self.device_type == "USB":
-            write_dev = self.ser
-            read_dev = self.ser
-        else:  # I2C
-            write_dev = self.fw
-            read_dev = self.fr
-        Status, Data = self.ReadGencpReg(write_dev, read_dev, reg_addr, 4)
-        ret = b'\x00\x00' + Data  # Add 2-byte prefix for compatibility
-    else:
-        out=bytearray(reg_addr.to_bytes(4, 'little'))+bytearray([0x04, 0x00])
-        self.write_device(out)
-        ret = self._poll_read(6)
-
-    self.close_device()
-    if self.gencp_enable:
-        val=struct.unpack('>L', ret[2:])
-    else:
-        val=struct.unpack('<L', ret[2:])
-
-    if (val[0] == 0):
-       return  0.0
-    else :
-       return struct.unpack('!f', bytes.fromhex(f'{val[0]:x}'))[0]
-
-  def write_reg32(self, reg_addr, val):
-    self.open_device()
-
-    if self.gencp_enable:
-        if self.device_type == "USB":
-            write_dev = self.ser
-            read_dev = self.ser
-        else:  # I2C
-            write_dev = self.fw
-            read_dev = self.fr
-        data = bytearray(val.to_bytes(4, 'big'))
-        Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, data)
-        ret = Status
-    else:
-        out=bytearray(reg_addr.to_bytes(4, 'little')) \
-            +bytearray([0x04, 0x00]) \
-            +bytearray(val.to_bytes(4, 'little'))
-        self.write_device(out)
-        raw = self._poll_read(2)
-        ret = struct.unpack_from('<H', raw)[0]
-
-    self.close_device()
-    return ret
-
-  def write_reg32f(self, reg_addr, val):
-    self.open_device()
-
-    if self.gencp_enable:
-        if self.device_type == "USB":
-            write_dev = self.ser
-            read_dev = self.ser
-        else:  # I2C
-            write_dev = self.fw
-            read_dev = self.fr
-        data = bytearray(struct.pack('>f', val))
-        Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, data)
-        ret = Status
-    else:
-        out=bytearray(reg_addr.to_bytes(4, 'little')) \
-            +bytearray([0x04, 0x00]) \
-            +bytearray(struct.pack('<f', val))
-        self.write_device(out)
-        raw = self._poll_read(2)
-        ret = struct.unpack_from('<H', raw)[0]
-
-    self.close_device()
-    return ret
+    The previous implementation round-tripped through a hex string
+    (bytes.fromhex(f'{val:x}')), which drops leading zeros and can yield an
+    odd-length string: every value below 0x10000000 raised ValueError or
+    struct.error instead of returning a number -- 6.2 % of all bit patterns,
+    and every integer register read through this method by mistake."""
+    return struct.unpack(self._f32_fmt(), self._read_raw(reg_addr, 4))[0]
 
   def read_buf(self, reg_addr, length):
-    """Read <length> bytes from <reg_addr>."""
+    """Read <length> bytes from <reg_addr>.
 
-    self.open_device()
+    Returns a 2-byte status header followed by the payload, so callers keep
+    slicing [2:] as they always have."""
+    return b'\x00\x00' + self._read_raw(reg_addr, length)
 
-    if self.gencp_enable:
-        if self.device_type == "USB":
-            write_dev = self.ser
-            read_dev = self.ser
-        else:  # I2C
-            write_dev = self.fw
-            read_dev = self.fr
-        Status, Data = self.ReadGencpReg(write_dev, read_dev, reg_addr, length)
-        ret = b'\x00\x00' + Data  # Add 2-byte prefix for compatibility
-    else:
-        out=bytearray(reg_addr.to_bytes(4, 'little')) \
-            + bytearray(length.to_bytes(2, 'little'))
-        self.write_device(out)
-        ret = self._poll_read(2 + length)
+  def write_reg32(self, reg_addr, val):
+    return self._write_raw(reg_addr, val.to_bytes(4, 'big' if self.gencp_enable else 'little'))
 
-    self.close_device()
-    return ret
+  def write_reg32f(self, reg_addr, val):
+    return self._write_raw(reg_addr, struct.pack(self._f32_fmt(), val))
 
   def write_buf(self, reg_addr, buf):
     """Write <buf> to <reg_addr>."""
-
-    self.open_device()
-
-    if self.gencp_enable:
-        if self.device_type == "USB":
-            write_dev = self.ser
-            read_dev = self.ser
-        else:  # I2C
-            write_dev = self.fw
-            read_dev = self.fr
-        Status = self.WriteGencpReg(write_dev, read_dev, reg_addr, buf)
-    else:
-        out=bytearray(reg_addr.to_bytes(4, 'little')) \
-            + bytearray(len(buf).to_bytes(2, 'little')) + buf
-        self.write_device(out)
-        raw = self._poll_read(2)
-        Status = struct.unpack_from('<H', raw)[0]
-
-    self.close_device()
-    return Status
+    return self._write_raw(reg_addr, buf)
 
   # -------------------------------------------------------------------------
   # Firmware upload
@@ -681,6 +663,7 @@ class dioneCtrl(object):
 if __name__ == "__main__":
   import argparse
   import code
+  import sys
 
   try:
     import readline  # noqa: F401 - enables arrow keys / history in the console
@@ -694,13 +677,31 @@ if __name__ == "__main__":
       formatter_class=argparse.RawDescriptionHelpFormatter,
   )
 
-  # Connection options
+  # Connection options -- exactly one per dioneCtrl() constructor parameter, and
+  # named the same, so that a command line and an interactive call read alike:
+  #     dioneCtrl(bus=7, dev_addr=0x5d, device_type="I2C", gencp_enable=False)
+  #     dioneCtrl.py --bus 7 --dev-addr 0x5d --device-type I2C
+  # Keep that mapping when adding a parameter on either side.
+  #
+  # The address option must NOT be called --addr: every subcommand takes a
+  # positional 'addr' (a register address), both would land on the same
+  # namespace attribute, and the positional -- parsed second -- would win. The
+  # register address then reached the I2C_SLAVE ioctl, which rejected it with
+  # EINVAL. That was the state of the CLI until this was fixed.
   conn = parser.add_argument_group('connection')
   conn.add_argument('--device-type', choices=['I2C', 'USB'], default='I2C',
                     help='Communication type (default: I2C)')
-  conn.add_argument('--bus',  type=int,     default=6,      help='I2C bus number (default: 6)')
-  conn.add_argument('--addr', type=hex_int, default=0x5A,   help='I2C device address (default: 0x5A)')
-  conn.add_argument('--com',  default='COM0',               help='Serial port for USB mode (default: COM0)')
+  conn.add_argument('--bus', type=int, default=6,
+                    help='I2C bus number (default: 6)')
+  conn.add_argument('--dev-addr', type=hex_int, default=0x5A,
+                    help='I2C device address (default: 0x5A)')
+  conn.add_argument('--com-device', default='COM0',
+                    help='Serial port for USB mode (default: COM0)')
+  conn.add_argument('--gencp-enable', action='store_true',
+                    help='Use GenCP framing (default: off)')
+  conn.add_argument('--force-slave', action='store_true',
+                    help='Claim the I2C address even if a kernel driver holds it '
+                         '(I2C_SLAVE_FORCE)')
 
   subparsers = parser.add_subparsers(dest='command')
 
@@ -741,43 +742,61 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   if args.command:
-    cam = dioneCtrl(
-        bus=args.bus,
-        dev_addr=args.addr,
-        com_device=args.com,
-        device_type=args.device_type,
-    )
+    # Every failure path below must exit non-zero: a caller in a shell script
+    # has no other way to tell a written register from a refused one. Errors are
+    # reported as one line on stderr rather than as a Python traceback -- an
+    # unreachable bus or a wrong address is a user mistake, not a crash.
+    def fail(msg):
+      print(f'Error: {msg}', file=sys.stderr)
+      sys.exit(1)
 
-    if args.command == 'upload':
-      if cam.upload_file(args.file, args.type):
-        print('\nUpload complete. Power cycle the camera to apply the update.')
-      else:
-        print('\nUpload failed.')
-        exit(1)
+    try:
+      with dioneCtrl(
+          bus=args.bus,
+          dev_addr=args.dev_addr,
+          com_device=args.com_device,
+          device_type=args.device_type,
+          gencp_enable=args.gencp_enable,
+          force_slave=args.force_slave,
+      ) as cam:
 
-    elif args.command == 'read_reg32':
-      val = cam.read_reg32(args.addr)
-      print(f'0x{val:08X}  ({val})')
+        if args.command == 'upload':
+          if cam.upload_file(args.file, args.type):
+            print('\nUpload complete. Power cycle the camera to apply the update.')
+          else:
+            fail('upload failed.')
 
-    elif args.command == 'read_reg32f':
-      val = cam.read_reg32f(args.addr)
-      print(val)
+        elif args.command == 'read_reg32':
+          val = cam.read_reg32(args.addr)
+          print(f'0x{val:08X}  ({val})')
 
-    elif args.command == 'write_reg32':
-      status = cam.write_reg32(args.addr, args.val)
-      print('OK' if not status else f'Error: 0x{status:04X}')
+        elif args.command == 'read_reg32f':
+          print(cam.read_reg32f(args.addr))
 
-    elif args.command == 'write_reg32f':
-      status = cam.write_reg32f(args.addr, args.val)
-      print('OK' if not status else f'Error: 0x{status:04X}')
+        elif args.command in ('write_reg32', 'write_reg32f'):
+          writer = cam.write_reg32 if args.command == 'write_reg32' else cam.write_reg32f
+          status = writer(args.addr, args.val)
+          if status:
+            fail(f'write to 0x{args.addr:08X} refused, status 0x{status:04X}')
+          print('OK')
 
-    elif args.command == 'read_buf':
-      data = cam.read_buf(args.addr, args.length)
-      print(' '.join(f'{b:02X}' for b in data[2:]))   # skip 2-byte status header
+        elif args.command == 'read_buf':
+          data = cam.read_buf(args.addr, args.length)
+          print(' '.join(f'{b:02X}' for b in data[2:]))   # skip 2-byte status header
 
-    elif args.command == 'read_string':
-      data = cam.read_buf(args.addr, args.length)
-      print(data[2:].decode('utf-8', errors='replace').rstrip('\x00'))
+        elif args.command == 'read_string':
+          data = cam.read_buf(args.addr, args.length)
+          print(data[2:].decode('utf-8', errors='replace').rstrip('\x00'))
+
+    except CameraError as e:
+      fail(str(e))
+    except FileNotFoundError as e:
+      fail(f'{e.filename}: no such device -- check --bus (I2C) or --com-device (USB).')
+    except PermissionError as e:
+      fail(f'{e.filename}: permission denied -- run as root or join the i2c group.')
+    except OSError as e:
+      fail(f'{e.strerror or e} -- check --dev-addr, and whether a kernel driver '
+           f'already holds the address (--force-slave).')
 
   else:
     banner = (
@@ -788,7 +807,11 @@ if __name__ == "__main__":
         "Example: cam = dioneCtrl(dev_addr=0x5b, bus=9, device_type=\"I2C\", gencp_enable=False)\n"
         "\n"
         "CLI commands (run outside this console):\n"
-        "  python dioneCtrl.py [--device-type I2C|USB] [--bus N] [--addr 0xNN] [--com COMx] <command>\n"
+        "  python dioneCtrl.py [connection options] <command>\n"
+        "\n"
+        "  Connection options carry the same names as the constructor arguments above:\n"
+        "  --bus N  --dev-addr 0xNN  --device-type I2C|USB  --com-device COMx\n"
+        "  --gencp-enable  --force-slave\n"
         "\n"
         "  read_reg32   <addr>              Read 32-bit integer\n"
         "  read_reg32f  <addr>              Read 32-bit float\n"
