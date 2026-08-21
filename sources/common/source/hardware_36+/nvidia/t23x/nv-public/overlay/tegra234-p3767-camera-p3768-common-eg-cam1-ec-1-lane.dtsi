@@ -69,7 +69,7 @@
 		#endif
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "20000000";
+         pix_clk_hz = "29629628";
 		};
 	};
 #endif
@@ -85,7 +85,7 @@
 		#endif
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "20000000";
+         pix_clk_hz = "29629628";
 		};
 	};
 	fragment@16 {
@@ -100,7 +100,7 @@
 		#endif
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "20000000";
+         pix_clk_hz = "29629628";
 		};
 	};
 #ifndef PRISTINE_KERNEL

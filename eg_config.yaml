@@ -679,13 +679,13 @@ cameras:
         modes:
           - pixel_format: "Y16"
             line_length: 640
-            pix_clk_hz: 20000000    # overridden by ec-1-lane overlay (DTSI has 100MHz)
+            pix_clk_hz: 29629628    # overridden by ec-1-lane overlay (DTSI has 100MHz)
           - pixel_format: "RGB888"
             line_length: 640
-            pix_clk_hz: 20000000    # overridden by ec-1-lane overlay
+            pix_clk_hz: 29629628    # overridden by ec-1-lane overlay
           - pixel_format: "YUYV"
             line_length: 640
-            pix_clk_hz: 20000000    # overridden by ec-1-lane overlay
+            pix_clk_hz: 29629628    # overridden by ec-1-lane overlay
 
   smartir640:
     name: "SmartIR640"

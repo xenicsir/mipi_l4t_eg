@@ -43,21 +43,21 @@
 		target-path = "/bus@0/i2c@c250000/eg_ec_e@16/mode0";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "20000000";
+         pix_clk_hz = "29629628";
 		};
 	};
 	fragment@5 {
 		target-path = "/bus@0/i2c@c250000/eg_ec_e@16/mode1";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "20000000";
+         pix_clk_hz = "29629628";
 		};
 	};
 	fragment@6 {
 		target-path = "/bus@0/i2c@c250000/eg_ec_e@16/mode2";
 		__overlay__ {
          num_lanes = "1";
-         pix_clk_hz = "20000000";
+         pix_clk_hz = "29629628";
 		};
 	};
 	fragment@7 {
