@@ -47,6 +47,15 @@
 
 #define ILUMOS_STR_MAX    256
 
+/*
+ * Every answer from the camera -- to a read as well as to a write -- starts
+ * with a 2-byte status word, little endian. Zero means the request was
+ * carried out; the error codes are the GenCP ones (0x8003 = address the
+ * camera does not implement, and so on).
+ */
+#define ILUMOS_STATUS_OK  0x0000
+#define ILUMOS_STATUS_BUSY   0xFFFF
+
 /* ---- ioctl interface (/dev/ilumos-<bus>-<addr>) ------------------------- */
 
 /**
@@ -203,20 +212,52 @@ static int ilumos_i2c_read_register(struct i2c_client *client, u32 reg, u8 *dst,
 
 static int ilumos_i2c_write_register(struct i2c_client *client, u32 reg, u32 val)
 {
-   struct i2c_msg msgs;
+   struct i2c_msg msgs[2];
    u8 tx_data[10];
+   u8 rx_data[2];
+   u16 status;
 
    *(u32 *)tx_data = cpu_to_le32(reg);
    *(u16 *)(tx_data + 4) = cpu_to_le16(4);
    *(u32 *)(tx_data + 6) = cpu_to_le32(val);
 
-   msgs.addr = client->addr;
-   msgs.flags = 0;
-   msgs.len = sizeof(tx_data);
-   msgs.buf = tx_data;
+   msgs[0].addr = client->addr;
+   msgs[0].flags = 0;
+   msgs[0].len = sizeof(tx_data);
+   msgs[0].buf = tx_data;
 
-   if (i2c_transfer(client->adapter, &msgs, 1) != 1)
+   /*
+    * Read the status back. It used to be left on the bus, so this function
+    * returned success whatever the camera made of the request: a write to the
+    * read-only width register and a write to an address the camera does not
+    * implement both reported success, while the *read* of that same address
+    * correctly failed.
+    *
+    * Fetched in the same combined transfer as the write, for two reasons
+    * measured on 35.6.0 (2026-08-31, iLumos 10-0030): the status is ready
+    * with no delay -- a separate immediate read already returns 0x8003 for a
+    * bad address, never 0xFFFF -- and a combined transfer cannot be split by
+    * another caller of this function, which matters because the chardev and
+    * the streaming path share it without a lock.
+    */
+   msgs[1].addr = client->addr;
+   msgs[1].flags = I2C_M_RD;
+   msgs[1].len = sizeof(rx_data);
+   msgs[1].buf = rx_data;
+
+   if (i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs)) != 2)
       return -EIO;
+
+   status = rx_data[0] | (rx_data[1] << 8);
+   if (status == ILUMOS_STATUS_BUSY)
+      return -EBUSY;
+
+   if (status != ILUMOS_STATUS_OK) {
+      dev_err_ratelimited(&client->dev,
+                          "write of 0x%08x to 0x%08x refused, status 0x%04x\n",
+                          val, reg, status);
+      return -EINVAL;
+   }
 
    return 0;
 }
