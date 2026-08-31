@@ -82,8 +82,9 @@ Firmware Upload (programmatic)
 
 Examples
 --------
-    # Read image width
-    width = cam.read_reg32(0x20001004)
+    # Read image width and height
+    width  = cam.read_reg32(0x20001000)
+    height = cam.read_reg32(0x20001004)
 
     # Read temperature
     temp = cam.read_reg32f(0x2f030)
@@ -105,14 +106,16 @@ Some Register Addresses
 -----------------------
     Address      Type    Description
     0x00000144   buffer  Serial number (64 bytes)
-    0x20001004   int     Image width
+    0x20001000   int     Image width
+    0x20001004   int     Image height
     0x00080118   int     Integration time (us)
     0x0002F004   float   GSK (Gain Signal Knee)
     0x0002F030   float   Temperature
 
 GenCP Status Codes
 ------------------
-When using GenCP protocol, operations return a status string:
+A failed read raises CameraError, quoting the status word below; a write
+returns it (0 = success). The same codes are used by both protocols:
 
     GENCP_SUCCESS           Operation successful
     GENCP_NOT_IMPLEMENTED   Feature not implemented
@@ -134,11 +137,12 @@ Complete Example
 
     # Read camera information
     serial = cam.read_buf(0x00000144, 64)[2:].decode('utf-8').rstrip('\\x00')
-    width = cam.read_reg32(0x20001004)
+    width  = cam.read_reg32(0x20001000)
+    height = cam.read_reg32(0x20001004)
     temp = cam.read_reg32f(0x2f030)
 
     print(f"Camera Serial: {serial}")
-    print(f"Image Width: {width}")
+    print(f"Image size: {width}x{height}")
     print(f"Temperature: {temp:.2f} C")
 
     # Configure camera
@@ -310,7 +314,7 @@ class dioneCtrl(object):
     whatever bytes came in, so a failed transfer was indistinguishable from a
     real value."""
     if status is None:
-      raise CameraError(f"{what}: GenCP transfer aborted")
+      raise CameraError(f"{what}: no answer from the camera")
     if status:
       name = next((k for k, v in GencpStatus.items() if v == status), None)
       raise CameraError(f"{what} failed with status 0x{status:04X}"
@@ -328,12 +332,21 @@ class dioneCtrl(object):
         self.write_device(bytearray(reg_addr.to_bytes(4, 'little'))
                           + bytearray(nbytes.to_bytes(2, 'little')))
         raw = self._poll_read(2 + nbytes)
-        status = struct.unpack_from('<H', raw)[0]
+        # The raw protocol has no error packet: on a refused read the CX3
+        # firmware NAKs the endpoint and sends nothing at all, so an empty or
+        # truncated answer *is* the error report.
+        status = struct.unpack_from('<H', raw)[0] if len(raw) >= 2 else None
         data = bytes(raw[2:])
     finally:
       self.close_device()
 
     self._check_status(status, f"read of 0x{reg_addr:08X}")
+    if len(data) != nbytes:
+      # A success status with the wrong byte count means the answer was cut
+      # short. Say so, rather than letting struct.unpack raise about a buffer
+      # length several frames away from the cause.
+      raise CameraError(f"read of 0x{reg_addr:08X}: got {len(data)} bytes, "
+                        f"expected {nbytes}")
     return bytes(data)
 
   def _write_raw(self, reg_addr, payload):
@@ -349,7 +362,8 @@ class dioneCtrl(object):
         self.write_device(bytearray(reg_addr.to_bytes(4, 'little'))
                           + bytearray(len(payload).to_bytes(2, 'little'))
                           + bytearray(payload))
-        status = struct.unpack_from('<H', self._poll_read(2))[0]
+        ack = self._poll_read(2)
+        status = struct.unpack_from('<H', ack)[0] if len(ack) >= 2 else None
     finally:
       self.close_device()
     return status
@@ -514,11 +528,11 @@ class dioneCtrl(object):
 
 
   def ReadGencpReg(self, write_device, read_device, Address, NumberOfByte):
-    MAX_RETRIES = 3
-    SERIAL_TIMEOUT = 300
-    NoRetries = 0
-    ErrFound = 'None'
+    """Return (status, data): the numeric GenCP status word -- 0 on success,
+    None if no usable answer came back -- and the payload bytes.
 
+    The status is a number, not a status name: the raw protocol returns one
+    too, and the callers must not have to tell the two apart."""
     DataToWrite_u16 = [0]*14
     DataToWrite_u16[0] = 0x0100 # Preamble
     DataToWrite_u16[3] = 0x0000 # Channel ID
@@ -554,36 +568,28 @@ class dioneCtrl(object):
     write_device.write(ByteArray)
 
     self.RequestId +=1
-    # get current time in ms
-    start = int(round(time.time() * 1000))
 
-    i = 0
+    # read() already blocks until the whole answer arrives or the port timeout
+    # expires; the busy-wait that used to sit here could not add a single byte.
     resp = read_device.read((NumberOfByte + 16))
-    while (((round(time.time() * 1000) - start) < SERIAL_TIMEOUT) and len(resp) < (NumberOfByte + 16)):
-      pass
 
-    Status = 'Error'
-    Data = b'\xFF'
+    # GenCP ack layout (16-byte prefix + CCD, then the payload):
+    #   0-1 preamble  2-3 CCD CRC  4-5 SCD CRC  6-7 channel id
+    #   8-9 status    10-11 cmd id  12-13 SCD length  14-15 request id
+    # On error the camera sets the SCD length to 0, so a bare 16-byte answer is
+    # a valid (failed) reply, not a truncated one.
+    if len(resp) not in (16, NumberOfByte + 16):
+      return None, b''
 
-    if(len(resp) == (NumberOfByte + 16) or len(resp) == 16):
-      for key,val in GencpStatus.items():
-        if val == ((resp[8] << 8) + resp[9]):
-          Status = key
-
-      if len(resp) == (NumberOfByte + 16):
-        for x in range(NumberOfByte):
-          Data = resp[16:(16+NumberOfByte)]
-      else:
-        Data = b'\x00'
+    Status = (resp[8] << 8) + resp[9]
+    Data = resp[16:(16 + NumberOfByte)] if len(resp) > 16 else b''
 
     return Status,Data
 
 
   def WriteGencpReg(self, write_device, read_device, Address, WrittenData):
-    MAX_RETRIES = 3
-    SERIAL_TIMEOUT = 300
-    NoRetries = 0
-    ErrFound = 'None'
+    """Return the numeric GenCP status word, 0 on success, None if no usable
+    answer came back. See ReadGencpReg for why it is a number."""
     Data = 0
 
     WrittenDataArray = WrittenData
@@ -642,22 +648,14 @@ class dioneCtrl(object):
     write_device.write(ByteArray)
 
     self.RequestId +=1
-    # get current time in ms
-    start = int(round(time.time() * 1000))
 
-    i = 0
     resp = read_device.read(16)
-    while (((round(time.time() * 1000) - start) < SERIAL_TIMEOUT) and len(resp) < 16):
-      pass
 
-    Status = 'Error'
+    # Same ack layout as in ReadGencpReg; a write ack carries no payload.
+    if len(resp) != 16:
+      return None
 
-    if(len(resp) == 16):
-      for key,val in GencpStatus.items():
-        if val == ((resp[8] << 8) + resp[9]):
-          Status = key
-
-    return Status
+    return (resp[8] << 8) + resp[9]
 
 
 if __name__ == "__main__":
