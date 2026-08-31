@@ -658,6 +658,27 @@ class dioneCtrl(object):
     return (resp[8] << 8) + resp[9]
 
 
+def hexdump(data, base_addr=0, width=16):
+  """Render <data> as address / hex / ASCII lines, hexdump -C style.
+
+  Most of what read_buf() returns is text -- firmware version strings, model
+  names, serial numbers -- padded with 0x00 or 0xFF. A bare run of hex bytes
+  hides that; the ASCII column makes it readable without decoding by hand.
+
+  base_addr is the register address of data[0], so the left column names where
+  each byte actually lives instead of numbering an offset into the answer."""
+  lines = []
+  for off in range(0, len(data), width):
+    chunk = data[off:off + width]
+    cells = [f'{b:02X}' for b in chunk] + ['  '] * (width - len(chunk))
+    # Gap in the middle of the row, and padded cells on a short last row, so
+    # the ASCII column stays aligned whatever the length read.
+    hexa = ' '.join(cells[:width // 2]) + '  ' + ' '.join(cells[width // 2:])
+    text = ''.join(chr(b) if 0x20 <= b < 0x7F else '.' for b in chunk)
+    lines.append(f'{base_addr + off:08X}  {hexa}  |{text}|')
+  return '\n'.join(lines)
+
+
 if __name__ == "__main__":
   import argparse
   import code
@@ -780,7 +801,7 @@ if __name__ == "__main__":
 
         elif args.command == 'read_buf':
           data = cam.read_buf(args.addr, args.length)
-          print(' '.join(f'{b:02X}' for b in data[2:]))   # skip 2-byte status header
+          print(hexdump(data[2:], args.addr))            # skip 2-byte status header
 
         elif args.command == 'read_string':
           data = cam.read_buf(args.addr, args.length)
@@ -793,6 +814,10 @@ if __name__ == "__main__":
     except PermissionError as e:
       fail(f'{e.filename}: permission denied -- run as root or join the i2c group.')
     except OSError as e:
+      # pyserial raises SerialException, a subclass of OSError, so a missing
+      # port used to be answered with I2C advice about --dev-addr.
+      if args.device_type == 'USB':
+        fail(f'{e.strerror or e} -- check --com-device.')
       fail(f'{e.strerror or e} -- check --dev-addr, and whether a kernel driver '
            f'already holds the address (--force-slave).')
 
