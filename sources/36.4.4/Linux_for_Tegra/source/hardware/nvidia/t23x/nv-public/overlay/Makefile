@@ -3,6 +3,18 @@
 
 DTC_FLAGS += -@
 
+# Propagate PRISTINE_KERNEL (exported by l4t_environment.sh from
+# vendors.<v>.pristine_kernel) to the device tree preprocessor.
+#
+# The overlays that react to it are shared by both Connect Tech build variants
+# and must NOT hardcode `#define PRISTINE_KERNEL`: on the pristine variant the
+# vendor's precompiled kernel cannot negotiate Y16, so those modes are dropped
+# and the remaining ones renumbered; on the source-built variant Y16 works and
+# the modes must stay as they are. Same .dts, two results, decided by the build.
+ifdef PRISTINE_KERNEL
+DTC_CPP_FLAGS += -DPRISTINE_KERNEL
+endif
+
 old-dtb := $(dtb-y)
 old-dtbo := $(dtbo-y)
 dtb-y :=
@@ -77,10 +89,15 @@ dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx219.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
+ifndef PRISTINE_KERNEL
+# ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
+# nvidia-oot camera framework, which can't be patched into a PRISTINE_KERNEL
+# vendor's precompiled tegra-camera.ko (see drivers/media/i2c/Makefile).
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
+endif
 dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
 dtbo-y += tegra234-p3767-camera-eg-cams-dione-cam0-lane-swap.dtbo
 
