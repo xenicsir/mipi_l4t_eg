@@ -20,6 +20,10 @@
 #   --build                     Run l4t_build.sh
 #   --gen-package               Run l4t_gen_delivery_package.sh
 #
+#   With no step given, all four run. The integration tests (test/run_all.sh)
+#   run afterwards when all four steps ran AND no version/vendor/SoM/carrier
+#   filter was given -- they check the whole matrix, so they need it all built.
+#
 # Execution Options:
 #   --from-scratch              Delete existing build directory before prepare
 #   --abort-on-error            Stop immediately on first error (default)
@@ -66,8 +70,6 @@ ARCHIVE_DIR_OPT=""
 DELIVERY_DIR_OPT=""
 NO_VERIFY_DTSI_OPT=""
 
-NO_ARGS=0
-[[ $# -eq 0 ]] && NO_ARGS=1
 
 DO_PREPARE=0
 DO_COPY_SOURCES=0
@@ -95,7 +97,10 @@ NC='\033[0m'
 # Help function
 #******************************************************************************
 show_help() {
-    head -42 "$0" | tail -n +2 | sed 's/^#//' | sed 's/^\*//g'
+    # Print the whole banner, not a hardcoded line count: "head -42" already cut
+    # the last examples off, and every line added to the header pushed more of it
+    # out of sight. Stop at the closing #**** instead.
+    sed -n '3,/^#\*\{10,\}$/p' "$0" | sed 's/^#//' | sed 's/^\*//g'
     echo ""
     echo "Supported configurations:"
     printf "  %-12s %-13s %-8s %s\n" "VERSION" "VENDOR" "SOM" "CARRIER"
@@ -619,9 +624,27 @@ else
 fi
 
 #******************************************************************************
-# Run integration tests (only in "do all" mode, after successful build)
+# Run integration tests, after a FULL successful build
+#
+# The tests are matrix-wide: P0 cross-checks eg_config.yaml against every build
+# output, P1 walks every (version, platform, camera, port) combination using the
+# DTBOs in the build trees, P2 runs the maintainer scripts of every built .deb.
+# They only make sense once everything has been built, hence the conditions
+# below: all four steps selected, and no filter narrowing the matrix.
+#
+# This used to test NO_ARGS -- literally "the command line was empty" -- which
+# is not the same thing as "do all". Any execution option was enough to skip the
+# tests while building exactly the same set: --from-scratch, -j, --delivery-dir,
+# --continue-on-error. Reported for --from-scratch, fixed for all of them.
 #******************************************************************************
-if [[ $NO_ARGS -eq 1 && $total_failed -eq 0 ]]; then
+run_tests=0
+if [[ $DO_PREPARE -eq 1 && $DO_COPY_SOURCES -eq 1 && $DO_BUILD -eq 1 \
+      && $DO_GEN_PACKAGE -eq 1 && -z "$VERSION_FILTER" && -z "$VENDOR_FILTER" \
+      && -z "$SOM_FILTER" && -z "$CARRIER_FILTER" ]]; then
+    run_tests=1
+fi
+
+if [[ $run_tests -eq 1 && $total_failed -eq 0 ]]; then
     echo ""
     echo "============================================"
     echo -e "${CYAN}Running integration tests...${NC}"
