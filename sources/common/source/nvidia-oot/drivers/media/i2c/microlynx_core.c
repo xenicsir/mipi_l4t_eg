@@ -6,6 +6,7 @@
  *
  */
 
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
 #include <linux/miscdevice.h>
@@ -146,6 +147,40 @@ struct microlynx {
    char                 miscdev_name[32];
 };
 
+/*
+ * How long to keep retrying the first I2C access while the camera boots.
+ *
+ * The camera needs more than a second after power-up before it answers. On the
+ * usual Jetson carriers its rails are wired to the board supply, so it has been
+ * running since t=0 and one attempt always suffices. On a carrier that switches
+ * camera power or reset it does not: a customer's board releases camera reset
+ * through an I2C GPIO expander at t=1.81 s and the driver probes ~40 ms later.
+ *
+ * The real figure depends on both the carrier and the camera, so it is a device
+ * tree property on the camera node rather than a constant:
+ *
+ *     exosens,probe-timeout-ms = <2000>;
+ *
+ * Absent, or 0 -> a single attempt, the behaviour before this existed. The
+ * default is deliberately "no retry": a device tree that says nothing about the
+ * timeout gets no silent boot delay, and the shipped device trees carry an
+ * explicit value. The first attempt is never delayed, so a carrier that powers
+ * the camera early pays nothing whatever the value.
+ */
+#define MICROLYNX_PROBE_TIMEOUT_MS_DEFAULT  0
+#define MICROLYNX_PROBE_RETRY_MS            200
+
+/* Attempts to make for a given timeout: always at least one. */
+static unsigned int microlynx_probe_attempts(struct device *dev)
+{
+   u32 ms = MICROLYNX_PROBE_TIMEOUT_MS_DEFAULT;
+
+   if (dev->of_node)
+      of_property_read_u32(dev->of_node, "exosens,probe-timeout-ms", &ms);
+
+   return ms / MICROLYNX_PROBE_RETRY_MS + 1;
+}
+
 static int microlynx_sensor_check(struct microlynx *priv)
 {
    struct device *dev = &priv->i2c_client->dev;
@@ -156,8 +191,29 @@ static int microlynx_sensor_check(struct microlynx *priv)
    /* INIT the gencp client */
    GENCPCLIENT_Init(&priv->io_handle);
 
+   /*
+    * First access to the camera: retry while it boots. See the budget above.
+    * A retry that was actually needed is reported, so a late power rail or a
+    * late reset stays visible instead of turning into a silent boot delay.
+    */
+   {
+      unsigned int attempts = microlynx_probe_attempts(dev);
+      unsigned int attempt;
+
+      for (attempt = 0; attempt < attempts; attempt++) {
+         status = GENCPCLIENT_ReadRegister(REG_MIPI_ENA_R, &read_data);
+         if (status == 0)
+            break;
+         if (attempt + 1 < attempts)   /* no wait after the last try */
+            msleep(MICROLYNX_PROBE_RETRY_MS);
+      }
+      if (status == 0 && attempt)
+         dev_warn(dev, "camera answered only after %u ms (%u retries) -- "
+                  "it was still booting when the driver probed\n",
+                  attempt * MICROLYNX_PROBE_RETRY_MS, attempt);
+   }
+
    /* FPGA test read - check if MIPI is enabled */
-   status = GENCPCLIENT_ReadRegister(REG_MIPI_ENA_R, &read_data);
    if (status == 0) {
       if (read_data == 0x1) {
          PRINT_INFO("MIPI is enabled, status = %#08x\n", read_data);

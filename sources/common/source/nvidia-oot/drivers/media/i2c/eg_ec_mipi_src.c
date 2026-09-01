@@ -7,6 +7,7 @@
  */
 
 //#define DEBUG
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
 #include <linux/of_device.h>
@@ -25,6 +26,40 @@
 #define ENGINECORE_REG_HEIGHT    0x0184
 #define ENGINECORE_REG_PIXEL_FORMAT 0x0260
 #define ENGINECORE_REG_FIRMWARE_VERSION   0x00A0
+
+/*
+ * How long to keep retrying the first I2C access while the camera boots.
+ *
+ * The camera needs more than a second after power-up before it answers. On the
+ * usual Jetson carriers its rails are wired to the board supply, so it has been
+ * running since t=0 and one attempt always suffices. On a carrier that switches
+ * camera power or reset it does not: a customer's board releases camera reset
+ * through an I2C GPIO expander at t=1.81 s and the driver probes ~40 ms later.
+ *
+ * The real figure depends on both the carrier and the camera, so it is a device
+ * tree property on the camera node rather than a constant:
+ *
+ *     exosens,probe-timeout-ms = <2000>;
+ *
+ * Absent, or 0 -> a single attempt, the behaviour before this existed. The
+ * default is deliberately "no retry": a device tree that says nothing about the
+ * timeout gets no silent boot delay, and the shipped device trees carry an
+ * explicit value. The first attempt is never delayed, so a carrier that powers
+ * the camera early pays nothing whatever the value.
+ */
+#define EG_EC_PROBE_TIMEOUT_MS_DEFAULT  0
+#define EG_EC_PROBE_RETRY_MS            200
+
+/* Attempts to make for a given timeout: always at least one. */
+static unsigned int eg_ec_probe_attempts(struct device *dev)
+{
+   u32 ms = EG_EC_PROBE_TIMEOUT_MS_DEFAULT;
+
+   if (dev->of_node)
+      of_property_read_u32(dev->of_node, "exosens,probe-timeout-ms", &ms);
+
+   return ms / EG_EC_PROBE_RETRY_MS + 1;
+}
 
 int eg_ec_chnod_open (struct inode * pInode, struct file * file);
 int eg_ec_chnod_release (struct inode * pInode, struct file * file);
@@ -775,12 +810,51 @@ static int eg_ec_mipi_probe(struct i2c_client *client,
             return err;
          }
 
-         // Try to communicate with the camera
-         err = eg_ec_mipi_read_reg(i2c_clients[i].i2c_client, ENGINECORE_REG_UPGRADE_MODE, (uint8_t*)&upgradeMode, sizeof(upgradeMode));
-         if (err)
+         /*
+          * Try to communicate with the camera, retrying while it boots.
+          *
+          * The camera needs more than a second after power-up before it
+          * answers I2C. On the usual Jetson carriers that never shows: the
+          * camera rails are wired to the board supply, so it has been running
+          * since t=0 and is long ready by the time this probe runs -- which is
+          * why a single attempt was enough here for years.
+          *
+          * On a carrier that switches camera power or reset, it is not. A
+          * customer's board releases camera reset through an I2C GPIO expander
+          * (tca6408) at t=1.81 s and this driver probes ~40 ms later: the first
+          * transfer cannot succeed, and without a retry the driver never binds.
+          *
+          * The wait is bounded and the first attempt is not delayed, so a
+          * carrier that powers the camera early pays nothing. When a retry was
+          * needed we say so with dev_warn rather than staying silent: a camera
+          * that takes a long time to answer is worth knowing about, and a mute
+          * retry loop would turn a genuine power or reset problem into an
+          * invisible boot delay.
+          */
          {
-            dev_err(dev, "Failed to communicate with the camera\n");
-            goto err_camera_register;
+            unsigned int attempts = eg_ec_probe_attempts(dev);
+            unsigned int attempt;
+
+            for (attempt = 0; ; attempt++)
+            {
+               err = eg_ec_mipi_read_reg(i2c_clients[i].i2c_client,
+                     ENGINECORE_REG_UPGRADE_MODE,
+                     (uint8_t*)&upgradeMode, sizeof(upgradeMode));
+               if (!err)
+                  break;
+               if (attempt + 1 >= attempts)
+               {
+                  dev_err(dev, "Failed to communicate with the camera after %u ms\n",
+                        attempt * EG_EC_PROBE_RETRY_MS);
+                  goto err_camera_register;
+               }
+               msleep(EG_EC_PROBE_RETRY_MS);
+            }
+
+            if (attempt)
+               dev_warn(dev, "camera answered only after %u ms (%u retries) -- "
+                     "it was still booting when the driver probed\n",
+                     attempt * EG_EC_PROBE_RETRY_MS, attempt);
          }
 
          break;

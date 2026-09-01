@@ -479,7 +479,36 @@ cp tegra234-p3767-camera-common-eg-cams-dione.dtsi \
 # - I2C bus numbers in cam_i2cmux
 # - GPIO assignments (reset, power-down, I2C MUX control)
 # - Clock configurations
+# - exosens,probe-timeout-ms (see below)
 ```
+
+**`exosens,probe-timeout-ms`** — how long the driver keeps retrying its first I2C
+access while the camera boots, in milliseconds, on each camera node. This one is
+worth a thought when porting, because the right value is a property of *your*
+board, not of the camera alone.
+
+A camera needs on the order of a second after power-up before it answers I2C. On
+a carrier whose camera rails are wired straight to the board supply, the camera
+has been running since power-on and is long ready by the time the driver probes:
+the first attempt succeeds and the timeout is never spent. On a carrier that
+switches camera power or releases camera reset late — through a GPIO expander,
+for instance — the driver can probe within tens of milliseconds of the camera
+waking up, and without this margin it never binds.
+
+```dts
+exosens,probe-timeout-ms = <2000>;   /* what the shipped device trees carry */
+exosens,probe-timeout-ms = <0>;      /* single attempt, no retry */
+```
+
+**Absent is the same as `<0>`: one attempt, no retry.** The driver default is
+deliberately "no wait", so a device tree that says nothing about the timeout
+cannot inflict a silent boot delay on anyone; the value that matters is the one
+written in the device tree. Our own device trees carry `<2000>`.
+
+The first attempt is never delayed, so raising the value costs nothing on a board
+that powers its cameras early — it only bounds how long a boot may be delayed on
+one that does not. `tools/verify_dtsi_structure.py` fails the build if a camera
+node is missing the property, since the omission is otherwise silent.
 
 2. **Per-camera overlay DTS files**: Copy existing overlays and adapt target-paths for the new hardware:
 

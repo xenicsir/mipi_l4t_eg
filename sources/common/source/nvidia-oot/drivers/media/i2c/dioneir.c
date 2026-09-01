@@ -1679,6 +1679,42 @@ error:
    return ret;
 }
 
+/*
+ * How long to keep retrying the first I2C access while the camera boots.
+ *
+ * The camera needs more than a second after power-up before it answers. On the
+ * usual Jetson carriers its rails are wired to the board supply, so it has been
+ * running since t=0 and one attempt always suffices. On a carrier that switches
+ * camera power or reset it does not: a customer's board releases camera reset
+ * through an I2C GPIO expander at t=1.81 s and the driver probes ~40 ms later.
+ *
+ * The real figure depends on both the carrier and the camera, so it is a device
+ * tree property on the camera node rather than a constant:
+ *
+ *     exosens,probe-timeout-ms = <2000>;
+ *
+ * Absent, or 0 -> a single attempt, the behaviour before this existed. The
+ * default is deliberately "no retry": a device tree that says nothing about the
+ * timeout gets no silent boot delay, and the shipped device trees carry an
+ * explicit value. The first attempt is never delayed, so a carrier that powers
+ * the camera early pays nothing whatever the value.
+ *
+ * Only the first of the two board_setup() passes waits -- see the loop.
+ */
+#define DIONE_IR_PROBE_TIMEOUT_MS_DEFAULT  0
+#define DIONE_IR_PROBE_RETRY_MS            200
+
+/* Attempts to make for a given timeout: always at least one. */
+static unsigned int dione_ir_probe_attempts(struct device *dev)
+{
+   u32 ms = DIONE_IR_PROBE_TIMEOUT_MS_DEFAULT;
+
+   if (dev->of_node)
+      of_property_read_u32(dev->of_node, "exosens,probe-timeout-ms", &ms);
+
+   return ms / DIONE_IR_PROBE_RETRY_MS + 1;
+}
+
 static int dione_ir_board_setup(struct dione_ir *priv)
 {
    struct camera_common_data *s_data = priv->s_data;
@@ -1704,10 +1740,41 @@ static int dione_ir_board_setup(struct dione_ir *priv)
 #ifdef DIONE_IR_STARTUP_TMO_MS
    priv->start_up = ktime_get();
 #endif
-   // Probe sensor model id registers
-   err = regmap_read(ctl_regmap, CHIPID, &reg_val);
-   if (err)
-      goto err_reg_probe;
+   /*
+    * Probe sensor model id registers -- first access to the camera, retried
+    * while it boots. See the budget above. A retry that was actually needed is
+    * reported, so a late power rail or a late reset stays visible instead of
+    * turning into a silent boot delay.
+    */
+   {
+      /*
+       * board_setup() is called twice by the caller: once per reset polarity,
+       * the second time with priv->reva set. Waiting the full budget in both
+       * would double it -- measured at 6 s with no camera attached. Only the
+       * first pass waits; by the time the reva fallback runs we already know
+       * nothing answers on this bus.
+       *
+       * Cost of that choice: a genuine revA board, whose first pass is
+       * expected to fail, now pays the budget once before the polarity is
+       * flipped. 2 s at probe, on that variant only.
+       */
+      unsigned int retries = priv->reva ? 1 : dione_ir_probe_attempts(dev);
+      unsigned int attempt;
+
+      for (attempt = 0; attempt < retries; attempt++) {
+         err = regmap_read(ctl_regmap, CHIPID, &reg_val);
+         if (!err)
+            break;
+         if (attempt + 1 < retries)
+            msleep(DIONE_IR_PROBE_RETRY_MS);
+      }
+      if (err)
+         goto err_reg_probe;
+      if (attempt)
+         dev_warn(dev, "camera answered only after %u ms (%u retries) -- "
+               "it was still booting when the driver probed\n",
+               attempt * DIONE_IR_PROBE_RETRY_MS, attempt);
+   }
 
    if ((reg_val & CHIPID_CHIPID_MASK) != 0x4400) {
       dev_err(dev, "%s: invalid tc35 chip-id: %#x\n",

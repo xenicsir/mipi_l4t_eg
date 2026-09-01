@@ -83,6 +83,14 @@
 				i2c@0 {
 					dione_ir_cam0: xenics_dione_ir_a@0e {
 						compatible = "xenics,dioneir", "exosens,dioneir";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						/* I2C device address */
 						reg = <0x0e>;
 						fpga-address = <0x5a 0x5b 0x5c 0x5d>;
@@ -380,6 +388,14 @@
 					};
 					eg_ec_cam0: eg_ec_a@16 {
 						compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						/* I2C device address */
 						reg = <0x16>;
 					status = "disabled";
@@ -585,6 +601,14 @@
 
 					ilumos_cam0: ilumos_a@30 {
 						compatible = "exosens,ilumos";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						/* I2C device address */
 						reg = <0x30>;
 						status = "disabled";
@@ -849,6 +873,14 @@
 
 					microlynx_cam0: microlynx_a@51 {
 						compatible = "exosens,microlynx";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						reg = <0x51>;
 						status = "disabled";
 						sensor_model = "microlynx";
@@ -908,6 +940,14 @@
 				i2c@1 {
 					dione_ir_cam1: xenics_dione_ir_c@0e {
 						compatible = "xenics,dioneir", "exosens,dioneir";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						reg = <0x0e>;
 						fpga-address = <0x5a 0x5b 0x5c 0x5d>;
 
@@ -1122,6 +1162,14 @@
 					};
 					eg_ec_cam1: eg_ec_c@16 {
 						compatible = "xenics,eg-ec-mipi", "exosens,eg-ec-mipi";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						reg = <0x16>;
 					status = "disabled";
 
@@ -1244,6 +1292,14 @@
 
 					ilumos_cam1: ilumos_c@30 {
 						compatible = "exosens,ilumos";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						/* I2C device address */
 						reg = <0x30>;
 						status = "disabled";
@@ -1508,6 +1564,14 @@
 
 					microlynx_cam1: microlynx_c@51 {
 						compatible = "exosens,microlynx";
+						/* Time allowed for the camera to boot before the driver
+						 * gives up on the first I2C access. Tune per board: a
+						 * carrier that switches camera power or reset probes
+						 * sooner after power-up than one wired to the board
+						 * supply. Absent or 0 = single attempt, which is what the
+						 * commented-out line below leaves in place. Uncomment and
+						 * adjust to give the camera time to boot on such a board. */
+						// exosens,probe-timeout-ms = <2000>;
 						reg = <0x51>;
 						status = "disabled";
 						sensor_model = "microlynx";

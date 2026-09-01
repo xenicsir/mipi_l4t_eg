@@ -11,6 +11,7 @@ For each DTSI platform defined in eg_config.yaml:
        discontinuous_clk, line_length, pix_clk_hz, active_w, active_h
   5. For EC cameras (MicroCube, SmartIR640, Crius1280):
        bus-width verification in the cam0 overlay DTS
+  6. Presence of exosens,probe-timeout-ms on every camera node
 
 Usage:
   python3 tools/verify_dtsi_structure.py          # from repo root
@@ -147,6 +148,37 @@ def resolve_conditionals(lines):
             continue
         out.append(line)
     return out
+
+
+PROBE_TIMEOUT_PROP = "exosens,probe-timeout-ms"
+
+
+def check_probe_timeout(lines, plat_key, errors):
+    """
+    Every camera node must carry exosens,probe-timeout-ms.
+
+    The driver falls back to its own default when the property is absent, so a
+    node that lacks it still works -- which is exactly why it needs checking:
+    the omission is silent, and the point of moving the value into the device
+    tree was to tune it per board. A camera node added for a new platform
+    without it would quietly inherit a timeout nobody chose.
+    """
+    LABEL_RE = re.compile(r'((?:dione_ir|eg_ec|ilumos|microlynx)_cam\d)\s*:')
+    MODE_RE  = re.compile(r'\bmode\d+\s*\{')
+
+    for i, line in enumerate(lines):
+        m = LABEL_RE.search(line)
+        if not m:
+            continue
+        end_node = find_block_end(lines, i)
+        # Look only at the node's own properties, before the first mode block.
+        end_props = end_node
+        for j in range(i, end_node + 1):
+            if MODE_RE.search(lines[j]):
+                end_props = j
+                break
+        if PROBE_TIMEOUT_PROP not in "".join(lines[i:end_props + 1]):
+            errors.append(f"[{plat_key}/{m.group(1)}] missing {PROBE_TIMEOUT_PROP}")
 
 
 def parse_sensor_nodes(lines):
@@ -371,6 +403,8 @@ def verify(quiet=False):
         bal = sum(l.count("{") - l.count("}") for l in lines)
         if bal != 0:
             errors.append(f"[{plat_key}] Brace imbalance: {bal:+d}")
+
+        check_probe_timeout(lines, plat_key, errors)
 
         nodes = parse_sensor_nodes(lines)
         platform_ids = plat.get("platform_ids", [])
