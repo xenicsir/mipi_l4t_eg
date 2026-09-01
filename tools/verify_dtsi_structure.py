@@ -232,13 +232,39 @@ def parse_overlay_bus_width(overlay_path):
     return int(matches[-1])
 
 
+_DEFINE_RE = re.compile(r'^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)[ \t]+("[^"]*")[ \t]*$', re.M)
+
+
+def _expand_first_defines(text):
+    """
+    Substitutes object-like `#define NAME "value"` macros, first definition
+    winning, and drops the directives.
+
+    The EC overlays name each mode by what it IS (EG_EC_640_RGB888...) instead
+    of by a number, because the number differs between a normal build and a
+    PRISTINE_KERNEL one. Each name is therefore defined four times -- {Hadron
+    DM, generic} x {normal, PRISTINE_KERNEL} -- and this parser models neither
+    macro. Keeping the FIRST definition reproduces exactly what it did before
+    the macros existed, when a fragment listed its target-path variants inline
+    and re.search took the first one: the normal, non-PRISTINE_KERNEL
+    numbering, which is what the shipped overlays are built with.
+    """
+    defines = {}
+    for m in _DEFINE_RE.finditer(text):
+        defines.setdefault(m.group(1), m.group(2))
+    text = _DEFINE_RE.sub("", text)
+    for name, value in defines.items():
+        text = re.sub(r'\b%s\b' % re.escape(name), value, text)
+    return text
+
+
 def parse_overlay_mode_overrides(overlay_path):
     """
     Returns dict: mode_idx (int) → dict of fields overridden in the overlay DTS.
     Possible fields: pix_clk_hz, num_lanes.
     Searches for fragments targeting .../modeN.
     """
-    text = _read_overlay_text(overlay_path)
+    text = _expand_first_defines(_read_overlay_text(overlay_path))
     result = {}
     for frag in re.finditer(r'fragment@\d+\s*\{(.*?)\n\s*\}', text, re.DOTALL):
         frag_text = frag.group(1)

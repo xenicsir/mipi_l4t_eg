@@ -14,6 +14,54 @@
 
 #include <dt-bindings/tegra234-p3767-0000-common.h>
 
+/*
+ * Mode paths vary on two INDEPENDENT axes, and they must stay independent:
+ *
+ *   - the I2C mux -- a real PCA9540 chip on Hadron DM, a GPIO-toggled
+ *     cam_i2cmux everywhere else (HADRON_DM_CAM_I2C_MUX);
+ *   - the mode numbering -- PRISTINE_KERNEL drops the two RAW16 modes,
+ *     which the vendor's precompiled kernel cannot negotiate, and shifts
+ *     the survivors down (see drivers/media/i2c/eg_ec_mipi_src.c and
+ *     tegra234-p3767-camera-common-eg-cams-dione.dtsi, which renumbers the
+ *     mode nodes themselves).
+ *
+ * They used to be nested, with the renumbering written only inside the
+ * Hadron DM branch. A PRISTINE_KERNEL build on any other carrier therefore
+ * kept targeting mode4/mode5 -- nodes that build does not define -- and put
+ * the wrong pixel clocks on the two modes that did exist. Naming each mode
+ * by what it IS, rather than by a number that means different things in
+ * different builds, is what keeps the two axes from re-entangling.
+ */
+#ifdef HADRON_DM_CAM_I2C_MUX
+#ifndef PRISTINE_KERNEL
+#define EG_EC_640_RAW16   "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode0"
+#define EG_EC_640_RGB888  "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode1"
+#define EG_EC_640_YUYV    "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode2"
+#define EG_EC_1280_RAW16  "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode3"
+#define EG_EC_1280_RGB888 "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode4"
+#define EG_EC_1280_YUYV   "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode5"
+#else
+#define EG_EC_640_RGB888  "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode0"
+#define EG_EC_640_YUYV    "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode1"
+#define EG_EC_1280_RGB888 "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode2"
+#define EG_EC_1280_YUYV   "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode3"
+#endif
+#else
+#ifndef PRISTINE_KERNEL
+#define EG_EC_640_RAW16   "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode0"
+#define EG_EC_640_RGB888  "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode1"
+#define EG_EC_640_YUYV    "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode2"
+#define EG_EC_1280_RAW16  "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode3"
+#define EG_EC_1280_RGB888 "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode4"
+#define EG_EC_1280_YUYV   "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode5"
+#else
+#define EG_EC_640_RGB888  "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode0"
+#define EG_EC_640_YUYV    "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode1"
+#define EG_EC_1280_RGB888 "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode2"
+#define EG_EC_1280_YUYV   "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode3"
+#endif
+#endif
+
 / {
 	#ifdef EG_CSI_22PIN
 	jetson-header-name = "Jetson 22pin CSI Connector";
@@ -62,11 +110,7 @@
 	};
 #ifndef PRISTINE_KERNEL
 	fragment@14 {
-		#ifdef HADRON_DM_CAM_I2C_MUX
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode0";
-		#else
-		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode0";
-		#endif
+		target-path = EG_EC_640_RAW16;
 		__overlay__ {
          num_lanes = "2";
          pix_clk_hz = "100000000";
@@ -74,30 +118,14 @@
 	};
 #endif
 	fragment@15 {
-		#ifdef HADRON_DM_CAM_I2C_MUX
-		#ifndef PRISTINE_KERNEL
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode1";
-		#else
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode0";
-		#endif
-		#else
-		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode1";
-		#endif
+		target-path = EG_EC_640_RGB888;
 		__overlay__ {
          num_lanes = "2";
          pix_clk_hz = "100000000";
 		};
 	};
 	fragment@16 {
-		#ifdef HADRON_DM_CAM_I2C_MUX
-		#ifndef PRISTINE_KERNEL
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode2";
-		#else
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode1";
-		#endif
-		#else
-		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode2";
-		#endif
+		target-path = EG_EC_640_YUYV;
 		__overlay__ {
          num_lanes = "2";
          pix_clk_hz = "100000000";
@@ -105,11 +133,7 @@
 	};
 #ifndef PRISTINE_KERNEL
 	fragment@17 {
-		#ifdef HADRON_DM_CAM_I2C_MUX
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode3";
-		#else
-		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode3";
-		#endif
+		target-path = EG_EC_1280_RAW16;
 		__overlay__ {
          num_lanes = "2";
          pix_clk_hz = "100000000";
@@ -117,30 +141,14 @@
 	};
 #endif
 	fragment@18 {
-		#ifdef HADRON_DM_CAM_I2C_MUX
-		#ifndef PRISTINE_KERNEL
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode4";
-		#else
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode2";
-		#endif
-		#else
-		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode4";
-		#endif
+		target-path = EG_EC_1280_RGB888;
 		__overlay__ {
          num_lanes = "2";
          pix_clk_hz = "133333336";
 		};
 	};
 	fragment@19 {
-		#ifdef HADRON_DM_CAM_I2C_MUX
-		#ifndef PRISTINE_KERNEL
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode5";
-		#else
-		target-path = "/bus@0/i2c@3180000/tca9540@70/i2c@1/eg_ec_c@16/mode3";
-		#endif
-		#else
-		target-path = "/bus@0/cam_i2cmux/i2c@1/eg_ec_c@16/mode5";
-		#endif
+		target-path = EG_EC_1280_YUYV;
 		__overlay__ {
          num_lanes = "2";
          pix_clk_hz = "100000000";
