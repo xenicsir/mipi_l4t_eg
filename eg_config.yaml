@@ -818,7 +818,6 @@ cameras:
 
   microlynx:
     name: "Microlynx"
-    enabled: false              # development on hold (2026-08-21)
     dt_node_label_prefix: "microlynx_cam"
     resolutions:
       - res: "1024x128"
