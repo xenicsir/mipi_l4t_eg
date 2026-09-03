@@ -59,6 +59,7 @@ sudo reboot
 - [Boot configuration and device trees](#boot-configuration-and-device-trees)
 - [Y14 pixel layout](#y14-pixel-layout)
 - [Choosing a pixel format](#choosing-a-pixel-format)
+- [Switching pixel format at runtime](#switching-pixel-format-at-runtime)
 
 **Part 2 — Building the drivers from source**
 
@@ -267,7 +268,8 @@ eg_dt_camera_config_get.sh
 
 This displays:
 - **Board:** The detected board, SoM and SoC
-- **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format
+- **Camera ports:** For each port, the camera model (from sysfs), connection status (color-coded), video device, I2C device, serial number, native resolution, and pixel format, followed by ready-to-paste streaming commands
+  - A camera whose pixel format can be **changed while it runs** gets one command block per format instead of a single `Pixel format:` line — see [Switching pixel format at runtime](#switching-pixel-format-at-runtime)
   - The **I2C device** is the character device used to send read/write commands to the camera's control registers (firmware updates, configuration, diagnostics)
 - **Total configured:** Number of configured cameras
 
@@ -275,21 +277,31 @@ This displays:
 ```
 === Exosens Camera Configuration ===
 
-Board: nvidia-devkit (orin-nx, t234)
+Driver package: jetson-l4t-35.6.0_forecr_eg 0~develop+ge0defe3
 
-Camera ports:
-  Port 0: SmartIR640 (connected)
-    Video device: /dev/video0
-    I2C device:   /dev/eg-ec-mipi-10-0016
-    Serial:       21456
-    Resolution:   640x480
-    Pixel format: 'Y16 ' (16-bit Greyscale)
-  Port 1: Dione 640 (connected)
+Board: dsboard-ornxs (orin-nx, t234)
+
+Camera ports configuration:
+
+═══════════════════════════════════════════════════════════════════════════
+  Port 0: Crius1280 (connected)
+═══════════════════════════════════════════════════════════════════════════
     Video device: /dev/video1
-    I2C device:   /dev/dioneir-i2c-9-000e-5a
-    Serial:       20823
-    Resolution:   640x480
+    I2C device:   /dev/eg-ec-mipi-9-0016
+    Sysfs:        /sys/bus/i2c/devices/9-0016
+    Serial:       21971
+    FW version:   1.19.5 (0)
+    Resolution:   1280x1024
     Pixel format: 'AR24' (32-bit BGRA 8-8-8-8)
+    Streaming (one command per line — triple-click to copy):
+# 1. Capture only, no display — check the stream is alive:
+v4l2-ctl -d /dev/video1 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="AR24"
+# 2. Live display + frame-rate/drop monitoring:
+rt_frame_monitor.py -d /dev/video1 --display
+# 3. Live display through GStreamer:
+gst-launch-1.0 -v v4l2src device=/dev/video1 ! "video/x-raw, format=(string)BGRA, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+
+  [second port omitted]
 
 Total configured: 2 camera(s)
 ```
@@ -443,6 +455,71 @@ draw — sometimes a lot. The **[camera format benchmark](tools/camera-format-be
 measures YUYV, Y16 and AR24 on an Orin NX (JetPack 6.2.1 / L4T 36.4.4), for display only,
 H.264 recording, and both at once. It gives per-scenario recommendations and the matching
 GStreamer command lines.
+
+---
+
+## Switching pixel format at runtime
+
+**Most cameras cannot.** On those, the pixel format is read once when the kernel module
+loads: `--set-fmt-video` has no effect on the camera, and changing format means reconfiguring
+the camera by other means and reloading the module. Some have a single format to begin with;
+on others a format change takes too long and requires restarting the camera.
+
+A camera that **can** switch says so in sysfs, and `eg_dt_camera_config_get.sh` then prints one
+ready-to-paste command block per format instead of a single `Pixel format:` line:
+
+```
+    Resolution:   1280x1024
+
+    ──── Format 'Y16 -BE' ──── (one command per line — triple-click to copy)
+# 1. Capture only, no display — check the stream is alive:
+v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="Y16 -BE"
+# 2. Live display + frame-rate/drop monitoring:
+rt_frame_monitor.py -d /dev/video0 --display --fmt Y16_BE
+# 3. Live display through GStreamer:
+gst-launch-1.0 -v v4l2src device=/dev/video0 ! "video/x-raw, format=(string)GRAY16_BE, width=1280, height=1024" ! videoconvert ! ximagesink sync=false
+
+    ──── Format 'Y14 ' ──── (one command per line — triple-click to copy)
+    Y14 layout:   14 bits right-aligned, high bits 0 — as V4L2 defines Y14
+# 1. Capture only, no display — check the stream is alive:
+v4l2-ctl -d /dev/video0 --stream-mmap --set-fmt-video=width=1280,height=1024,pixelformat="Y14 "
+# 2. Live display + frame-rate/drop monitoring:
+rt_frame_monitor.py -d /dev/video0 --display --fmt Y14
+```
+
+**The resolution never changes** — it is fixed by the camera model. Only the format moves.
+
+### When the change actually happens
+
+**At stream start, not at `--set-fmt-video`.** Between the two, `--get-fmt-video` reports the
+format you asked for while the camera is still in the previous one. This is normal, and it is
+how every Jetson camera driver behaves: the kernel applies the mode just before capture
+begins. It matters in one case only — reading the camera's format register directly, through
+its I2C character device, right after a `--set-fmt-video` shows the *old* value until you
+stream.
+
+The sysfs attributes take the two sides of this:
+
+| attribute | meaning |
+| --- | --- |
+| `pixel_format` | the format the camera **is in right now**, re-read from the camera |
+| `pixel_formats` | every format it **can be switched into**, one per line |
+
+`pixel_formats` exists only on a camera that can switch; its absence means the single format
+named by `pixel_format`. That is the reliable way to tell, in a script as well as by eye.
+
+If the camera refuses the format change, the stream fails to start and the reason is in
+`dmesg` — the driver never lets V4L2 believe in a format the camera did not accept.
+
+### Listing the formats
+
+Use `eg_dt_camera_config_get.sh`, as above.
+
+> ⚠️ **`v4l2-ctl --list-formats` is not the list of switchable formats.** It enumerates what
+> the device-tree mode nodes declare, which is a superset for every one of our cameras, and it
+> says nothing about whether the camera can be told to switch. A Crius1280 lists `Y16`, `AR24`,
+> `AB24` and `YUYV` across two resolutions — a cross product — while emitting only the one
+> format it was configured for. Filtering by resolution does not help.
 
 ---
 
@@ -820,7 +897,7 @@ This appendix provides a summary of the files involved. For detailed step-by-ste
 | config_get.sh | `sources/common/.../rootfs/usr/bin/eg_dt_camera_config_get.sh` | CAMERA_DATABASE entry |
 | postinst | `l4t_gen_delivery_package.sh` | Camera type normalization |
 
-The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
+The driver must expose sysfs attributes (`model`, `serial_number`, `resolution`, `pixel_format`) for `eg_dt_camera_config_get.sh`. A driver whose camera can switch pixel format at runtime adds `pixel_formats` (plural, one per line); its **absence** is what tells the script the camera has a single fixed format, so do not add it to a driver that cannot switch. The overlay-name must follow: `"Exosens Cameras. CAM<N>:<DisplayName>"`.
 
 ---
 

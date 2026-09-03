@@ -25,7 +25,11 @@
 #define REG_MODEL_NAME_R  0x00044
 #define REG_IMG_HEIGHT_R  0x50000004
 #define REG_IMG_WIDTH_R   0x50000000 
-#
+#define REG_PIXEL_FORMAT   0x50000008 
+
+#define PIXEL_FORMAT_MONO16 0x01100007u
+#define PIXEL_FORMAT_MONO14 0x01100025u
+
 /* Crosslink bridge register interface */
 #define REG_CROSSLINK_ADDR          0x50000C00
 #define REG_CROSSLINK_DATA          0x50000C04
@@ -42,8 +46,8 @@
 #define READ_CROSSLINK      0x1
 #define WRITE_CROSSLINK     0x0
 
-#define PIXEL_FORMAT_MONO16 0x2E
-#define PIXEL_FORMAT_MONO14 0x2D
+#define CROSSLINK_PIXEL_FORMAT_MONO16 0x2E
+#define CROSSLINK_PIXEL_FORMAT_MONO14 0x2D
 
 #define ILUMOS_STR_MAX    256
 
@@ -296,7 +300,7 @@ static int ilumos_i2c_write_register(struct i2c_client *client, u32 reg, u32 val
    return 0;
 }
 
-
+/*
 static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
                                               u32 reg, u32 *val)
 {
@@ -314,6 +318,7 @@ static int ilumos_i2c_read_crosslink_register(struct i2c_client *client,
    return ilumos_i2c_read_register(client, REG_CROSSLINK_DATA,
                                    (u8 *)val, sizeof(*val));
 }
+*/
 
 /*
 static int ilumos_i2c_write_crosslink_register(struct i2c_client *client, u32 reg, u32 val)
@@ -414,6 +419,107 @@ static const struct file_operations ilumos_cdev_fops = {
    .unlocked_ioctl = ilumos_cdev_ioctl,
 };
 
+/*
+ * Pixel format, as a GenICam PixelFormat value in REG_PIXEL_FORMAT.
+ *
+ * iLumos is the only camera we ship whose format can be switched while it is
+ * powered: the register is writable and the change takes effect on the next
+ * acquisition. Every other one needs the module reloaded, which is why they only
+ * ever read their format at probe. So here the format follows VIDIOC_S_FMT.
+ *
+ * The resolution does NOT follow: it is a property of the sensor, fixed per
+ * camera model. Only the format axis moves.
+ */
+static int ilumos_pixfmt_to_reg(u32 v4l2_pixfmt, u32 *reg)
+{
+   switch (v4l2_pixfmt) {
+   case V4L2_PIX_FMT_Y16_BE:
+   case V4L2_PIX_FMT_Y16:
+      *reg = PIXEL_FORMAT_MONO16;
+      return 0;
+   case V4L2_PIX_FMT_Y14:
+      *reg = PIXEL_FORMAT_MONO14;
+      return 0;
+   }
+
+   return -EINVAL;
+}
+
+static const char *ilumos_pixfmt_name(u32 reg)
+{
+   switch (reg) {
+   case PIXEL_FORMAT_MONO14:
+      return "'Y14 ' (14-bit Greyscale)";
+   case PIXEL_FORMAT_MONO16:
+      return "'Y16 -BE' (16-bit Greyscale Big Endian)";
+   }
+
+   return "unknown";
+}
+
+/*
+ * Bring the camera to the requested format and keep the driver's own view of it
+ * in sync: the sysfs pixel_format attribute, and the mode index the DT numbers
+ * from (0-2 RAW16, 3-5 RAW14, same three resolutions in the same order).
+ *
+ * Writing is skipped when the camera is already there, so a stream start that
+ * changes nothing costs one read and leaves the camera untouched.
+ */
+static int ilumos_apply_pixel_format(struct ilumos *priv, u32 want)
+{
+   struct device *dev = &priv->i2c_client->dev;
+   u32 current_fmt;
+   int mode;
+   int rc;
+
+   rc = ilumos_i2c_read_register(priv->i2c_client, REG_PIXEL_FORMAT,
+                                 (u8 *)&current_fmt, sizeof(current_fmt));
+   if (rc) {
+      dev_err(dev, "PIXEL_FORMAT read failed (%d)\n", rc);
+      return rc;
+   }
+
+   if (current_fmt != want) {
+      rc = ilumos_i2c_write_register(priv->i2c_client, REG_PIXEL_FORMAT, want);
+      if (rc) {
+         dev_err(dev, "camera refused PIXEL_FORMAT 0x%08x %s (%d)\n",
+                 want, ilumos_pixfmt_name(want), rc);
+         return rc;
+      }
+
+      /* Read back rather than trust the write: the status word says the camera
+       * accepted the transfer, not that it settled on the value we asked for. */
+      rc = ilumos_i2c_read_register(priv->i2c_client, REG_PIXEL_FORMAT,
+                                    (u8 *)&current_fmt, sizeof(current_fmt));
+      if (rc) {
+         dev_err(dev, "PIXEL_FORMAT read-back failed (%d)\n", rc);
+         return rc;
+      }
+      if (current_fmt != want) {
+         dev_err(dev, "PIXEL_FORMAT stayed at 0x%08x after writing 0x%08x\n",
+                 current_fmt, want);
+         return -EIO;
+      }
+
+      dev_info(dev, "PIXEL_FORMAT set to 0x%08x %s\n",
+               current_fmt, ilumos_pixfmt_name(current_fmt));
+   }
+
+   strncpy(priv->pixel_format, ilumos_pixfmt_name(current_fmt),
+           sizeof(priv->pixel_format) - 1);
+   priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
+
+   mode = ilumos_find_frmfmt(priv->native_width, priv->native_height);
+   if (mode >= 0) {
+      if (current_fmt == PIXEL_FORMAT_MONO14)
+         mode += 3;
+      priv->tc_dev->s_data->sensor_mode_id = mode;
+      priv->tc_dev->s_data->def_mode       = mode;
+   }
+
+   return 0;
+}
+
 static int ilumos_sensor_check(struct ilumos *priv)
 {
    struct device *dev = &priv->i2c_client->dev;
@@ -460,16 +566,17 @@ static int ilumos_sensor_check(struct ilumos *priv)
       goto error_exit;
    }
 
-   /* Pixel format via Crosslink */
-   if (ilumos_i2c_read_crosslink_register(priv->i2c_client,
-                                          REG_CROSSLINK_PIXEL_FORMAT,
-                                          &read_data) == 0) {
-      if (read_data == PIXEL_FORMAT_MONO14) {
+   /* Pixel format the camera is currently in. It is only a starting point now:
+    * VIDIOC_S_FMT can change it later, see ilumos_set_mode(). */
+   if (ilumos_i2c_read_register(priv->i2c_client, REG_PIXEL_FORMAT,
+                                (u8 *)&read_data, sizeof(read_data)) == 0) {
+      if (read_data == PIXEL_FORMAT_MONO14)
          is_raw14 = true;
-         dev_info(dev, "PIXEL_FORMAT = 0x%08x (RAW14)\n", read_data);
-      } else {
-         dev_info(dev, "PIXEL_FORMAT = 0x%08x (RAW16)\n", read_data);
-      }
+      else if (read_data != PIXEL_FORMAT_MONO16)
+         dev_warn(dev, "unknown PIXEL_FORMAT 0x%08x, assuming RAW16\n",
+                  read_data);
+      dev_info(dev, "PIXEL_FORMAT = 0x%08x %s\n", read_data,
+               ilumos_pixfmt_name(read_data));
    } else {
       dev_warn(dev, "PIXEL_FORMAT read failed, assuming RAW16\n");
    }
@@ -552,12 +659,10 @@ static int ilumos_sensor_check(struct ilumos *priv)
                   v4l2_pixfmt);
    }
 
-   if (is_raw14)
-      strncpy(priv->pixel_format, "'Y14 ' (14-bit Greyscale)",
-              sizeof(priv->pixel_format) - 1);
-   else
-      strncpy(priv->pixel_format, "'Y16 -BE' (16-bit Greyscale Big Endian)",
-              sizeof(priv->pixel_format) - 1);
+   strncpy(priv->pixel_format,
+           ilumos_pixfmt_name(is_raw14 ? PIXEL_FORMAT_MONO14
+                                       : PIXEL_FORMAT_MONO16),
+           sizeof(priv->pixel_format) - 1);
    priv->pixel_format[sizeof(priv->pixel_format) - 1] = '\0';
 
    dev_info(dev, "mode=%d  pixel_format=%s\n", mode, priv->pixel_format);
@@ -694,11 +799,41 @@ static struct camera_common_pdata *ilumos_parse_dt(
    return board_priv_pdata;
 }
 
+/*
+ * Called by tegracam at stream start, before start_streaming -- the same hook
+ * imx219 uses to push its mode register table. Everything but the pixel format
+ * is still configured out of band by a control application.
+ *
+ * The camera is stopped at this point, which is when it accepts a format change.
+ * That is also why the change lands here and not in VIDIOC_S_FMT: tegracam gives
+ * the sensor no callback on set_fmt, and its pad ops are a single static shared
+ * by every tegracam driver on the system.
+ *
+ * s_data->colorfmt is what V4L2 negotiated (camera_common_s_fmt() resolves it
+ * from the mbus code), so it is the request, not the camera's current state.
+ */
 static int ilumos_set_mode(struct tegracam_device *tc_dev)
 {
-   /* Configuration is done independently by a control application */
+   struct ilumos *priv = tegracam_get_privdata(tc_dev);
+   struct camera_common_data *s_data = tc_dev->s_data;
+   u32 want;
+
    dev_dbg(tc_dev->dev, "%s\n", __func__);
-   return 0;
+
+   if (!s_data->colorfmt)
+      return 0;
+
+   if (ilumos_pixfmt_to_reg(s_data->colorfmt->pix_fmt, &want)) {
+      /* Not reachable through V4L2: ENUM_FMT only offers what the DT modes
+       * declare, and those are Y16-BE and Y14. Leave the camera alone rather
+       * than guess. */
+      dev_warn(tc_dev->dev,
+               "no camera pixel format for V4L2 0x%08x, leaving it unchanged\n",
+               s_data->colorfmt->pix_fmt);
+      return 0;
+   }
+
+   return ilumos_apply_pixel_format(priv, want);
 }
 
 static int ilumos_start_streaming(struct tegracam_device *tc_dev)
@@ -788,6 +923,31 @@ static ssize_t pixel_format_show(struct device *dev,
    return scnprintf(buf, PAGE_SIZE, "%s\n", priv->pixel_format);
 }
 static DEVICE_ATTR_RO(pixel_format);
+
+/*
+ * Every pixel format this camera can be switched into without reloading the
+ * module, one per line, in the same "'FOURCC' (description)" shape as
+ * pixel_format -- of which this is the superset, and which keeps meaning "the
+ * one the camera is in right now".
+ *
+ * Only iLumos has this attribute. On the other cameras the format is fixed once
+ * the module is loaded, and its absence is what says so: a reader that finds no
+ * pixel_formats has exactly one choice, the one in pixel_format. That is why
+ * this is a separate attribute rather than a list inside pixel_format -- the
+ * existing meaning stays the same on all four drivers.
+ *
+ * It cannot be derived from v4l2-ctl --list-formats: that lists what the device
+ * tree modes declare, which is a superset (all our cameras declare several) and
+ * says nothing about whether the camera can be told to switch.
+ */
+static ssize_t pixel_formats_show(struct device *dev,
+      struct device_attribute *attr, char *buf)
+{
+   return scnprintf(buf, PAGE_SIZE, "%s\n%s\n",
+         ilumos_pixfmt_name(PIXEL_FORMAT_MONO16),
+         ilumos_pixfmt_name(PIXEL_FORMAT_MONO14));
+}
+static DEVICE_ATTR_RO(pixel_formats);
 
 static ssize_t firmware_version_show(struct device *dev,
       struct device_attribute *attr, char *buf)
@@ -882,6 +1042,7 @@ static int ilumos_probe(struct i2c_client *client,
    device_create_file(dev, &dev_attr_serial_number);
    device_create_file(dev, &dev_attr_resolution);
    device_create_file(dev, &dev_attr_pixel_format);
+   device_create_file(dev, &dev_attr_pixel_formats);
    device_create_file(dev, &dev_attr_firmware_version);
 
    /* Register chardev for userspace register access */
@@ -912,6 +1073,7 @@ static void ilumos_remove(struct i2c_client *client)
    misc_deregister(&priv->miscdev);
 
    device_remove_file(dev, &dev_attr_firmware_version);
+   device_remove_file(dev, &dev_attr_pixel_formats);
    device_remove_file(dev, &dev_attr_pixel_format);
    device_remove_file(dev, &dev_attr_resolution);
    device_remove_file(dev, &dev_attr_serial_number);

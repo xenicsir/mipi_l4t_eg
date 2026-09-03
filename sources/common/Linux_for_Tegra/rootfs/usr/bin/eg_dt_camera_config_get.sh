@@ -223,6 +223,11 @@ check_camera_connected() {
         # Read native resolution and pixel format from sysfs (preferred)
         camera_resolution[$port_num]=$(cat "$sysfs_path/resolution" 2>/dev/null | tr -d '\n')
         camera_pixfmt[$port_num]=$(cat "$sysfs_path/pixel_format" 2>/dev/null | tr -d '\n')
+        # Formats the camera can be switched into without reloading the module,
+        # one per line. Published only by drivers whose camera has more than one
+        # -- today iLumos alone. Absent means "the single format above", which is
+        # what every other camera reports, so their output is unchanged.
+        camera_pixfmts[$port_num]=$(cat "$sysfs_path/pixel_formats" 2>/dev/null)
 
         # Fallback to V4L2 for resolution and pixel format
         if [[ -z "${camera_resolution[$port_num]}" ]] || [[ -z "${camera_pixfmt[$port_num]}" ]]; then
@@ -570,6 +575,7 @@ declare -A camera_model
 declare -A camera_serial
 declare -A camera_fwver
 declare -A camera_resolution
+declare -A camera_pixfmts
 declare -A camera_pixfmt
 declare -A camera_sysfs_paths
 for port in $(echo "${!camera_configs[@]}" | tr ' ' '\n' | sort -n); do
@@ -673,12 +679,20 @@ else
             if [[ "$conn_status" == "connected" ]] && [[ -n "$model" ]]; then
                 display_name="$model"
             fi
+            # Two levels of rule, so the eye can tell them apart while
+            # scrolling: heavy for a camera port, light for a pixel format
+            # inside one. Without the port rule the format blocks of two
+            # cameras run into each other -- they are flush at column 0 and
+            # look alike, and the only thing separating them used to be a
+            # blank line.
             echo ""
+            echo "═══════════════════════════════════════════════════════════════════════════"
             if [[ "$conn_status" == "connected" ]]; then
                 echo "  Port $port: $display_name ("$'\033[32m'"$conn_status"$'\033[0m'")"
             else
                 echo "  Port $port: $display_name ("$'\033[31m'"$conn_status"$'\033[0m'")"
             fi
+            echo "═══════════════════════════════════════════════════════════════════════════"
             if [[ "$conn_status" == "connected" ]]; then
                 [[ -n "$video_dev" ]] && echo "    Video device: $video_dev"
                 [[ -n "$i2c_dev" ]] && echo "    I2C device:   $i2c_dev"
@@ -686,30 +700,61 @@ else
                 [[ -n "$serial" ]] && echo "    Serial:       $serial"
                 [[ -n "$fwver" ]] && echo "    FW version:   $fwver"
                 [[ -n "$resolution" ]] && echo "    Resolution:   $resolution"
-                [[ -n "$pixfmt" ]] && echo "    Pixel format: $pixfmt"
-                if [[ "$pixfmt" == "'Y14 '"* ]] && [[ -n "$sysfs_path" ]] && [[ -n "$resolution" ]]; then
-                    describe_y14_layout "$sysfs_path" "${resolution%%[x/]*}" "${resolution##*[x/]}"
+                # Which formats to show streaming commands for. A camera that
+                # publishes pixel_formats can be switched between them at will;
+                # one that does not has exactly the one format it reported, and
+                # changing it means reconfiguring the camera and reloading the
+                # module. So the list below is the driver's answer, not a guess.
+                #
+                # v4l2-ctl --list-formats cannot replace it: it enumerates what
+                # the device tree mode nodes declare, which is a superset for
+                # every one of our cameras -- a Crius1280 lists Y16, AR24, AB24
+                # and YUYV while being able to emit only the one it was
+                # configured for -- and it says nothing about switchability.
+                _fmt_list=()
+                if [[ -n "${camera_pixfmts[$port]}" ]]; then
+                    mapfile -t _fmt_list <<< "${camera_pixfmts[$port]}"
                 fi
-                if [[ -n "$video_dev" ]] && [[ -n "$resolution" ]] && [[ -n "$pixfmt" ]]; then
+                if [[ ${#_fmt_list[@]} -eq 0 ]] && [[ -n "$pixfmt" ]]; then
+                    _fmt_list=("$pixfmt")
+                fi
+                # One format is a fixed property of the camera, so it is listed
+                # here with model, serial and resolution. Several are not: which
+                # one the camera happens to be in right now is transient, the
+                # next stream start changes it, so naming it here would only
+                # invite the reader to trust a value that is about to be wrong.
+                # The per-format blocks below say it without that trap.
+                if [[ ${#_fmt_list[@]} -le 1 ]] && [[ -n "$pixfmt" ]]; then
+                    echo "    Pixel format: $pixfmt"
+                fi
+                if [[ -n "$video_dev" ]] && [[ -n "$resolution" ]] && [[ ${#_fmt_list[@]} -gt 0 ]]; then
                     _w="${resolution%%[x/]*}"
                     _h="${resolution##*[x/]}"
+                  for pixfmt in "${_fmt_list[@]}"; do
+                    [[ -z "$pixfmt" ]] && continue
                     # Extract fourcc code between the two single-quotes:
                     # sysfs gives "'Y16 ' (desc)" or "'Y16 -BE' (desc)", V4L2 gives "Y16"
                     _raw="${pixfmt#\'}"        # strip leading '
                     _code="${_raw%%\'*}"       # take everything up to next '
-                    _v4l2fmt="" ; _gstfmt=""
+                    # _rtfmt is rt_frame_monitor's own spelling of the format
+                    # (FORMAT_V4L2 in rt_frame_monitor.py): no space, and BE
+                    # written as a suffix. Passing it explicitly matters here --
+                    # without --fmt the tool reads whatever format the device is
+                    # currently in, which on a camera with several is whichever
+                    # one was streamed last, not the one this block is about.
+                    _v4l2fmt="" ; _gstfmt="" ; _rtfmt=""
                     case "$_code" in
                         # GStreamer has no GRAY14_LE (no 14-bit raw video format exists in
                         # GstVideoFormat, any version) — leave _gstfmt empty so only the
                         # v4l2-ctl command is shown. Spoofing GRAY16_LE while the camera is
                         # actually in Y14 corrupts the capture (mismatched DT pix_clk_hz
                         # between the Y14/Y16 modes) — see microlynx_y14_colorfmt_gstreamer.
-                        "Y14 "|"Y14") _v4l2fmt='"Y14 "' ;;
-                        "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ;;
-                        "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ;;
-                        "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ;;
-                        "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ;;
-                        "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ;;
+                        "Y14 "|"Y14") _v4l2fmt='"Y14 "' ; _rtfmt="Y14" ;;
+                        "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ; _rtfmt="Y16" ;;
+                        "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ; _rtfmt="Y16_BE" ;;
+                        "AR24")       _v4l2fmt='"AR24"'  ; _gstfmt="BGRA"      ; _rtfmt="AR24" ;;
+                        "AB24")       _v4l2fmt='"AB24"'  ; _gstfmt="RGBA"      ; _rtfmt="AB24" ;;
+                        "YUYV")       _v4l2fmt='"YUYV"'  ; _gstfmt="YUY2"      ; _rtfmt="YUYV" ;;
                     esac
                     if [[ -n "$_v4l2fmt" ]]; then
                         if [[ "$TEGRA_SOC" == "t210" ]] && [[ "$_gstfmt" == GRAY16* ]]; then
@@ -729,7 +774,25 @@ else
                             #    plus its command still pastes cleanly.
                             _cmdno=0
                             _caps="\"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\""
-                            echo "    Streaming (one command per line — triple-click to copy):"
+                            # With several formats the blocks must not run into
+                            # each other: the commands are flush at column 0 and
+                            # look alike, so a reader scrolling past can easily
+                            # copy the Y16 line believing it is the Y14 one. A
+                            # blank line and a ruled header per format is the
+                            # cheapest thing that makes the boundary obvious.
+                            if [[ ${#_fmt_list[@]} -gt 1 ]]; then
+                                echo ""
+                                echo "    ──── Format '$_code' ──── (one command per line — triple-click to copy)"
+                            else
+                                echo "    Streaming (one command per line — triple-click to copy):"
+                            fi
+                            # Under the header of the block it describes: this
+                            # line is about how Y14 samples sit in the 16-bit
+                            # word, so above a 'Y16 -BE' block it reads as if it
+                            # applied to that one.
+                            if [[ "$pixfmt" == "'Y14 '"* ]] && [[ -n "$sysfs_path" ]]; then
+                                describe_y14_layout "$sysfs_path" "$_w" "$_h"
+                            fi
                             _cmdno=$((_cmdno + 1))
                             echo "# $_cmdno. Capture only, no display — check the stream is alive:"
                             echo "v4l2-ctl -d $video_dev --stream-mmap --set-fmt-video=width=$_w,height=$_h,pixelformat=$_v4l2fmt"
@@ -737,7 +800,11 @@ else
                             # device's currently active pixel format and resolution itself.
                             _cmdno=$((_cmdno + 1))
                             echo "# $_cmdno. Live display + frame-rate/drop monitoring:"
-                            echo "rt_frame_monitor.py -d $video_dev --display"
+                            if [[ ${#_fmt_list[@]} -gt 1 ]] && [[ -n "$_rtfmt" ]]; then
+                                echo "rt_frame_monitor.py -d $video_dev --display --fmt $_rtfmt"
+                            else
+                                echo "rt_frame_monitor.py -d $video_dev --display"
+                            fi
                             if [[ -z "$_gstfmt" ]]; then
                                 echo "    Note: GStreamer has no 14-bit greyscale format — use command 1 or 2"
                                 echo "          above (rt_frame_monitor.py needs python3-opencv) to display Y14."
@@ -753,6 +820,7 @@ else
                             fi
                         fi
                     fi
+                  done
                 fi
             fi
         done
