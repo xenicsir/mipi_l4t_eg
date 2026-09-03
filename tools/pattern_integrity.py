@@ -155,7 +155,7 @@ def _median_ref(frames, h, w, chunk_rows=128):
     return ref
 
 
-def _ramp_compliance(ref, step):
+def _ramp_compliance(ref, step, bits=16):
     """Compare a frame against the ramp its generator is supposed to emit.
 
     Why this is NOT redundant with the median-reference check: the median
@@ -170,16 +170,52 @@ def _ramp_compliance(ref, step):
     because everything after it is shifted -- and that lost increment is itself
     one of the defects we want to see.
 
+    `bits` is the width of the values the generator actually emits. It is NOT
+    always the width of the format: measured on iLumos 2026-09-03 (Forecr,
+    35.6.0, FW 1.1.505), the Y14 pattern is the SAME 16-bit counter as Y16 with
+    its two low bits dropped -- Y14[c] == Y16[c-1] >> 2 held on 100.000 % of
+    20 frames. So every value comes out four times in a row and the line covers
+    320 distinct values, not 1280. Scored against a step-of-1 model that reads
+    as 75 % corruption on a perfectly healthy capture, which is exactly the
+    false negative this tool exists to avoid.
+
+    So the model is: a 16-bit counter incremented by `step` per pixel, of which
+    the top `bits` are emitted. repeat = 2**(16-bits) values in a row, values
+    wrapping at 2**bits. bits=16 reduces to the plain ramp.
+
+    The per-line start is fitted, so a whole-line offset -- the one-pixel delay
+    iLumos shows in Y14 -- is absorbed rather than reported as corruption. It is
+    a constant, harmless for integrity, and not what this check is looking for.
+
     Returns (expected_frame, per_line_start, per_line_bad).
     """
     h, w = ref.shape
     col = np.arange(w, dtype=np.int64)
+    repeat = 1 << (16 - bits)
+    modulo = 1 << bits
     exp = np.empty_like(ref)
     starts = np.empty(h, dtype=np.int64)
     for r in range(h):
-        cand = (ref[r].astype(np.int64) - step * col) % 65536
-        starts[r] = np.bincount(cand, minlength=65536).argmax()
-        exp[r] = ((starts[r] + step * col) % 65536).astype(np.uint16)
+        v = ref[r].astype(np.int64)
+        if repeat == 1:
+            starts[r] = np.bincount((v - step * col) % 65536,
+                                    minlength=65536).argmax()
+        else:
+            # v = ((s + step*col) // repeat) % modulo leaves `repeat` values of s
+            # consistent with each pixel, so the mode alone does not identify it.
+            # Score the repeat candidates and keep the best -- repeat is 2 or 4.
+            base = (v * repeat - step * col) % 65536
+            mode = int(np.bincount(base, minlength=65536).argmax())
+            best = -1
+            # Scan BOTH directions around the mode: a generator that is one
+            # pixel late -- which iLumos is in Y14 -- has a start of -1, i.e.
+            # 65535 once wrapped, and a forward-only scan never reaches it.
+            for j in range(-repeat + 1, repeat):
+                s = (mode + j) % 65536
+                hits = int(((((s + step * col) // repeat) % modulo) == v).sum())
+                if hits > best:
+                    best, starts[r] = hits, s
+        exp[r] = ((((starts[r] + step * col) // repeat) % modulo)).astype(np.uint16)
     return exp, starts, (ref != exp).sum(axis=1)
 
 
@@ -276,27 +312,49 @@ def cmd_analyse(a):
     # early return: a defect that is identical in every frame gives nbad==0.
     comp = None
     if a.expect == "ramp":
-        exp, starts, line_bad = _ramp_compliance(ref, a.expect_step)
+        exp, starts, line_bad = _ramp_compliance(ref, a.expect_step, a.ramp_bits)
+        repeat = 1 << (16 - a.ramp_bits)
         nc = int(line_bad.sum())
         d = np.diff(starts) % 65536
         dv, dc = np.unique(d, return_counts=True)
+        # A step-of-1 ramp must never repeat a value; a truncated one repeats
+        # each value `repeat` times BY CONSTRUCTION, so count only the excess.
         dup = int((np.diff(ref.astype(np.int64), axis=1) == 0).sum()) if a.expect_step else 0
-        comp = dict(n=nc, rate=100 * nc / ref.size, dup=dup,
+        dup_expected = (w - w // repeat) * h if repeat > 1 else 0
+        comp = dict(n=nc, rate=100 * nc / ref.size, dup=dup, repeat=repeat,
+                    dup_expected=dup_expected,
                     step_mode=int(dv[np.argmax(dc)]), expected_step=a.expect_step * w)
         p()
         p("-- 2bis. COMPLIANCE against the expected ramp " + "-" * 30)
-        p(f"model                        : value = line_start + {a.expect_step} x column")
+        if repeat > 1:
+            p(f"model                        : 16-bit counter, +{a.expect_step}/pixel, top "
+              f"{a.ramp_bits} bits emitted")
+            p(f"                               => each value repeated {repeat}x, wrap at "
+              f"{1 << a.ramp_bits}")
+        else:
+            p(f"model                        : value = line_start + {a.expect_step} x column")
         p(f"                               (line start inferred per line, robust to")
         p(f"                                up to ~50%% corruption inside the line)")
         p(f"pixels != expected           : {nc} / {ref.size}  ({comp['rate']:.4f} %)")
         p(f"lines not fully compliant    : {int((line_bad>0).sum())} / {h}")
+        if repeat > 1:
+            _bc = np.where(ref != exp)[1]
+            if len(_bc) and (_bc == 0).all():
+                p(f"  all in column 0            : the generator is one pixel late, so")
+                p(f"                               column 0 holds the tail of the previous")
+                p(f"                               line — a per-line model cannot express it.")
+                p(f"                               Expected residue, not corruption.")
         p(f"  per line                   : min={line_bad.min()} max={line_bad.max()} "
           f"mean={line_bad.mean():.1f}")
         ep, od = int((ref[:, 0::2] != exp[:, 0::2]).sum()), \
                  int((ref[:, 1::2] != exp[:, 1::2]).sum())
         p(f"  even / odd columns         : {ep} / {od}")
-        p(f"repeated pixels (step lost)  : {dup}   "
-          f"({dup/h:.2f} per line — a ramp must never repeat)")
+        if repeat > 1:
+            p(f"repeated pixels              : {dup}, expected {dup_expected} "
+              f"(each value comes out {repeat}x by construction)")
+        else:
+            p(f"repeated pixels (step lost)  : {dup}   "
+              f"({dup/h:.2f} per line — a ramp must never repeat)")
         p(f"line-to-line start step      : expected {comp['expected_step']}, "
           f"most common {comp['step_mode']}")
         p("  distribution               : " +
@@ -488,6 +546,13 @@ def main():
                          "the median reference) and the report says CLEAN.")
     an.add_argument("--expect-step", type=int, default=1, metavar="N",
                     help="ramp increment per pixel (default 1)")
+    an.add_argument("--ramp-bits", type=int, default=16, metavar="N",
+                    help="width of the values the generator emits, when it is a "
+                         "16-bit counter truncated to N bits. Use 14 for iLumos "
+                         "Y14: its pattern is the Y16 counter shifted right by 2, "
+                         "so each value repeats 4x. Leaving this at 16 on a Y14 "
+                         "capture reports ~75%% corruption on a healthy stream. "
+                         "(default 16, i.e. a plain ramp)")
     an.set_defaults(func=cmd_analyse)
 
     cp = sub.add_parser("compare", help="side-by-side summary of several reports")
