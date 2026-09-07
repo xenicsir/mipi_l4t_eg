@@ -1225,6 +1225,9 @@ def frame_to_gray(frame, fmt, width, height):
         if frame.ndim == 2 and frame.shape[0] == 1:
             # Flat buffer from MSMF: (1, H*W*2) uint8 → uint16 → (H, W)
             return frame.reshape(height * width * 2).view('<u2').reshape(height, width).astype(np.float32)
+        elif frame.ndim == 2 and frame.dtype == np.uint8 and frame.shape == (height, width * 2):
+            # MSMF Y16 raw bytes as (H, W*2) uint8 — reinterpret as uint16 LE
+            return np.ascontiguousarray(frame).view(np.uint16).astype(np.float32)
         elif frame.ndim == 2:
             return frame.astype(np.float32)
         elif frame.ndim == 3 and frame.shape[2] == 2:
@@ -1812,6 +1815,12 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                         # to_luma() but without the astype(float32) copy.
                         if frame.ndim == 3 and frame.shape[2] == 2:
                             _raw = frame.view(np.uint16).reshape(height, width)
+                        elif frame.ndim == 2 and frame.shape[0] == 1:
+                            # Flat buffer from MSMF: (1, H*W*2) uint8
+                            _raw = frame.reshape(height * width * 2).view(np.uint16).reshape(height, width)
+                        elif frame.ndim == 2 and frame.dtype == np.uint8 and frame.shape == (height, width * 2):
+                            # MSMF Y16 raw bytes as (H, W*2) uint8 — reinterpret as uint16 LE
+                            _raw = np.ascontiguousarray(frame).view(np.uint16)
                         else:
                             _raw = frame
                         _disp = cv2.normalize(_raw, None, 0, 255,
@@ -1861,6 +1870,18 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     return run_dir
 
 
+def _parse_device_arg(value):
+    value = value.strip()
+    if value.lstrip('-').isdigit():
+        n = int(value)
+        return n, f"/dev/video{n}"
+    if not value.startswith("/dev/"):
+        value = "/dev/" + value
+    m = re.search(r"(\d+)$", value)
+    n = int(m.group(1)) if m else 0
+    return n, value
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
@@ -1889,14 +1910,16 @@ if __name__ == "__main__":
                              "Y16_BE is Linux/MIPI-only (e.g. iLumos, which only offers GRAY16_BE to V4L2). "
                              "Omit (Linux only) to not force a format at all and use whatever the device "
                              "is currently set to.")
-    parser.add_argument("--device", "-d", default=run_cfg.device,
-                        help="V4L2 device path (Linux)")
-    parser.add_argument("--cam-index", "-c", type=int, default=run_cfg.cam_index,
-                        help="Camera index for MSMF (Windows)")
-    parser.add_argument("--width",  "-W", type=int, default=run_cfg.width,
-                        help="Frame width in pixels")
-    parser.add_argument("--height", "-H", type=int, default=run_cfg.height,
-                        help="Frame height in pixels")
+    _default_device = (run_cfg.device if platform.system() == "Linux"
+                       else str(run_cfg.cam_index))
+    parser.add_argument("--device", "-d", default=_default_device,
+                        help="Camera device: integer index (0, 1, …) expands to "
+                             "/dev/videoN on Linux or selects MSMF camera N on Windows. "
+                             "Full path (/dev/video0) or shorthand (video0) also accepted on Linux.")
+    parser.add_argument("--width",  "-W", type=int, default=None,
+                        help="Frame width in pixels (default: ask the device)")
+    parser.add_argument("--height", "-H", type=int, default=None,
+                        help="Frame height in pixels (default: ask the device)")
     parser.add_argument("--fps", type=int, default=run_cfg.target_fps,
                         help="Target capture frame rate")
     parser.add_argument("--num-frames", type=int, default=0,
@@ -1972,9 +1995,31 @@ if __name__ == "__main__":
 
     # ── Step 5: Apply CLI overrides onto run_cfg
     run_cfg.fmt                    = args.fmt
-    run_cfg.cam_index              = args.cam_index
-    run_cfg.device                 = args.device
+    run_cfg.cam_index, run_cfg.device = _parse_device_arg(args.device)
     run_cfg.target_fps             = args.fps
+    # Resolve the frame size from the device when the user did not ask for one.
+    #
+    # A hardcoded default is wrong on a fixed-resolution camera: asking a Dione
+    # 1280 for 640x480 was ACCEPTED by the V4L2 layer (the driver advertises
+    # every Dione model's resolution) and then failed at stream start, so this
+    # tool reported "Cannot stream" on every camera whose native size was not
+    # the default. Measured 2026-09-07. The device's current format is the
+    # driver's own default, i.e. the camera's real size, so ask it.
+    if args.width is None or args.height is None:
+        dev_w = dev_h = None
+        if os.name != "nt" and run_cfg.device:
+            try:
+                dev_w, dev_h, _ = _v4l2_get_fmt(run_cfg.device)
+            except Exception:
+                dev_w = dev_h = None
+        if args.width is None:
+            args.width = dev_w if dev_w else run_cfg.width
+        if args.height is None:
+            args.height = dev_h if dev_h else run_cfg.height
+        if dev_w:
+            log.info("%s: using the device's own %dx%d (no --width/--height given)",
+                     run_cfg.device, args.width, args.height)
+
     run_cfg.width                  = args.width
     run_cfg.height                 = args.height
     run_cfg.num_frames             = args.num_frames if args.num_frames > 0 else None
