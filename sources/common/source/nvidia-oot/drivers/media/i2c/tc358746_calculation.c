@@ -90,6 +90,27 @@ static const struct tc358746_mbus_fmt tc358746_formats[] = {
          .pdformat = DATAFMT_PDFMT_RGB888,
          .pdataf = CONFCTL_PDATAF_MODE0,
          .ppp = 1,
+   }, {
+      /*
+       * RAW14. Datasheet Table 4.3 gives the parallel pin usage as
+       * {10'b0, P[13:0]}, i.e. the 14 bits right-aligned on PD[13:0] --
+       * which is exactly where a Dione in pseudo-mono already puts them:
+       * its "blue" byte (PD[7:0]) carries Y2..Y9 and the low 6 bits of its
+       * "green" byte (PD[13:8]) carry Y10..Y15. So the bridge can pack this
+       * as RAW14 with no change on the camera side, and losslessly: the
+       * camera only ever emits 14 bits (Y0/Y1 never leave it -- measured,
+       * see memory note dione_mono_in_rgb_encoding).
+       *
+       * bpp drops 24 -> 14, so tc358746_calculate() re-derives the link
+       * frequency and the video buffer size from it. Check both in the
+       * DBG_TC358746 trace when bringing this up.
+       */
+      .code = MEDIA_BUS_FMT_Y14_1X14,
+         .bus_width = 14,
+         .bpp = 14,
+         .pdformat = DATAFMT_PDFMT_RAW14,
+         .pdataf = CONFCTL_PDATAF_MODE0,
+         .ppp = 1,
    },
 };
 

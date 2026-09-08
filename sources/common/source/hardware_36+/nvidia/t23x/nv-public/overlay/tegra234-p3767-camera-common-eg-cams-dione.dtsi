@@ -543,6 +543,206 @@
 								embedded_metadata_height = "0";
 							 };
 
+#ifndef PRISTINE_KERNEL
+/* Y14 needs the RAW14 entry our patches add to vi5_formats.h; a PRISTINE_KERNEL
+ * vendor runs the stock NVIDIA kernel, whose VI has no 14-bit greyscale format at
+ * all. Declaring these modes there would advertise something that can never
+ * stream. They sit LAST on purpose: dropping them leaves mode0..mode3 untouched,
+ * so no renumbering -- the trap that bit the eg_ec nodes (fixed in 321e732). */
+							 mode4 { /* DIONE_IR_MODE_640x480_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								lane_polarity = "6";
+								tegra_sinterface = SENSOR_CAM0_SERIAL;
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "640";
+								active_h = "480";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "694";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "20000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60020000"; /* 60.020 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+
+							 mode5 { /* DIONE_IR_MODE_1280x1024_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								lane_polarity = "6";
+								tegra_sinterface = SENSOR_CAM0_SERIAL;
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "1280";
+								active_h = "1024";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "1334";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "83000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+
+							 mode6 { /* DIONE_IR_MODE_320x240_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								lane_polarity = "6";
+								tegra_sinterface = SENSOR_CAM0_SERIAL;
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "320";
+								active_h = "240";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "1404";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "20000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60020000"; /* 60.020 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+
+							 mode7 { /* DIONE_IR_MODE_1024x768_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								lane_polarity = "6";
+								tegra_sinterface = SENSOR_CAM0_SERIAL;
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "1024";
+								active_h = "768";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "1079";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "83000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+#endif /* PRISTINE_KERNEL */
+
+
 							 ports {
 								#address-cells = <1>;
 								#size-cells = <0>;
@@ -2062,6 +2262,202 @@
 
 								embedded_metadata_height = "0";
 							 };
+
+#ifndef PRISTINE_KERNEL
+/* Y14 needs the RAW14 entry our patches add to vi5_formats.h; a PRISTINE_KERNEL
+ * vendor runs the stock NVIDIA kernel, whose VI has no 14-bit greyscale format at
+ * all. Declaring these modes there would advertise something that can never
+ * stream. They sit LAST on purpose: dropping them leaves mode0..mode3 untouched,
+ * so no renumbering -- the trap that bit the eg_ec nodes (fixed in 321e732). */
+							 mode4 { /* DIONE_IR_MODE_640x480_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								tegra_sinterface = "serial_c";
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "640";
+								active_h = "480";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "694";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "20000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60020000"; /* 60.020 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+
+							 mode5 { /* DIONE_IR_MODE_1280x1024_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								tegra_sinterface = "serial_c";
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "1280";
+								active_h = "1024";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "1334";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "83000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+
+							 mode6 { /* DIONE_IR_MODE_320x240_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								tegra_sinterface = "serial_c";
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "320";
+								active_h = "240";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "1404";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "20000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60020000"; /* 60.020 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+
+							 mode7 { /* DIONE_IR_MODE_1024x768_60FPS_Y14 */
+								mclk_khz = "24000";
+								num_lanes = "2";
+								tegra_sinterface = "serial_c";
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+
+								active_w = "1024";
+								active_h = "768";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								readout_orientation = "0";
+								line_length = "1079";
+								/* inherent_gain = "1"; */
+								/* mclk_multiplier = "9.33"; */
+								pix_clk_hz = "83000000";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+
+								embedded_metadata_height = "0";
+							 };
+#endif /* PRISTINE_KERNEL */
+
 
 							 ports {
 								#address-cells = <1>;

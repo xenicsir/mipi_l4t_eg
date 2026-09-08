@@ -675,6 +675,10 @@ cameras:
           - pixel_format: "RGB888"
             line_length: 694
             pix_clk_hz: 20000000
+
+          - pixel_format: "Y14"
+            line_length: 694
+            pix_clk_hz: 20000000
       - res: "1280x1024"
         active_w: 1280
         active_h: 1024
@@ -682,6 +686,10 @@ cameras:
         discontinuous_clk: "no"
         modes:
           - pixel_format: "RGB888"
+            line_length: 1334
+            pix_clk_hz: 83000000
+
+          - pixel_format: "Y14"
             line_length: 1334
             pix_clk_hz: 83000000
       - res: "320x240"
@@ -693,6 +701,10 @@ cameras:
           - pixel_format: "RGB888"
             line_length: 1404
             pix_clk_hz: 20000000
+
+          - pixel_format: "Y14"
+            line_length: 1404
+            pix_clk_hz: 20000000
       - res: "1024x768"
         active_w: 1024
         active_h: 768
@@ -700,6 +712,10 @@ cameras:
         discontinuous_clk: "no"
         modes:
           - pixel_format: "RGB888"
+            line_length: 1079
+            pix_clk_hz: 83000000
+
+          - pixel_format: "Y14"
             line_length: 1079
             pix_clk_hz: 83000000
 

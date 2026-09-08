@@ -1,7 +1,9 @@
 #!/bin/bash
 # Top-level test runner. Runs all 3 phases sequentially:
 #
-#   P0  Matrix coherence check (host)
+#   P0  Matrix coherence check (host), then the TC358746 C <-> Python
+#       equivalence: tc358746_configure.py (shipped to customers who do not
+#       run our driver) must compute exactly what tc358746_calculation.c does.
 #       Verifies eg_config.yaml ↔ hardware.yaml ↔ build outputs.
 #       Output: test/config/test_matrix.py --check
 #
@@ -34,6 +36,12 @@ echo "════════════════════════�
 echo "  P0 — Matrix coherence (eg_config.yaml ↔ hardware.yaml ↔ .debs)"
 echo "══════════════════════════════════════════════════════════════════════"
 python3 "$SCRIPT_DIR/config/test_matrix.py" --check
+
+echo ""
+echo "══════════════════════════════════════════════════════════════════════"
+echo "  TC358746 C ↔ Python equivalence"
+echo "══════════════════════════════════════════════════════════════════════"
+python3 "$SCRIPT_DIR/config/test_tc358746_equivalence.py"
 
 echo ""
 echo "══════════════════════════════════════════════════════════════════════"

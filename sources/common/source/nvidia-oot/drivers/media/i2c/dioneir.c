@@ -47,6 +47,10 @@
 #define EG_GPIO_CANSLEEP(g)	gpio_cansleep(g)
 #endif
 
+/* Bring-up aid: dumps every tc358746_calculate() input and result, plus each
+ * bridge register write. Uncomment when bringing up a new format or link rate --
+ * the link frequency and the video buffer size are both derived from bpp, and
+ * that trace is the only place they are visible. */
 //#define DBG_TC358746
 
 #define MAX_I2C_CLIENTS_NUMBER 128
@@ -59,16 +63,84 @@
 #define DIONE_IR_REG_ACQUISITION_STOP  0x00080104
 #define DIONE_IR_REG_ACQUISITION_SRC   0x00080108
 #define DIONE_IR_REG_ACQUISITION_STAT  0x0008010c
+#define DIONE_IR_REG_PIXEL_FORMAT      0x00080194
 
-// #define DIONE_IR_I2C_TMO_MS      5
+/*
+ * GenICam PixelFormat values the camera accepts. "Mono16" is a misnomer kept
+ * from the vendor documentation: the camera only ever emits 14 significant
+ * bits -- Y0 and Y1 never leave it, measured. See dione_mono_in_rgb_encoding.
+ */
+/* The two PixelFormat values the driver recognises. It never WRITES this
+ * register -- the user sets the camera's output format by other means
+ * (dioneCtrl.py) -- it only reads it once at probe to decide what to offer
+ * userspace. */
+#define DIONE_IR_PIXFMT_RGB8    0x02180014
+#define DIONE_IR_PIXFMT_MONO16  0x01100007
+
+
+
+/*
+ * Status 0xFFFF means "packet being processed" -- read the answer again.
+ *
+ * Documented in the Dione family manual ENG-2021-UMN008 **R013** (the R0010 we
+ * had before does not mention it): "While a request is being processed, the
+ * status field in the output buffer will read 0xFFFF. Only a single in-flight
+ * request at a time is supported. Sending a new request while the current
+ * request is still being processed will result in undefined behaviour."
+ *
+ * ⚠️ So the retry is a RE-READ, never a re-sent request. The manual's own
+ * example does exactly that: one write, then r6 answering 0xffff, then a second
+ * r6 answering 0x0000 plus the value.
+ *
+ * This driver used to issue the request and the answer as ONE combined I2C
+ * transfer (write, repeated START, read), which gives the camera no time at
+ * all. Older firmware tolerated it; the Dione 320 firmware
+ * FPGA 3.2.797 / ESW 18.255.72839-25 returns 0xFFFF, the status check rejected
+ * it, and detect_dione_ir() ended with "no fpga found" on a healthy camera.
+ *
+ * Measured on that camera 2026-09-08: one to two re-reads are always enough.
+ * dioneCtrl.py had already been taught to poll; the driver had not.
+ */
+#define DIONE_IR_STATUS_BUSY      0xFFFF
+
+/*
+ * ⚠️ WAIT before the first read. This is the whole fix; the polling below is
+ * only a safety net.
+ *
+ * Reading too early does not merely return 0xFFFF -- it POISONS the camera's
+ * output buffer, and no amount of re-reading recovers it. Measured on a
+ * Dione 320 (FPGA 3.2.797 / ESW 18.255.72839-25), 40 reads per strategy:
+ *
+ *   read immediately, poll every 2 ms   -> 17/40 failed, stuck after 250 polls
+ *   wait 2 ms, poll every 2 ms          ->  1/40 failed
+ *   wait 50 ms, poll every 50 ms        ->  0/40 failed, ZERO re-reads needed
+ *
+ * The stuck cases also produced a status of 0x00FF -- 0xFFFF shifted by a byte,
+ * i.e. the answer buffer read out of step. That is what an early read leaves
+ * behind.
+ *
+ * These are dioneCtrl.py's own values (POLL_INTERVAL / POLL_ATTEMPTS): that
+ * script sleeps POLL_INTERVAL *before* its first read, which is exactly why it
+ * never sees the problem while this driver did. Keep the two in step.
+ */
+#define DIONE_IR_READ_WAIT_US     50000
+#define DIONE_IR_READ_POLLS       10
+#define DIONE_IR_READ_TRIES       3
 // #define DIONE_IR_STARTUP_TMO_MS     1500
 // #define DIONE_IR_HAS_SYSFS_RESTART_MIPI
 
 #define CSI_HSTXVREGCNT       5
 
+/* Hand the bridge over to userspace. With this set, set_mode() computes and
+ * selects the device-tree mode as usual but writes NOTHING to the TC358746 --
+ * the caller must configure it beforehand, e.g. with tc358746_configure.py.
+ * Used to validate that standalone script against the driver end to end. */
+static int skip_bridge_cfg = 0;
+
 static int test_mode = 0;
 static int quick_mode = 1;
 static int link_frequency = 0;
+module_param(skip_bridge_cfg, int, 0644);
 module_param(test_mode, int, 0644);
 module_param(quick_mode, int, 0644);
 module_param(link_frequency, int, 0644);
@@ -76,11 +148,37 @@ module_param(link_frequency, int, 0644);
 int dione_ir_chnod_open (struct inode * pInode, struct file * file);
 int dione_ir_chnod_release (struct inode * pInode, struct file * file);
 
+/*
+ * Mode indices, in the order the device tree declares them. The RGB888 block
+ * must stay first: dione_ir_find_frmfmt() matches on resolution only and
+ * returns the first hit, which is what the probe stores as the detected
+ * variant.
+ *
+ * Y14 is the same sensor data carried differently: the camera's pseudo-mono
+ * output puts its 14 significant bits on the bridge's PD[13:0], which is
+ * exactly the RAW14 pin usage, so the bridge packs them as CSI-2 RAW14
+ * (dt 0x2D) instead of RGB888. See memory note dione_mono_in_rgb_encoding.
+ *
+ * Not declared on L4T 32.x platforms (Nano/t210, TX2/t186): their VI format
+ * tables have no 14-bit greyscale entry at all. eg_config.yaml's
+ * platform_restrictions carries that exclusion.
+ */
+/*
+ * Number of RGB888 modes, which is also the index of the first Y14 mode: the
+ * device tree declares the RGB888 modes first and the Y14 ones last, in this
+ * same order. Keep in step if a resolution is added.
+ */
+#define DIONE_IR_NUM_RGB888_MODES  4
+
 enum {
-   DIONE_IR_MODE_640x480_60FPS,
-   DIONE_IR_MODE_1280x1024_60FPS,
-   DIONE_IR_MODE_320x240_60FPS,
-   DIONE_IR_MODE_1024x768_60FPS,
+   DIONE_IR_MODE_640x480_60FPS_RGB888,
+   DIONE_IR_MODE_1280x1024_60FPS_RGB888,
+   DIONE_IR_MODE_320x240_60FPS_RGB888,
+   DIONE_IR_MODE_1024x768_60FPS_RGB888,
+   DIONE_IR_MODE_640x480_60FPS_Y14,
+   DIONE_IR_MODE_1280x1024_60FPS_Y14,
+   DIONE_IR_MODE_320x240_60FPS_Y14,
+   DIONE_IR_MODE_1024x768_60FPS_Y14,
 };
 struct dione_ir_i2c_client {
    struct i2c_client *i2c_client;
@@ -103,10 +201,14 @@ static const int dione_ir_60fps[] = {
  * device tree!
  */
 static const struct camera_common_frmfmt dione_ir_frmfmt[] = {
-   {{640, 480},   dione_ir_60fps, 1, 0, DIONE_IR_MODE_640x480_60FPS},
-   {{1280, 1024}, dione_ir_60fps, 1, 0, DIONE_IR_MODE_1280x1024_60FPS},
-   {{320, 240},   dione_ir_60fps, 1, 0, DIONE_IR_MODE_320x240_60FPS},
-   {{1024, 768},  dione_ir_60fps, 1, 0, DIONE_IR_MODE_1024x768_60FPS},
+   {{640, 480},   dione_ir_60fps, 1, 0, DIONE_IR_MODE_640x480_60FPS_RGB888},
+   {{1280, 1024}, dione_ir_60fps, 1, 0, DIONE_IR_MODE_1280x1024_60FPS_RGB888},
+   {{320, 240},   dione_ir_60fps, 1, 0, DIONE_IR_MODE_320x240_60FPS_RGB888},
+   {{1024, 768},  dione_ir_60fps, 1, 0, DIONE_IR_MODE_1024x768_60FPS_RGB888},
+   {{640, 480},   dione_ir_60fps, 1, 0, DIONE_IR_MODE_640x480_60FPS_Y14},
+   {{1280, 1024}, dione_ir_60fps, 1, 0, DIONE_IR_MODE_1280x1024_60FPS_Y14},
+   {{320, 240},   dione_ir_60fps, 1, 0, DIONE_IR_MODE_320x240_60FPS_Y14},
+   {{1024, 768},  dione_ir_60fps, 1, 0, DIONE_IR_MODE_1024x768_60FPS_Y14},
    /* Add modes with no device tree support after below */
 };
 
@@ -201,6 +303,7 @@ struct dione_ir {
 
    u32            *fpga_address;
    unsigned int         fpga_address_num;
+   u32            cam_pixfmt;        /* PixelFormat read once at probe */
 
    u64            *link_frequencies;
    unsigned int         link_frequencies_num;
@@ -974,16 +1077,80 @@ static int dione_ir_set_mode(struct tegracam_device *tc_dev)
    struct tc358746 params;
    int i, err;
 
-   if (s_data->mode != priv->mode)
+   if (s_data->mode != priv->mode) {
+      /* Should be unreachable now that only the camera's own resolution is
+       * advertised. Say so if it happens: refusing in silence here cost a
+       * whole debugging session, the caller only ever sees the framework's
+       * generic "Error writing mode". */
+      dev_err(tc_dev->dev,
+            "mode %d requested but this camera is mode %d (%ux%u) -- refusing\n",
+            s_data->mode, priv->mode, s_data->fmt_width, s_data->fmt_height);
       return -EINVAL;
+   }
 
-   sensor_mode = s_data->sensor_props.sensor_modes + s_data->mode_prop_idx;
+   /*
+    * Pick the device-tree mode node by resolution AND format, not by
+    * s_data->mode_prop_idx.
+    *
+    * mode_prop_idx comes from camera_common_try_fmt(), which matches on width
+    * and height only and breaks on the first hit. As soon as one resolution is
+    * declared in two formats -- RGB888 and RAW14 for the same sensor -- it
+    * always lands on the first of the two, so the format below would be the
+    * device tree's rather than the one V4L2 negotiated. Measured on an Orin
+    * Nano 2026-09-04: asking for AB24 while only a Y14 node existed at that
+    * resolution reported AB24 to userspace and still programmed the bridge for
+    * RAW14 (DATAFMT 0x80) -- silently wrong data, no error anywhere.
+    *
+    * s_data->colorfmt is what camera_common_s_fmt() resolved from the request,
+    * so it is the authority here. Match on the media-bus code: it is the one
+    * value both sides share -- the device tree gives a V4L2 fourcc that need
+    * not equal the requested one (an rgb888 node yields RGB24 while userspace
+    * asks for AB24/ABGR32), but both map to MEDIA_BUS_FMT_RGB888_1X24.
+    *
+    * Same reasoning, and the same trap, as vi5_pad0_en() on the VI side.
+    */
+   sensor_mode = NULL;
+   if (s_data->colorfmt) {
+      unsigned int m;
+
+      for (m = 0; m < s_data->sensor_props.num_modes; m++) {
+         const struct sensor_mode_properties *cand =
+               s_data->sensor_props.sensor_modes + m;
+         const struct camera_common_colorfmt *cand_fmt =
+               camera_common_find_pixelfmt(
+                     cand->image_properties.pixel_format);
+
+         if (cand_fmt && cand_fmt->code == s_data->colorfmt->code &&
+             cand->image_properties.width  == s_data->fmt_width &&
+             cand->image_properties.height == s_data->fmt_height) {
+            sensor_mode = cand;
+            break;
+         }
+      }
+   }
+
+   if (!sensor_mode) {
+      /* No node for this resolution/format pair. Fall back to the old
+       * behaviour rather than refuse: a device tree with a single format per
+       * resolution -- every shipped one today -- keeps working unchanged. */
+      sensor_mode = s_data->sensor_props.sensor_modes + s_data->mode_prop_idx;
+      dev_dbg(tc_dev->dev,
+              "no DT mode for %ux%u code 0x%04x, using mode_prop_idx %u\n",
+              s_data->fmt_width, s_data->fmt_height,
+              s_data->colorfmt ? s_data->colorfmt->code : 0,
+              s_data->mode_prop_idx);
+   }
+
    colorfmt = camera_common_find_pixelfmt(sensor_mode->image_properties.pixel_format);
 
    if (!colorfmt) {
       dev_err(tc_dev->dev, "unsupported pixelformat\n");
       return -EINVAL;
    }
+
+   dev_dbg(tc_dev->dev, "set_mode: %ux%u -> DT pixel_format 0x%08x, mbus 0x%04x\n",
+           s_data->fmt_width, s_data->fmt_height,
+           sensor_mode->image_properties.pixel_format, colorfmt->code);
 
    if (s_data->def_clk_freq != sensor_mode->signal_properties.mclk_freq * 1000) {
       dev_err(tc_dev->dev, "mclk_freq must be the same in every mode\n");
@@ -1072,6 +1239,13 @@ static int dione_ir_set_mode(struct tegracam_device *tc_dev)
    printk("tc358746_calculate params.vb_fifo = %d\n", params.vb_fifo);
 #endif
 
+
+   if (skip_bridge_cfg) {
+      dev_info_once(tc_dev->dev,
+            "skip_bridge_cfg=1: leaving the TC358746 alone, configure it "
+            "externally before starting the stream\n");
+      return 0;
+   }
 
    regmap_write(ctl_regmap, DBG_ACT_LINE_CNT, 0);
 #ifdef DBG_TC358746
@@ -1176,6 +1350,18 @@ static int dione_ir_stop_streaming(struct tegracam_device *tc_dev)
 
    if (!err)
    {
+      /*
+       * Both bits (0x3), RstMdl included.
+       *
+       * ⚠️ Datasheet Table 6.73 (p.102) says of RstMdl: "Do not set this bit to
+       * 1. Perform a hardware reset when a CSI TX block reset is necessary."
+       * TRIED on 2026-09-07: writing RstCnf alone (0x2), as the datasheet
+       * prescribes, and the link produced NO frames at all -- 0/18 captures,
+       * every tool, both formats. Restored to 0x3, which works.
+       *
+       * So the bit is required here in practice despite the warning. Do not
+       * "fix" this against the datasheet again without measuring.
+       */
       dione_ir_regmap_format_32_ble((void *)&bleVal, CSIRESET_RESET_CNF_MASK | CSIRESET_RESET_MODULE_MASK);
       err = regmap_write(tx_regmap, CSIRESET, bleVal);
 #ifdef DBG_TC358746
@@ -1211,157 +1397,88 @@ static struct camera_common_sensor_ops dione_ir_ops = {
    .stop_streaming = dione_ir_stop_streaming,
 };
 
-#ifdef DIONE_IR_I2C_TMO_MS
-static inline int i2c_transfer_one(struct i2c_client *client,
-      void *buf, size_t len, u16 flags)
-{
-   struct i2c_msg msgs;
-
-   msgs.addr = client->addr;
-   msgs.flags = flags;
-   msgs.len = len;
-   msgs.buf = buf;
-
-   return i2c_transfer(client->adapter, &msgs, 1);
-}
-
-static int dione_ir_i2c_read(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
-{
-   u8 tx_data[6];
-   u8 rx_data[72];
-   int ret = 0, tmo, retry;
-
-   if (len > sizeof(rx_data) - 2)
-      ret = -EINVAL;
-
-   if (!ret) {
-      *(u32 *)tx_data = cpu_to_le32(reg);
-      *(u16 *)(tx_data + 4) = cpu_to_le16(len);
-
-      retry = 4;
-      tmo = DIONE_IR_I2C_TMO_MS;
-      ret = -EIO;
-
-      while (retry-- > 0) {
-         if (i2c_transfer_one(client, tx_data, 6, 0) == 1) {
-            ret = 0;
-            break;
-         }
-         msleep(tmo);
-         tmo <<= 2;
-      }
-   }
-
-   if (!ret) {
-      retry = 4;
-      tmo = DIONE_IR_I2C_TMO_MS;
-      ret = -EIO;
-
-      msleep(2);
-      while (retry-- > 0) {
-         if (i2c_transfer_one(client,
-                  rx_data, len + 2, I2C_M_RD) == 1) {
-            ret = 0;
-            break;
-         }
-         msleep(tmo);
-         tmo <<= 2;
-      }
-   }
-
-   if (!ret) {
-      if (rx_data[0] != 0 || rx_data[1] != 0) {
-         ret = -EINVAL;
-      } else {
-         switch (len) {
-            case 1:
-               dst[0] = rx_data[2];
-               break;
-            case 2:
-               *(u16 *)dst = le16_to_cpu(*(u16 *)(rx_data + 2));
-               break;
-            case 4:
-               *(u32 *)dst = le32_to_cpu(*(u32 *)(rx_data + 2));
-               break;
-            default:
-               memcpy(dst, rx_data + 2, len);
-         }
-      }
-   }
-
-   return ret;
-}
-
-static int dione_ir_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
-{
-   int ret = -EIO, retry = 4, tmo = DIONE_IR_I2C_TMO_MS;
-   u8 tx_data[10];
-
-   *(u32 *)tx_data = cpu_to_le32(reg);
-   *(u16 *)(tx_data + 4) = cpu_to_le16(4);
-   *(u32 *)(tx_data + 6) = cpu_to_le32(val);
-
-   while (retry-- > 0) {
-      if (i2c_transfer_one(client, tx_data, sizeof(tx_data), 0) == 1) {
-         ret = 0;
-         break;
-      }
-      msleep(tmo);
-      tmo <<= 2;
-   }
-
-   return ret;
-}
-#else
 static int dione_ir_i2c_read(struct i2c_client *client, u32 reg, u8 *dst, u16 len)
 {
    struct i2c_msg msgs[2];
    u8 tx_data[6];
    u8 rx_data[72];
-   int ret = 0;
+   unsigned int attempt, try;
+   u16 status = DIONE_IR_STATUS_BUSY;
 
    if (len > sizeof(rx_data) - 2)
-      ret = -EINVAL;
+      return -EINVAL;
 
-   if (!ret) {
-      *(u32 *)tx_data = cpu_to_le32(reg);
-      *(u16 *)(tx_data + 4) = cpu_to_le16(len);
+   *(u32 *)tx_data = cpu_to_le32(reg);
+   *(u16 *)(tx_data + 4) = cpu_to_le16(len);
 
-      msgs[0].addr = client->addr;
-      msgs[0].flags = 0;
-      msgs[0].len = sizeof(tx_data);
-      msgs[0].buf = tx_data;
+   msgs[0].addr = client->addr;
+   msgs[0].flags = 0;
+   msgs[0].len = sizeof(tx_data);
+   msgs[0].buf = tx_data;
 
-      msgs[1].addr = client->addr;
-      msgs[1].flags = I2C_M_RD;
-      msgs[1].len = len + 2;
-      msgs[1].buf = rx_data;
+   msgs[1].addr = client->addr;
+   msgs[1].flags = I2C_M_RD;
+   msgs[1].len = len + 2;
+   msgs[1].buf = rx_data;
 
-      if (i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs)) != 2)
-         ret = -EIO;
-   }
+   for (try = 1; try <= DIONE_IR_READ_TRIES; try++) {
+      /* One request, and one only while it is in flight. */
+      if (i2c_transfer(client->adapter, &msgs[0], 1) != 1)
+         return -EIO;
 
-   if (!ret) {
-      if (rx_data[0] != 0 || rx_data[1] != 0) {
-         ret = -EINVAL;
-      } else {
-         switch (len) {
-            case 1:
-               dst[0] = rx_data[2];
-               break;
-            case 2:
-               *(u16 *)dst = le16_to_cpu(*(u16 *)(rx_data + 2));
-               break;
-            case 4:
-               *(u32 *)dst = le32_to_cpu(*(u32 *)(rx_data + 2));
-               break;
-            default:
-               memcpy(dst, rx_data + 2, len);
-         }
+      /* Let the camera prepare the answer before touching the buffer. */
+      usleep_range(DIONE_IR_READ_WAIT_US, 2 * DIONE_IR_READ_WAIT_US);
+
+      for (attempt = 1; attempt <= DIONE_IR_READ_POLLS; attempt++) {
+         if (i2c_transfer(client->adapter, &msgs[1], 1) != 1)
+            return -EIO;
+
+         status = le16_to_cpu(*(u16 *)rx_data);
+         if (status != DIONE_IR_STATUS_BUSY)
+            break;
+
+         usleep_range(DIONE_IR_READ_WAIT_US, 2 * DIONE_IR_READ_WAIT_US);
       }
+
+      if (status == 0)
+         break;
+
+      /*
+       * A status other than 0xFFFF means the request COMPLETED, with an error.
+       * Nothing is in flight any more, so re-sending it is allowed -- the
+       * manual only forbids a second request while one is still processing.
+       * Worth doing: this read is intermittently refused right after the three
+       * 32-byte string reads of detect_dione_ir(), and succeeds on a retry
+       * (measured on a Dione 320, 2026-09-08).
+       */
+      if (status == DIONE_IR_STATUS_BUSY)
+         break;                  /* still busy after all the polls: give up */
+
+      dev_dbg(&client->dev, "reg %#010x: status %#06x, retrying\n", reg, status);
+      usleep_range(DIONE_IR_READ_WAIT_US, 2 * DIONE_IR_READ_WAIT_US);
    }
 
-   return ret;
+   if (status != 0) {
+      dev_warn(&client->dev, "reg %#010x: status %#06x after %u try/tries\n",
+            reg, status, try > DIONE_IR_READ_TRIES ? DIONE_IR_READ_TRIES : try);
+      return status == DIONE_IR_STATUS_BUSY ? -ETIMEDOUT : -EINVAL;
+   }
+
+   switch (len) {
+   case 1:
+      dst[0] = rx_data[2];
+      break;
+   case 2:
+      *(u16 *)dst = le16_to_cpu(*(u16 *)(rx_data + 2));
+      break;
+   case 4:
+      *(u32 *)dst = le32_to_cpu(*(u32 *)(rx_data + 2));
+      break;
+   default:
+      memcpy(dst, rx_data + 2, len);
+   }
+
+   return 0;
 }
 
 static int dione_ir_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
@@ -1383,7 +1500,6 @@ static int dione_ir_i2c_write32(struct i2c_client *client, u32 reg, u32 val)
 
    return 0;
 }
-#endif
 
 static ssize_t dione_ir_chnod_read(
       struct file *file_ptr
@@ -1642,6 +1758,25 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
          priv->serial_number[i] = '\0';
    }
 
+   /*
+    * Read the camera's output pixel format ONCE, here, while the camera's I2C
+    * client still exists (probe releases it right after, so that dioneCtrl.py
+    * can claim the address with a plain I2C_SLAVE ioctl).
+    *
+    * The driver never writes this register: the user selects the camera's
+    * output format by other means. What the driver does is adapt to it --
+    * dione_ir_probe() offers userspace only the formats that the current
+    * camera state can actually produce. See the truncation there.
+    */
+   priv->cam_pixfmt = 0;
+   ret = dione_ir_i2c_read(priv->fpga_client, DIONE_IR_REG_PIXEL_FORMAT,
+         (u8 *)&priv->cam_pixfmt, sizeof(priv->cam_pixfmt));
+   if (ret < 0) {
+      priv->cam_pixfmt = 0;
+      dev_warn(dev, "failed to read PixelFormat (%d), assuming RGB888 only\n",
+            ret);
+   }
+
    if (priv->fpga_found)
    {
       // Find the first i2c client available
@@ -1663,8 +1798,12 @@ static int detect_dione_ir(struct dione_ir *priv, u32 fpga_addr)
          }
       }
    }
-   dev_info(dev, "dione-ir %ux%u at address %#02x, firmware: %s, model: %s, serial: %s\n",
-         width, height, fpga_addr, buf,
+   dev_info(dev, "dione-ir %ux%u at address %#02x, PixelFormat 0x%08x (%s), "
+         "firmware: %s, model: %s, serial: %s\n",
+         width, height, fpga_addr, priv->cam_pixfmt,
+         priv->cam_pixfmt == DIONE_IR_PIXFMT_MONO16 ? "pseudo-mono" :
+         priv->cam_pixfmt == DIONE_IR_PIXFMT_RGB8 ? "colour" : "unknown",
+         buf,
          priv->model[0] ? priv->model : "N/A",
          priv->serial_number[0] ? priv->serial_number : "N/A");
 
@@ -1904,6 +2043,39 @@ static struct tegracam_device *dione_ir_probe_sensor(struct dione_ir *priv)
          dev_err(dev, "dione_ir_board_setup error: %d\n", err);
    }
 
+   /* After board_setup: detect_dione_ir() has read the camera's PixelFormat by
+    * now, which is what the decision below needs. */
+   if (!err) {
+      /*
+       * Offer userspace only the formats the camera can actually produce
+       * right now.
+       *
+       * The parallel bus carries RGB888 either way; what changes is what the
+       * camera puts in it. In colour mode the three bytes are a palette
+       * rendering, and reading them as RAW14 would yield nonsense -- so Y14
+       * must not even be advertised. In pseudo-mono mode the 14-bit value sits
+       * in the low two bytes, and BOTH readings are legitimate: Y14 (the
+       * bridge packs PD[13:0]) and RGB888 (the established mono-in-RGB
+       * workflow, where userspace recombines the bytes).
+       *
+       * ENUM_FMT does not come from frmfmt_table: find_matching_color_fmt()
+       * in camera_common.c walks sensor_props.num_modes, i.e. the device-tree
+       * modes. The Y14 modes are declared LAST in every Dione DT node -- for
+       * the PRISTINE_KERNEL guard -- so dropping the count to the RGB888 half
+       * hides them with no renumbering and nothing else to touch. Both are
+       * per-instance copies made by tegracam_device_register(), so two Dione
+       * cameras in different states each get the right list.
+       */
+      if (tc_dev->s_data->sensor_props.num_modes >
+                  DIONE_IR_NUM_RGB888_MODES &&
+            priv->cam_pixfmt != DIONE_IR_PIXFMT_MONO16) {
+         dev_info(dev, "camera is not in pseudo-mono: offering RGB888 only "
+               "(%u of %u DT modes)\n", DIONE_IR_NUM_RGB888_MODES,
+               tc_dev->s_data->sensor_props.num_modes);
+         tc_dev->s_data->sensor_props.num_modes = DIONE_IR_NUM_RGB888_MODES;
+      }
+   }
+
    if (err) {
       if (tc_dev)
          tegracam_device_unregister(tc_dev);
@@ -1952,6 +2124,15 @@ static DEVICE_ATTR_RO(resolution);
 static ssize_t pixel_format_show(struct device *dev,
       struct device_attribute *attr, char *buf)
 {
+   struct camera_common_data *s_data = to_camera_common_data(dev);
+
+   /* Follow what V4L2 actually negotiated rather than assuming RGB888: with a
+    * RAW14 device-tree mode the bridge packs the camera's 14 bits as CSI-2
+    * RAW14 (dt 0x2D) and the fourcc is Y14, not a 32-bit RGB one. */
+   if (s_data && s_data->colorfmt &&
+       s_data->colorfmt->pix_fmt == V4L2_PIX_FMT_Y14)
+      return scnprintf(buf, PAGE_SIZE, "'Y14 ' (14-bit Greyscale)\n");
+
    /* Dione always transmits RGB888 over CSI-2 (see tc358746_calculation.c) —
     * what varies is which V4L2 fourcc gets used to report it: AB24 on L4T
     * versions where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
@@ -1967,6 +2148,43 @@ static ssize_t pixel_format_show(struct device *dev,
 #endif
 }
 static DEVICE_ATTR_RO(pixel_format);
+
+/*
+ * Every pixel format this camera can be switched into without reloading the
+ * module, one per line, in the same shape as pixel_format -- of which this is
+ * the superset, pixel_format still meaning "the one it is in right now".
+ *
+ * Published only where the device tree actually declares a Y14 mode: on L4T
+ * 32.x platforms it does not (no 14-bit greyscale in their VI format tables),
+ * and a reader that finds no pixel_formats correctly concludes the camera has
+ * a single fixed format. Same contract as ilumos.c.
+ */
+static ssize_t pixel_formats_show(struct device *dev,
+      struct device_attribute *attr, char *buf)
+{
+   struct camera_common_data *s_data = to_camera_common_data(dev);
+   unsigned int m;
+   bool has_y14 = false;
+
+   for (m = 0; s_data && m < s_data->sensor_props.num_modes; m++)
+      if (s_data->sensor_props.sensor_modes[m].image_properties.pixel_format
+            == V4L2_PIX_FMT_Y14) {
+         has_y14 = true;
+         break;
+      }
+
+   if (!has_y14)
+      return 0;
+
+#ifdef EG_RGB888_AB24
+   return scnprintf(buf, PAGE_SIZE, "%s\n%s\n",
+         "'AB24' (32-bit RGBA 8-8-8-8)", "'Y14 ' (14-bit Greyscale)");
+#else
+   return scnprintf(buf, PAGE_SIZE, "%s\n%s\n",
+         "'AR24' (32-bit BGRA 8-8-8-8)", "'Y14 ' (14-bit Greyscale)");
+#endif
+}
+static DEVICE_ATTR_RO(pixel_formats);
 
 static ssize_t firmware_version_show(struct device *dev,
       struct device_attribute *attr, char *buf)
@@ -2074,6 +2292,11 @@ static int dione_ir_probe(struct i2c_client *client,
 
    dev_dbg(dev, "probing v4l2 sensor at addr %#02x\n", client->addr);
 
+   /* Hiding the Y14 modes assumes they come after the RGB888 ones and that the
+    * count is right. Break the build rather than mis-truncate if a resolution
+    * is ever added without updating the constant. */
+   BUILD_BUG_ON(DIONE_IR_MODE_640x480_60FPS_Y14 != DIONE_IR_NUM_RGB888_MODES);
+
    if (!IS_ENABLED(CONFIG_OF) || !dev->of_node)
       return -EINVAL;
 
@@ -2123,6 +2346,28 @@ static int dione_ir_probe(struct i2c_client *client,
             dione_ir_frmfmt[priv->mode].size.width;
       tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
             dione_ir_frmfmt[priv->mode].size.height;
+
+      /*
+       * ⚠️ This camera's resolution is the only one it can produce, but we
+       * CANNOT restrict what is advertised by trimming s_data->frmfmt /
+       * numfmts. Tried on 2026-09-07: streaming stopped completely, both
+       * formats, 0 frames.
+       *
+       * Reason: the framework sets s_data->mode_prop_idx to the INDEX in
+       * frmfmt where the resolution matched, and then uses that same number to
+       * index the device-tree modes -- csi.c:320 reads
+       * sensor_modes[mode_prop_idx].signal_properties.pixel_clock to program
+       * the NVCSI link rate, and csi.c:149 reads mipi_clock the same way. With
+       * a one-entry table the index collapses to 0, i.e. device-tree mode0
+       * (640x480), so the CSI is set up for the wrong link frequency and every
+       * frame is discarded. frmfmt[i] must stay aligned with mode i.
+       *
+       * Consequence to know: the driver advertises every Dione model's
+       * resolution, so an application that asks for one this camera does not
+       * have gets it accepted and then fails at stream start. Tools we ship
+       * must not hardcode a resolution -- rt_frame_monitor.py defaulted to
+       * 640x480 and failed on every Dione but the 640 for exactly this reason.
+       */
    }
 
    err = tegracam_v4l2subdev_register(tc_dev, true);
@@ -2142,6 +2387,7 @@ static int dione_ir_probe(struct i2c_client *client,
    device_create_file(dev, &dev_attr_serial_number);
    device_create_file(dev, &dev_attr_resolution);
    device_create_file(dev, &dev_attr_pixel_format);
+   device_create_file(dev, &dev_attr_pixel_formats);
    device_create_file(dev, &dev_attr_firmware_version);
 #ifdef DIONE_IR_HAS_SYSFS_RESTART_MIPI
    device_create_file(dev, &dev_attr_restart_mipi);
@@ -2185,6 +2431,7 @@ static void dione_ir_remove(struct i2c_client *client)
    device_remove_file(dev, &dev_attr_restart_mipi);
 #endif
    device_remove_file(dev, &dev_attr_firmware_version);
+   device_remove_file(dev, &dev_attr_pixel_formats);
    device_remove_file(dev, &dev_attr_pixel_format);
    device_remove_file(dev, &dev_attr_resolution);
    device_remove_file(dev, &dev_attr_serial_number);
