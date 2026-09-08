@@ -104,24 +104,53 @@
 #define DIONE_IR_STATUS_BUSY      0xFFFF
 
 /*
- * ⚠️ WAIT before the first read. This is the whole fix; the polling below is
- * only a safety net.
+ * ⚠️ Issue the request, WAIT, then read. Never glue the read to the request.
  *
- * Reading too early does not merely return 0xFFFF -- it POISONS the camera's
- * output buffer, and no amount of re-reading recovers it. Measured on a
- * Dione 320 (FPGA 3.2.797 / ESW 18.255.72839-25), 40 reads per strategy:
+ * This deliberately departs from the manual's own example, and the reason is
+ * measured, not guessed.
  *
- *   read immediately, poll every 2 ms   -> 17/40 failed, stuck after 250 polls
- *   wait 2 ms, poll every 2 ms          ->  1/40 failed
- *   wait 50 ms, poll every 50 ms        ->  0/40 failed, ZERO re-reads needed
+ * ENG-2021-UMN008 R013 section 2.8 documents status 0xFFFF ("packet being
+ * processed") and shows a combined write+read followed by a bare re-read:
  *
- * The stuck cases also produced a status of 0x00FF -- 0xFFFF shifted by a byte,
- * i.e. the answer buffer read out of step. That is what an early read leaves
- * behind.
+ *      i2ctransfer -y -f 6 w6@0x5A 0x04 0xF0 0x02 0x00 0x04 0x00 r6
+ *      >> 0xff 0xff ...                      (0xFFFF, in progress)
+ *      i2ctransfer -y -f 6 r6@0x5A
+ *      >> 0x00 0x00 0x53 0x05 0x0b 0x40      (success)
  *
- * These are dioneCtrl.py's own values (POLL_INTERVAL / POLL_ATTEMPTS): that
- * script sleeps POLL_INTERVAL *before* its first read, which is exactly why it
- * never sees the problem while this driver did. Keep the two in step.
+ * That sequence is NOT reliable on a Dione 320 with firmware
+ * FPGA 3.2.797 / ESW 18.255.72839-25. Measured 2026-09-08, reading WidthMax
+ * twenty times in a row: 7 of 20 failed, in two shapes --
+ *
+ *   status 0x00FF                    the status field caught mid-update -- it
+ *                                    clears high byte first, 0xFFFF -> 0x00FF
+ *                                    -> 0x0000. 0x00FF is in no manual.
+ *   torn payload                     the DATA is written while being read too:
+ *                                    0x00000100 (256) instead of 0x00000140
+ *                                    (320) on three glued reads out of nine
+ *   status 0xFFFF, payload zeroed    never completes, not after 20 re-reads
+ *                                    50 ms apart
+ *
+ * ⚠️ A glued read sometimes carries the RIGHT value with a not-ready status. So
+ * the payload must be discarded until the status is exactly 0x0000 -- trusting
+ * a plausible-looking value is right two times in three and silently wrong the
+ * third.
+ *
+ * And nothing repairs it afterwards: re-reading (13/32 failures), spacing the
+ * accesses 100 ms apart (8/32), or reopening /dev/i2c per access (18/32) all
+ * still fail. Only not reading too early works: request, wait 50 ms, read
+ * once -- 0/32 failures, and the answer is always ready on the first read, so
+ * the polling loop below is a safety net rather than the mechanism.
+ *
+ * The camera reached us undetected because of this: detect_dione_ir() read
+ * WidthMax, got 0xFFFF, and the probe ended with "no fpga found".
+ *
+ * Harmless on older firmware: a Dione 640 (FPGA 3.2.836 / ESW 16.5.65496)
+ * never returns 0xFFFF at all -- 40/40 reads succeed immediately, the wait
+ * simply costs 50 us of sleep it does not need.
+ *
+ * 50 ms and 10 attempts are dioneCtrl.py's POLL_INTERVAL / POLL_ATTEMPTS. That
+ * script sleeps before its first read too, which is exactly why it never saw
+ * any of this. Keep the two in step.
  */
 #define DIONE_IR_READ_WAIT_US     50000
 #define DIONE_IR_READ_POLLS       10
