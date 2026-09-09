@@ -6,8 +6,14 @@ dioneCtrl.py - Xenics Dione Camera Control Module
 Overview
 --------
 Python module for controlling Xenics Dione thermal cameras via I2C (Linux)
-or USB/Serial (Windows). Supports both direct register access and the
-GenCP (Generic Camera Protocol) standard.
+or USB/Serial (Windows).
+
+Two wire protocols are implemented. The plain register protocol (4-byte
+address, 2-byte length, both little endian) is what the Dione speaks on
+I2C -- it is the default, and it is all that is needed, upload included.
+GenCP framing is available on the USB/Serial path, where the CX3
+converter acts as a GenCP server; the Dione itself does not serve GenCP
+over I2C, so gencp_enable is for the serial path only.
 
 Requirements
 ------------
@@ -37,11 +43,15 @@ Constructor Parameters
     dev_addr     : int   (default: 0x5a)   - I2C device address (depends on camera model)
     com_device   : str   (default: "COM0") - Serial port (Windows only, e.g., "COM20")
     device_type  : str   (default: "I2C")  - Communication type: "I2C" or "USB"
-    gencp_enable : bool  (default: False)  - Enable GenCP protocol
+    gencp_enable : bool  (default: False)  - Use GenCP framing. USB/Serial only: the
+                                             Dione does not serve GenCP over I2C.
     force_slave  : bool  (default: False)  - Use I2C_SLAVE_FORCE (0x0706) instead of
                                              I2C_SLAVE (0x0703). Required when a kernel
-                                             driver (e.g. microlynx) already holds the
+                                             driver (e.g. dione_ir) already holds the
                                              I2C address; otherwise ioctl returns EBUSY.
+                                             Prefer unbinding the driver for an upload:
+                                             the camera handles one request at a time,
+                                             and the driver would be polling in parallel.
 
 Note: On Windows, device_type is automatically set to "USB".
 
@@ -60,17 +70,42 @@ Writing Registers:
     write_reg32f(reg_addr, val) Write a 32-bit float
     write_buf(reg_addr, buf)    Write a byte buffer
 
-Firmware Upload (command line)
-------------------------------
+Command line
+------------
+Running the script with no command opens an interactive console. With a
+command, it runs it and exits:
 
-    python dioneCtrl.py upload <file.bin> firmware   [--bus BUS] [--addr ADDR]
-    python dioneCtrl.py upload <file.bin> application [--bus BUS] [--addr ADDR]
+    python dioneCtrl.py [connection options] <command> [connection options]
 
-    file type choices:
+    upload       <file.bin> firmware|application
+    read_reg32   <addr>              Read 32-bit integer
+    read_reg32f  <addr>              Read 32-bit float
+    write_reg32  <addr> <val>        Write 32-bit integer
+    write_reg32f <addr> <val>        Write 32-bit float
+    read_buf     <addr> <length>     Read byte buffer (hex + ASCII)
+    read_string  <addr> <length>     Read byte buffer as text
+
+    Connection options carry the same names as the constructor parameters
+    above, and may be given before or after the command:
+
+        --bus N            (default: 6)
+        --dev-addr 0xNN    (default: 0x5A)   -- not --addr, see below
+        --device-type I2C|USB               --com-device COMx
+        --gencp-enable                      --force-slave
+
+    upload file type choices:
         firmware      Upload as FAC_SEL.FIRMWARE    (selector = 1)
         application   Upload as FAC_SEL.APPLICATION (selector = 2)
 
-    Defaults: --bus 6, --addr 0x5A
+    Upload works over plain I2C; do not pass --gencp-enable for it.
+
+        python dioneCtrl.py upload app.bin application \\
+                            --device-type I2C --bus 9 --dev-addr 0x5a
+
+    The camera address option is --dev-addr, never --addr: every register
+    subcommand takes a positional 'addr', both would land on the same
+    namespace attribute, and the register address would reach the
+    I2C_SLAVE ioctl. Passing --addr reports this instead of failing.
 
 Firmware Upload (programmatic)
 -------------------------------
@@ -93,8 +128,11 @@ Examples
     data = cam.read_buf(0x00000144, 64)
     serial = data[2:].decode('utf-8').rstrip('\\x00')  # Skip 2-byte header
 
-    # Set integration time to 33333 us
+    # Cap the frame period at 33333 us -> at most 30 fps
     cam.write_reg32(0x00080118, 33333)
+
+    # Set the exposure time to 60 us
+    cam.write_reg32f(0x0002F00C, 60.0)
 
     # Set GSK (Gain Signal Knee) to 1.8
     cam.write_reg32f(0x0002F004, 1.8)
@@ -108,7 +146,9 @@ Some Register Addresses
     0x00000144   buffer  Serial number (64 bytes)
     0x20001000   int     Image width
     0x20001004   int     Image height
-    0x00080118   int     Integration time (us)
+    0x00080118   int     AcquisitionFrameTime (us) -- an upper bound on the
+                         frame period, not the exposure. 0 = free-running.
+    0x0002F00C   float   ExposureTime (us) -- this is the integration time
     0x0002F004   float   GSK (Gain Signal Knee)
     0x0002F030   float   Temperature
 
@@ -146,7 +186,7 @@ Complete Example
     print(f"Temperature: {temp:.2f} C")
 
     # Configure camera
-    cam.write_reg32(0x00080118, 33333)    # Set integration time
+    cam.write_reg32(0x00080118, 33333)    # Cap the frame period (30 fps)
     cam.write_reg32f(0x0002F004, 1.8)     # Set GSK
 
 Platform Notes
@@ -154,8 +194,11 @@ Platform Notes
 - Linux: Requires access to /dev/i2c-* devices. Run with appropriate
   permissions or add user to i2c group.
 - Windows: Requires COM port access. Install appropriate USB-Serial drivers.
-- I2C Address: Typical values are 0x5a or 0x5b depending on camera model.
+- I2C Address: one per model -- Dione 320 = 0x5c, 640 = 0x5a, 1024 = 0x5d,
+  1280 = 0x5b (user manual ENG-2021-UMN008-R013). The default here is 0x5a.
 - I2C Bus: Depends on the camera port on Jetson/RPi (check with i2cdetect).
+  If the dione_ir driver is loaded, the bus and address are both in the name
+  of the node it creates: /dev/dioneir-i2c-<bus>-000e-<address>.
 """
 
 import platform
@@ -707,20 +750,43 @@ if __name__ == "__main__":
   # namespace attribute, and the positional -- parsed second -- would win. The
   # register address then reached the I2C_SLAVE ioctl, which rejected it with
   # EINVAL. That was the state of the CLI until this was fixed.
-  conn = parser.add_argument_group('connection')
-  conn.add_argument('--device-type', choices=['I2C', 'USB'], default='I2C',
-                    help='Communication type (default: I2C)')
-  conn.add_argument('--bus', type=int, default=6,
-                    help='I2C bus number (default: 6)')
-  conn.add_argument('--dev-addr', type=hex_int, default=0x5A,
-                    help='I2C device address (default: 0x5A)')
-  conn.add_argument('--com-device', default='COM0',
-                    help='Serial port for USB mode (default: COM0)')
-  conn.add_argument('--gencp-enable', action='store_true',
-                    help='Use GenCP framing (default: off)')
-  conn.add_argument('--force-slave', action='store_true',
-                    help='Claim the I2C address even if a kernel driver holds it '
-                         '(I2C_SLAVE_FORCE)')
+  #
+  # These options are added twice: on the main parser with their real defaults,
+  # and again on every subcommand with default=argparse.SUPPRESS, so that both
+  # orders work --
+  #     dioneCtrl.py --bus 9 --dev-addr 0x5a upload pkg.bin application
+  #     dioneCtrl.py upload pkg.bin application --bus 9 --dev-addr 0x5a
+  # The second is the order people actually type (the command first, then how to
+  # reach the camera), and with the options declared only on the main parser
+  # argparse hands everything after the subcommand name to the subparser, which
+  # knows nothing about them: they come back as "unrecognized arguments".
+  #
+  # SUPPRESS on the subcommand copies is what makes the duplication safe. A
+  # subparser parses into a namespace of its own and then copies every attribute
+  # that namespace holds onto the main one (CPython's
+  # _SubParsersAction.__call__), so a real default there would silently
+  # overwrite an option given *before* the subcommand with that default --
+  # `--bus 9 upload ...` would go back to bus 6. SUPPRESS leaves the attribute
+  # unset unless the user typed it, so the main parser's value survives.
+  def add_conn_options(p, suppress=False):
+    default = (lambda v: argparse.SUPPRESS) if suppress else (lambda v: v)
+    conn = p.add_argument_group('connection')
+    conn.add_argument('--device-type', choices=['I2C', 'USB'], default=default('I2C'),
+                      help='Communication type (default: I2C)')
+    conn.add_argument('--bus', type=int, default=default(6),
+                      help='I2C bus number (default: 6)')
+    conn.add_argument('--dev-addr', type=hex_int, default=default(0x5A),
+                      help='I2C device address (default: 0x5A)')
+    conn.add_argument('--com-device', default=default('COM0'),
+                      help='Serial port for USB mode (default: COM0)')
+    conn.add_argument('--gencp-enable', action='store_true', default=default(False),
+                      help='Use GenCP framing (default: off). The Dione does not '
+                           'serve GenCP over I2C -- leave this off in I2C mode.')
+    conn.add_argument('--force-slave', action='store_true', default=default(False),
+                      help='Claim the I2C address even if a kernel driver holds it '
+                           '(I2C_SLAVE_FORCE)')
+
+  add_conn_options(parser)
 
   subparsers = parser.add_subparsers(dest='command')
 
@@ -749,7 +815,7 @@ if __name__ == "__main__":
   p.add_argument('val',  type=float,   help='Float value to write')
 
   # read_buf
-  p = subparsers.add_parser('read_buf', help='Read a byte buffer (hex output)')
+  p = subparsers.add_parser('read_buf', help='Read a byte buffer (hex + ASCII)')
   p.add_argument('addr',   type=hex_int, help='Register address')
   p.add_argument('length', type=int,     help='Number of bytes to read')
 
@@ -757,6 +823,21 @@ if __name__ == "__main__":
   p = subparsers.add_parser('read_string', help='Read a byte buffer and print as string')
   p.add_argument('addr',   type=hex_int, help='Register address')
   p.add_argument('length', type=int,     help='Number of bytes to read')
+
+  # Applied to every subcommand in one loop rather than at each add_parser()
+  # call, so a subcommand added later cannot be forgotten -- the failure mode is
+  # a confusing "unrecognized arguments" on that one command only.
+  for sub in subparsers.choices.values():
+    add_conn_options(sub, suppress=True)
+
+  # --addr was renamed --dev-addr to break the collision described above, but it
+  # is the name still in shell histories and in older notes. argparse would only
+  # say "unrecognized arguments", which does not point at the new name.
+  for arg in sys.argv[1:]:
+    if arg == '--addr' or arg.startswith('--addr='):
+      parser.error("--addr no longer exists: use --dev-addr for the camera's I2C "
+                   "address. It was renamed because it collided with the 'addr' "
+                   "register argument taken by every subcommand.")
 
   args = parser.parse_args()
 
@@ -830,11 +911,15 @@ if __name__ == "__main__":
         "Example: cam = dioneCtrl(dev_addr=0x5b, bus=9, device_type=\"I2C\", gencp_enable=False)\n"
         "\n"
         "CLI commands (run outside this console):\n"
-        "  python dioneCtrl.py [connection options] <command>\n"
+        "  python dioneCtrl.py [connection options] <command> [connection options]\n"
         "\n"
-        "  Connection options carry the same names as the constructor arguments above:\n"
+        "  Connection options carry the same names as the constructor arguments above,\n"
+        "  and may be given before or after the command:\n"
         "  --bus N  --dev-addr 0xNN  --device-type I2C|USB  --com-device COMx\n"
         "  --gencp-enable  --force-slave\n"
+        "\n"
+        "  In I2C mode the Dione speaks the plain register protocol, not GenCP:\n"
+        "  leave --gencp-enable off. Upload works over plain I2C.\n"
         "\n"
         "  read_reg32   <addr>              Read 32-bit integer\n"
         "  read_reg32f  <addr>              Read 32-bit float\n"
