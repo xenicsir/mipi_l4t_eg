@@ -62,10 +62,10 @@ class DeploymentMatrixGenerator:
             },
         ],
         "table": [
-            {"board": "Jetson Nano devkit",              "csi": "15-pin", "dione": "A", "microcube": "B", "ilumos": "F"},
-            {"board": "Jetson Xavier NX devkit",         "csi": "15-pin", "dione": "A", "microcube": "B", "ilumos": "F"},
-            {"board": "Jetson AGX Orin / Auvidea X230D", "csi": "22-pin", "dione": "C", "microcube": "A", "ilumos": "D or G"},
-            {"board": "Jetson Orin NX devkit",           "csi": "22-pin", "dione": "C", "microcube": "A", "ilumos": "D or G"},
+            {"board": "Jetson Nano devkit",              "csi": "15-pin", "dione": "A", "microcube": "B", "ilumos": "F", "titan": "TBD"},
+            {"board": "Jetson Xavier NX devkit",         "csi": "15-pin", "dione": "A", "microcube": "B", "ilumos": "F", "titan": "TBD"},
+            {"board": "Jetson AGX Orin / Auvidea X230D", "csi": "22-pin", "dione": "C", "microcube": "A", "ilumos": "D or G", "titan": "TBD"},
+            {"board": "Jetson Orin NX devkit",           "csi": "22-pin", "dione": "C", "microcube": "A", "ilumos": "D or G", "titan": "TBD"},
         ],
         "img_cables": "tools/images/flex_cables.png",
     }
@@ -418,13 +418,13 @@ class DeploymentMatrixGenerator:
             "and the camera connector pitch.\n",
             "| Board | CSI connector | Dione (22-pin) | "
             + self._enabled_label("MicroCube / Crius1280 / SmartIR640 / Microlynx")
-            + " (15-pin) | iLumos (22-pin) |",
-            "| --- | --- | --- | --- | --- |",
+            + " (15-pin) | iLumos (22-pin) | Titan (connector TBD) |",
+            "| --- | --- | --- | --- | --- | --- |",
         ]
         for row in d["table"]:
             lines.append(
                 f"| {row['board']} | {row['csi']} | **{row['dione']}** "
-                f"| **{row['microcube']}** | **{row['ilumos']}** |"
+                f"| **{row['microcube']}** | **{row['ilumos']}** | {row['titan']} |"
             )
         lines.append("")
         cables_uri = self._img_data_uri(d['img_cables'])
@@ -451,7 +451,7 @@ class DeploymentMatrixGenerator:
                 f"<tr><td>{row['board']}</td><td>{row['csi']}</td>"
                 f"<td><strong>{row['dione']}</strong></td>"
                 f"<td><strong>{row['microcube']}</strong></td>"
-                f"<td><strong>{row['ilumos']}</strong></td></tr>\n"
+                f"<td><strong>{row['ilumos']}</strong></td><td>{row['titan']}</td></tr>\n"
             )
 
         cable_types_html = ""
@@ -493,7 +493,7 @@ class DeploymentMatrixGenerator:
                 <th>CSI connector</th>
                 <th>Dione (22-pin)</th>
                 <th>{self._enabled_label("MicroCube / Crius1280 / SmartIR640 / Microlynx")} (15-pin)</th>
-                <th>iLumos (22-pin)</th>
+                <th>iLumos (22-pin)</th><th>Titan (connector TBD)</th>
             </tr></thead>
             <tbody>
 {rows_html}            </tbody>
@@ -1185,7 +1185,7 @@ class DeploymentMatrixGenerator:
             f"<tr><td>{r['board']}</td><td>{r['csi']}</td>"
             f"<td style='text-align:center;font-weight:bold'>{r['dione']}</td>"
             f"<td style='text-align:center;font-weight:bold'>{r['microcube']}</td>"
-            f"<td style='text-align:center;font-weight:bold'>{r['ilumos']}</td></tr>"
+            f"<td style='text-align:center;font-weight:bold'>{r['ilumos']}</td><td>{r['titan']}</td></tr>"
             for r in d["table"]
         )
         cable_list_html = ""
@@ -1224,7 +1224,7 @@ class DeploymentMatrixGenerator:
         lines.append("<th>Board</th><th>CSI connector</th>"
                      "<th>Dione (22-pin)</th>"
                      f"<th>{self._enabled_label('MicroCube / Crius1280 / SmartIR640 / Microlynx')} (15-pin)</th>"
-                     "<th>iLumos (22-pin)</th>")
+                     "<th>iLumos (22-pin)</th><th>Titan (connector TBD)</th>")
         lines.append(f"</tr></thead><tbody>{rows_html}</tbody></table>")
         lines.append(f"<div style='margin-bottom:8px;'>"
                      f"<img src='{cables_uri}' alt='CSI flex cables A–D' style='max-height:120px;'>"

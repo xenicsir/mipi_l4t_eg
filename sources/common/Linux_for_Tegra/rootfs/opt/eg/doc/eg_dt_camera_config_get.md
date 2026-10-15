@@ -192,6 +192,7 @@ Connected cameras include additional fields: `video_device`, `i2c_device`, `mode
 | **MicroCube640** | 1 | `eg_ec_*@16` device with `num_lanes=1` | MicroCube |
 | **SmartIR640 or Crius1280** | 2 | `eg_ec_*@16` device with `num_lanes=2` | SmartIR640, Crius640, Crius1280, Aion640 |
 | **iLumos** | 4 | Presence of `ilumos_*@30` device with status "okay" | iLumos |
+| **Titan** | 2 (provisional) | Presence of `titan_*@30` device with status "okay" | Titan |
 
 **Note:** The "DT Type" column shows the name from the device tree configuration. When a camera is connected, the driver reads the actual model from the camera hardware via sysfs, and the output displays the real model name instead (e.g., "MicroCube" instead of "MicroCube640").
 
@@ -828,3 +829,27 @@ For issues or feature requests:
 
 Copyright © 2026 Exosens
 Part of Forecr/Exosens Jetson BSP distribution.
+
+### Titan development configuration
+
+Titan uses I2C address **`0x30`**, confirmed by Werner (Titan eSW). Two MIPI lanes,
+continuous clock and a 148750000 Hz pixel clock are provisionally copied from
+iLumos. The two DT modes are 1208x1024 RAW16 big endian and RAW14. The native resolution was
+confirmed by Werner (Titan eSW) on 2026-10-15. CSI timing, including
+`line_length = 1280`, lane count and pixel formats remain provisional.
+Titan is unavailable on L4T 32.x
+and on vendors using a pristine, precompiled camera framework.
+
+Select it with `sudo eg_dt_camera_config_set.sh 0/Titan` (camera names are
+case-insensitive). The corresponding sensor node is, for example,
+`/proc/device-tree/cam_i2cmux/i2c@0/titan_b@30`; the exact parent depends on the
+board and L4T family. The chardev is `/dev/titan-<bus>-0030`.
+`exosensCamCtrl.py /dev/titan-<bus>-0030 read_string 0x44` reads the model
+through the driver's GenCP ioctls. The standalone tool also supports iLumos and
+MicroLynx; see [exosensCamCtrl.md](exosensCamCtrl.md). Titan register addresses
+provisionally follow iLumos and still require refinement with Werner, including
+acquisition commands.
+
+No embedded metadata is assumed (`embedded_metadata_height = "0"`). Confirm
+whether any metadata occupies complete lines or columns within image lines
+before changing that property.

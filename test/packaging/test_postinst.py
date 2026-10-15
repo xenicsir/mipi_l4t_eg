@@ -206,7 +206,7 @@ def _overlay_map(entry: Entry) -> dict:
             result[name] = p
 
     lane_suffixes = {"ec-1-lane": "EC_1_lane", "ec-2-lanes": "EC_2_lanes",
-                     "ilumos": "iLumos", "microlynx": "Microlynx"}
+                     "ilumos": "iLumos", "microlynx": "Microlynx", "titan": "Titan"}
     for port in range(entry.ports):
         for suffix, lane in lane_suffixes.items():
             p = f"{BOOT}/{lpfx}-cam{port}-{suffix}.dtbo"

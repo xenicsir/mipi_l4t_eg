@@ -44,7 +44,7 @@ eg_dt_camera_config_set.sh [<port/camera_type>] ...
 Each argument is a **port/camera pair** separated by a `/`:
 
 - **port_number**: Integer from 0 to N-1, where N is the number of camera ports detected on the board (e.g., 0-1 on DSBOARD-ORNXS, 0-3 on DSBOARD-ORNX, 0-5 on DSBOARD-XV2)
-- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`
+- **camera_type**: One of: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`, `Titan`
 
 Example: `0/Dione`, `1/MicroCube640`, `2/SmartIR640`
 
@@ -77,6 +77,7 @@ Example: `0/Dione`, `1/MicroCube640`, `2/SmartIR640`
 | **SmartIR640** | 2 | 0x16 | Exosens EC camera (2 lanes) |
 | **Crius1280** | 2 | 0x16 | Exosens EC camera (2 lanes) |
 | **iLumos** | 4 | 0x30 | Exosens iLumos camera |
+| **Titan** | 2 (provisional) | 0x30 (confirmed) | Exosens Titan camera, hardware not yet confirmed |
 
 **Note**: `SmartIR640` and `Crius1280` use the same device tree configuration (2 MIPI lanes). `iLumos` is also accepted as `ilumos` (case-insensitive).
 
@@ -164,8 +165,8 @@ Overlays:
 ```
 Base: "Exosens Cameras"
 Overlays:
-  - CAM0:EC_1_lane, CAM0:EC_2_lanes, CAM0:iLumos
-  - CAM1:EC_1_lane, CAM1:EC_2_lanes, CAM1:iLumos
+  - CAM0:EC_1_lane, CAM0:EC_2_lanes, CAM0:iLumos, CAM0:Titan
+  - CAM1:EC_1_lane, CAM1:EC_2_lanes, CAM1:iLumos, CAM1:Titan
   - ... up to CAM<N-1> (depending on detected port count)
 ```
 
@@ -455,13 +456,13 @@ The valid port range is automatically detected from the device tree. Use
 
 ### "Error: unknown camera type"
 
-Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`
+Supported types: `Dione`, `MicroCube640`, `SmartIR640`, `Crius1280`, `iLumos`, `Titan`
 
 ```bash
 # ✗ Wrong: typo in camera name
 $ eg_dt_camera_config_set.sh 0/microcube640
 Error: unknown camera type 'microcube640' (from argument '0/microcube640').
-Supported cameras: Crius1280, Dione, MicroCube, MicroCube640, SmartIR640, iLumos
+Supported cameras: Crius1280, Dione, MicroCube, MicroCube640, SmartIR640, iLumos, Titan
 
 # ✓ Correct: exact camera name
 $ eg_dt_camera_config_set.sh 0/MicroCube640
@@ -632,3 +633,27 @@ For issues or feature requests:
 
 Copyright © 2026 Exosens
 Part of Forecr/Exosens Jetson BSP distribution.
+
+### Titan development configuration
+
+Titan uses I2C address **`0x30`**, confirmed by Werner (Titan eSW). Two MIPI lanes,
+continuous clock and a 148750000 Hz pixel clock are provisionally copied from
+iLumos. The two DT modes are 1208x1024 RAW16 big endian and RAW14. The native resolution was
+confirmed by Werner (Titan eSW) on 2026-10-15. CSI timing, including
+`line_length = 1280`, lane count and pixel formats remain provisional.
+Titan is unavailable on L4T 32.x
+and on vendors using a pristine, precompiled camera framework.
+
+Select it with `sudo eg_dt_camera_config_set.sh 0/Titan` (camera names are
+case-insensitive). The corresponding sensor node is, for example,
+`/proc/device-tree/cam_i2cmux/i2c@0/titan_b@30`; the exact parent depends on the
+board and L4T family. The chardev is `/dev/titan-<bus>-0030`.
+`exosensCamCtrl.py /dev/titan-<bus>-0030 read_string 0x44` reads the model
+through the driver's GenCP ioctls. The standalone tool also supports iLumos and
+MicroLynx; see [exosensCamCtrl.md](exosensCamCtrl.md). Titan register addresses
+provisionally follow iLumos and still require refinement with Werner, including
+acquisition commands.
+
+No embedded metadata is assumed (`embedded_metadata_height = "0"`). Confirm
+whether any metadata occupies complete lines or columns within image lines
+before changing that property.

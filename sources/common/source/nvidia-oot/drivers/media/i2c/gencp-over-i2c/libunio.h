@@ -7,6 +7,7 @@
 #define LIB_UNIO_H
 
 #include "libtarget.h"
+#include "transport_config.h"
 #ifdef __KERNEL__
     #include <linux/i2c.h>
 #else

@@ -94,7 +94,9 @@ ifndef PRISTINE_KERNEL
 # nvidia-oot camera framework, which can't be patched into a PRISTINE_KERNEL
 # vendor's precompiled tegra-camera.ko (see drivers/media/i2c/Makefile).
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-titan.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-titan.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
 endif
@@ -120,9 +122,13 @@ dtbo-y += tegra234-p3737-camera-eg-cam1-microlynx.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam2-microlynx.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam3-microlynx.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam0-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam0-titan.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam1-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam1-titan.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam2-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam2-titan.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam3-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam3-titan.dtbo
 
 
 ifneq ($(dtb-y),)

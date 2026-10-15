@@ -211,6 +211,15 @@ config VIDEO_ILUMOS
 		To compile this driver as a module, choose M here: the
 		module will be called ilumos.
 
+config VIDEO_TITAN
+	tristate "Titan MIPI camera support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+		This driver supports Titan camera from Exosens.
+		To compile this driver as a module, choose M here: the
+		module will be called titan.
+
 config VIDEO_MICROLYNX
 	tristate "Microlynx MIPI camera support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API

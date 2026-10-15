@@ -47,7 +47,7 @@ test/
     verify_dt.py                    # vérification structure DT après overlay
 ```
 
-**Caméras testées :** Dione, MicroCube, MicroCube640, SmartIR640, Crius1280, iLumos, Microlynx
+**Caméras testées :** Dione, MicroCube, MicroCube640, SmartIR640, Crius1280, iLumos, Microlynx, Titan
 
 **Matrice de boards / versions L4T :**
 

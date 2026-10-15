@@ -163,11 +163,13 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
             return 0, 1, [f"dpkg-deb extract failed: {r.stderr.decode().strip()}"]
 
         # --- Script present and executable ---
-        script = extract_dir / "usr" / "bin" / "eg_dt_camera_config_set.sh"
-        if script.exists() and os.access(script, os.X_OK):
-            passed += 1
-        else:
-            errors.append("usr/bin/eg_dt_camera_config_set.sh missing or not executable")
+        for script_name in ("eg_dt_camera_config_set.sh", "exosensCamCtrl.py",
+                            "ilumosCtrl.py", "microlynxCtrl.py"):
+            script = extract_dir / "usr" / "bin" / script_name
+            if script.exists() and os.access(script, os.X_OK):
+                passed += 1
+            else:
+                errors.append(f"usr/bin/{script_name} missing or not executable")
 
         # --- Version file present ---
         ver_file = extract_dir / "etc" / "version_eg_cams"
@@ -241,6 +243,11 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
                 else:
                     errors.append("No *-cam*-ilumos.dtbo found in boot/")
 
+                if any(re.search(r"cam\d+-titan", n) for n in dtbo_names):
+                    passed += 1
+                else:
+                    errors.append("No *-cam*-titan.dtbo found in boot/")
+
                 # cam*-microlynx.dtbo present
                 if any(re.search(r"cam\d+-microlynx", n) for n in dtbo_names):
                     passed += 1
@@ -257,7 +264,7 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
 
         # ilumos.ko, microlynx.ko — see has_y16_cams above
         if has_y16_cams:
-            for ko in ("ilumos.ko", "microlynx.ko"):
+            for ko in ("ilumos.ko", "microlynx.ko", "titan.ko"):
                 if find_ko(extract_dir, ko):
                     passed += 1
                 else:

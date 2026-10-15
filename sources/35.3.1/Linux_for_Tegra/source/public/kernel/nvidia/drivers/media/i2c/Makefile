@@ -39,3 +39,6 @@ microlynx-objs := \
     gencp-over-i2c/gencp_common.o \
     gencp-over-i2c/gencp_client.o
 obj-$(CONFIG_VIDEO_MICROLYNX) += microlynx.o
+include $(src)/gencp-over-i2c/titan.mk
+titan-objs := titan_core.o gencp-over-i2c/titan_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/titan_gencp_client.o
+obj-$(CONFIG_VIDEO_TITAN) += titan.o

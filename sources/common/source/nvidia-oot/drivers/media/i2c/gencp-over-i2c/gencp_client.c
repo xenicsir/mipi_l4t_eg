@@ -162,6 +162,11 @@ uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data)
 {
    uint16_t status = GENCP_STATUS_SUCCESS;
 
+#if GENCP_I2C_BUFFER_SIZE == 1024
+   if (!data)
+      return GENCP_STATUS_INVALID_PARAMETER;
+#endif
+
    if(gGencpInitWasSuccessfull)
    {
       uint32_t command_size_bytes = 0;
@@ -176,8 +181,8 @@ uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data)
       command_size_bytes = GENCPCLIENT_ComposeReadCommand((uint64_t) address, 4);
       PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
 
-      // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   U A R T
-      PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by UART...");
+      // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   I 2 C
+      PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by I2C...");
       GENCPCLIENT_sendCommand(command_size_bytes);
 
       // WV [20201026] R E A D   T H E   R E S P O N S E
@@ -196,9 +201,14 @@ uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data)
       }
       else
       {
-         tempdata = *((uint32_t*) &pRxBuffer->pScd_u16[0]);
-         *data = __builtin_bswap32(tempdata);
          status = __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
+#if GENCP_I2C_BUFFER_SIZE == 1024
+         if (status == GENCP_STATUS_SUCCESS)
+#endif
+         {
+            tempdata = *((uint32_t*) &pRxBuffer->pScd_u16[0]);
+            *data = __builtin_bswap32(tempdata);
+         }
 
          if(status == GENCP_STATUS_SUCCESS)
             PRINT_DEBUG("\n\rGENCP CLIENT     - Register 0x%08x content: 0x%08x", address, *data);
@@ -235,8 +245,8 @@ uint16_t GENCPCLIENT_ReadRegister(uint32_t address, uint32_t* data)
 //         command_size_bytes = GENCPCLIENT_ComposeReadCommand((uint64_t) address, 8);
 //         PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
 //
-//         // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   U A R T
-//         PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by UART...");
+//         // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   I 2 C
+//         PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by I2C...");
 //         GENCPCLIENT_sendCommand(command_size_bytes);
 //
 //         // WV [20201026] R E A D   T H E   R E S P O N S E
@@ -280,8 +290,7 @@ static uint32_t GENCPCLIENT_ComposeReadCommand(uint64_t address, uint16_t read_l
    uint32_t command_size_bytes;
    const uint16_t SCD_size = 12;
 
-   /** Note:   The byte must be transmit in Big Endian mode, thus the MSB and LSB byte must be inverted in the transmission,
-     the "__builtin_bswap16" function is used in order to swap the byte of each packet. */
+   /* Store multi-byte GenCP fields in big-endian wire order. */
 
    // P R E F I X
    pTxBuffer->prefix.preamble_u16      = __builtin_bswap16(GENCP_PREAMBLE);
@@ -292,7 +301,7 @@ static uint32_t GENCPCLIENT_ComposeReadCommand(uint64_t address, uint16_t read_l
    // C O M M O N   C O M M A N D   D A T A
    pTxBuffer->ccd.flags_status_u16     = __builtin_bswap16(GENCP_CMD_FLAG_REQUEST_ACK);
    pTxBuffer->ccd.command_id_u16       = __builtin_bswap16(GENCP_READMEM_CMD);
-   pTxBuffer->ccd.scd_length_u16       = __builtin_bswap16(SCD_size);              // SCD section consists of 12 bytes
+   pTxBuffer->ccd.scd_length_u16       = __builtin_bswap16(SCD_size);              // ReadMem request SCD: address (8), reserved (2), read length (2)
    pTxBuffer->ccd.request_id_u16       = __builtin_bswap16(GENCPCLIENT_getNextRequestId());
 
    // S P E C I F I C   C O M M A N D   D A T A
@@ -340,8 +349,8 @@ uint16_t GENCPCLIENT_WriteRegister(uint32_t address, uint32_t data)
       command_size_bytes = GENCPCLIENT_ComposeWriteCommand((uint64_t) address, 4, (uint8_t*) &dataword);
       PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
 
-      // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E   O V E R   U A R T
-      PRINT_DEBUG("\n\rGENCP CLIENT     - Send the write command by UART...");
+      // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E   O V E R   I 2 C
+      PRINT_DEBUG("\n\rGENCP CLIENT     - Send the write command by I2C...");
       GENCPCLIENT_sendCommand(command_size_bytes);
 
       // WV [20201026] R E A D   T H E   R E S P O N S E
@@ -392,8 +401,8 @@ uint16_t GENCPCLIENT_WriteRegister(uint32_t address, uint32_t data)
 //         PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
 //
 //
-//         // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E   O V E R   U A R T
-//         PRINT_DEBUG("\n\rGENCP CLIENT     - Send the write command by UART...");
+//         // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E   O V E R   I 2 C
+//         PRINT_DEBUG("\n\rGENCP CLIENT     - Send the write command by I2C...");
 //         GENCPCLIENT_sendCommand(command_size_bytes);
 //
 //         // WV [20201026] R E A D   T H E   R E S P O N S E
@@ -429,8 +438,7 @@ static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write
    uint32_t command_size_bytes;
    uint16_t SCD_size = 8 + write_length_b;
 
-   /** Note:   The byte must be transmit in Big Endian mode, thus the MSB and LSB byte must be inverted in the transmission,
-     the "__builtin_bswap16" function is used in order to swap the byte of each packet. */
+   /* Store multi-byte GenCP fields in big-endian wire order. */
 
    // WV [202010] 24 bytes used out of the 1024 byte TX buffer: 1000 bytes left for data
    const uint32_t overhead_b = sizeof(pTxBuffer->prefix) + sizeof(pTxBuffer->ccd) + sizeof(address);
@@ -444,7 +452,7 @@ static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write
    // C O M M O N   C O M M A N D   D A T A
    pTxBuffer->ccd.flags_status_u16     = __builtin_bswap16(GENCP_CMD_FLAG_REQUEST_ACK);
    pTxBuffer->ccd.command_id_u16       = __builtin_bswap16(GENCP_WRITEMEM_CMD);
-   pTxBuffer->ccd.scd_length_u16       = __builtin_bswap16(SCD_size);              // SCD section consists of 12 bytes
+   pTxBuffer->ccd.scd_length_u16       = __builtin_bswap16(SCD_size);              // WriteMem request SCD: address (8) plus write_length_b data bytes
    pTxBuffer->ccd.request_id_u16       = __builtin_bswap16(GENCPCLIENT_getNextRequestId());
 
    // S P E C I F I C   C O M M A N D   D A T A
@@ -500,6 +508,39 @@ static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write
   __/ |
   |___/
   */
+#if GENCP_I2C_BUFFER_SIZE == 1024
+/* Titan uses raw buffered GenCP packets. Validate packet integrity and request
+ * correlation before exposing data. As in the working MicroLynx client, WRITE
+ * ACK payload length comes from the received CCD; the API returns its status.
+ * Do not impose an address echo or a fixed SCD layout from a diagram.
+ */
+static bool GENCPCLIENT_BufferAckHeaderValid(void)
+{
+   uint16_t length = __builtin_bswap16(pRxBuffer->ccd.scd_length_u16);
+   uint16_t command = __builtin_bswap16(pTxBuffer->ccd.command_id_u16);
+
+   if (length > sizeof(pRxBuffer->pScd_u16) ||
+       pRxBuffer->ccd.request_id_u16 != pTxBuffer->ccd.request_id_u16 ||
+       pRxBuffer->prefix.channel_id_u16 != pTxBuffer->prefix.channel_id_u16 ||
+       __builtin_bswap16(pRxBuffer->ccd.command_id_u16) != command + 1)
+      return false;
+   if (pRxBuffer->ccd.flags_status_u16 != 0)
+      return true; /* Valid GenCP error ACK; never copy its payload as data. */
+   if (command == GENCP_READMEM_CMD)
+      return length == __builtin_bswap16(pTxBuffer->pScd_u16[5]);
+   return command == GENCP_WRITEMEM_CMD;
+}
+
+static bool GENCPCLIENT_BufferAckPayloadValid(void)
+{
+   uint16_t length = __builtin_bswap16(pRxBuffer->ccd.scd_length_u16);
+   uint16_t crc = GENCP_crc16((uint8_t *)&pRxBuffer->prefix.channel_id_u16,
+                            CCD_CRC_LENGTH_BYTES + length);
+
+   return crc == __builtin_bswap16(pRxBuffer->prefix.scd_crc_16);
+}
+#endif
+
 static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpired)
 {
    uint32_t Status_u32 = ACK_NOT_READY;
@@ -513,6 +554,10 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
    {
       nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
       AckMsgState = HUNTING_PREAMBLE_0;
+#if GENCP_I2C_BUFFER_SIZE == 1024
+      RxIndex = 0;
+      memset(pRxBuffer, 0, sizeof(*pRxBuffer));
+#endif
    }
    else
    {
@@ -522,6 +567,9 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
          *timerIsExpired = 1;                // Set the Timer expired flag HIGH!
          memset(pRxBuffer, 0, sizeof(GENCP_MSG));
          AckMsgState = HUNTING_PREAMBLE_0;
+#if GENCP_I2C_BUFFER_SIZE == 1024
+         return ACK_NOT_READY;
+#endif
       }
       while (SUCCESS == unio_read_byte(unio_handle_ptr, &byteReceived_u8))
       {
@@ -566,6 +614,12 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
 
                   if(Checksum_u16 == __builtin_bswap16(pRxBuffer->prefix.ccd_crc_16))
                   {
+#if GENCP_I2C_BUFFER_SIZE == 1024
+                     if (!GENCPCLIENT_BufferAckHeaderValid()) {
+                        AckMsgState = WAIT_FOR_PTT_TIMEOUT;
+                        break;
+                     }
+#endif
                      if(__builtin_bswap16(pRxBuffer->ccd.scd_length_u16) == 0)
                      {
                         // S T O P   H E R E   A L R E A D Y  . . .
@@ -594,8 +648,14 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
                pAckStartPtr_u8[RxIndex++] = byteReceived_u8;
 
                // All of the data have been received
-               if (RxIndex == (PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES + __builtin_bswap16(pRxBuffer->ccd.scd_length_u16)))
+               if (RxIndex == (PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES + (uint32_t)__builtin_bswap16(pRxBuffer->ccd.scd_length_u16)))
                {
+#if GENCP_I2C_BUFFER_SIZE == 1024
+                  if (!GENCPCLIENT_BufferAckPayloadValid()) {
+                     AckMsgState = WAIT_FOR_PTT_TIMEOUT;
+                     break;
+                  }
+#endif
                   nb_timer_delete(TIMER_GENCPCLIENT_PTT);
                   Status_u32 = ACK_READY;
                   RxIndex = 0;
@@ -612,6 +672,11 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
                // nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
                break;
          }
+
+#if GENCP_I2C_BUFFER_SIZE == 1024
+         if (Status_u32 == ACK_READY)
+            break; /* Ignore buffer padding after the complete valid ACK. */
+#endif
 
          if (RxIndex > GENCP_RX_BUF_INDEX_MAX)
          {   // Exceed the end of GENCP RX Buf => Not receive all of the message
@@ -689,6 +754,11 @@ uint16_t GENCPCLIENT_ReadString(uint32_t address, uint8_t* my_string, uint32_t l
 {
    uint16_t status = GENCP_STATUS_SUCCESS;
 
+#if GENCP_I2C_BUFFER_SIZE == 1024
+   if (!my_string || !lenght || lenght > sizeof(pRxBuffer->pScd_u16))
+      return GENCP_STATUS_INVALID_PARAMETER;
+#endif
+
    if(gGencpInitWasSuccessfull)
    {
       uint32_t command_size_bytes = 0;
@@ -701,8 +771,8 @@ uint16_t GENCPCLIENT_ReadString(uint32_t address, uint8_t* my_string, uint32_t l
       command_size_bytes = GENCPCLIENT_ComposeReadCommand((uint64_t) address, lenght);
       PRINT_DEBUG(" DONE: GENCP package consists of %d bytes.", command_size_bytes);
 
-      // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   U A R T
-      PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by UART...");
+      // WV [20201026] S E N D   T H E   C O M M A N D   T O   T H E   S E N S O R   M O D U L E  O V E R   I 2 C
+      PRINT_DEBUG("\n\rGENCP CLIENT     - Send the read command by I2C...");
       //PRINT_DEBUG("\n\rSEND");
       GENCPCLIENT_sendCommand(command_size_bytes);
 
@@ -723,8 +793,11 @@ uint16_t GENCPCLIENT_ReadString(uint32_t address, uint8_t* my_string, uint32_t l
       else
       {
          //tempdata = *((uint32_t*) &pRxBuffer->pScd_u16[0]);
-         memcpy((void *) my_string, (void *) &pRxBuffer->pScd_u16[0], lenght);
          status = __builtin_bswap16(pRxBuffer->ccd.flags_status_u16);
+#if GENCP_I2C_BUFFER_SIZE == 1024
+         if (status == GENCP_STATUS_SUCCESS)
+#endif
+            memcpy((void *) my_string, (void *) &pRxBuffer->pScd_u16[0], lenght);
       }
    }
    else

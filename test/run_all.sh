@@ -44,6 +44,12 @@ echo "════════════════════════�
 python3 "$SCRIPT_DIR/config/test_tc358746_equivalence.py"
 
 echo ""
+echo "Titan driver transactions and shared camera control"
+python3 "$SCRIPT_DIR/config/test_titan_driver.py"
+python3 "$SCRIPT_DIR/config/test_exosens_cam_ctrl.py"
+python3 "$SCRIPT_DIR/config/test_gencp_transport.py"
+
+echo ""
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  DTSI structure verification"
 echo "══════════════════════════════════════════════════════════════════════"

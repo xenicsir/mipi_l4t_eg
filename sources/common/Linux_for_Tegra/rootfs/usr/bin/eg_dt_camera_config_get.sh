@@ -37,6 +37,8 @@ CAMERA_DATABASE=(
     "ec_1lane:16:eg_ec_([a-h])@16:MicroCube:1"
     "ec_2lanes:16:eg_ec_([a-h])@16:SmartIR640 or Crius1280:2"
     "ilumos:30:ilumos_([a-h])@30:iLumos:4"
+    # Titan I2C 0x30 confirmed by Werner; lane count remains provisional.
+    "titan:30:titan_([a-h])@30:Titan:2"
     "microlynx:51:microlynx_([a-h])@51:Microlynx:2"
 )
 

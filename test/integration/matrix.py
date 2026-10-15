@@ -51,6 +51,7 @@ CAMERA_LANE_SUFFIX = {
     "SmartIR640":   "ec-2-lanes",
     "Crius1280":    "ec-2-lanes",
     "iLumos":       "ilumos",
+    "Titan":        "titan",
     "Microlynx":    "microlynx",
 }
 CAMERA_LANE_NAME = {
@@ -59,6 +60,7 @@ CAMERA_LANE_NAME = {
     "SmartIR640":   "EC_2_lanes",
     "Crius1280":    "EC_2_lanes",
     "iLumos":       "iLumos",
+    "Titan":        "Titan",
     "Microlynx":    "Microlynx",
 }
 TEST_CAMERAS = list(CAMERA_LANE_SUFFIX.keys())
@@ -216,6 +218,7 @@ def build_overlay_map(entry: Entry) -> dict[str, str]:
         "ec-1-lane":  "EC_1_lane",
         "ec-2-lanes": "EC_2_lanes",
         "ilumos":     "iLumos",
+        "titan":      "Titan",
         "microlynx":  "Microlynx",
     }
     for port in range(ports):

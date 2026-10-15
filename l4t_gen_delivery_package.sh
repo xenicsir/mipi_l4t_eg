@@ -621,6 +621,7 @@ else
             *MicroCube*)     cam_type="MicroCube640" ;;
             *iLumos*|*ilumos*) cam_type="iLumos" ;;
             *Microlynx*|*microlynx*) cam_type="Microlynx" ;;
+            *Titan*|*titan*) cam_type="Titan" ;;
             *Dione*)         cam_type="Dione" ;;
             *)               continue ;;
          esac

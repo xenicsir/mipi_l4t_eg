@@ -163,7 +163,7 @@ def check_probe_timeout(lines, plat_key, errors):
     tree was to tune it per board. A camera node added for a new platform
     without it would quietly inherit a timeout nobody chose.
     """
-    LABEL_RE = re.compile(r'((?:dione_ir|eg_ec|ilumos|microlynx)_cam\d)\s*:')
+    LABEL_RE = re.compile(r'((?:dione_ir|eg_ec|ilumos|microlynx|titan)_cam\d)\s*:')
     MODE_RE  = re.compile(r'\bmode\d+\s*\{')
 
     for i, line in enumerate(lines):
@@ -188,7 +188,7 @@ def parse_sensor_nodes(lines):
 
     `lines` is expected to already be resolve_conditionals()-ed.
     """
-    LABEL_RE = re.compile(r'((?:dione_ir|eg_ec|ilumos|microlynx)_cam\d)\s*:')
+    LABEL_RE = re.compile(r'((?:dione_ir|eg_ec|ilumos|microlynx|titan)_cam\d)\s*:')
     MODE_RE  = re.compile(r'\bmode\d+\s*\{')
     nodes = {}
 

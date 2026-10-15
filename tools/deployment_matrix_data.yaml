@@ -112,6 +112,10 @@ cameras:
     name: "iLumos"
     csi_lanes: 2
 
+  titan:
+    name: "Titan"
+    csi_lanes: 2  # placeholder copied from iLumos; confirm with hardware
+
   microlynx:
     name: "Microlynx"
     csi_lanes: 2
@@ -203,6 +207,12 @@ deployment_matrix:
         32.7.4: "not_supported||"
         32.7.5: "not_supported||"
         32.7.6: "not_supported||"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
       microlynx:
         32.7.1: "not_supported||"
         32.7.4: "not_supported||"
@@ -233,6 +243,12 @@ deployment_matrix:
         32.7.5: "theoretically_supported|l4t-32.7.5|smartir640-tx2-l4t-32.7.5.deb"
         32.7.6: "theoretically_supported|l4t-32.7.6|smartir640-tx2-l4t-32.7.6.deb"
       ilumos:
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
         32.7.1: "not_supported||"
         32.7.4: "not_supported||"
         32.7.5: "not_supported||"
@@ -287,6 +303,20 @@ deployment_matrix:
         35.6.1: "tested|l4t-35.6.1|ilumos-xnx-l4t-35.6.1.deb"
         35.6.2: "tested|l4t-35.6.2|ilumos-xnx-l4t-35.6.2.deb"
         35.6.4: "theoretically_supported|l4t-35.6.4|ilumos-xnx-l4t-35.6.4.deb"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        35.3.1: "not_supported||"
+        35.4.1: "not_supported||"
+        35.5.0: "not_supported||"
+        35.6.0: "not_supported||"
+        35.6.1: "not_supported||"
+        35.6.2: "not_supported||"
+        35.6.4: "not_supported||"
+        32.7.1: "not_supported||"
+        32.7.4: "not_supported||"
+        32.7.5: "not_supported||"
+        32.7.6: "not_supported||"
+        35.1: "not_supported||"
       microlynx:
         35.3.1: "tested|l4t-35.3.1|microlynx-xnx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microlynx-xnx-l4t-35.4.1.deb"
@@ -369,6 +399,21 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-orin-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-orin-l4t-36.5.0.deb"
         39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        35.1: "not_supported||"
+        35.3.1: "not_supported||"
+        35.4.1: "not_supported||"
+        35.5.0: "not_supported||"
+        35.6.0: "not_supported||"
+        35.6.1: "not_supported||"
+        35.6.2: "not_supported||"
+        35.6.4: "not_supported||"
+        36.4: "not_supported||"
+        36.4.3: "not_supported||"
+        36.4.4: "not_supported||"
+        36.5.0: "not_supported||"
+        39.2: "not_supported||"
       microlynx:
         35.1: "theoretically_supported|l4t-35.1|microlynx-orin-l4t-35.1.deb"
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-orin-l4t-35.3.1.deb"
@@ -422,6 +467,14 @@ deployment_matrix:
         36.4: "tested|l4t-36.4|ilumos-auvidea-l4t-36.4.deb"
         36.4.3: "tested|l4t-36.4.3|ilumos-auvidea-l4t-36.4.3.deb"
         36.4.4: "tested|l4t-36.4.4|ilumos-auvidea-l4t-36.4.4.deb"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        35.1: "not_supported||"
+        35.3.1: "not_supported||"
+        35.4.1: "not_supported||"
+        36.4: "not_supported||"
+        36.4.3: "not_supported||"
+        36.4.4: "not_supported||"
       microlynx:
         35.1: "theoretically_supported|l4t-35.1|microlynx-auvidea-l4t-35.1.deb"
         35.3.1: "tested|l4t-35.3.1|microlynx-auvidea-l4t-35.3.1.deb"
@@ -498,6 +551,20 @@ deployment_matrix:
         36.4.4: "tested|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-ornx-l4t-36.5.0.deb"
         39.2: "tested|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        35.3.1: "not_supported||"
+        35.4.1: "not_supported||"
+        35.5.0: "not_supported||"
+        35.6.0: "not_supported||"
+        35.6.1: "not_supported||"
+        35.6.2: "not_supported||"
+        35.6.4: "not_supported||"
+        36.4: "not_supported||"
+        36.4.3: "not_supported||"
+        36.4.4: "not_supported||"
+        36.5.0: "not_supported||"
+        39.2: "not_supported||"
       microlynx:
         35.3.1: "tested|l4t-35.3.1|microlynx-ornx-l4t-35.3.1.deb"
         35.4.1: "tested|l4t-35.4.1|microlynx-ornx-l4t-35.4.1.deb"
@@ -580,6 +647,20 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-ornx-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-ornx-l4t-36.5.0.deb"
         39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        35.3.1: "not_supported||"
+        35.4.1: "not_supported||"
+        35.5.0: "not_supported||"
+        35.6.0: "not_supported||"
+        35.6.1: "not_supported||"
+        35.6.2: "not_supported||"
+        35.6.4: "not_supported||"
+        36.4: "not_supported||"
+        36.4.3: "not_supported||"
+        36.4.4: "not_supported||"
+        36.5.0: "not_supported||"
+        39.2: "not_supported||"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-ornx-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-ornx-l4t-35.4.1.deb"
@@ -662,6 +743,20 @@ deployment_matrix:
         36.4.4: "theoretically_supported|l4t-36.4.4|ilumos-forecr-l4t-36.4.4.deb"
         36.5.0: "theoretically_supported|l4t-36.5.0|ilumos-forecr-l4t-36.5.0.deb"
         39.2: "theoretically_supported|3.0|jetson-l4t-39.2-jp7.2-eg-cams.deb"
+      # Titan hardware/register map not confirmed; no validated deployment yet.
+      titan:
+        35.3.1: "not_supported||"
+        35.4.1: "not_supported||"
+        35.5.0: "not_supported||"
+        35.6.0: "not_supported||"
+        35.6.1: "not_supported||"
+        35.6.2: "not_supported||"
+        35.6.4: "not_supported||"
+        36.4: "not_supported||"
+        36.4.3: "not_supported||"
+        36.4.4: "not_supported||"
+        36.5.0: "not_supported||"
+        39.2: "not_supported||"
       microlynx:
         35.3.1: "theoretically_supported|l4t-35.3.1|microlynx-forecr-l4t-35.3.1.deb"
         35.4.1: "theoretically_supported|l4t-35.4.1|microlynx-forecr-l4t-35.4.1.deb"

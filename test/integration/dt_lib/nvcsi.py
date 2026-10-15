@@ -22,6 +22,7 @@ EXOSENS_SENSOR_PREFIXES = (
     "eg_ec",
     "ilumos",
     "microlynx",
+    "titan",
 )
 
 REFERENCE_SENSOR_PREFIXES = (

@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
+
+#include "tegra234-p3767-camera-p3768-common-eg-cam0-titan.dtsi"
+
+/ {
+	overlay-name = "Exosens Cameras. CAM0:Titan";
+};

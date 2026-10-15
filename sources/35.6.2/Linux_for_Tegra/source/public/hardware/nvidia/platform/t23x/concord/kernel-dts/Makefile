@@ -66,9 +66,13 @@ dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam1-microlynx.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam2-microlynx.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam3-microlynx.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam0-titan.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam1-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam1-titan.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam2-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam2-titan.dtbo
 dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam3-ilumos.dtbo
+dtbo-$(BUILD_ENABLE) += tegra234-p3737-camera-eg-cam3-titan.dtbo
 
 ifneq ($(dtb-y),)
 dtb-y := $(addprefix $(makefile-path)/,$(dtb-y))

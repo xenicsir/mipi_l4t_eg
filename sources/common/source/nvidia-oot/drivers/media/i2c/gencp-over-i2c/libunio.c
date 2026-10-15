@@ -9,17 +9,41 @@
 #define PREFIX "libunio"
 #include "liblogger.h"
 
+#if GENCP_I2C_BUFFER_SIZE == 16
 static struct ring_buffer rb_fifo;
+#else
+/* Raw Titan GenCP bytes: never run the FIFO repeat/complement decoder. */
+static u8 raw_rx[GENCP_I2C_BUFFER_SIZE];
+static size_t raw_index, raw_length;
+#endif
 
 int unio_read_buffer_init(struct unio_handle *h, size_t depth)
 {
+#if GENCP_I2C_BUFFER_SIZE == 16
     rb_init(&rb_fifo);
+#else
+    raw_index = raw_length = 0;
+#endif
     h->read_buffer_enable = true;
     return 0;
 }
 
 static enum return_status __unio_parsed_byte (struct unio_handle *h, u8 *buf)
 {
+#if GENCP_I2C_BUFFER_SIZE == 1024
+    if (raw_index == raw_length) {
+        if (raw_length) {
+            /* Yield after each poll so the caller can check its timeout. */
+            raw_index = raw_length = 0;
+            return NO_DATA;
+        }
+        if (unio_read(h, raw_rx, sizeof(raw_rx)) != 0)
+            return ERROR;
+        raw_length = sizeof(raw_rx);
+    }
+    *buf = raw_rx[raw_index++];
+    return SUCCESS;
+#else
     int ret;
     u8 temp_buff[16];
     size_t temp_size = sizeof(temp_buff)/sizeof(temp_buff[0]);
@@ -50,6 +74,7 @@ static enum return_status __unio_parsed_byte (struct unio_handle *h, u8 *buf)
         rb_pop(&rb_fifo,buf);
     }
     return 0;
+#endif
 }
 
 int unio_read_byte (struct unio_handle *h, u8 *buf)
@@ -74,6 +99,13 @@ int unio_write(struct unio_handle *h, const u8 *buf, size_t len)
     int ret;
     struct i2c_msg msg;
 
+#if GENCP_I2C_BUFFER_SIZE == 1024
+    /* Discard trailing bytes from the previous ACK before a new request. */
+    if (len > GENCP_I2C_BUFFER_SIZE)
+        return -EMSGSIZE;
+    raw_index = raw_length = 0;
+#endif
+
     PRINT_DEBUG("Writing to 0x%X, %lu bytes.\n", h->client->addr, len);
     msg.addr  = h->client->addr;
     msg.flags = 0;               /* write */
@@ -82,7 +114,7 @@ int unio_write(struct unio_handle *h, const u8 *buf, size_t len)
 
     ret = i2c_transfer(h->client->adapter, &msg, 1);
     PRINT_DEBUG("Write status: %d.\n", ret);
-    return (ret == 1) ? 0 : ret;
+    return (ret == 1) ? 0 : (ret < 0 ? ret : -EIO);
 }
 
 int unio_read(struct unio_handle *h, u8 *buf, size_t len)
@@ -106,7 +138,7 @@ int unio_read(struct unio_handle *h, u8 *buf, size_t len)
         if (i < len-1) PRINT_DEBUG(", ");
     }
     PRINT_DEBUG("]\n");
-    return (ret == 1) ? 0 : ret;
+    return (ret == 1) ? 0 : (ret < 0 ? ret : -EIO);
 }
 
 #else   /* Userspace implementation */
@@ -115,14 +147,20 @@ int unio_read(struct unio_handle *h, u8 *buf, size_t len)
 
 int unio_write(struct unio_handle *h, const u8 *buf, size_t len)
 {
-    size_t ret = write(h->fd, buf, len);
-    return (ret == (size_t)len) ? 0 : -errno;
+    ssize_t ret;
+#if GENCP_I2C_BUFFER_SIZE == 1024
+    if (len > GENCP_I2C_BUFFER_SIZE)
+        return -EMSGSIZE;
+    raw_index = raw_length = 0;
+#endif
+    ret = write(h->fd, buf, len);
+    return ret == (ssize_t)len ? 0 : (ret < 0 ? -errno : -EIO);
 }
 
 int unio_read(struct unio_handle *h, u8 *buf, size_t len)
 {
-    size_t ret = read(h->fd, buf, len);
-    return (ret == (size_t)len) ? 0 : -errno;
+    ssize_t ret = read(h->fd, buf, len);
+    return ret == (ssize_t)len ? 0 : (ret < 0 ? -errno : -EIO);
 }
 
 #endif

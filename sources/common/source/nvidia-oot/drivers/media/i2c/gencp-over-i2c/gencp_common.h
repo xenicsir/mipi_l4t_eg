@@ -114,6 +114,7 @@ enum {
 #define CCD_CRC_LENGTH_W                                (5)
 #define CCD_CRC_LENGTH_BYTES                            (CCD_CRC_LENGTH_W * 2)
 #define SCD_REG_ADDR_LENGTH_W                           (4)
+/* Size of the compact layout declared below, not a receive-length constraint. */
 #define WRITE_MEM_ACK_MSG_SCD_LENGTH_BYTES      (4)
 
 
@@ -144,8 +145,8 @@ typedef enum
 typedef struct GenCPPrefixLayout {
         // WV [20201023] P R E F I X :   4 x uint16
     uint16_t preamble_u16;                              // preamble (= 0x0100 = SOH NULL)
-    uint16_t ccd_crc_16;                                // crc-16 build form the channel_id and CCD
-    uint16_t scd_crc_16;                                // crc-16 build form the channel_id, CCD, SCD (and Postfix, which is not present)
+    uint16_t ccd_crc_16;                                // GenCP checksum over channel_id and CCD
+    uint16_t scd_crc_16;                                // GenCP checksum over channel_id, CCD and SCD (no postfix)
     uint16_t channel_id_u16;                    // = 0 (reserved for the default comms channel)
 }GenCPPrefixLayout;
 
@@ -153,8 +154,8 @@ typedef struct GenCPCCDLayout {
         // WV [20201023] C O M M O N   C O M M A N D   D A T A :   4 x uint16
     uint16_t flags_status_u16;          // flags for command - request ack bit is set 0b 0100 0000 0000 0000 | status for ACK;
     uint16_t command_id_u16;                    // command_id = 0x0800 READMEM_CMD
-    uint16_t scd_length_u16;                    // always 12 bytes for this cmd
-    uint16_t request_id_u16;                    // reserved, set to 0
+    uint16_t scd_length_u16;                    // SCD byte count; depends on command/ACK
+    uint16_t request_id_u16;                    // nonzero request ID, echoed by its ACK
 }GenCPCCDLayout;
 
 typedef struct ReadMemCmdLayout {
@@ -184,6 +185,10 @@ typedef struct WriteMemCmdLayout {
     uint8_t  pData[GENCP_RX_BUF_SIZE - SCD_DATA_OFFSET_BYTES - WRITEMEM_REGADDR_LENGTH_BYTES];
 }WriteMemCmdLayout;
 
+/* Historical compact WRITE ACK layout. The working MicroLynx client does not
+ * cast received ACKs to this structure: it consumes CCD.scd_length_u16 bytes
+ * and returns the CCD status. Titan follows the same payload-length semantics.
+ */
 typedef struct WriteMemAckLayout {
     GenCPPrefixLayout prefix;
     GenCPCCDLayout ccd;

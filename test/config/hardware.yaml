@@ -193,4 +193,5 @@ test_cameras:
   - SmartIR640
   - Crius1280
   - iLumos
+  - Titan
   - Microlynx

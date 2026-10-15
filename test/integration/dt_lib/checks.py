@@ -72,13 +72,14 @@ CAMERA_NODE = {
     "SmartIR640":   ("eg_ec",        2),
     "Crius1280":    ("eg_ec",        2),
     "iLumos":       ("ilumos",       2),
+    "Titan":        ("titan",        2),
     "Microlynx":    ("microlynx",    2),
 }
 
 # Device-name prefixes used by tegra-camera-platform/moduleN/drivernode0/devname
 # for our Exosens cameras. Any other devname is considered NVIDIA-inherited
 # and is not validated (not our responsibility to clean up the base DTB).
-EXOSENS_DEVNAME_PREFIXES = ("dione_ir", "eg_ec", "ilumos", "microlynx")
+EXOSENS_DEVNAME_PREFIXES = ("dione_ir", "eg_ec", "ilumos", "microlynx", "titan")
 
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,9 @@
  */
 #include "gencp_common.h"
 
+/* Historical API name: GenCP's complemented 16-bit word-sum checksum,
+ * including the zero-result convention below; not a polynomial CRC.
+ */
 uint16_t GENCP_crc16(uint8_t *buf, uint32_t len)
 {
     uint32_t sum = 0;

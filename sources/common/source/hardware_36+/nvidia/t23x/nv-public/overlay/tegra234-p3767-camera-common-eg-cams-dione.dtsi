@@ -1424,6 +1424,125 @@
 								};
 							 };
 						  };
+						  /* Titan I2C 0x30 confirmed by Werner; iLumos CSI timing remains provisional. */
+						  titan_cam0: titan_b@30 {
+							 compatible = "exosens,titan";
+							 /* Time allowed for the camera to boot before the driver
+							  * gives up on the first I2C access. Tune per board: a
+							  * carrier that switches camera power or reset probes
+							  * sooner after power-up than one wired to the board
+							  * supply. Absent or 0 = single attempt, which is what the
+							  * commented-out line below leaves in place. Uncomment and
+							  * adjust to give the camera time to boot on such a board. */
+							 // exosens,probe-timeout-ms = <2000>;
+							 /* I2C device address */
+							 reg = <0x30>;
+							 status = "disabled";
+
+							 sensor_model = "titan";
+
+							 use_sensor_mode_id = "false";
+
+							 mode0 { // TITAN_MODE_1208x1024_RAW16_BE
+								num_lanes = "2";
+								lane_polarity = "6";
+								tegra_sinterface = SENSOR_CAM0_SERIAL;
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+								active_w = "1208";
+								active_h = "1024";
+								line_length = "1280";
+								mode_type = "raw";
+								pixel_phase = "grey_be";
+								csi_pixel_bit_depth = "16";
+								pix_clk_hz = "148750000";
+								embedded_metadata_height = "0";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+							 };
+
+							 mode1 { // TITAN_MODE_1208x1024_RAW14
+								num_lanes = "2";
+								lane_polarity = "6";
+								tegra_sinterface = SENSOR_CAM0_SERIAL;
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+								active_w = "1208";
+								active_h = "1024";
+								line_length = "1280";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								pix_clk_hz = "148750000";
+								embedded_metadata_height = "0";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+							 };
+
+							 ports {
+								#address-cells = <1>;
+								#size-cells = <0>;
+								port@0 {
+								   reg = <0>;
+								   titan_out0: endpoint {
+#ifdef CAM0_LANE_SWAP
+									  port-index = <0>;
+#else
+									  port-index = <1>;
+#endif
+									  bus-width = <2>;
+									  remote-endpoint = <&eg_cams_csi_in0>;
+								   };
+								};
+							 };
+						  };
 						  microlynx_cam0: microlynx_b@51 {
 							 compatible = "exosens,microlynx";
 							 /* Time allowed for the camera to boot before the driver
@@ -3029,6 +3148,118 @@
 								port@0 {
 								   reg = <0>;
 								   ilumos_out1: endpoint {
+									  port-index = <2>;
+									  bus-width = <2>;
+									  remote-endpoint = <&eg_cams_csi_in1>;
+								   };
+								};
+							 };
+						  };
+						  /* Titan I2C 0x30 confirmed by Werner; iLumos CSI timing remains provisional. */
+						  titan_cam1: titan_c@30 {
+							 compatible = "exosens,titan";
+							 /* Time allowed for the camera to boot before the driver
+							  * gives up on the first I2C access. Tune per board: a
+							  * carrier that switches camera power or reset probes
+							  * sooner after power-up than one wired to the board
+							  * supply. Absent or 0 = single attempt, which is what the
+							  * commented-out line below leaves in place. Uncomment and
+							  * adjust to give the camera time to boot on such a board. */
+							 // exosens,probe-timeout-ms = <2000>;
+							 reg = <0x30>;
+							 status = "disabled";
+
+							 sensor_model = "titan";
+
+							 use_sensor_mode_id = "false";
+
+							 mode0 { // TITAN_MODE_1208x1024_RAW16_BE
+								num_lanes = "2";
+								tegra_sinterface = "serial_c";
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+								active_w = "1208";
+								active_h = "1024";
+								line_length = "1280";
+								mode_type = "raw";
+								pixel_phase = "grey_be";
+								csi_pixel_bit_depth = "16";
+								pix_clk_hz = "148750000";
+								embedded_metadata_height = "0";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+							 };
+
+							 mode1 { // TITAN_MODE_1208x1024_RAW14
+								num_lanes = "2";
+								tegra_sinterface = "serial_c";
+								phy_mode = "DPHY";
+								discontinuous_clk = "no";
+								dpcm_enable = "false";
+								cil_settletime = "0";
+								active_w = "1208";
+								active_h = "1024";
+								line_length = "1280";
+								mode_type = "raw";
+								pixel_phase = "grey";
+								csi_pixel_bit_depth = "14";
+								pad0_en = "1";	/* right-aligned, V4L2-conformant Y14 */
+								pix_clk_hz = "148750000";
+								embedded_metadata_height = "0";
+
+								/* unused */
+								gain_factor = "16";
+								exposure_factor = "1000000";
+								min_gain_val = "16"; /* 1.00x */
+								max_gain_val = "170"; /* 10.66x */
+								step_gain_val = "1";
+								default_gain = "16"; /* 1.00x */
+								min_hdr_ratio = "1";
+								max_hdr_ratio = "1";
+
+								/* framerate */
+								framerate_factor = "1000000";
+								min_framerate = "40000000"; /* 40 fps */
+								max_framerate = "62000000"; /* 62 fps */
+								step_framerate = "1";
+								default_framerate = "60756000"; /* 60.756 fps */
+
+								/* unused */
+								min_exp_time = "13"; /* us */
+								max_exp_time = "683709"; /* us */
+								step_exp_time = "1";
+								default_exp_time = "2495"; /* us */
+							 };
+
+							 ports {
+								#address-cells = <1>;
+								#size-cells = <0>;
+								port@0 {
+								   reg = <0>;
+								   titan_out1: endpoint {
 									  port-index = <2>;
 									  bus-width = <2>;
 									  remote-endpoint = <&eg_cams_csi_in1>;

@@ -78,7 +78,9 @@ dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-imx477-4-lanes.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-imx477.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-ilumos.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-titan.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-ilumos.dtbo
+dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-titan.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam0-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-p3768-eg-cam1-microlynx.dtbo
 dtbo-y += tegra234-p3767-camera-dsboard-ornxs-eg-cams-dione.dtbo
@@ -103,9 +105,13 @@ dtbo-y += tegra234-p3737-camera-eg-cam1-microlynx.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam2-microlynx.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam3-microlynx.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam0-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam0-titan.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam1-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam1-titan.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam2-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam2-titan.dtbo
 dtbo-y += tegra234-p3737-camera-eg-cam3-ilumos.dtbo
+dtbo-y += tegra234-p3737-camera-eg-cam3-titan.dtbo
 
 
 ifneq ($(dtb-y),)

@@ -16,6 +16,7 @@ declare -A CAMERA_LANES=(
 	[Crius1280]="EC_2_lanes"
 	[iLumos]="iLumos"
 	[Microlynx]="Microlynx"
+	[Titan]="Titan"
 )
 
 # Obsolete names, kept working for backward compatibility and mapped to the
@@ -31,6 +32,7 @@ declare -A CAMERA_ALIASES=(
 declare -A CAMERA_GREY_ONLY=(
 	[iLumos]=1
 	[Microlynx]=1
+	[Titan]=1
 )
 
 # Cameras requiring x4 MIPI lanes
