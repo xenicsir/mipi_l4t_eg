@@ -237,14 +237,13 @@ NOTES
   or YUYV instead.
 
 • The AR24/AB24 split above is driven by GStreamer, not V4L2: NVIDIA's
-  own vi5_formats.h/camera_common.c natively switched to RGBA32-only
-  starting L4T 35.4.1 (v4l2-ctl always works fine there), but EG keeps
-  ABGR32/AR24 available too through L4T 35.6.4 because gst-plugins-good
+  vi5_formats.h/camera_common.c expose RGBA32 only on L4T 35.4.1+
+  (supported by v4l2-ctl), while the Exosens BSP also exposes
+  ABGR32/AR24 through L4T 35.6.4 because gst-plugins-good
   1.16.3 (JetPack 5.x, Ubuntu 20.04) doesn't support the RGBA32 V4L2
   fourcc. L4T 36.x+ (JetPack 6.x+, GStreamer 1.20+) doesn't need that
   workaround and reports AB24 only, matching NVIDIA's table. L4T 32.x
-  (T210/T186, VI2/VI4 pipeline) always reports AR24 — NVIDIA never
-  changed that table on those older SoCs.
+  (T210/T186, VI2/VI4 pipeline) reports AR24 in the NVIDIA VI format tables.
 
 • For GStreamer, the format and dimensions are negotiated automatically
   when not explicitly constrained in the caps filter.

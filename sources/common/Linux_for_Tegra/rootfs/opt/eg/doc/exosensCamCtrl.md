@@ -18,7 +18,7 @@ camera, including when several cameras of the same type are connected.
 ```sh
 python3 exosensCamCtrl.py /dev/ilumos-9-0030 read_string 0x10000000
 python3 exosensCamCtrl.py /dev/microlynx-9-0051 read_string 0xB0000000
-python3 exosensCamCtrl.py /dev/titan-9-0030 read_reg32 0x50000000
+python3 exosensCamCtrl.py /dev/titan-9-0030 read_reg32 0x500E0000
 ```
 
 The type is inferred from the **specified device's name**, or the target of
@@ -29,9 +29,54 @@ the type before the command:
 python3 exosensCamCtrl.py --camera titan /dev/my-camera read_string 0x44
 ```
 
-Titan's I2C address `0x30` and native sensor resolution 1208x1024 are confirmed
-by Werner (Titan eSW). Its register map provisionally follows iLumos and still
-requires refinement, including acquisition commands.
+Titan uses I2C address `0x30` and has a native sensor resolution of 1208x1024.
+Its register map is:
+
+| Register | Address | Access / expected value |
+| --- | --- | --- |
+| Firmware version | `0x10000000` | Read, 64-byte string |
+| Pixel format | `0x500E0010` | Read/write, 32 bits; Mono16 `0x01100007`, Mono14 `0x01100025` (to be confirmed) |
+| Image width | `0x500E0000` | Read, 32 bits; native width 1208 |
+| Image height | `0x500E0004` | Read, 32 bits; native height 1024 |
+| Model name | `0x00000044` | Read, 64-byte string |
+| Serial number | `0x00000144` | Read, 64-byte string |
+| Acquisition command | `0x500F0000` | Write, 32 bits; 0 = STOP, 1 = START |
+| Acquisition status | `0x500F000C` | Read, 32 bits; 1 when active |
+
+For example, stop and start acquisition with:
+
+```sh
+python3 exosensCamCtrl.py /dev/titan-9-0030 write_reg32 0x500F0000 0
+python3 exosensCamCtrl.py /dev/titan-9-0030 write_reg32 0x500F0000 1
+```
+
+Titan hardware probe/streaming, CSI byte order and timing are not validated.
+
+## Titan diagnostic probe mode
+
+The `titan` module parameter `allow_probe_failure` defaults to `1`.
+When sensor checks fail, the driver keeps `/dev/titan-<bus>-0030` available
+for register access. The Titan device tree node must be enabled, and driver
+resource allocation and framework registration must succeed.
+
+This mode does not establish camera presence or streaming capability. The
+reported 1208x1024 geometry is a fallback, sensor identity strings are empty,
+and `pixel_format` is `unverified`. Register operations still report I2C and
+GenCP errors; reads and writes are not simulated.
+
+```sh
+cat /sys/module/titan/parameters/allow_probe_failure
+python3 exosensCamCtrl.py /dev/titan-9-0030 read_string 0x10000000 64
+python3 exosensCamCtrl.py /dev/titan-9-0030 read_reg32 0x500E0000
+```
+
+To require successful sensor checks, unload the module after closing camera
+applications, then load it with strict probing:
+
+```sh
+sudo modprobe -r titan
+sudo modprobe titan allow_probe_failure=0
+```
 
 ## Commands
 
@@ -48,12 +93,12 @@ The last form opens an interactive console bound to that device:
 
 ```python
 camera.read_string(0x44)
-camera.read_reg32(0x50000000)
+camera.read_reg32(0x500E0000)
 ```
 
 Addresses and integer values accept decimal and `0x` notation and must fit in
 an unsigned 32-bit register. Float operations reinterpret IEEE 754 binary32
-bits. String length defaults to 64 bytes; the current maximum per read is
+bits. String length defaults to 64 bytes; the maximum per read is
 70 bytes for iLumos and 256 for MicroLynx/Titan. Trailing NUL and `0xff` padding
 is removed. Register addresses remain camera-specific; the script does not
 translate them between camera types.
@@ -66,7 +111,7 @@ driver are reported as errors as well.
 ## Compatibility entry points
 
 `ilumosCtrl.py` and `microlynxCtrl.py` are thin wrappers around
-the same implementation. Their existing `read_reg32`, `write_reg32`, float
+the same implementation. Their `read_reg32`, `write_reg32`, float
 and string functions remain importable. They also require an explicit device:
 
 ```sh
@@ -74,8 +119,7 @@ ilumosCtrl.py /dev/ilumos-9-0030 read_string 0x44
 microlynxCtrl.py /dev/microlynx-9-0051 read_string 0x44
 ```
 
-Old invocations that omitted DEVICE must be updated. To use a wrapper on a
-different target, copy `exosensCamCtrl.py` alongside it; copying only the generic
-script is sufficient when using the new command directly.
+To use a wrapper on another target, copy `exosensCamCtrl.py` alongside it.
+To invoke `exosensCamCtrl.py` directly, copy only that file.
 
 Titan uses `exosensCamCtrl.py` directly; there is no Titan-specific wrapper.

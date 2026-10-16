@@ -76,7 +76,8 @@ CAMERA_DATABASE=(
 )
 ```
 
-**Note**: Since iLumos uses a unique I2C address (0x30), no MIPI lane disambiguation is needed.
+**Note**: iLumos and Titan share I2C address 0x30. Distinguish them by their
+device tree node names (`ilumos_*@30` and `titan_*@30`), not by lane count.
 
 ### Example 3: Adding a Variant of Existing Camera
 
@@ -271,8 +272,3 @@ The script automatically handles:
 - ✅ Matching device tree nodes
 - ✅ Detecting physical connections
 - ✅ Mapping to port numbers
-
----
-
-**Last Updated**: 2026-02-03
-**Script Version**: 2.0 (Data-driven architecture)

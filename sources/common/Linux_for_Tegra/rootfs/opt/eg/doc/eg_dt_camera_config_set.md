@@ -601,17 +601,6 @@ done
 
 ---
 
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.3 | 2026-02-11 | Automatic camera port count detection from device tree, dynamic port validation, default configuration (no args = all ports with Dione), factorized camera database (CAMERA_LANES) |
-| 1.2 | 2026-02-11 | New argument format: `port/camera_type` pairs, usage help, improved error messages |
-| 1.1 | 2026-02-03 | Improved command argument handling (dynamic array expansion), added board detection with detect_jetson_board.sh |
-| 1.0 | 2025-02-02 | Initial version |
-
----
-
 ## Support
 
 For issues or feature requests:
@@ -636,11 +625,10 @@ Part of Forecr/Exosens Jetson BSP distribution.
 
 ### Titan development configuration
 
-Titan uses I2C address **`0x30`**, confirmed by Werner (Titan eSW). Two MIPI lanes,
-continuous clock and a 148750000 Hz pixel clock are provisionally copied from
-iLumos. The two DT modes are 1208x1024 RAW16 big endian and RAW14. The native resolution was
-confirmed by Werner (Titan eSW) on 2026-10-15. CSI timing, including
-`line_length = 1280`, lane count and pixel formats remain provisional.
+Titan uses I2C address **`0x30`** and has a native resolution of 1208x1024.
+The device tree defines RAW16 big-endian and RAW14 modes, two MIPI lanes,
+continuous clock, a 148750000 Hz pixel clock and `line_length = 1280`.
+Lane count, CSI timing, byte order and RAW14 support require hardware validation.
 Titan is unavailable on L4T 32.x
 and on vendors using a pristine, precompiled camera framework.
 
@@ -650,9 +638,9 @@ case-insensitive). The corresponding sensor node is, for example,
 board and L4T family. The chardev is `/dev/titan-<bus>-0030`.
 `exosensCamCtrl.py /dev/titan-<bus>-0030 read_string 0x44` reads the model
 through the driver's GenCP ioctls. The standalone tool also supports iLumos and
-MicroLynx; see [exosensCamCtrl.md](exosensCamCtrl.md). Titan register addresses
-provisionally follow iLumos and still require refinement with Werner, including
-acquisition commands.
+MicroLynx; see [exosensCamCtrl.md](exosensCamCtrl.md) for the Titan register map.
+Acquisition uses `0x500F0000`: write 0 to stop or 1 to start. Read `0x500F000C`
+for acquisition status (1 when active).
 
 No embedded metadata is assumed (`embedded_metadata_height = "0"`). Confirm
 whether any metadata occupies complete lines or columns within image lines

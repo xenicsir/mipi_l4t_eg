@@ -25,23 +25,29 @@
 #define PREFIX "titan"
 #include "gencp-over-i2c/liblogger.h"
 
-/* Werner (Titan eSW) confirms I2C address 0x30 and a map closer to iLumos.
- * Use iLumos addresses and acquisition commands provisionally; refine with FW.
- * Timing and CSI byte order also await hardware confirmation.
+/* Register map confirmed by Werner (Titan eSW), 2026-10-16.
+ * Acquisition uses one register: 0 = STOP, 1 = START; status 1 = active.
+ * Mono14 support, timing and CSI byte order still await confirmation.
  */
-#define REG_ACQ_START_W   0x50000A00
-#define REG_ACQ_STATUS_R  0x50000A20
+#define REG_ACQ_START_W   0x500F0000
+#define REG_ACQ_STATUS_R  0x500F000C
 #define REG_FIRW_VER_R    0x10000000
 #define REG_SERIAL_R      0x00144
 #define REG_MODEL_NAME_R  0x00044
-#define REG_IMG_HEIGHT_R  0x50000004
-#define REG_IMG_WIDTH_R   0x50000000
-#define REG_PIXEL_FORMAT  0x50000008
+#define REG_IMG_HEIGHT_R  0x500E0004
+#define REG_IMG_WIDTH_R   0x500E0000
+#define REG_PIXEL_FORMAT  0x500E0010
 
 #define PIXEL_FORMAT_MONO16 0x01100007u
-#define PIXEL_FORMAT_MONO14 0x01100025u
+#define PIXEL_FORMAT_MONO14 0x01100025u /* To be confirmed by Titan FW. */
 
 #define TITAN_STR_MAX    256
+
+/* Diagnostic mode keeps register access available when sensor checks fail. */
+static bool allow_probe_failure = true;
+module_param(allow_probe_failure, bool, 0444);
+MODULE_PARM_DESC(allow_probe_failure,
+      "Keep register access after sensor check failure (default: true)");
 
 /* Optional boot retry budget inherited from iLumos. Titan boot timing is
  * unknown: absent/zero exosens,probe-timeout-ms means a single attempt.
@@ -452,7 +458,8 @@ static int titan_sensor_check(struct titan *priv)
    if (rc == 0) {
       for (i = sizeof(buf) - 1; i >= 0 && buf[i] == (u8)0xff; i--)
          buf[i] = '\0';
-      strncpy(priv->firmware_version, buf, sizeof(priv->firmware_version) - 1);
+      strncpy(priv->firmware_version, (const char *)buf,
+              sizeof(priv->firmware_version) - 1);
       priv->firmware_version[sizeof(priv->firmware_version) - 1] = '\0';
       dev_info(dev, "FPGA firmware version = %s\n", priv->firmware_version);
    } else {
@@ -562,11 +569,49 @@ static int titan_sensor_check(struct titan *priv)
 
    // Stop the video streaming by default
    dev_dbg(dev, "%s Stop streaming\n", __func__);
-   return titan_write_register(priv, REG_ACQ_START_W, 2);
+   return titan_write_register(priv, REG_ACQ_START_W, 0);
 
 error_exit:
-   dev_err(dev, "Probing failed\n");
+   dev_err(dev, "sensor validation failed\n");
    return -EIO;
+}
+
+/* Caller holds titan_gencp_lock. Transport resources must remain available
+ * for diagnostic ioctls even when no camera answers the sensor checks.
+ */
+static int titan_probe_sensor(struct titan *priv)
+{
+   struct device *dev = &priv->i2c_client->dev;
+   struct camera_common_data *s_data = priv->s_data;
+   int err;
+
+   GENCPCLIENT_Select(&priv->io_handle);
+   if (!GENCPCLIENT_isSuccesfullyInitialized())
+      return -ENOMEM;
+
+   err = titan_sensor_check(priv);
+   if (!err || !allow_probe_failure)
+      return err;
+
+   /* These are unverified defaults for framework registration, not values
+    * read from the camera. Discard any partially populated sensor identity. */
+   priv->native_width = 1208;
+   priv->native_height = 1024;
+   priv->model[0] = '\0';
+   priv->serial_number[0] = '\0';
+   priv->firmware_version[0] = '\0';
+   strncpy(priv->pixel_format, "unverified", sizeof(priv->pixel_format));
+   s_data->sensor_mode_id = TITAN_MODE_1208x1024_RAW16_BE;
+   s_data->def_mode = TITAN_MODE_1208x1024_RAW16_BE;
+   s_data->def_width = s_data->fmt_width = priv->native_width;
+   s_data->def_height = s_data->fmt_height = priv->native_height;
+   s_data->colorfmt = camera_common_find_pixelfmt(V4L2_PIX_FMT_Y16_BE);
+   if (!s_data->colorfmt)
+      return -EINVAL;
+
+   dev_warn(dev, "sensor check failed (%d); diagnostic register access enabled, "
+            "camera presence and video format unverified\n", err);
+   return 0;
 }
 
 static int titan_set_group_hold(struct tegracam_device *tc_dev, bool val)
@@ -731,7 +776,7 @@ static int titan_stop_streaming(struct tegracam_device *tc_dev)
    int rc;
 
    mutex_lock(&titan_gencp_lock);
-   rc = priv->gencp_initialized ? titan_write_register(priv, REG_ACQ_START_W, 2)
+   rc = priv->gencp_initialized ? titan_write_register(priv, REG_ACQ_START_W, 0)
                               : -ENODEV;
    mutex_unlock(&titan_gencp_lock);
    /* Let VI finish the last DMA before teardown, as in iLumos. */
@@ -892,7 +937,7 @@ static int titan_probe(struct i2c_client *client,
       GENCPCLIENT_Init(&priv->io_handle);
    priv->gencp_initialized = true;
    titan_gencp_users++;
-   err = titan_sensor_check(priv);
+   err = titan_probe_sensor(priv);
    if (err)
       titan_gencp_put(priv);
    mutex_unlock(&titan_gencp_lock);

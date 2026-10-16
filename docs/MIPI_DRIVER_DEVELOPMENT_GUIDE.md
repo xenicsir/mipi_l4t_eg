@@ -65,7 +65,7 @@ When multiple layers modify the same file (e.g., a Makefile), a **3-way merge** 
 - `t210` — Jetson Nano / porg (tegra210): has device tree overlays
 - `t186` — Jetson TX2 / TX2i / TX2 NX (tegra186): has device tree overlays (`tegra186-camera-eg-*`)
 
-Neither SoM supports 14- or 16-bit greyscale: their VI format tables (`vi2_formats.h`, `vi4_formats.h`) carry no such entry and we deliberately do not add one (obsolete L4T). **Greyscale-only cameras are therefore not supported on 32.x at all** — no overlays, no kernel modules. The 32.x kernel modules are `dione_ir` and `eg-ec-mipi` only.
+Neither SoM supports 14- or 16-bit greyscale: their VI format tables (`vi2_formats.h`, `vi4_formats.h`) carry no such entry; this BSP does not add those formats on L4T 32.x. **Greyscale-only cameras are therefore not supported on 32.x at all** — no overlays, no kernel modules. The 32.x kernel modules are `dione_ir` and `eg-ec-mipi` only.
 
 For L4T 35.x and 36.x, the SoM is always Orin-family and no `-s` flag is needed.
 
@@ -503,7 +503,7 @@ exosens,probe-timeout-ms = <0>;      /* single attempt, no retry */
 **Absent is the same as `<0>`: one attempt, no retry.** The driver default is
 deliberately "no wait", so a device tree that says nothing about the timeout
 cannot inflict a silent boot delay on anyone; the value that matters is the one
-written in the device tree. Our own device trees carry `<2000>`.
+written in the device tree. The Exosens device trees carry `<2000>`.
 
 The first attempt is never delayed, so raising the value costs nothing on a board
 that powers its cameras early — it only bounds how long a boot may be delayed on
@@ -559,15 +559,12 @@ dtbo-y += tegra234-pXXXX-camera-pYYYY-eg-cam1-ec-2-lanes.dtbo
    subtly wrong — the vendor typically enables board-critical drivers as
    **built-in** (`=y`) where the generic config leaves them as modules (`=m`).
 
-   > **Real case (CTI Hadron DM, 2026-07-24):** the `cti` build used the generic
-   > `defconfig` instead of `cti_tegra_defconfig`. CTI has `BLK_DEV_NVME=y` and
-   > `PCIE_TEGRA194_HOST=y` (built-in); the generic config has both `=m`. Result:
-   > the NVMe rootfs was ready at 4.5 s but the initramfs took until 32.5 s to
-   > mount it — **+26 s of boot time** — because the root driver was a module the
-   > initramfs had to load, instead of being in the kernel. Also diverged:
-   > AppArmor, Bluetooth, ~114 config lines total. `v4l2`/camera worked either
-   > way, which is why it passed functional tests — boot *timing* was the only
-   > visible symptom.
+   > **CTI Hadron DM configuration:** `cti_tegra_defconfig` sets
+   > `BLK_DEV_NVME=y` and `PCIE_TEGRA194_HOST=y` (built-in), whereas the generic
+   > `defconfig` sets both to `=m`. Building these root-filesystem drivers as
+   > modules requires the initramfs to load them and can delay mounting the
+   > NVMe rootfs. AppArmor and Bluetooth configuration can differ as well.
+   > Verify boot behavior in addition to camera operation.
 
    Where the vendor defconfig comes from depends on how its sources arrive:
    - **Vendor ships a defconfig file you commit** (Forecr): put it under

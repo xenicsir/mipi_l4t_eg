@@ -616,15 +616,6 @@ sudo apt-get install jq
 
 ---
 
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.1 | 2026-02-02 | Enhanced detection using compatible strings for improved reliability. Now correctly identifies boards even when DTB filename is unavailable or model string is misleading. Added compatible strings to verbose output. |
-| 1.0 | 2025-02-02 | Initial release with comprehensive board support |
-
----
-
 ## Support
 
 For issues or feature requests:

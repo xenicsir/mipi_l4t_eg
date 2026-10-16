@@ -55,9 +55,6 @@ states:
 
 > *"Note: CSI_0_D1 and CSI_1_D0 have P/N swapped on the module."*
 
-This was first documented in Design Guide v1.0 (December 2022), where the changelog reads:
-"Table 10-1 and Figure 10-1: Updated to show swapped P/N on two data lanes".
-
 Since the swap is inherent to the Orin NX/Nano SoM (between the Tegra234 SoC and the
 SODIMM edge connector), **all carrier boards** using this module must apply
 `lane_polarity = "6"` for CSI0 and CSI1 — this is not specific to the Nvidia devkit

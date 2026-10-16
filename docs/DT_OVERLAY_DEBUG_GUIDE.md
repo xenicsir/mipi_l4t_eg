@@ -239,7 +239,7 @@ Fragment@1: target = /
 
 **Symptom:** Camera probe fails or DT graph validation errors, even though the overlay compiles and applies cleanly.
 
-**Cause:** The author created new labels (e.g., `eg_cams_csi_in0`) inside an `__overlay__` block for nodes that already exist in the base DTB (the nvcsi `endpoint@0`, vi `endpoint`, etc.). This gives the node two phandles — the original one from the base DTB and a new one from the overlay. Other nodes that already referenced the original phandle (e.g., the disabled stock camera's back-pointer to nvcsi) are not updated, creating an asymmetric graph.
+**Cause:** Assigning labels (e.g., `eg_cams_csi_in0`) inside an `__overlay__` block to nodes that already exist in the base DTB (the nvcsi `endpoint@0`, vi `endpoint`, etc.). This gives the node two phandles — the original one from the base DTB and a new one from the overlay. Other nodes that already referenced the original phandle (e.g., the disabled stock camera's back-pointer to nvcsi) are not updated, creating an asymmetric graph.
 
 **Rule:** Never assign labels to nodes that already exist in the base DTB inside an `__overlay__` block. Instead:
 

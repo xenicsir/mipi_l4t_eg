@@ -143,7 +143,7 @@ class CameraControlTests(unittest.TestCase):
     def test_cli_output_and_device_binding(self):
         with patch.object(ctrl.Camera, 'read_reg32', return_value=1208), \
                 contextlib.redirect_stdout(io.StringIO()) as output:
-            self.assertEqual(ctrl.main(['/dev/titan-9-0030', 'read_reg32', '0x50000000']), 0)
+            self.assertEqual(ctrl.main(['/dev/titan-9-0030', 'read_reg32', '0x500E0000']), 0)
             self.assertIn('0x000004B8  (1208)', output.getvalue())
         with patch.object(ctrl.Camera, 'read_reg32', side_effect=OSError('no camera')), \
                 contextlib.redirect_stderr(io.StringIO()) as output:

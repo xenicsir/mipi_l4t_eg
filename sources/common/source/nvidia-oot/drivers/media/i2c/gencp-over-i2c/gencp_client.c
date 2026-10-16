@@ -10,6 +10,12 @@
 #include "gencp_client.h"
 #include "nb_timer.h"
 
+#if GENCP_I2C_BUFFER_SIZE == 1024
+#ifdef __KERNEL__
+#include <linux/delay.h>
+#endif
+#endif
+
 #define TIMER_GENCPCLIENT_PTT 0
 #define TIMER_GENCPCLIENT_HEARTBEAT 1
 #define TIMER_GENCPCLIENT_ACK_READ 2
@@ -510,9 +516,8 @@ static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write
   */
 #if GENCP_I2C_BUFFER_SIZE == 1024
 /* Titan uses raw buffered GenCP packets. Validate packet integrity and request
- * correlation before exposing data. As in the working MicroLynx client, WRITE
- * ACK payload length comes from the received CCD; the API returns its status.
- * Do not impose an address echo or a fixed SCD layout from a diagram.
+ * correlation before exposing data. WRITE ACK payload length comes from the
+ * received CCD; the API returns its status.
  */
 static bool GENCPCLIENT_BufferAckHeaderValid(void)
 {
@@ -531,18 +536,71 @@ static bool GENCPCLIENT_BufferAckHeaderValid(void)
    return command == GENCP_WRITEMEM_CMD;
 }
 
+/* The complemented 16-bit sum can encode zero as 0x0000 or 0xffff.
+ * GENCP_crc16 normalizes it to 0xffff; accept either encoding on reception. */
+static bool GENCPCLIENT_BufferChecksumValid(uint8_t *data, uint32_t length,
+                                           uint16_t received_wire)
+{
+   uint16_t calculated = GENCP_crc16(data, length);
+   uint16_t received = __builtin_bswap16(received_wire);
+
+   return calculated == received || (calculated == 0xffff && received == 0);
+}
+
 static bool GENCPCLIENT_BufferAckPayloadValid(void)
 {
    uint16_t length = __builtin_bswap16(pRxBuffer->ccd.scd_length_u16);
-   uint16_t crc = GENCP_crc16((uint8_t *)&pRxBuffer->prefix.channel_id_u16,
-                            CCD_CRC_LENGTH_BYTES + length);
 
-   return crc == __builtin_bswap16(pRxBuffer->prefix.scd_crc_16);
+   return GENCPCLIENT_BufferChecksumValid(
+      (uint8_t *)&pRxBuffer->prefix.channel_id_u16,
+      CCD_CRC_LENGTH_BYTES + length, pRxBuffer->prefix.scd_crc_16);
+}
+
+/* Each Titan read returns a complete buffer snapshot. Re-read stale or
+ * corrupt ACKs without combining snapshots or searching their padding for
+ * another packet. All polls share one deadline for the request. */
+static uint32_t GENCPCLIENT_BufferIsAckMsgRdy(uint8_t startTimer,
+                                           uint8_t *timerIsExpired)
+{
+   if (startTimer) {
+      *timerIsExpired = 0;
+      memset(pRxBuffer, 0, sizeof(*pRxBuffer));
+      nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
+      return ACK_NOT_READY;
+   }
+   if (nb_timer_is_expired(TIMER_GENCPCLIENT_PTT)) {
+      *timerIsExpired = 1;
+      memset(pRxBuffer, 0, sizeof(*pRxBuffer));
+      return ACK_NOT_READY;
+   }
+
+   if (unio_read(unio_handle_ptr, (uint8_t *)pRxBuffer, sizeof(*pRxBuffer)) == 0 &&
+       __builtin_bswap16(pRxBuffer->prefix.preamble_u16) == GENCP_PREAMBLE &&
+       GENCPCLIENT_BufferChecksumValid(
+          (uint8_t *)&pRxBuffer->prefix.channel_id_u16,
+          CCD_CRC_LENGTH_BYTES, pRxBuffer->prefix.ccd_crc_16) &&
+       GENCPCLIENT_BufferAckHeaderValid() &&
+       (pRxBuffer->ccd.scd_length_u16 == 0 || GENCPCLIENT_BufferAckPayloadValid())) {
+      nb_timer_delete(TIMER_GENCPCLIENT_PTT);
+      return ACK_READY;
+   }
+
+   /* Clear rejected data and wait before polling the next snapshot. */
+   memset(pRxBuffer, 0, sizeof(*pRxBuffer));
+#ifdef __KERNEL__
+   usleep_range(5000, 6000);
+#else
+   usleep(5000);
+#endif
+   return ACK_NOT_READY;
 }
 #endif
 
 static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpired)
 {
+#if GENCP_I2C_BUFFER_SIZE == 1024
+   return GENCPCLIENT_BufferIsAckMsgRdy(startTimer, timerIsExpired);
+#else
    uint32_t Status_u32 = ACK_NOT_READY;
    uint8_t* pAckStartPtr_u8 = (uint8_t*) pRxBuffer;
    uint8_t byteReceived_u8 = 0xab;
@@ -554,10 +612,6 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
    {
       nb_timer_start(TIMER_GENCPCLIENT_PTT, GENCPCLIENT_GetPackageTransferTime());
       AckMsgState = HUNTING_PREAMBLE_0;
-#if GENCP_I2C_BUFFER_SIZE == 1024
-      RxIndex = 0;
-      memset(pRxBuffer, 0, sizeof(*pRxBuffer));
-#endif
    }
    else
    {
@@ -567,9 +621,6 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
          *timerIsExpired = 1;                // Set the Timer expired flag HIGH!
          memset(pRxBuffer, 0, sizeof(GENCP_MSG));
          AckMsgState = HUNTING_PREAMBLE_0;
-#if GENCP_I2C_BUFFER_SIZE == 1024
-         return ACK_NOT_READY;
-#endif
       }
       while (SUCCESS == unio_read_byte(unio_handle_ptr, &byteReceived_u8))
       {
@@ -614,12 +665,6 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
 
                   if(Checksum_u16 == __builtin_bswap16(pRxBuffer->prefix.ccd_crc_16))
                   {
-#if GENCP_I2C_BUFFER_SIZE == 1024
-                     if (!GENCPCLIENT_BufferAckHeaderValid()) {
-                        AckMsgState = WAIT_FOR_PTT_TIMEOUT;
-                        break;
-                     }
-#endif
                      if(__builtin_bswap16(pRxBuffer->ccd.scd_length_u16) == 0)
                      {
                         // S T O P   H E R E   A L R E A D Y  . . .
@@ -650,12 +695,6 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
                // All of the data have been received
                if (RxIndex == (PREFIXE_LENGTH_BYTES + CCD_LENGTH_BYTES + (uint32_t)__builtin_bswap16(pRxBuffer->ccd.scd_length_u16)))
                {
-#if GENCP_I2C_BUFFER_SIZE == 1024
-                  if (!GENCPCLIENT_BufferAckPayloadValid()) {
-                     AckMsgState = WAIT_FOR_PTT_TIMEOUT;
-                     break;
-                  }
-#endif
                   nb_timer_delete(TIMER_GENCPCLIENT_PTT);
                   Status_u32 = ACK_READY;
                   RxIndex = 0;
@@ -673,10 +712,6 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
                break;
          }
 
-#if GENCP_I2C_BUFFER_SIZE == 1024
-         if (Status_u32 == ACK_READY)
-            break; /* Ignore buffer padding after the complete valid ACK. */
-#endif
 
          if (RxIndex > GENCP_RX_BUF_INDEX_MAX)
          {   // Exceed the end of GENCP RX Buf => Not receive all of the message
@@ -687,6 +722,7 @@ static uint32_t GENCPCLIENT_IsAckMsgRdy(uint8_t startTimer, uint8_t* timerIsExpi
    }
 
    return Status_u32;
+#endif
 }
 
 /*_    _      _                   ______                _   _

@@ -25,7 +25,7 @@ out — keep this as a usage cheat-sheet.
 - Put the board in **recovery mode** (hold RECOVERY, tap RESET) **before each** command.
 - All commands are run from the BSP's `Linux_for_Tegra/` directory.
 - When using **SDK Manager**, use version **2.4.0** — some of the JetPack versions
-  listed here are no longer offered in 2.4.1.
+  listed here are unavailable in 2.4.1.
 
 ---
 

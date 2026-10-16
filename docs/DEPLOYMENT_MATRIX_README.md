@@ -196,7 +196,7 @@ A blank cell means:
 Some combinations are impossible:
 
 - **T210 (Nano) cannot support Y16** — *hardware*: the Tegra X1 video input has no 16-bit RAW format (TRM tables 184/185 stop at RAW14)
-- **T210 and T186 do not support Y14 either** — *software*: the L4T 32.x kernel has no Y14 entry in its VI format table (`vi2_formats.h`, `vi4_formats.h`) and we deliberately do not add one (obsolete L4T, decision 2026-08-17). On T210 the hardware would handle RAW14; on T186 that is undetermined (no Parker TRM available)
+- **T210 and T186 do not support Y14 either** — *software*: the L4T 32.x kernel has no Y14 entry in its VI format table (`vi2_formats.h`, `vi4_formats.h`); this BSP does not add Y14 support on L4T 32.x. On T210 the hardware would handle RAW14; on T186 that is undetermined (no Parker TRM available)
 - **Greyscale-only cameras therefore cannot stream on 32.x at all** — every one of their modes is Y14 or Y16. They are marked `not_supported` on `nano_t210` and `tx2_t186`, and their device-tree overlays are not built for those SoMs
 - **32.x L4T cannot support 36.x cameras** — Different driver architecture (in-tree vs out-of-tree)
 
@@ -204,8 +204,8 @@ A combination ruled out by `platform_restrictions` needs an explicit `not_suppor
 
 ### Testing vs. Theoretical Support
 
-- **✅ Tested** = We've flashed, booted, and verified the camera works
-- **⚠️ Theoretically Supported** = Architecture supports it, but we haven't tested it
+- **✅ Tested** = Camera operation verified after flashing and booting the platform
+- **⚠️ Theoretically Supported** = Architecture supports it; camera operation is not validated
 - **❌ Not Supported** = Hardware or firmware makes it impossible
 
 ## 🔄 Workflow for Adding New Camera Support
@@ -238,7 +238,7 @@ Example progression:
 
 1. **See which cameras are available for your platform** — Find your SoM row in the matrix
 2. **Check the L4T version** — Match your JetPack/L4T version to see what's supported
-3. **Contact support if you see ⚠️** — We can test on your specific platform if needed
+3. **Contact support if you see ⚠️** — Provide the platform and camera details for validation
 
 ### Example: "I have Orin NX DevKit with L4T 35.6.0"
 
@@ -249,7 +249,7 @@ Looking at the matrix:
 
 ## 📚 Related Documentation
 
-- See `claude_porting_runbook.md` for detailed porting procedures
+- See [MIPI Driver Development Guide](MIPI_DRIVER_DEVELOPMENT_GUIDE.md) for driver integration and porting procedures
 - See individual camera datasheets for specifications
 
 ## 🤝 Support
@@ -262,6 +262,4 @@ For issues or questions about the matrix:
 
 ---
 
-**Last Updated:** 2026-02-20
-**Maintained By:** MIPI Portage Team
 **Generated From:** `deployment_matrix_data.yaml`
