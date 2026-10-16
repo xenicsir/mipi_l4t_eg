@@ -36,6 +36,12 @@
 #include "tc358746_regs.h"
 #include "tc358746_calculation.h"
 
+/* L4T 32.x headers predate this fourcc. Defining it lets the shared reporting
+ * code compile; the device tree still determines which formats are offered. */
+#ifndef V4L2_PIX_FMT_Y14
+#define V4L2_PIX_FMT_Y14 v4l2_fourcc('Y', '1', '4', ' ')
+#endif
+
 /*
  * gpio_cansleep() (legacy integer GPIO API) a été retiré du kernel en 6.x.
  * gpiod_cansleep()+gpio_to_desc() existent de 4.9 à 6.8 -> on garde les deux branches

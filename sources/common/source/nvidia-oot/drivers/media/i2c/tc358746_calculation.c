@@ -90,7 +90,10 @@ static const struct tc358746_mbus_fmt tc358746_formats[] = {
          .pdformat = DATAFMT_PDFMT_RGB888,
          .pdataf = CONFCTL_PDATAF_MODE0,
          .ppp = 1,
-   }, {
+   },
+/* Older L4T 32.x headers and VI format tables do not provide RAW14. */
+#ifdef MEDIA_BUS_FMT_Y14_1X14
+   {
       /*
        * RAW14. Datasheet Table 4.3 gives the parallel pin usage as
        * {10'b0, P[13:0]}, i.e. the 14 bits right-aligned on PD[13:0] --
@@ -112,6 +115,7 @@ static const struct tc358746_mbus_fmt tc358746_formats[] = {
          .pdataf = CONFCTL_PDATAF_MODE0,
          .ppp = 1,
    },
+#endif
 };
 
 static const struct tc358746_mbus_fmt *tc358746_get_format(u32 code)
