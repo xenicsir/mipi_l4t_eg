@@ -111,8 +111,8 @@ static const struct of_device_id titan_of_match[] = {
 MODULE_DEVICE_TABLE(of, titan_of_match);
 
 enum {
-   TITAN_MODE_1208x1024_RAW16_BE,
-   TITAN_MODE_1208x1024_RAW14,
+   TITAN_MODE_1280x1024_RAW16_BE,
+   TITAN_MODE_1280x1024_RAW14,
 };
 
 static const int titan_60fps[] = {
@@ -123,11 +123,10 @@ static const int titan_60fps[] = {
  * WARNING: frmfmt ordering need to match mode definition in
  * device tree!
  */
-/* Native resolution confirmed by Werner (Titan eSW), 2026-10-15.
- * TODO: confirm frame rate. */
+/* Native resolution: 1280x1024. Frame rate requires hardware validation. */
 static const struct camera_common_frmfmt titan_frmfmt[] = {
-   {{1208, 1024}, titan_60fps, 1, 0, TITAN_MODE_1208x1024_RAW16_BE},
-   {{1208, 1024}, titan_60fps, 1, 0, TITAN_MODE_1208x1024_RAW14},
+   {{1280, 1024}, titan_60fps, 1, 0, TITAN_MODE_1280x1024_RAW16_BE},
+   {{1280, 1024}, titan_60fps, 1, 0, TITAN_MODE_1280x1024_RAW14},
 };
 
 static int titan_find_frmfmt(u32 width, u32 height)
@@ -413,7 +412,7 @@ static int titan_apply_pixel_format(struct titan *priv, u32 want)
    mode = titan_find_frmfmt(priv->native_width, priv->native_height);
    if (mode >= 0) {
       if (current_fmt == PIXEL_FORMAT_MONO14)
-         mode += TITAN_MODE_1208x1024_RAW14;
+         mode += TITAN_MODE_1280x1024_RAW14;
       priv->tc_dev->s_data->sensor_mode_id = mode;
       priv->tc_dev->s_data->def_mode       = mode;
    }
@@ -503,13 +502,13 @@ static int titan_sensor_check(struct titan *priv)
       goto error_exit;
    }
    if (is_raw14)
-      mode += TITAN_MODE_1208x1024_RAW14;
+      mode += TITAN_MODE_1280x1024_RAW14;
 
    priv->tc_dev->s_data->sensor_mode_id = mode;
    priv->tc_dev->s_data->def_mode       = mode;
    /* Sync the V4L2 format to the camera's actual native resolution.
     * tegracam_device_register() always initialises fmt from frmfmt[0]
-    * (1208x1024). Keep this fixup for future native sensor resolutions. */
+    * (1280x1024). Keep this fixup for future native sensor resolutions. */
    priv->tc_dev->s_data->def_width  = width;
    priv->tc_dev->s_data->def_height = height;
    priv->tc_dev->s_data->fmt_width  = width;
@@ -595,14 +594,14 @@ static int titan_probe_sensor(struct titan *priv)
 
    /* These are unverified defaults for framework registration, not values
     * read from the camera. Discard any partially populated sensor identity. */
-   priv->native_width = 1208;
+   priv->native_width = 1280;
    priv->native_height = 1024;
    priv->model[0] = '\0';
    priv->serial_number[0] = '\0';
    priv->firmware_version[0] = '\0';
    strncpy(priv->pixel_format, "unverified", sizeof(priv->pixel_format));
-   s_data->sensor_mode_id = TITAN_MODE_1208x1024_RAW16_BE;
-   s_data->def_mode = TITAN_MODE_1208x1024_RAW16_BE;
+   s_data->sensor_mode_id = TITAN_MODE_1280x1024_RAW16_BE;
+   s_data->def_mode = TITAN_MODE_1280x1024_RAW16_BE;
    s_data->def_width = s_data->fmt_width = priv->native_width;
    s_data->def_height = s_data->fmt_height = priv->native_height;
    s_data->colorfmt = camera_common_find_pixelfmt(V4L2_PIX_FMT_Y16_BE);

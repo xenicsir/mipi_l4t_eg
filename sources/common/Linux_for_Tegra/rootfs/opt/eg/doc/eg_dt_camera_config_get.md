@@ -824,7 +824,7 @@ Part of Forecr/Exosens Jetson BSP distribution.
 
 ### Titan development configuration
 
-Titan uses I2C address **`0x30`** and has a native resolution of 1208x1024.
+Titan uses I2C address **`0x30`** and has a native resolution of 1280x1024.
 The device tree defines RAW16 big-endian and RAW14 modes, two MIPI lanes,
 continuous clock, a 148750000 Hz pixel clock and `line_length = 1280`.
 Lane count, CSI timing, byte order and RAW14 support require hardware validation.

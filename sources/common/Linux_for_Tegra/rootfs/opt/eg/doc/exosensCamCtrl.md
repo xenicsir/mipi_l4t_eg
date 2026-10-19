@@ -29,14 +29,14 @@ the type before the command:
 python3 exosensCamCtrl.py --camera titan /dev/my-camera read_string 0x44
 ```
 
-Titan uses I2C address `0x30` and has a native sensor resolution of 1208x1024.
+Titan uses I2C address `0x30` and has a native sensor resolution of 1280x1024.
 Its register map is:
 
 | Register | Address | Access / expected value |
 | --- | --- | --- |
 | Firmware version | `0x10000000` | Read, 64-byte string |
 | Pixel format | `0x500E0010` | Read/write, 32 bits; Mono16 `0x01100007`, Mono14 `0x01100025` (to be confirmed) |
-| Image width | `0x500E0000` | Read, 32 bits; native width 1208 |
+| Image width | `0x500E0000` | Read, 32 bits; native width 1280 |
 | Image height | `0x500E0004` | Read, 32 bits; native height 1024 |
 | Model name | `0x00000044` | Read, 64-byte string |
 | Serial number | `0x00000144` | Read, 64-byte string |
@@ -60,7 +60,7 @@ for register access. The Titan device tree node must be enabled, and driver
 resource allocation and framework registration must succeed.
 
 This mode does not establish camera presence or streaming capability. The
-reported 1208x1024 geometry is a fallback, sensor identity strings are empty,
+reported 1280x1024 geometry is a fallback, sensor identity strings are empty,
 and `pixel_format` is `unverified`. Register operations still report I2C and
 GenCP errors; reads and writes are not simulated.
 

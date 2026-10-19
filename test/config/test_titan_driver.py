@@ -110,7 +110,7 @@ static u16 GENCPCLIENT_ReadRegister(u32 reg, u32 *value)
     check_probe(reg, false, 0, false, 0);
     switch (reg) {
     case 0x500E0010: *value = formats[selected->id]; break;
-    case 0x500E0000: *value = 1208; break;
+    case 0x500E0000: *value = 1280; break;
     case 0x500E0004: *value = 1024; break;
     case 0x500F000C: *value = acquisition[selected->id]; break;
     default: assert(fake_status || !fake_initialized); break;
@@ -149,9 +149,9 @@ int main(void)
     struct tegracam_device tc[2] = {{.s_data = &data[0]}, {.s_data = &data[1]}};
     struct titan cams[2] = {
         {.io_handle = {0}, .i2c_client = &client, .tc_dev = &tc[0], .s_data = &data[0],
-         .native_width = 1208, .native_height = 1024, .gencp_initialized = true},
+         .native_width = 1280, .native_height = 1024, .gencp_initialized = true},
         {.io_handle = {1}, .i2c_client = &client, .tc_dev = &tc[1], .s_data = &data[1],
-         .native_width = 1208, .native_height = 1024, .gencp_initialized = true}
+         .native_width = 1280, .native_height = 1024, .gencp_initialized = true}
     };
     u32 value = 0;
     u8 buf[8];
@@ -191,9 +191,9 @@ int main(void)
     assert(data[0].def_mode == 0); /* don't claim a rejected mode */
     ignore_write = false; fake_status = 0x800B;
     assert(titan_apply_pixel_format(&cams[0], PIXEL_FORMAT_MONO14) == -EIO);
-    assert(titan_find_frmfmt(1208, 1024) == 0);
+    assert(titan_find_frmfmt(1280, 1024) == 0);
     assert(titan_find_frmfmt(640, 480) == -1);
-    assert(titan_find_frmfmt(1280, 1024) == -1); /* superseded placeholder */
+    assert(titan_find_frmfmt(1279, 1024) == -1); /* unsupported width */
     assert(titan_pixfmt_to_reg(V4L2_PIX_FMT_Y14, &value) == 0);
     assert(value == PIXEL_FORMAT_MONO14);
     assert(titan_pixfmt_to_reg(V4L2_PIX_FMT_RGB24, &value) == -EINVAL);
@@ -202,21 +202,21 @@ int main(void)
     acquisition[0] = 1;
     assert(titan_sensor_check(&cams[0]) == 0);
     assert(probe_step == 7 && acquisition[0] == 0);
-    assert(data[0].fmt_width == 1208 && data[0].fmt_height == 1024);
+    assert(data[0].fmt_width == 1280 && data[0].fmt_height == 1024);
     assert(data[0].colorfmt->pix_fmt == V4L2_PIX_FMT_Y16_BE);
     checking_probe = false;
     /* No response must preserve real register access and discard partial data. */
     fake_status = 0x8003;
     assert(titan_probe_sensor(&cams[0]) == 0);
     assert(cams[0].gencp_initialized);
-    assert(cams[0].native_width == 1208 && cams[0].native_height == 1024);
+    assert(cams[0].native_width == 1280 && cams[0].native_height == 1024);
     assert(cams[0].model[0] == 0 && cams[0].serial_number[0] == 0);
     assert(cams[0].firmware_version[0] == 0);
     assert(strcmp(cams[0].pixel_format, "unverified") == 0);
     assert(titan_read_register(&cams[0], REG_IMG_WIDTH_R, &value) == -EIO);
     fake_status = 0;
     assert(titan_read_register(&cams[0], REG_IMG_WIDTH_R, &value) == 0);
-    assert(value == 1208); /* ioctl path can recover without another probe */
+    assert(value == 1280); /* ioctl path can recover without another probe */
     const u32 failure_regs[] = {0x10000000, 0x500E0000, 0x500E0004, 0x500F0000};
     for (unsigned int i = 0; i < ARRAY_SIZE(failure_regs); i++) {
         fake_failure_reg = failure_regs[i];
@@ -285,7 +285,7 @@ PROBE_SHIM = r"""
 #define dev_warn(dev, ...) ((void)(dev))
 #define dev_info(dev, ...) ((void)(dev))
 #define V4L2_PIX_FMT_Y16_BE 1
-#define TITAN_MODE_1208x1024_RAW16_BE 0
+#define TITAN_MODE_1280x1024_RAW16_BE 0
 struct device { void *of_node; };
 struct adapter { int nr; };
 struct i2c_client { struct device dev; int addr; struct adapter *adapter; };

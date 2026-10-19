@@ -10,6 +10,7 @@ This guide covers the common development scenarios for Exosens MIPI camera drive
 - [Scenario A: Adding a new camera to an existing BSP version](#scenario-a-adding-a-new-camera-to-an-existing-bsp-version)
 - [Scenario B: Porting a camera to another existing BSP version](#scenario-b-porting-a-camera-to-another-existing-bsp-version)
 - [Scenario C: Porting to a new hardware platform](#scenario-c-porting-to-a-new-hardware-platform)
+  - [AGX Orin NVIDIA developer kit](#agx-orin-nvidia-developer-kit)
 - [Scenario D: Adding support for a new Nvidia BSP version](#scenario-d-adding-support-for-a-new-nvidia-bsp-version)
 - [Scenario E: Adding a PRISTINE_KERNEL vendor (precompiled kernel/nvidia-oot, no source access)](#scenario-e-adding-a-pristine_kernel-vendor-precompiled-kernelnvidia-oot-no-source-access)
 - [Reference: Device tree differences between L4T 32+/35.x and 36.x](#reference-device-tree-differences-between-l4t-3235x-and-36x)
@@ -637,6 +638,151 @@ Finally, add the new `platform_id` to the `platform_ids` list of each supported 
 ```bash
 ./l4t_make.sh
 ```
+
+### AGX Orin NVIDIA developer kit
+
+The NVIDIA AGX Orin developer kit uses the P3737 carrier with a P3701 module.
+The `p3737` camera overlays provide a starting point for this platform. Hardware
+validation of the Exosens AGX Orin configuration covers the **Auvidea X230D**;
+application of overlays to NVIDIA DTBs is tested in software. Camera operation
+on the physical NVIDIA AGX Orin developer kit requires hardware validation.
+
+#### 1. Select the NVIDIA BSP and module SKU
+
+Use the NVIDIA BSP matching the target L4T release and P3701 SKU. Obtain the
+complete **Driver Package (BSP) Sources**, including the DTSI dependencies, from
+[NVIDIA L4T 35.4.1](https://developer.nvidia.com/embedded/jetson-linux-r3541) or
+[NVIDIA L4T 36.4.4](https://developer.nvidia.com/embedded/jetson-linux-r3644), as
+appropriate. These are L4T device trees; a mainline Linux DTS alone does not
+provide the NVIDIA camera framework configuration.
+
+For a P3701-0004 module, the top-level source paths inside the extracted BSP are:
+
+| L4T family | Top-level NVIDIA DTS |
+| --- | --- |
+| 35.x | `source/public/hardware/nvidia/platform/t23x/concord/kernel-dts/tegra234-p3701-0004-p3737-0000.dts` |
+| 36.x | `source/hardware/nvidia/t23x/nv-public/nv-platform/tegra234-p3737-0000+p3701-0004-nv.dts` |
+
+Other module SKUs have corresponding DTS files. See NVIDIA's
+[AGX Orin device tree documentation](https://docs.nvidia.com/jetson/archives/r36.4.4/DeveloperGuide/HR/JetsonModuleAdaptationAndBringUp/JetsonAgxOrinSeries.html#porting-the-linux-kernel-device-tree)
+for the SKU variants and include hierarchy. Keep the NVIDIA base DTB on the
+NVIDIA carrier and the carrier-specific BSP/DTB on an Auvidea carrier; their
+PCIe, USB, CAN and pinmux configuration can differ outside the camera subsystem.
+
+#### 2. Identify the carrier and inspect the base DTB
+
+`detect_jetson_board.sh` uses the model and device tree source filename. An
+Auvidea X230D BSP can expose the same `Jetson AGX Orin Developer Kit` model and
+`p3737` identifiers as NVIDIA. Therefore, `nvidia-p3737` does not establish the
+physical carrier type. Identify the board from its hardware documentation.
+
+On the target:
+
+```bash
+head -n 1 /etc/nv_tegra_release
+uname -r
+detect_jetson_board.sh --json
+agx_base_dtb=$(awk '/^LABEL primary/{f=1} f && /^[[:space:]]*FDT /{print $2; exit}' \
+    /boot/extlinux/extlinux.conf)
+printf 'Primary base DTB: %s\n' "$agx_base_dtb"
+dtc -I dtb -O dts "$agx_base_dtb" > /tmp/agx-base.dts
+```
+
+If the `primary` entry has no `FDT`, identify the DTB selected by the BSP/UEFI
+before proceeding. Inspect the **base** DTB used for overlay application; the
+live `/proc/device-tree` may already contain a merged Exosens configuration.
+In `/tmp/agx-base.dts`, inspect `__symbols__`, the NVCSI channels/endpoints,
+I2C controllers, sensor nodes and their `status` properties.
+
+#### 3. Verify the connector-to-CSI and I2C mapping
+
+Use the NVIDIA P3737 schematics and the camera adapter/cable pinout to map the
+physical connector to the SoC CSI lanes and I2C controller. The X230D PCB names
+**CD (logical port 0)** and **AB (logical port 1)** do not define the NVIDIA
+connector numbering. Likewise, `/dev/videoN` is a registration order, not a
+physical connector number.
+
+Start from these shared source files:
+
+| L4T family | Exosens camera source directory |
+| --- | --- |
+| 35.x | `sources/common/source/hardware_32+/nvidia/platform/t23x/concord/kernel-dts/` |
+| 36.x | `sources/common/source/hardware_36+/nvidia/t23x/nv-public/overlay/` |
+
+The common file is `tegra234-p3737-camera-common-eg-cams-dione.dtsi`; the per-port
+files follow `tegra234-p3737-camera-eg-cam<N>-<camera>.dts`.
+For each connected camera, check the following as one coherent graph:
+
+- Sensor I2C controller/address, `devname` and `proc-device-tree` path. The
+  supplied p3737 nodes use controllers `31e0000`, `c240000`, `c250000` and
+  `3180000`; verify their connection to the selected NVIDIA connector.
+- Sensor `tegra_sinterface`, NVCSI input `port-index`, lane count and polarity;
+  VI-side `port-index` according to the lane mode. Do not copy the P3768
+  Orin Nano/NX lane-polarity settings into P3737 without checking the hardware.
+- Bidirectional sensor–NVCSI and NVCSI–VI `remote-endpoint` links, plus enabled
+  VI/NVCSI ports and `tegra-camera-platform` module entries.
+- Camera power/reset GPIOs, regulators, clock mode and probe timing. Derive
+  `exosens,probe-timeout-ms` from the power/reset sequence.
+
+If a mapping differs, implement a dedicated wrapper or conditional variant as
+in Scenario C rather than changing the shared mapping for all p3737 boards.
+Register that variant in the build and target overlay selection. Edit the files
+under `sources/`, not only the generated `<version>/Linux_for_Tegra/` tree.
+
+#### 4. Preserve the DTB-dependent overlay handling
+
+`eg_dt_camera_config_set.sh` inspects the base DTB and camera configuration;
+it does not choose separate NVIDIA/Auvidea camera mappings from the vendor name.
+Preserve these behaviors when adapting it:
+
+| Base DTB / configuration | Required handling |
+| --- | --- |
+| Only NVCSI channels 0 and 1 exist | Select the two-port overlay when available and reject ports 2/3. Do not restrict a four-channel NVIDIA DTB to two ports. |
+| 35.x global endpoint numbering (`@0/@1`, `@2/@3`, `@4/@5`, `@6/@7`) | Use the global base overlay when eligible. Per-port camera configurations use the regular base with the script's residual-endpoint cleanup. |
+| Active stock IMX219/IMX477 nodes | Apply the corresponding disable overlays so they do not compete for the camera pipeline. |
+| 36.x empty or globally numbered NVCSI graph | The p3737 base overlay creates or merges the global endpoints; retain any required stock-sensor disable overlays. |
+
+Do not select endpoint numbering from `BOARD=auvidea-x230d` alone: X230D BSPs
+can also use NVIDIA global numbering. The 35.x cleanup must retain the Exosens
+endpoints and only remove the residual reference-sensor endpoints. Do not apply
+it blindly to a global Exosens base overlay. A successful `fdtoverlay` operation
+alone does not validate the resulting camera graph; inspect the final DTB after
+all script post-processing. See [Device Tree Overlay Debug Guide](DT_OVERLAY_DEBUG_GUIDE.md).
+
+#### 5. Build, configure and validate on the NVIDIA hardware
+
+For example, build the generic L4T 36.4.4 package on the host:
+
+```bash
+./l4t_make.sh -v 36.4.4 -V generic
+```
+
+Install the matching package on the target. For example, to select a MicroCube
+on logical port 0:
+
+```bash
+sudo eg_dt_camera_config_set.sh 0/MicroCube
+```
+
+Inspect the generated DTB referenced by the `JetsonIO` entry in
+`/boot/extlinux/extlinux.conf`. Keep a working boot entry, then reboot into the
+camera configuration and check:
+
+```bash
+eg_dt_camera_config_get.sh
+v4l2-ctl --list-devices
+v4l2-ctl -d /dev/video0 --list-formats-ext
+sudo dmesg | grep -Ei 'tegra|nvcsi|capture|error|failed'
+v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=300 --stream-to=/dev/null
+```
+
+Replace `/dev/video0` with the device belonging to the selected camera. Validate
+probe, actual image content, resolution, pixel format, frame rate and repeated
+start/stop for each connected port. For multi-camera configurations, also test
+simultaneous acquisition. A `/dev/videoN` or register-access device alone does
+not establish successful camera communication or streaming. Record hardware
+results for `agx_orin_devkit` separately from `agx_orin_x230d` in
+`tools/deployment_matrix_data.yaml`.
 
 ---
 

@@ -832,15 +832,15 @@ cameras:
             line_length: 1280
             pix_clk_hz: 148750000
 
-  # Native resolution 1208x1024 and I2C address 0x30 confirmed by Werner (Titan eSW).
+  # Native sensor resolution: 1280x1024. I2C address: 0x30.
   # CSI timing, including line_length=1280, remains an iLumos placeholder.
   titan:
     name: "Titan"
     dt_node_label_prefix: "titan_cam"
     resolutions:
-      - res: "1208x1024"
+      - res: "1280x1024"
         enabled: true
-        active_w: 1208
+        active_w: 1280
         active_h: 1024
         data_lanes: 2
         discontinuous_clk: "no"
