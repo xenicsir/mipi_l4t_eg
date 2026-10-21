@@ -21,9 +21,9 @@ STR_MAX = 256
 _REG_FMT = '<II'
 _STR_FMT = '<II256s'
 # family: (display name, ioctl magic, actual maximum string read)
-# ilumos_i2c_read_register() has a 72-byte RX buffer, including 2 status bytes.
+# Each driver exposes the same 256-byte string ioctl buffer.
 PROFILES = {
-    'ilumos': ('iLumos', 'I', 70),
+    'ilumos': ('iLumos', 'I', STR_MAX),
     'microlynx': ('MicroLynx', 'M', STR_MAX),
     'titan': ('Titan', 'T', STR_MAX),
 }

@@ -835,9 +835,9 @@ Select it with `sudo eg_dt_camera_config_set.sh 0/Titan` (camera names are
 case-insensitive). The corresponding sensor node is, for example,
 `/proc/device-tree/cam_i2cmux/i2c@0/titan_b@30`; the exact parent depends on the
 board and L4T family. The chardev is `/dev/titan-<bus>-0030`.
-`exosensCamCtrl.py /dev/titan-<bus>-0030 read_string 0x44` reads the model
+`egCamCtrl.py /dev/titan-<bus>-0030 read_string 0x44` reads the model
 through the driver's GenCP ioctls. The standalone tool also supports iLumos and
-MicroLynx; see [exosensCamCtrl.md](exosensCamCtrl.md) for the Titan register map.
+MicroLynx; see [egCamCtrl.md](egCamCtrl.md) for the Titan register map.
 Acquisition uses `0x500F0000`: write 0 to stop or 1 to start. Read `0x500F000C`
 for acquisition status (1 when active).
 

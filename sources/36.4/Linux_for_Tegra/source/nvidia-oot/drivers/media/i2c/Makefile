@@ -38,10 +38,13 @@ obj-m += eg-ec-mipi.o
 # dioneir.c/eg_ec_mipi_src.c's descriptive pixel_format sysfs strings to
 # match, since LINUX_VERSION_CODE alone can't express this distinction.
 ccflags-y += -DEG_RGB888_AB24
+eg_i2c_gencp_dir := $(dir $(lastword $(MAKEFILE_LIST)))gencp-over-i2c/
+include $(eg_i2c_gencp_dir)ilumos.mk
+ilumos-objs := ilumos_core.o gencp-over-i2c/ilumos_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/ilumos_gencp_client.o
 obj-m += ilumos.o
 microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 obj-m += microlynx.o
-include $(dir $(lastword $(MAKEFILE_LIST)))gencp-over-i2c/titan.mk
+include $(eg_i2c_gencp_dir)titan.mk
 titan-objs := titan_core.o gencp-over-i2c/titan_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/titan_gencp_client.o
 obj-m += titan.o
 

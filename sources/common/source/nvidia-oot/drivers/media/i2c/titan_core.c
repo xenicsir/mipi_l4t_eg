@@ -974,7 +974,7 @@ static int titan_probe(struct i2c_client *client,
    priv->miscdev.fops   = &titan_cdev_fops;
    priv->miscdev.parent = dev;
    if (misc_register(&priv->miscdev)) {
-      dev_warn(dev, "failed to register chardev; exosensCamCtrl.py will not work\n");
+      dev_warn(dev, "failed to register chardev; egCamCtrl.py will not work\n");
    } else {
       priv->misc_registered = true;
       dev_info(dev, "chardev registered at /dev/%s\n", priv->miscdev_name);

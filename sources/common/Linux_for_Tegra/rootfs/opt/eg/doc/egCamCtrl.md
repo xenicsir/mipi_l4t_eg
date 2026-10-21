@@ -1,11 +1,11 @@
 # Exosens camera register control
 
-`exosensCamCtrl.py` controls **iLumos, MicroLynx and Titan** through their
+`egCamCtrl.py` controls **iLumos, MicroLynx and Titan** through their
 kernel-driver chardevs. Dione and the `eg_ec_mipi` cameras (MicroCube,
 Crius1280, SmartIR640) are outside its scope.
 
 The tool is a **single standalone Python 3 file**, using only the Python
-standard library. Copy `exosensCamCtrl.py` to another Linux target and run it
+standard library. Copy `egCamCtrl.py` to another Linux target and run it
 with `python3`; no `/opt/eg/lib`, pip dependency or separate package is needed.
 The target must have the appropriate camera driver and a successfully probed
 camera. The global Exosens Debian package also installs the script in `/usr/bin`.
@@ -16,9 +16,9 @@ Always specify the device. The tool never scans `/dev` or picks the first
 camera, including when several cameras of the same type are connected.
 
 ```sh
-python3 exosensCamCtrl.py /dev/ilumos-9-0030 read_string 0x10000000
-python3 exosensCamCtrl.py /dev/microlynx-9-0051 read_string 0xB0000000
-python3 exosensCamCtrl.py /dev/titan-9-0030 read_reg32 0x500E0000
+python3 egCamCtrl.py /dev/ilumos-9-0030 read_string 0x10000000
+python3 egCamCtrl.py /dev/microlynx-9-0051 read_string 0xB0000000
+python3 egCamCtrl.py /dev/titan-9-0030 read_reg32 0x500E0000
 ```
 
 The type is inferred from the **specified device's name**, or the target of
@@ -26,7 +26,7 @@ an explicit symlink. For a custom name with no identifiable target, specify
 the type before the command:
 
 ```sh
-python3 exosensCamCtrl.py --camera titan /dev/my-camera read_string 0x44
+python3 egCamCtrl.py --camera titan /dev/my-camera read_string 0x44
 ```
 
 Titan uses I2C address `0x30` and has a native sensor resolution of 1208x1024.
@@ -46,8 +46,8 @@ Its register map is:
 For example, stop and start acquisition with:
 
 ```sh
-python3 exosensCamCtrl.py /dev/titan-9-0030 write_reg32 0x500F0000 0
-python3 exosensCamCtrl.py /dev/titan-9-0030 write_reg32 0x500F0000 1
+python3 egCamCtrl.py /dev/titan-9-0030 write_reg32 0x500F0000 0
+python3 egCamCtrl.py /dev/titan-9-0030 write_reg32 0x500F0000 1
 ```
 
 Titan hardware probe/streaming, CSI byte order and timing are not validated.
@@ -66,8 +66,8 @@ GenCP errors; reads and writes are not simulated.
 
 ```sh
 cat /sys/module/titan/parameters/allow_probe_failure
-python3 exosensCamCtrl.py /dev/titan-9-0030 read_string 0x10000000 64
-python3 exosensCamCtrl.py /dev/titan-9-0030 read_reg32 0x500E0000
+python3 egCamCtrl.py /dev/titan-9-0030 read_string 0x10000000 64
+python3 egCamCtrl.py /dev/titan-9-0030 read_reg32 0x500E0000
 ```
 
 To require successful sensor checks, unload the module after closing camera
@@ -78,15 +78,43 @@ sudo modprobe -r titan
 sudo modprobe titan allow_probe_failure=0
 ```
 
+## iLumos protocol selection
+
+The driver supports both GenCP-over-I2C and the basic register/length/status
+protocol. At probe, its first camera request reads the firmware version using
+GenCP. If this read succeeds, the camera uses GenCP for subsequent operations;
+otherwise the driver selects the basic protocol and retries the firmware read.
+The choice is independent for each camera and remains fixed for that binding.
+Later communication errors do not switch protocols.
+
+The selected protocol is reported in the kernel log:
+
+```sh
+sudo dmesg | grep 'I2C protocol selected'
+```
+
+The camera must be ready when detection runs. If neither protocol answers, probe
+fails. A new probe repeats detection; after a firmware replacement, unload/reload
+or rebind the driver to select the protocol again.
+
+Register addresses and acquisition commands are the same with both protocols.
+iLumos writes 1 to `0x50000A00` to start and 2 to stop acquisition, and reads
+`0x50000A20` for status. The ioctl layout and `/dev/ilumos-<bus>-0030` naming are
+unchanged. In GenCP mode, the transport polls 1024-byte response buffers and
+validates request IDs, packet lengths and checksums. In basic mode, register
+and status fields are little endian; string read lengths are rounded up to a
+multiple of four on the bus, while only the requested bytes are returned.
+The maximum requested string length is 256 bytes in either mode.
+
 ## Commands
 
 ```text
-exosensCamCtrl.py DEVICE read_reg32 ADDR
-exosensCamCtrl.py DEVICE read_reg32f ADDR
-exosensCamCtrl.py DEVICE write_reg32 ADDR VALUE
-exosensCamCtrl.py DEVICE write_reg32f ADDR VALUE
-exosensCamCtrl.py DEVICE read_string ADDR [LENGTH]
-exosensCamCtrl.py DEVICE
+egCamCtrl.py DEVICE read_reg32 ADDR
+egCamCtrl.py DEVICE read_reg32f ADDR
+egCamCtrl.py DEVICE write_reg32 ADDR VALUE
+egCamCtrl.py DEVICE write_reg32f ADDR VALUE
+egCamCtrl.py DEVICE read_string ADDR [LENGTH]
+egCamCtrl.py DEVICE
 ```
 
 The last form opens an interactive console bound to that device:
@@ -99,7 +127,7 @@ camera.read_reg32(0x500E0000)
 Addresses and integer values accept decimal and `0x` notation and must fit in
 an unsigned 32-bit register. Float operations reinterpret IEEE 754 binary32
 bits. String length defaults to 64 bytes; the maximum per read is
-70 bytes for iLumos and 256 for MicroLynx/Titan. Trailing NUL and `0xff` padding
+256 bytes for iLumos, MicroLynx and Titan. Trailing NUL and `0xff` padding
 is removed. Register addresses remain camera-specific; the script does not
 translate them between camera types.
 
@@ -119,7 +147,7 @@ ilumosCtrl.py /dev/ilumos-9-0030 read_string 0x44
 microlynxCtrl.py /dev/microlynx-9-0051 read_string 0x44
 ```
 
-To use a wrapper on another target, copy `exosensCamCtrl.py` alongside it.
-To invoke `exosensCamCtrl.py` directly, copy only that file.
+To use a wrapper on another target, copy `egCamCtrl.py` alongside it.
+To invoke `egCamCtrl.py` directly, copy only that file.
 
-Titan uses `exosensCamCtrl.py` directly; there is no Titan-specific wrapper.
+Titan uses `egCamCtrl.py` directly; there is no Titan-specific wrapper.

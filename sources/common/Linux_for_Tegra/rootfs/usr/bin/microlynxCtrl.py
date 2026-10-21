@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for exosensCamCtrl.py; an explicit device is required."""
+"""Compatibility entry point for egCamCtrl.py; an explicit device is required."""
 
 from functools import partial
 import os
@@ -7,7 +7,7 @@ import sys
 
 # Compatibility wrappers live alongside the standalone implementation.
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import exosensCamCtrl as _ctrl
+import egCamCtrl as _ctrl
 
 read_reg32 = partial(_ctrl.read_reg32, camera_type='microlynx')
 read_reg32f = partial(_ctrl.read_reg32f, camera_type='microlynx')

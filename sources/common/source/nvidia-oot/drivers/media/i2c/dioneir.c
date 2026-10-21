@@ -2192,7 +2192,7 @@ static DEVICE_ATTR_RO(pixel_format);
  * Published only where the device tree actually declares a Y14 mode: on L4T
  * 32.x platforms it does not (no 14-bit greyscale in their VI format tables),
  * and a reader that finds no pixel_formats correctly concludes the camera has
- * a single fixed format. Same contract as ilumos.c.
+ * a single fixed format. Same contract as ilumos_core.c.
  */
 static ssize_t pixel_formats_show(struct device *dev,
       struct device_attribute *attr, char *buf)

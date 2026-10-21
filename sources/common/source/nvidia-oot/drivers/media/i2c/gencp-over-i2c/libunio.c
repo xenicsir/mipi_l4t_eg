@@ -12,7 +12,7 @@
 #if GENCP_I2C_BUFFER_SIZE == 16
 static struct ring_buffer rb_fifo;
 #else
-/* Raw Titan GenCP bytes: never run the FIFO repeat/complement decoder. */
+/* Raw buffered GenCP bytes: never run the FIFO repeat/complement decoder. */
 static u8 raw_rx[GENCP_I2C_BUFFER_SIZE];
 static size_t raw_index, raw_length;
 #endif

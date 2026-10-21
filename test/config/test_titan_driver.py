@@ -3,7 +3,7 @@
 
 No hardware is required. Compile selected driver functions with host shims, then
 check multi-camera selection, error propagation, format read-back and cleanup.
-The shared control tool's ABI tests live in test_exosens_cam_ctrl.py.
+The shared control tool's ABI tests live in test_eg_cam_ctrl.py.
 """
 from pathlib import Path
 import re

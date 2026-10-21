@@ -30,6 +30,9 @@ eg-ec-mipi-objs := eg_ec_mipi_src.o ecctrl_i2c_common.o
 obj-$(CONFIG_VIDEO_EG_EC_MIPI)	+= eg-ec-mipi.o
 obj-$(CONFIG_VIDEO_DIONE_IR) += dione_ir.o
 dione_ir-y += dioneir.o tc358746_calculation.o
+eg_i2c_gencp_dir := $(dir $(lastword $(MAKEFILE_LIST)))gencp-over-i2c/
+include $(eg_i2c_gencp_dir)ilumos.mk
+ilumos-objs := ilumos_core.o gencp-over-i2c/ilumos_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/ilumos_gencp_client.o
 obj-$(CONFIG_VIDEO_ILUMOS) += ilumos.o
 microlynx-objs := \
     microlynx_core.o \
@@ -39,6 +42,6 @@ microlynx-objs := \
     gencp-over-i2c/gencp_common.o \
     gencp-over-i2c/gencp_client.o
 obj-$(CONFIG_VIDEO_MICROLYNX) += microlynx.o
-include $(dir $(lastword $(MAKEFILE_LIST)))gencp-over-i2c/titan.mk
+include $(eg_i2c_gencp_dir)titan.mk
 titan-objs := titan_core.o gencp-over-i2c/titan_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/titan_gencp_client.o
 obj-$(CONFIG_VIDEO_TITAN) += titan.o

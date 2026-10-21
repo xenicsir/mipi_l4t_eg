@@ -515,7 +515,7 @@ static uint32_t GENCPCLIENT_ComposeWriteCommand(uint64_t address, uint16_t write
   |___/
   */
 #if GENCP_I2C_BUFFER_SIZE == 1024
-/* Titan uses raw buffered GenCP packets. Validate packet integrity and request
+/* Buffered GenCP packets: Validate packet integrity and request
  * correlation before exposing data. WRITE ACK payload length comes from the
  * received CCD; the API returns its status.
  */
@@ -556,7 +556,7 @@ static bool GENCPCLIENT_BufferAckPayloadValid(void)
       CCD_CRC_LENGTH_BYTES + length, pRxBuffer->prefix.scd_crc_16);
 }
 
-/* Each Titan read returns a complete buffer snapshot. Re-read stale or
+/* Each buffered read returns a complete buffer snapshot. Re-read stale or
  * corrupt ACKs without combining snapshots or searching their padding for
  * another packet. All polls share one deadline for the request. */
 static uint32_t GENCPCLIENT_BufferIsAckMsgRdy(uint8_t startTimer,

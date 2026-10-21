@@ -163,7 +163,7 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
             return 0, 1, [f"dpkg-deb extract failed: {r.stderr.decode().strip()}"]
 
         # --- Script present and executable ---
-        for script_name in ("eg_dt_camera_config_set.sh", "exosensCamCtrl.py",
+        for script_name in ("eg_dt_camera_config_set.sh", "egCamCtrl.py",
                             "ilumosCtrl.py", "microlynxCtrl.py"):
             script = extract_dir / "usr" / "bin" / script_name
             if script.exists() and os.access(script, os.X_OK):

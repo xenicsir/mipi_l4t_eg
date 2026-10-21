@@ -16,9 +16,9 @@ from unittest.mock import mock_open, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 ROOTFS = ROOT / 'sources/common/Linux_for_Tegra/rootfs'
-LIB = ROOTFS / 'usr/bin/exosensCamCtrl.py'
+LIB = ROOTFS / 'usr/bin/egCamCtrl.py'
 DRIVERS = ROOT / 'sources/common/source/nvidia-oot/drivers/media/i2c'
-spec = importlib.util.spec_from_file_location('exosensCamCtrl', LIB)
+spec = importlib.util.spec_from_file_location('egCamCtrl', LIB)
 ctrl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ctrl)
 
@@ -26,7 +26,7 @@ spec.loader.exec_module(ctrl)
 class CameraControlTests(unittest.TestCase):
     def test_abi_against_kernel_structs_and_macros(self):
         """Compile the real UAPI declarations, independently of Python's packing."""
-        for family, filename in (('ilumos', 'ilumos.c'), ('microlynx', 'microlynx_core.c'),
+        for family, filename in (('ilumos', 'ilumos_core.c'), ('microlynx', 'microlynx_core.c'),
                                  ('titan', 'titan_core.c')):
             with self.subTest(family=family), tempfile.TemporaryDirectory() as temp:
                 source = (DRIVERS / filename).read_text()
@@ -99,6 +99,17 @@ class CameraControlTests(unittest.TestCase):
                         camera.read_string(0x44, length)
                 opened.assert_not_called()
 
+    def test_ilumos_long_strings(self):
+        camera = ctrl.Camera('/dev/ilumos-9-0030')
+        for length in (71, 256):
+            def fake_ioctl(fd, request, buf):
+                self.assertEqual(request, camera.ioctl_read_str)
+                self.assertEqual(struct.unpack_from('<II', buf), (0x44, length))
+                buf[8:8 + length] = b'A' * length
+                return 0
+            with patch('builtins.open', mock_open()), patch.object(ctrl.fcntl, 'ioctl', side_effect=fake_ioctl):
+                self.assertEqual(camera.read_string(0x44, length), 'A' * length)
+
     def test_protocol_and_system_errors(self):
         camera = ctrl.Camera('/dev/microlynx-9-0051')
         with patch('builtins.open', mock_open()), patch.object(ctrl.fcntl, 'ioctl', return_value=0x8003):
@@ -130,7 +141,7 @@ class CameraControlTests(unittest.TestCase):
                  ['/dev/titan-9-0030', 'read_reg32', '-1'],
                  ['/dev/titan-9-0030', 'write_reg32', '0x44', '0x100000000'],
                  ['/dev/titan-9-0030', 'read_string', '0x44', '0'],
-                 ['/dev/ilumos-9-0030', 'read_string', '0x44', '71'],
+                 ['/dev/ilumos-9-0030', 'read_string', '0x44', '257'],
                  ['--camera', 'titan', '/dev/ilumos-9-0030', 'read_reg32', '0x44'],
                  ['/dev/titan-9-0030', 'read_reg32', '0x44', 'surplus']]
         for args in cases:
@@ -157,7 +168,7 @@ class CameraControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             rootfs = Path(temp)
             (rootfs / 'usr/bin').mkdir(parents=True)
-            for name in ('exosensCamCtrl', 'ilumosCtrl', 'microlynxCtrl'):
+            for name in ('egCamCtrl', 'ilumosCtrl', 'microlynxCtrl'):
                 script = rootfs / 'usr/bin' / (name + '.py')
                 shutil.copy(ROOTFS / 'usr/bin' / script.name, script)
                 result = subprocess.run([sys.executable, str(script), '--help'], capture_output=True)
