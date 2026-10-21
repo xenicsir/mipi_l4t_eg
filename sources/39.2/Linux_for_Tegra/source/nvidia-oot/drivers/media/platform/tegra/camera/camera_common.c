@@ -535,43 +535,21 @@ static const struct camera_common_colorfmt *find_matching_color_fmt(
 		size_t index)
 {
 	const struct sensor_properties *sensor_props = &s_data->sensor_props;
-	const size_t num_modes = sensor_props->num_modes;
-	const size_t common_fmts_size = ARRAY_SIZE(camera_common_color_fmts);
+	size_t i, j, match_index = 0;
 
-	struct sensor_image_properties *cur_props;
-	bool matched[ARRAY_SIZE(camera_common_color_fmts)];
-	int match_num = -1;
-	int match_index = -1;
-	size_t i, j;
-
-	// Clear matched array so no format has been matched
-	memset(matched, 0, sizeof(matched));
-
-	// Find and count matching color formats
-	for (i = 0; i < common_fmts_size; i++) {
-		for (j = 0; j < num_modes; j++) {
-			cur_props = &sensor_props->sensor_modes[j].
-							image_properties;
-			if (cur_props->pixel_format ==
-					camera_common_color_fmts[i].pix_fmt &&
-					!matched[i]) {
-				if (match_num == INT_MAX) {
-					dev_err(s_data->dev, "Number of matched color format exceeds the limit\n");
-					return NULL;
-				}
-				match_num++;
-				match_index = i;
-				// Found index
-				if (match_num == index)
-					goto break_loops;
-			}
+	/* A format is supported once, regardless of how many modes use it. */
+	for (i = 0; i < ARRAY_SIZE(camera_common_color_fmts); i++) {
+		for (j = 0; j < sensor_props->num_modes; j++) {
+			if (sensor_props->sensor_modes[j].image_properties.pixel_format !=
+					camera_common_color_fmts[i].pix_fmt)
+				continue;
+			if (match_index++ == index)
+				return &camera_common_color_fmts[i];
+			break;
 		}
 	}
-break_loops:
-	if (match_num < index)
-		return NULL;
-	index = array_index_nospec(index, match_num);
-	return &camera_common_color_fmts[match_index];
+
+	return NULL;
 }
 
 int camera_common_enum_mbus_code(struct v4l2_subdev *sd,
@@ -842,6 +820,7 @@ int camera_common_enum_framesizes(struct v4l2_subdev *sd,
 		struct v4l2_subdev_frame_size_enum *fse)
 {
 	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
+	unsigned int i, j, unique_index = 0;
 	int ret;
 
 	if (!s_data || !s_data->frmfmt)
@@ -855,11 +834,23 @@ int camera_common_enum_framesizes(struct v4l2_subdev *sd,
 	if (ret)
 		return ret;
 
-	fse->min_width = fse->max_width =
-		s_data->frmfmt[fse->index].size.width;
-	fse->min_height = fse->max_height =
-		s_data->frmfmt[fse->index].size.height;
-	return 0;
+	/* Several format modes can share dimensions; keep their mode IDs intact. */
+	for (i = 0; i < s_data->numfmts; i++) {
+		for (j = 0; j < i; j++) {
+			if (s_data->frmfmt[j].size.width == s_data->frmfmt[i].size.width &&
+					s_data->frmfmt[j].size.height == s_data->frmfmt[i].size.height)
+				break;
+		}
+		if (j != i)
+			continue;
+		if (unique_index++ != fse->index)
+			continue;
+		fse->min_width = fse->max_width = s_data->frmfmt[i].size.width;
+		fse->min_height = fse->max_height = s_data->frmfmt[i].size.height;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(camera_common_enum_framesizes);
 

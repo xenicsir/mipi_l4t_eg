@@ -1211,26 +1211,27 @@ static int
 tegra_channel_enum_format(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 {
 	struct tegra_channel *chan = video_drvdata(file);
-	unsigned int index = 0, i;
 	unsigned long *fmts_bitmap = chan->fmts_bitmap;
+	unsigned int index, previous, unique_index = 0;
+	u32 fourcc;
 
-	if (f->index >= bitmap_weight(fmts_bitmap, MAX_FORMAT_NUM))
-		return -EINVAL;
-
-	for (i = 0; i < f->index + 1; i++, index++) {
-		index = find_next_bit(fmts_bitmap, MAX_FORMAT_NUM, index);
-		if (index >= MAX_FORMAT_NUM)
-			break;
+	/* Keep all bus formats internally, but expose each fourcc only once. */
+	for_each_set_bit(index, fmts_bitmap, MAX_FORMAT_NUM) {
+		fourcc = tegra_core_get_fourcc_by_idx(chan, index);
+		for (previous = 0; previous < index; previous++) {
+			if (test_bit(previous, fmts_bitmap) &&
+					tegra_core_get_fourcc_by_idx(chan, previous) == fourcc)
+				break;
+		}
+		if (previous != index)
+			continue;
+		if (unique_index++ == f->index) {
+			f->pixelformat = fourcc;
+			return 0;
+		}
 	}
 
-	if (__builtin_usub_overflow(index, 1, &index)) {
-		dev_err(chan->vi->dev, "%s: update pixel format failed due to an overflow\n",
-			__func__);
-		return -EOVERFLOW;
-	}
-	f->pixelformat = tegra_core_get_fourcc_by_idx(chan, index);
-
-	return 0;
+	return -EINVAL;
 }
 
 static int

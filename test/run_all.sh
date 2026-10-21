@@ -47,6 +47,8 @@ echo ""
 echo "Titan driver transactions and shared camera control"
 python3 "$SCRIPT_DIR/config/test_titan_driver.py"
 python3 "$SCRIPT_DIR/config/test_ilumos_driver.py"
+python3 "$SCRIPT_DIR/config/test_v4l2_enumeration.py"
+python3 "$SCRIPT_DIR/config/test_camera_regression.py"
 python3 "$SCRIPT_DIR/config/test_eg_cam_ctrl.py"
 python3 "$SCRIPT_DIR/config/test_gencp_transport.py"
 
