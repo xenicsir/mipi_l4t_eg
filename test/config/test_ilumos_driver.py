@@ -254,7 +254,12 @@ int main(void) {
 struct inode { int unused; };
 struct file { void *private_data; };
 struct kref { int count; };
-struct ilumos { int miscdev; bool gencp_initialized; struct kref refcount; };
+#define EG_IOCTL_GENCP_XFER 0xdead1001
+#define EG_IOCTL_GENCP_STATS 0xdead1002
+#define ILUMOS_I2C_GENCP 1
+struct ilumos { int miscdev; bool gencp_initialized; struct kref refcount; int i2c_protocol; int io_handle; };
+static int GENCPCLIENT_UserExchange(int *handle, unsigned long arg) { (void)handle; (void)arg; return 0; }
+static int GENCPCLIENT_UserStats(int *handle, unsigned long arg) { (void)handle; (void)arg; return 0; }
 static int ilumos_gencp_lock, reads;
 static bool freed;
 static void kref_get(struct kref *ref) { ref->count++; }
@@ -282,6 +287,10 @@ int main(void) {
     assert(file.private_data == &cam && cam.refcount.count == 2);
     assert(ilumos_cdev_ioctl(&file, ILUMOS_IOCTL_READ_REG, (unsigned long)&reg) == 0);
     assert(reg.val == 0x12345678 && reads == 1);
+    assert(ilumos_cdev_ioctl(&file, EG_IOCTL_GENCP_XFER, 0) == -EOPNOTSUPP);
+    cam.i2c_protocol = ILUMOS_I2C_GENCP;
+    assert(ilumos_cdev_ioctl(&file, EG_IOCTL_GENCP_XFER, 0) == 0);
+    assert(ilumos_cdev_ioctl(&file, EG_IOCTL_GENCP_STATS, 0) == 0);
     assert(ilumos_cdev_ioctl(&file, ILUMOS_IOCTL_WRITE_REG, (unsigned long)&reg) == -EIO);
     assert(ilumos_cdev_ioctl(&file, ILUMOS_IOCTL_READ_STR, (unsigned long)&str) == 0);
     assert(str.buf[255] == 'X');

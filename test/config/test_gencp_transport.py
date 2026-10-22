@@ -13,9 +13,11 @@ PEER = r'''
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "gencp_common.h"
 #include "gencp_client.h"
 
+static unsigned long long virtual_ms;
 static unsigned char ack[1024], fifo[4096];
 static size_t fifo_len, fifo_pos;
 static unsigned char wire_last = 0xaa;
@@ -142,6 +144,11 @@ ssize_t __wrap_read(int fd, void *buffer, size_t length)
     unsigned char *data = buffer;
     (void)fd;
     reads++;
+#if GENCP_I2C_BUFFER_SIZE == 1024
+    virtual_ms += 334;
+#else
+    virtual_ms++;
+#endif
     attempt++;
     assert(length == GENCP_I2C_BUFFER_SIZE);
     if (!strcmp(fault, "read_io_then_valid") && attempt <= 2) { errno = EIO; return -1; }
@@ -212,19 +219,28 @@ ssize_t __wrap_read(int fd, void *buffer, size_t length)
     return length;
 }
 
-/* Deterministic finite poll budget instead of waiting for real wall time. */
-int nb_timers_init(int n) { (void)n; polls = 0; return 0; }
-int nb_timer_start(int id, int ms) { (void)id; (void)ms; polls = 0; timer_starts++; return 0; }
-int nb_timer_is_expired(int id) { (void)id; return ++polls > 8; }
-int nb_timer_delete(int id) { (void)id; return 0; }
-int nb_timer_delete_all(void) { return 0; }
+/* Monotonic fake time: data-bearing FIFO reads stay fast; idle waits advance. */
+int __wrap_clock_gettime(clockid_t clock, struct timespec *ts)
+{
+    (void)clock; ts->tv_sec = virtual_ms / 1000;
+    ts->tv_nsec = (virtual_ms % 1000) * 1000000; return 0;
+}
+int __wrap_usleep(unsigned int usec)
+{
+#if GENCP_I2C_BUFFER_SIZE == 16
+    virtual_ms += 334;
+#else
+    virtual_ms += usec / 1000;
+#endif
+    return 0;
+}
 
 int main(int argc, char **argv)
 {
     struct unio_handle camera = {.fd = 7};
     unsigned int value = 0xdeadbeef, before;
 #if GENCP_I2C_BUFFER_SIZE == 1024
-    unsigned int reads_before, writes_before, starts_before;
+    unsigned int reads_before, writes_before;
 #endif
     unsigned short status;
     unsigned char text[1009];
@@ -235,7 +251,7 @@ int main(int argc, char **argv)
     assert(GENCPCLIENT_isSuccesfullyInitialized());
     fault = argv[1];
 #if GENCP_I2C_BUFFER_SIZE == 1024
-    reads_before = reads; writes_before = writes; starts_before = timer_starts;
+    reads_before = reads; writes_before = writes;
 #endif
     if (!strcmp(fault, "busy")) busy = 2;
     if (!strcmp(fault, "request_id_wrap")) {
@@ -244,7 +260,7 @@ int main(int argc, char **argv)
         assert(last_request_id == 3 && werner_zero_seen == 1);
 #if GENCP_I2C_BUFFER_SIZE == 1024
         assert(writes == writes_before + 65536 && reads == reads_before + 65536);
-        assert(timer_starts == starts_before + 65536);
+        assert(camera.gencp.transactions == writes);
 #endif
     } else if (!strcmp(fault, "write") || !strcmp(fault, "write_extended") || !strcmp(fault, "write_empty") || !strcmp(fault, "write_stale_then_valid")) {
         status = GENCPCLIENT_WriteRegister(0x50000a00, 0x12345678);
@@ -275,7 +291,8 @@ int main(int argc, char **argv)
                    !strcmp(fault, "scd_zero") || !strcmp(fault, "scd_zero_ffff"))
             assert(status == 0 && value == expected_value);
         else {
-            assert(status == (!strcmp(fault, "status") ? 0x8003 : 0x800b));
+            assert(status == (!strcmp(fault, "status") ? 0x8003 :
+                (!strcmp(fault, "write_io") || !strcmp(fault, "write_short")) ? 0x8008 : 0x800b));
 #if GENCP_I2C_BUFFER_SIZE == 1024
             assert(value == 0xdeadbeef);
 #endif
@@ -286,7 +303,7 @@ int main(int argc, char **argv)
         !strcmp(fault, "ccd_zero_ffff") || !strcmp(fault, "padding_preamble") ||
         !strcmp(fault, "noise_timeout")) {
         assert(writes == writes_before + 1); /* Poll again, never resend the command. */
-        assert(timer_starts == starts_before + 1); /* One request deadline. */
+        assert(camera.gencp.transactions == writes); /* One transmission per request. */
         if (!strcmp(fault, "noise_timeout") || !strcmp(fault, "padding_preamble"))
             assert(reads == reads_before + 8);
         else if (!strcmp(fault, "mixed_then_valid")) assert(reads == reads_before + 4);
@@ -309,13 +326,13 @@ class GenCPTransportTests(unittest.TestCase):
             for mode in (16, 1024):
                 executable = path / ('peer-' + str(mode))
                 command = ['cc', '-std=gnu11', '-g', '-Wall', '-Wextra', '-Werror',
-                           '-Wno-unused-parameter', '-Wno-unused-const-variable',
+                           '-Wno-unused-parameter', '-Wno-unused-const-variable','-Wno-unused-parameter',
                            '-Wno-unused-variable', '-fsanitize=address,undefined',
                            '-fno-pie', '-no-pie', '-DGENCP_I2C_BUFFER_SIZE=' + str(mode),
                            '-I', str(LIB), str(path / 'peer.c')]
                 command += [str(LIB / name) for name in
-                            ('libunio.c', 'libunio_extras.c', 'gencp_common.c', 'gencp_client.c')]
-                command += ['-Wl,--wrap=read', '-Wl,--wrap=write', '-o', str(executable)]
+                            ('libunio.c', 'gencp_transport.c', 'gencp_common.c', 'gencp_client.c')]
+                command += ['-Wl,--wrap=read', '-Wl,--wrap=write', '-Wl,--wrap=clock_gettime', '-Wl,--wrap=usleep', '-o', str(executable)]
                 subprocess.run(command, check=True)
                 cases = ['none', 'busy', 'write', 'string', 'timeout', 'status',
                          'read_io', 'read_short', 'write_io', 'write_short', 'write_extended', 'write_empty']

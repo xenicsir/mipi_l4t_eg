@@ -102,6 +102,7 @@ static const struct camera_common_colorfmt *camera_common_find_pixelfmt(u32 fmt)
         if (colorfmts[i].pix_fmt == fmt) return &colorfmts[i];
     return NULL;
 }
+#define GENCPCLIENT_Configure(h, size) ((void)(h), assert((size) == 16 || (size) == 1024))
 static void GENCPCLIENT_Select(struct unio_handle *h) { selected = h; }
 static bool GENCPCLIENT_isSuccesfullyInitialized(void) { return fake_initialized; }
 static u16 GENCPCLIENT_ReadRegister(u32 reg, u32 *value)
@@ -139,6 +140,7 @@ static u16 GENCPCLIENT_ReadString(u32 reg, u8 *buf, u32 len)
     return reg == fake_failure_reg ? 0x8003 : fake_status;
 }
 static void GENCPCLIENT_Cleanup(void) { cleanups++; }
+
 '''
 
 CASES = r'''
@@ -347,6 +349,7 @@ static void tegracam_set_privdata(struct tegracam_device *tc, void *priv) {
     (void)tc; registered_priv = priv;
 }
 static void GENCPCLIENT_Init(void *handle) { (void)handle; }
+#define GENCPCLIENT_Configure(h, size) ((void)(h), assert((size) == 16 || (size) == 1024))
 static void GENCPCLIENT_Select(void *handle) { (void)handle; }
 static bool GENCPCLIENT_isSuccesfullyInitialized(void) { return transport_ready; }
 static int titan_sensor_check(struct titan *priv) { (void)priv; return sensor_error; }

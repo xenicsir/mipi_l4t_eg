@@ -42,14 +42,11 @@ ifndef PRISTINE_KERNEL
 # ilumos/microlynx need Y16/Y16_BE/Y14 negotiation support in the shared
 # nvidia-oot camera framework (sensor_common.c, vi5_formats.h...), which
 # can't be patched into a PRISTINE_KERNEL vendor's precompiled tegra-camera.ko.
-eg_i2c_gencp_dir := $(dir $(lastword $(MAKEFILE_LIST)))gencp-over-i2c/
-include $(eg_i2c_gencp_dir)ilumos.mk
-ilumos-objs := ilumos_core.o gencp-over-i2c/ilumos_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/ilumos_gencp_client.o
+ilumos-objs := ilumos_core.o gencp-over-i2c/libunio.o gencp-over-i2c/gencp_transport.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 obj-m += ilumos.o
-microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
+microlynx-objs := microlynx_core.o gencp-over-i2c/libunio.o gencp-over-i2c/gencp_transport.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 obj-m += microlynx.o
-include $(eg_i2c_gencp_dir)titan.mk
-titan-objs := titan_core.o gencp-over-i2c/titan_libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/titan_gencp_client.o
+titan-objs := titan_core.o gencp-over-i2c/libunio.o gencp-over-i2c/gencp_transport.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 obj-m += titan.o
 endif
 ifdef PRISTINE_KERNEL

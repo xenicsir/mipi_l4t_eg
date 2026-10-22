@@ -131,6 +131,11 @@ Use an existing driver as template: `dione_ir.c` (I2C register access) or `eg_ec
 (EngineCore). Other sensor drivers in `media/i2c` cover further transports — GenCP over I2C
 among them — if the new camera needs one.
 
+For GenCP control, see [the camera control ABI and transport extension guide](GENCP_CONTROL_INTERFACE.md).
+It describes atomic transactions on the existing character device, per-camera
+state and transport callbacks. A reference SDK packet client is provided in
+[`tools/xeneth`](../tools/xeneth/README.md).
+
 ### Step 2: Driver build integration (per version)
 
 **For L4T 36.x (out-of-tree build):**
@@ -142,7 +147,7 @@ Modify `sources/<version>/Linux_for_Tegra/source/nvidia-oot/drivers/media/i2c/Ma
 obj-m += <camera>.o
 
 # Multi-file driver (e.g., with GenCP library):
-<camera>-objs := <camera>_core.o gencp-over-i2c/libunio.o gencp-over-i2c/libunio_extras.o gencp-over-i2c/nb_timer.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
+<camera>-objs := <camera>_core.o gencp-over-i2c/libunio.o gencp-over-i2c/gencp_transport.o gencp-over-i2c/gencp_common.o gencp-over-i2c/gencp_client.o
 obj-m += <camera>.o
 ```
 
@@ -176,7 +181,7 @@ Three files to modify in `sources/<version>/Linux_for_Tegra/source/public/kernel
    ```
    Also enable in all vendor-specific defconfigs (e.g., `dsboard_ornx_defconfig`, `milboard_ornx_defconfig`, etc.) in `Linux_for_Tegra_<vendor>/`.
 
-> **Kernel API compatibility (32.x — kernel 4.9):** The 32.x kernel (4.9) does not have `timer_setup()` / `from_timer()` (added in kernel 4.15). If the driver or a library it uses (e.g., `gencp-over-i2c/nb_timer.c`) uses these APIs, guard them with:
+> **Kernel API compatibility (32.x — kernel 4.9):** The 32.x kernel (4.9) does not have `timer_setup()` / `from_timer()` (added in kernel 4.15). If a driver uses these timer APIs, guard them with:
 > ```c
 > #include <linux/version.h>
 > #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)

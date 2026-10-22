@@ -51,6 +51,8 @@ python3 "$SCRIPT_DIR/config/test_v4l2_enumeration.py"
 python3 "$SCRIPT_DIR/config/test_camera_regression.py"
 python3 "$SCRIPT_DIR/config/test_eg_cam_ctrl.py"
 python3 "$SCRIPT_DIR/config/test_gencp_transport.py"
+python3 "$SCRIPT_DIR/config/test_gencp_exchange.py"
+python3 "$SCRIPT_DIR/config/test_microlynx_chardev.py"
 
 echo ""
 echo "══════════════════════════════════════════════════════════════════════"

@@ -11,6 +11,8 @@
 #include <linux/i2c-mux.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
+#include <linux/kref.h>
+#include <linux/compat.h>
 #include <linux/of_device.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
@@ -67,15 +69,8 @@ struct microlynx_str_op {
 #define MICROLYNX_IOCTL_READ_STR  _IOWR(MICROLYNX_IOCTL_MAGIC, 3, \
 					struct microlynx_str_op)
 
-/*
- * Module-level mutex: GENCPCLIENT uses process-global state (pRxBuffer,
- * pTxBuffer, unio_handle_ptr).  Serialise all GenCP calls behind this lock.
- *
- * Multi-camera workaround: GENCPCLIENT_Select() is called before every
- * GENCPCLIENT_ReadRegister / WriteRegister invocation (in cdev_ioctl and
- * start_streaming) to restore the global state to the correct camera's I2C
- * handle.  The long-term fix is to refactor gencp_client to per-instance
- * state.
+/* Serialize legacy selection, explicit user transactions and streaming calls.
+ * Protocol buffers and request IDs are owned by each camera handle.
  */
 static DEFINE_MUTEX(microlynx_gencp_lock);
 
@@ -137,6 +132,8 @@ struct microlynx {
    u32    line_height;
    u32    native_width;
    bool   gencp_initialized;
+   bool   misc_registered;
+   struct kref refcount;
    char   model[64];
    char   serial_number[64];
    char   pixel_format[64];
@@ -187,6 +184,7 @@ static int microlynx_sensor_check(struct microlynx *priv)
    int status;
    u32 read_data = 0;
    priv->io_handle.client = priv->i2c_client;
+   GENCPCLIENT_Configure(&priv->io_handle, 16);
 
    /* INIT the gencp client */
    GENCPCLIENT_Init(&priv->io_handle);
@@ -450,15 +448,14 @@ static int microlynx_start_streaming(struct tegracam_device *tc_dev)
 
    dev_dbg(tc_dev->dev, "%s\n", __func__);
 
+   mutex_lock(&microlynx_gencp_lock);
    if (!priv->gencp_initialized) {
       dev_err(tc_dev->dev, "GenCP not initialized\n");
+      mutex_unlock(&microlynx_gencp_lock);
       return -EIO;
    }
 
-   /* Restore global GenCP state to this camera's I2C handle.
-    * Required when multiple Microlynx cameras are probed: the global
-    * unio_handle_ptr / gGencpInitWasSuccessfull are overwritten during
-    * probe of the last camera (which may have failed). */
+   /* Keep selection and the complete transaction serialized with ioctl/probe. */
    GENCPCLIENT_Select(&priv->io_handle);
 
    /* Camera should always be streaming. But we can check that. */
@@ -472,6 +469,7 @@ static int microlynx_start_streaming(struct tegracam_device *tc_dev)
       PRINT_INFO("Register read failed\n");
    }
 
+   mutex_unlock(&microlynx_gencp_lock);
    return 0;
 }
 
@@ -577,20 +575,29 @@ static const struct regmap_config microlynx_dummy_regmap_config = {
 
 /* ---- GenCP chardev file operations ------------------------------------ */
 
-static int microlynx_cdev_open(struct inode *inode, struct file *file)
+static void microlynx_free(struct kref *ref)
 {
-   /*
-    * The misc layer sets file->private_data to the struct miscdevice *.
-    * Use container_of to reach the enclosing struct microlynx.
-    */
-   struct microlynx *priv =
-      container_of(file->private_data, struct microlynx, miscdev);
-   file->private_data = priv;
-   return 0;
+   struct microlynx *priv = container_of(ref, struct microlynx, refcount);
+   kfree(priv);
 }
 
+static int microlynx_cdev_open(struct inode *inode, struct file *file)
+{
+   struct microlynx *priv = container_of(file->private_data, struct microlynx, miscdev);
+   mutex_lock(&microlynx_gencp_lock);
+   if (!priv->gencp_initialized) {
+      mutex_unlock(&microlynx_gencp_lock);
+      return -ENODEV;
+   }
+   kref_get(&priv->refcount);
+   file->private_data = priv;
+   mutex_unlock(&microlynx_gencp_lock);
+   return 0;
+}
 static int microlynx_cdev_release(struct inode *inode, struct file *file)
 {
+   struct microlynx *priv = file->private_data;
+   kref_put(&priv->refcount, microlynx_free);
    return 0;
 }
 
@@ -600,14 +607,21 @@ static long microlynx_cdev_ioctl(struct file *file, unsigned int cmd,
    struct microlynx *priv = file->private_data;
    int ret = 0;
 
-   if (!priv->gencp_initialized)
-      return -ENODEV;
-
    mutex_lock(&microlynx_gencp_lock);
-   /* Restore global GenCP state to this camera's I2C handle (multi-camera). */
+   if (!priv->gencp_initialized) {
+      ret = -ENODEV;
+      goto out;
+   }
+   /* Bind the legacy entry points while explicit transactions use this handle. */
    GENCPCLIENT_Select(&priv->io_handle);
 
    switch (cmd) {
+   case EG_IOCTL_GENCP_STATS:
+      ret = GENCPCLIENT_UserStats(&priv->io_handle, arg);
+      break;
+   case EG_IOCTL_GENCP_XFER:
+      ret = GENCPCLIENT_UserExchange(&priv->io_handle, arg);
+      break;
    case MICROLYNX_IOCTL_READ_REG: {
       struct microlynx_reg_op op;
 
@@ -648,6 +662,7 @@ static long microlynx_cdev_ioctl(struct file *file, unsigned int cmd,
       break;
    }
 
+out:
    mutex_unlock(&microlynx_gencp_lock);
    return ret;
 }
@@ -657,6 +672,9 @@ static const struct file_operations microlynx_cdev_fops = {
    .open           = microlynx_cdev_open,
    .release        = microlynx_cdev_release,
    .unlocked_ioctl = microlynx_cdev_ioctl,
+#ifdef CONFIG_COMPAT
+   .compat_ioctl   = compat_ptr_ioctl,
+#endif
 };
 
 /* ----------------------------------------------------------------------- */
@@ -678,13 +696,16 @@ static int microlynx_probe(struct i2c_client *client,
    if (!IS_ENABLED(CONFIG_OF) || !client->dev.of_node)
       return -EINVAL;
 
-   priv = devm_kzalloc(dev, sizeof(struct microlynx), GFP_KERNEL);
+   priv = kzalloc(sizeof(struct microlynx), GFP_KERNEL);
    if (!priv)
       return -ENOMEM;
 
+   kref_init(&priv->refcount);
    tc_dev = devm_kzalloc(dev, sizeof(struct tegracam_device), GFP_KERNEL);
-   if (!tc_dev)
+   if (!tc_dev) {
+      kref_put(&priv->refcount, microlynx_free);
       return -ENOMEM;
+   }
 
    priv->i2c_client = tc_dev->client = client;
    tc_dev->dev = dev;
@@ -697,6 +718,7 @@ static int microlynx_probe(struct i2c_client *client,
    err = tegracam_device_register(tc_dev);
    if (err) {
       dev_err(dev, "tegra camera driver registration failed\n");
+      kref_put(&priv->refcount, microlynx_free);
       return err;
    }
 
@@ -706,18 +728,25 @@ static int microlynx_probe(struct i2c_client *client,
    tegracam_set_privdata(tc_dev, (void *)priv);
 
    /* Initialize sensor and check GenCP communication */
+   mutex_lock(&microlynx_gencp_lock);
    err = microlynx_sensor_check(priv);
+   mutex_unlock(&microlynx_gencp_lock);
    if (err) {
       dev_err(dev, "sensor check failed\n");
       tegracam_device_unregister(tc_dev);
+      kref_put(&priv->refcount, microlynx_free);
       return err;
    }
 
    err = tegracam_v4l2subdev_register(tc_dev, true);
    if (err) {
       dev_err(dev, "tegra camera subdev registration failed\n");
+      mutex_lock(&microlynx_gencp_lock);
+      priv->gencp_initialized = false;
       GENCPCLIENT_Cleanup();
+      mutex_unlock(&microlynx_gencp_lock);
       tegracam_device_unregister(tc_dev);
+      kref_put(&priv->refcount, microlynx_free);
       return err;
    }
 
@@ -736,9 +765,10 @@ static int microlynx_probe(struct i2c_client *client,
    priv->miscdev.parent = dev;
    if (misc_register(&priv->miscdev))
       dev_warn(dev, "failed to register GenCP chardev; userspace access via microlynxCtrl.py will not work\n");
-   else
-      dev_info(dev, "GenCP chardev registered at /dev/%s\n",
-            priv->miscdev_name);
+   else {
+      priv->misc_registered = true;
+      dev_info(dev, "GenCP chardev registered at /dev/%s\n", priv->miscdev_name);
+   }
 
    dev_info(dev, "Registered microlynx device (width=%u, height=%u)\n",
          priv->native_width, priv->line_height);
@@ -761,14 +791,16 @@ static void microlynx_remove(struct i2c_client *client)
    device_remove_file(dev, &dev_attr_resolution);
    device_remove_file(dev, &dev_attr_pixel_format);
 
-   misc_deregister(&priv->miscdev);
+   if (priv->misc_registered) misc_deregister(&priv->miscdev);
+   mutex_lock(&microlynx_gencp_lock);
+   priv->gencp_initialized = false;
+   GENCPCLIENT_Cleanup();
+   mutex_unlock(&microlynx_gencp_lock);
 
    tegracam_v4l2subdev_unregister(priv->tc_dev);
    tegracam_device_unregister(priv->tc_dev);
 
-   if (priv->gencp_initialized)
-      GENCPCLIENT_Cleanup();
-
+   kref_put(&priv->refcount, microlynx_free);
    dev_info(dev, "Removed microlynx device\n");
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,1)

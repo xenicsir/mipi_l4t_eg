@@ -411,6 +411,20 @@ static long ilumos_cdev_ioctl(struct file *file, unsigned int cmd,
    }
 
    switch (cmd) {
+   case EG_IOCTL_GENCP_STATS:
+      if (priv->i2c_protocol != ILUMOS_I2C_GENCP) {
+         ret = -EOPNOTSUPP;
+         break;
+      }
+      ret = GENCPCLIENT_UserStats(&priv->io_handle, arg);
+      break;
+   case EG_IOCTL_GENCP_XFER:
+      if (priv->i2c_protocol != ILUMOS_I2C_GENCP) {
+         ret = -EOPNOTSUPP;
+         break;
+      }
+      ret = GENCPCLIENT_UserExchange(&priv->io_handle, arg);
+      break;
    case ILUMOS_IOCTL_READ_REG: {
       struct ilumos_reg_op op;
 
@@ -1051,8 +1065,9 @@ static int ilumos_probe(struct i2c_client *client,
 
    /* Initialize sensor and check GenCP communication */
    priv->io_handle.client = client;
+   GENCPCLIENT_Configure(&priv->io_handle, 1024);
    mutex_lock(&ilumos_gencp_lock);
-   /* Prepare buffers/timers without sending a preliminary version request. */
+   /* Select the camera context without sending a preliminary request. */
    GENCPCLIENT_Select(&priv->io_handle);
    priv->gencp_initialized = true;
    ilumos_gencp_users++;

@@ -174,6 +174,10 @@ update_status "Copying Exosens sources..."
 
 copy_from_sources "rootfs/usr" "usr"
 copy_from_sources "rootfs/opt/eg" "opt/eg"
+# Public control ABI is copied from its single canonical source.
+sudo install -D -m 0644 "$ROOT_DIR/sources/common/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/eg_camera_gencp.h" \
+   "${PACKAGE_NAME}/usr/include/exosens/eg_camera_gencp.h"
+
 
 #******************************************************************************
 # Step 2: Determine package version

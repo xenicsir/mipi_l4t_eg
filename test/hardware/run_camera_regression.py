@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import shlex
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -62,7 +63,9 @@ def parse_configuration(text):
                     camera.groups.append({})
                 if not camera.groups:
                     raise ValueError('Streaming command without a V4L2 command')
-                camera.groups[-1][tool] = shlex.split(line)
+                # Keep the primary command when optional variants follow it
+                # (for example the MicroLynx single-line crop).
+                camera.groups[-1].setdefault(tool, shlex.split(line))
         if camera.connected and not all((camera.sysfs, camera.device, camera.video, camera.groups)):
             raise ValueError('Incomplete connected camera description: ' + camera.name)
         cameras.append(camera)
@@ -112,6 +115,59 @@ def streaming_command(tool, group, frames, folder, raw=None):
     return args
 
 
+def register_read_plan(camera):
+    """Build read-only control checks from the discovered camera, not its port."""
+    family = Path(camera.device).name.split('-', 1)[0]
+    if family == 'dioneir':
+        match = re.fullmatch(r'dioneir-i2c-(\d+)-[0-9a-fA-F]{4}-([0-9a-fA-F]{2})',
+                             Path(camera.device).name)
+        if not match:
+            raise ValueError('Cannot determine Dione bus and FPGA address: ' + camera.device)
+        prefix = ['dioneCtrl.py', '--device-type', 'I2C', '--bus', match[1],
+                  '--dev-addr', hex(int(match[2], 16))]
+        registers = (0x2f028, 0x2f02c, 0x80194)
+        pixel_formats = [0x01080001, 0x01100007, 0x02180014]
+    elif family in ('ilumos', 'titan', 'microlynx'):
+        prefix = ['egCamCtrl.py', camera.device]
+        registers = {'ilumos': (0x50000000, 0x50000004, 0x50000008),
+                     'titan': (0x500e0000, 0x500e0004, 0x500e0010),
+                     'microlynx': (0x500e0008, 0x500e000c, 0x500e0018)}[family]
+        pixel_formats = [0x01100007, 0x01100025]
+    else:
+        return []
+    width, height, _ = format_spec(camera.groups[0])
+    checks = []
+    for name, address, expected in [('width', registers[0], width),
+                                    ('height', registers[1], height),
+                                    ('pixel-format', registers[2], pixel_formats)]:
+        checks.append(dict(name=name, command=prefix + ['read_reg32', hex(address)],
+                           kind='integer', expected=expected))
+    for name, address in [('model', 0x44), ('serial', 0x144)]:
+        checks.append(dict(name=name, command=prefix + ['read_string', hex(address), '64'],
+                           kind='string'))
+    return checks
+
+
+def validate_register_read(check, returncode, text):
+    if returncode:
+        return False, None
+    if check['kind'] == 'integer':
+        # egCamCtrl prints address = value; dioneCtrl prints just value.
+        match = re.search(r'=\s*(0x[0-9a-fA-F]+)', text)
+        if not match:
+            match = re.search(r'^\s*(0x[0-9a-fA-F]+)', text, re.M)
+        if not match:
+            return False, None
+        value = int(match[1], 16)
+        expected = check['expected']
+        return (value in expected if isinstance(expected, list) else value == expected), value
+    value = text.split(' = ', 1)[-1].strip().strip("'\"\x00\xff\ufffd")
+    # An empty string can be printed as "address =" without a trailing space.
+    if re.fullmatch(r'0x[0-9a-fA-F]+\s*=', value):
+        value = ''
+    return bool(value), value
+
+
 class Runner:
     def __init__(self, options):
         self.options = options
@@ -120,6 +176,8 @@ class Runner:
         self.env = os.environ.copy()
         self.env.update(DISPLAY=options.display, QT_X11_NO_MITSHM='1', PYTHONUNBUFFERED='1')
         self.results = []
+        self.register_results = []
+        self.xeneth_results = []
         self.events = []
         self.counter = 0
         self.cancelled = False
@@ -134,7 +192,7 @@ class Runner:
 
     def save(self):
         tmp = self.out / 'results.json.new'
-        tmp.write_text(json.dumps(dict(options=vars(self.options), results=self.results,
+        tmp.write_text(json.dumps(dict(options=vars(self.options), results=self.results, register_results=self.register_results, xeneth_results=self.xeneth_results,
                                        events=self.events), indent=2, default=str) + '\n')
         tmp.replace(self.out / 'results.json')
 
@@ -220,22 +278,83 @@ done
 sha256sum /usr/bin/eg_dt_camera_config_get.sh /usr/bin/rt_frame_monitor.py
 cat /proc/sys/kernel/random/boot_id
 '''], check=True)
-        _, text = self.run('xorg-process', ['pgrep', '-a', 'Xorg'])
-        candidates = ([self.options.xauthority] if self.options.xauthority else [])
-        candidates += re.findall(r'-auth\s+(\S+)', text)
-        candidates += [str(Path.home() / '.Xauthority'), '/home/jetson/.Xauthority']
-        for path in candidates:
-            if not Path(path).is_file():
-                continue
-            self.env['XAUTHORITY'] = path
-            record, _ = self.run('check-display', ['xdpyinfo'], timeout=3)
-            if record['returncode'] == 0:
-                self.event('Display available', display=self.options.display, authority=path)
-                break
-        else:
-            raise RuntimeError('Cannot open the display; set --display/--xauthority')
+        if not self.options.registers_only:
+            _, text = self.run('xorg-process', ['pgrep', '-a', 'Xorg'])
+            candidates = ([self.options.xauthority] if self.options.xauthority else [])
+            candidates += re.findall(r'-auth\s+(\S+)', text)
+            candidates += [str(Path.home() / '.Xauthority'), '/home/jetson/.Xauthority']
+            for path in candidates:
+                if not Path(path).is_file():
+                    continue
+                self.env['XAUTHORITY'] = path
+                record, _ = self.run('check-display', ['xdpyinfo'], timeout=3)
+                if record['returncode'] == 0:
+                    self.event('Display available', display=self.options.display, authority=path)
+                    break
+            else:
+                raise RuntimeError('Cannot open the display; set --display/--xauthority')
         self.event('Test script', sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
         self.run('dmesg-before', ['dmesg'])
+
+    def test_registers(self, camera, phase):
+        checks = register_read_plan(camera)
+        if not checks:
+            self.event('Register checks not applicable', camera=camera.name,
+                       reason='No dioneCtrl/egCamCtrl interface for this family')
+            return True
+        result = dict(key=camera.key, camera=camera.name, phase=phase, reads=[], passed=False)
+        self.register_results.append(result)
+        for check in checks:
+            self.pause(self.options.control_pause, 'before register read')
+            record, text = self.run('%s-%s-register-%s' % (camera.key, phase, check['name']),
+                                    check['command'])
+            passed, value = validate_register_read(check, record['returncode'], text)
+            result['reads'].append(dict(record, name=check['name'], value=value,
+                                        expected=check.get('expected'), passed=passed))
+            self.save()
+            if not passed:
+                self.event('Register read failed', camera=camera.name, phase=phase,
+                           register=check['name'], log=record['log'])
+                return False
+        result['passed'] = True
+        self.event('Register reads complete', camera=camera.name, phase=phase, count=len(checks))
+        return True
+
+    def test_xeneth(self, camera, phase):
+        family = Path(camera.device).name.split('-', 1)[0]
+        if self.options.skip_xeneth or family not in ('ilumos', 'microlynx', 'titan'):
+            return True
+        result = dict(key=camera.key, camera=camera.name, phase=phase, commands=[], passed=False)
+        self.xeneth_results.append(result)
+        binary = self.options.xeneth_minimal
+        if not shutil.which(binary):
+            result['error'] = 'Build egXenethMinimal or provide --xeneth-minimal PATH'
+            self.event('Xeneth test unavailable', camera=camera.name, error=result['error'])
+            return False
+        width = register_read_plan(camera)[0]
+        commands = [['probe'], ['read32', width['command'][-1], str(self.options.xeneth_reads)]]
+        for args in commands:
+            self.pause(self.options.control_pause, 'before Xeneth minimal control test')
+            record, text = self.run('%s-%s-xeneth-%s' % (camera.key, phase, args[0]),
+                                    [binary, camera.device] + args)
+            result['commands'].append(record)
+            if record['returncode'] == 3 and args[0] == 'probe' and family == 'ilumos':
+                result.update(status='not applicable', reason='Firmware uses basic I2C, not GenCP', passed=True)
+                self.event('Xeneth not applicable', camera=camera.name, reason=result['reason'])
+                return True
+            passed = record['returncode'] == 0
+            if args[0] == 'read32':
+                value = re.search(r'reads=(\d+) value=([0-9a-fA-F]{8})', text)
+                passed = passed and value is not None and int(value[1]) == self.options.xeneth_reads
+                passed = passed and value is not None and int(value[2], 16) == width['expected']
+            record['passed'] = bool(passed)
+            self.save()
+            if not passed:
+                self.event('Xeneth test failed', camera=camera.name, phase=phase, log=record['log'])
+                return False
+        result['passed'] = True
+        self.event('Xeneth tests complete', camera=camera.name, phase=phase)
+        return True
 
     def set_ec_format(self, key, code, reboot=False):
         camera = self.refresh(key)
@@ -375,8 +494,20 @@ cat /proc/sys/kernel/random/boot_id
                    (not self.options.only or c.key in self.options.only or c.name in self.options.only)]
         if not cameras:
             raise RuntimeError('No matching connected cameras')
+        if self.options.registers_only:
+            for camera in cameras:
+                current = self.refresh(camera.key)
+                if self.test_registers(current, 'registers-only'):
+                    self.test_xeneth(current, 'registers-only')
+            self.event('Register-only tests finished', passed=sum(x['passed'] for x in self.register_results),
+                       total=len(self.register_results))
+            return 0 if all(x['passed'] for x in self.register_results + self.xeneth_results) else 1
         for initial in cameras:
             camera = self.refresh(initial.key)
+            if not self.test_registers(camera, 'before-video'):
+                continue
+            if not self.test_xeneth(camera, 'before-video'):
+                continue
             original_code = ec_code(Path(camera.sysfs, 'pixel_format').read_text()) if camera.enginecore else None
             _, current = self.run('original-format-' + camera.key,
                                   ['v4l2-ctl', '-d', camera.video, '--get-fmt-video'], check=True)
@@ -402,15 +533,22 @@ cat /proc/sys/kernel/random/boot_id
                     current = self.refresh(camera.key)
                     target = format_spec(current.groups[0])[2] if camera.enginecore else original_format
                     self.test_group(current.key, target, original_code, tools=('v4l2',))
+                    current = self.refresh(camera.key)
+                    if self.test_registers(current, 'after-video'):
+                        self.test_xeneth(current, 'after-video')
         self.run('dmesg-after', ['dmesg'])
         self.event('Finished', passed=sum(x['passed'] for x in self.results), total=len(self.results))
-        return 0 if all(x['passed'] for x in self.results) else 1
+        return 0 if all(x['passed'] for x in self.results + self.register_results + self.xeneth_results) else 1
 
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path, required=True, help='New directory for all logs and JSON results')
     p.add_argument('--only', action='append', default=[], help='Camera name or sysfs ID; repeat to select several')
+    p.add_argument('--registers-only', action='store_true', help='Only read control registers; no video, format changes or GUI')
+    p.add_argument('--xeneth-minimal', default='egXenethMinimal', help='ARM64 reference client built with the Xeneth SDK packet codec')
+    p.add_argument('--xeneth-reads', type=int, default=20)
+    p.add_argument('--skip-xeneth', action='store_true', help='Explicitly omit the new GenCP interface tests for legacy driver packages')
     p.add_argument('--frames', type=int, default=60)
     p.add_argument('--timeout', type=float, default=10)
     p.add_argument('--control-pause', type=float, default=2)
@@ -426,7 +564,7 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
-    if args.frames <= 0 or args.timeout <= 0 or args.recoveries < 0:
+    if args.frames <= 0 or args.timeout <= 0 or args.recoveries < 0 or not 1 <= args.xeneth_reads <= 1000000:
         p.error('frames/timeout must be positive; recoveries must be nonnegative')
     if min(args.control_pause, args.boot_wait, args.probe_wait, args.stream_gap) < 0:
         p.error('Delays must be nonnegative')

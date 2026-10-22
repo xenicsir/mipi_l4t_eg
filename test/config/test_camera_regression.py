@@ -5,7 +5,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('camera_regression', ROOT/'test/hardware/run_camera_regression.py')
@@ -43,6 +43,12 @@ class RegressionTests(unittest.TestCase):
         self.assertFalse(MODULE.parse_configuration(CONFIG)[0].conformant_y14)
         text = CONFIG.replace('v4l2-ctl -d', '    Y14 layout:   14 bits right-aligned, high bits 0\nv4l2-ctl -d', 1)
         self.assertTrue(MODULE.parse_configuration(text)[0].conformant_y14)
+
+    def test_optional_gstreamer_variant_keeps_the_primary_full_frame_command(self):
+        primary = MODULE.parse_configuration(CONFIG)[0].groups[0]['gst']
+        text = CONFIG.replace('  Port 1:',
+                              'gst-launch-1.0 v4l2src ! videocrop bottom=127 ! autovideosink\n  Port 1:')
+        self.assertEqual(MODULE.parse_configuration(text)[0].groups[0]['gst'], primary)
 
     def test_effective_format_keeps_dimensions_and_byte_order(self):
         value = MODULE.parse_negotiated_format("Width/Height : 1280/1024\nPixel Format : 'Y16 -BE'\nSize Image : 2621440\n")
@@ -141,12 +147,126 @@ class RegressionTests(unittest.TestCase):
             if stat.exists():
                 self.assertIn(stat.read_text().split()[2], ('Z', 'X'))
 
+    def test_control_profiles_keep_camera_specific_register_maps(self):
+        group = MODULE.parse_configuration(CONFIG)[0].groups[0]
+        for family, addresses in [('ilumos', ['0x50000000', '0x50000004', '0x50000008']),
+                                  ('titan', ['0x500e0000', '0x500e0004', '0x500e0010']),
+                                  ('microlynx', ['0x500e0008', '0x500e000c', '0x500e0018'])]:
+            camera = MODULE.Camera(0, family, True, device='/dev/' + family + '-42-0030', groups=[group])
+            plan = MODULE.register_read_plan(camera)
+            self.assertEqual([c['command'][-1] for c in plan[:3]], addresses)
+            self.assertTrue(all(c['command'][0] == 'egCamCtrl.py' for c in plan))
+            self.assertEqual([c['command'][-3:] for c in plan[3:]],
+                             [['read_string', '0x44', '64'], ['read_string', '0x144', '64']])
+        self.assertEqual(MODULE.register_read_plan(MODULE.parse_configuration(CONFIG)[0]), [])
+
+    def test_dione_reads_use_discovered_fpga_address_without_forcing(self):
+        group = MODULE.parse_configuration(CONFIG)[0].groups[0]
+        camera = MODULE.Camera(0, 'Dione', True, device='/dev/dioneir-i2c-12-000e-5b', groups=[group])
+        plan = MODULE.register_read_plan(camera)
+        self.assertEqual(plan[0]['command'], ['dioneCtrl.py', '--device-type', 'I2C', '--bus', '12',
+                                             '--dev-addr', '0x5b', 'read_reg32', '0x2f028'])
+        self.assertFalse(any('--force-slave' in c['command'] or '--gencp-enable' in c['command'] for c in plan))
+        camera.device = '/dev/dioneir-invalid'
+        with self.assertRaises(ValueError):
+            MODULE.register_read_plan(camera)
+
+    def test_register_values_are_checked_in_addition_to_exit_status(self):
+        check = dict(kind='integer', expected=1280)
+        self.assertEqual(MODULE.validate_register_read(check, 0, '0x50000000 = 0x00000500 (1280)'), (True, 1280))
+        self.assertEqual(MODULE.validate_register_read(check, 0, '0x00000500 (1280)'), (True, 1280))
+        self.assertFalse(MODULE.validate_register_read(check, 0, '0x50000000 = 0x00000400 (1024)')[0])
+        self.assertFalse(MODULE.validate_register_read(check, 1, '0x00000500 (1280)')[0])
+        self.assertFalse(MODULE.validate_register_read(dict(kind='string'), 0, '0x44 = ')[0])
+        self.assertTrue(MODULE.validate_register_read(dict(kind='string'), 0, '0x44 = iLumos')[0])
+
+    def test_control_failure_is_recorded_and_stops_remaining_reads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp)
+            camera = runner.refresh.return_value
+            camera.device = '/dev/ilumos-42-0030'
+            runner.pause = Mock()
+            runner.run = Mock(return_value=({'returncode': 0, 'log': 'bad.log'}, '0x50000000 = 0xFFFFFFFF'))
+            self.assertFalse(runner.test_registers(camera, 'before-video'))
+            self.assertFalse(runner.register_results[0]['passed'])
+            self.assertEqual(runner.run.call_count, 1)
+
+    def test_registers_only_failure_sets_exit_status_without_video(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp)
+            camera = runner.refresh.return_value
+            camera.device = '/dev/ilumos-42-0030'
+            runner.options.registers_only = True
+            runner.setup = Mock()
+            runner.discover = Mock(return_value=[camera])
+            runner.idle = Mock()
+            runner.pause = Mock()
+            runner.run = Mock(return_value=({'returncode': 1, 'log': 'failed.log'}, 'Error: I/O'))
+            runner.capture = Mock()
+            self.assertEqual(runner.execute(), 1)
+            runner.capture.assert_not_called()
+            runner.set_ec_format.assert_not_called()
+
     def test_non_enginecore_failure_does_not_reboot_camera(self):
         with tempfile.TemporaryDirectory() as tmp:
             runner = self.runner(tmp)
             runner.capture = Mock(return_value={'pass': False})
             self.assertFalse(runner.test_group('42-0016', 'Y16 '))
             runner.set_ec_format.assert_not_called()
+
+    def test_xeneth_checks_width_and_read_count(self):
+        for output, expected in [('reads=20 value=00000280', True),
+                                 ('reads=19 value=00000280', False),
+                                 ('reads=20 value=00000400', False)]:
+            with self.subTest(output=output), tempfile.TemporaryDirectory() as tmp:
+                runner = self.runner(tmp)
+                camera = runner.refresh.return_value
+                camera.device = '/dev/microlynx-42-0030'
+                runner.pause = Mock()
+                runner.run = Mock(side_effect=[({'returncode': 0}, 'model=MicroLynx'),
+                                               ({'returncode': 0, 'log': 'reads.log'}, output)])
+                with patch.object(MODULE.shutil, 'which', return_value='/tmp/egXenethMinimal'):
+                    self.assertEqual(runner.test_xeneth(camera, 'before-video'), expected)
+                self.assertEqual(runner.xeneth_results[0]['passed'], expected)
+
+    def test_xeneth_basic_not_applicable_is_specific_to_ilumos(self):
+        for family, expected in [('ilumos', True), ('microlynx', False), ('titan', False)]:
+            with self.subTest(family=family), tempfile.TemporaryDirectory() as tmp:
+                runner = self.runner(tmp)
+                camera = runner.refresh.return_value
+                camera.device = '/dev/' + family + '-42-0030'
+                runner.pause = Mock()
+                runner.run = Mock(return_value=({'returncode': 3, 'log': 'probe.log'}, 'not supported'))
+                with patch.object(MODULE.shutil, 'which', return_value='/tmp/egXenethMinimal'):
+                    self.assertEqual(runner.test_xeneth(camera, 'before-video'), expected)
+                self.assertEqual(runner.run.call_count, 1)
+
+    def test_xeneth_missing_client_fails_and_excluded_families_do_not_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp)
+            camera = runner.refresh.return_value
+            self.assertTrue(runner.test_xeneth(camera, 'before-video'))
+            camera.device = '/dev/dioneir-i2c-42-000e-5d'
+            self.assertTrue(runner.test_xeneth(camera, 'before-video'))
+            self.assertEqual(runner.xeneth_results, [])
+            camera.device = '/dev/ilumos-42-0030'
+            with patch.object(MODULE.shutil, 'which', return_value=None):
+                self.assertFalse(runner.test_xeneth(camera, 'before-video'))
+            runner.run.assert_not_called()
+
+    def test_registers_only_keeps_xeneth_failure_in_exit_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp)
+            runner.options.registers_only = True
+            runner.setup = Mock()
+            runner.discover = Mock(return_value=[runner.refresh.return_value])
+            runner.idle = Mock()
+            runner.test_registers = Mock(return_value=True)
+            def failure(camera, phase):
+                runner.xeneth_results.append({'passed': False})
+                return False
+            runner.test_xeneth = Mock(side_effect=failure)
+            self.assertEqual(runner.execute(), 1)
 
 
 if __name__ == '__main__':

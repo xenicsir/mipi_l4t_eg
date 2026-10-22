@@ -266,6 +266,12 @@ static long titan_cdev_ioctl(struct file *file, unsigned int cmd,
    }
 
    switch (cmd) {
+   case EG_IOCTL_GENCP_STATS:
+      ret = GENCPCLIENT_UserStats(&priv->io_handle, arg);
+      break;
+   case EG_IOCTL_GENCP_XFER:
+      ret = GENCPCLIENT_UserExchange(&priv->io_handle, arg);
+      break;
    case TITAN_IOCTL_READ_REG: {
       struct titan_reg_op op;
 
@@ -929,6 +935,7 @@ static int titan_probe(struct i2c_client *client,
 
    /* Initialize sensor and check GenCP communication */
    priv->io_handle.client = client;
+   GENCPCLIENT_Configure(&priv->io_handle, 1024);
    mutex_lock(&titan_gencp_lock);
    /* Init allocates global buffers: only once while at least one Titan exists.
     * Select restores the handle before each subsequent transaction.
