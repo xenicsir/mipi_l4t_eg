@@ -269,5 +269,35 @@ class RegressionTests(unittest.TestCase):
             self.assertEqual(runner.execute(), 1)
 
 
+    def test_target_without_raw16_never_commands_enginecore_format20(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp)
+            camera = runner.refresh.return_value
+            camera.sysfs = tmp
+            (Path(tmp)/'pixel_format').write_text("'AR24'")
+            runner.setup = Mock()
+            runner.discover = Mock(return_value=[camera])
+            runner.idle = Mock()
+            runner.test_registers = Mock(return_value=True)
+            runner.test_xeneth = Mock(return_value=True)
+            runner.test_group = Mock(return_value=True)
+            runner.enumerate_formats = Mock(return_value=['AR24', 'YUYV'])
+            runner.run = Mock(return_value=({'returncode': 0}, "Pixel Format : 'AR24'"))
+            runner.execute()
+            self.assertEqual([c.args[1] for c in runner.set_ec_format.call_args_list], [21, 22, 21])
+            runner.set_ec_format.reset_mock()
+            (Path(tmp)/'pixel_format').write_text("'Y16 '")
+            with self.assertRaisesRegex(RuntimeError, 'unsupported'):
+                runner.execute()
+            runner.set_ec_format.assert_not_called()
+
+    def test_target_scripts_parse_with_legacy_python_syntax(self):
+        import ast
+        for name in ('run_camera_regression.py', 'run_camera_endurance.py'):
+            source = (ROOT/'test/hardware'/name).read_text()
+            ast.parse(source, feature_version=(3, 6))
+            self.assertNotIn('import dataclasses', source)
+
+
 if __name__ == '__main__':
     unittest.main()

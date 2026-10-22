@@ -34,6 +34,10 @@ if ! docker run --rm --platform=linux/arm64 arm64v8/ubuntu:22.04 /bin/true >/dev
     echo "     docker run --rm --privileged multiarch/qemu-user-static \\"
     echo "         --reset -p yes"
     echo "===================================================================="
+    if [[ "${EG_RELEASE_TESTS:-0}" == "1" ]]; then
+        echo "Release validation requires Phase 3; skipping it is a failure."
+        exit 1
+    fi
     exit 0
 fi
 

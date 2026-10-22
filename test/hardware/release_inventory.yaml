@@ -1,0 +1,47 @@
+# Physical inventory and an editable sequence; support comes from eg_config.yaml.
+# A null current_version must be filled from the target before scheduling flashes.
+boards:
+  nano: {platform: nano_t210, current_version: null, base_major: 32, ports: 2}
+  xavier: {platform: xavier_nx, current_version: null, base_major: 35, ports: 2}
+  orin: {platform: orin_nx_nano_devkit, current_version: '36.4.4', base_major: 36, ports: 2}
+  forecr: {platform: forecr_ornxs, current_version: '35.6.0', base_major: 35, ports: 2}
+  agx: {platform: agx_orin_x230d, current_version: null, base_major: 36, ports: 4}
+  hadron: {platform: cti_hadron_dm, current_version: null, base_major: 36, ports: 2}
+cameras:
+  microcube: {family: microcube, resolution: 640x480}
+  crius1280: {family: crius1280, resolution: 1280x1024}
+  smartir640: {family: smartir640, resolution: 640x480}
+  dione320: {family: dione_ir, resolution: 320x240}
+  dione640: {family: dione_ir, resolution: 640x480}
+  dione1024: {family: dione_ir, resolution: 1024x768}
+  dione1280: {family: dione_ir, resolution: 1280x1024}
+  ilumos: {family: ilumos, resolution: 1280x1024}
+  microlynx: {family: microlynx, resolution: 1024x128}
+exclusive_power_groups:
+  - [ilumos, microlynx]
+budget:
+  working_days: 3
+  hours_per_day: 8
+  flash_minutes: 75
+  placement_minutes: 8
+  reboot_minutes: 5
+  full_camera_minutes: 30
+  port_smoke_minutes: 5
+  soak_minutes: 60
+# Visits in one wave can run concurrently; cameras outside a visit are powered
+# down or disconnected. A camera cannot occupy two active stations in one wave.
+visits:
+  - {wave: 1, board: nano, track: base, cameras: {0: microcube, 1: dione320}, profile: release}
+  - {wave: 1, board: xavier, track: base, cameras: {0: smartir640, 1: dione640}, profile: release}
+  - {wave: 1, board: forecr, track: base, cameras: {0: crius1280, 1: ilumos}, profile: release}
+  - {wave: 1, board: agx, track: base, cameras: {0: dione1280}, profile: release}
+  - {wave: 1, board: hadron, track: base, cameras: {0: dione1024}, profile: release}
+  - {wave: 2, board: orin, track: base, cameras: {0: microcube, 1: microlynx}, profile: release}
+  - {wave: 2, board: hadron, track: base, platform: cti_hadron_dm_pristine, cameras: {1: dione1024}, profile: release}
+  - {wave: 3, board: orin, track: latest, cameras: {0: microcube, 1: microlynx}, profile: release}
+  - {wave: 3, board: forecr, track: latest, cameras: {0: crius1280, 1: dione320}, profile: release}
+  - {wave: 4, board: orin, track: latest, cameras: {0: microcube, 1: dione1024}, profile: release}
+  - {wave: 4, board: agx, track: base, cameras: {0: dione1280, 1: dione640, 2: smartir640, 3: dione320}, profile: release}
+  - {wave: 5, board: orin, track: latest, cameras: {0: microcube, 1: ilumos}, profile: release}
+  - {wave: 4, board: xavier, track: base, cameras: {1: microlynx}, profile: release}
+  - {wave: 6, board: hadron, track: base, cameras: {0: ilumos, 1: microcube}, profile: release}

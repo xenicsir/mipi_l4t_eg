@@ -91,6 +91,34 @@ platforms:
       - "⚠️ Camera port configuration is not handled by the `eg_dt_camera_config_set.sh` script on this board and must be done manually. See [Appendix C: Configuring camera ports manually with config-by-hardware.py](#appendix-c-configuring-camera-ports-manually-with-config-by-hardwarepy) in the README."
       - "⚠️ CAM0 and CAM1 ports are inverted compared to the Orin NX / Nano devkit."
 
+
+  - id: cti_hadron_dm
+    name: Connect Tech Hadron-DM (EG kernel)
+    description: Hadron-DM carrier for Jetson Orin NX, CTI source build
+    l4t_series: "36.x"
+    som: Tegra234
+    support_source:
+      vendor: cti
+      carrier: hadron_dm
+      versions: ["36.5.0"]
+    notes:
+      - "Requires the CTI package and BSP; NVIDIA developer-kit validation does not qualify this carrier."
+      - "Support entries describe availability, not validation of every camera, format and connector."
+  - id: cti_hadron_dm_pristine
+    name: Connect Tech Hadron-DM (vendor kernel)
+    description: Hadron-DM carrier for Jetson Orin NX, unmodified CTI kernel
+    l4t_series: "36.x"
+    som: Tegra234
+    support_source:
+      vendor: cti_pristine
+      carrier: hadron_dm
+      versions: ["36.5.0"]
+    unsupported_cameras: [ilumos, microlynx, titan]
+    unsupported_formats: [Y16, "Y16 -BE", Y14]
+    notes:
+      - "Keeps the CTI kernel and camera framework. Dione RGB and EngineCore RGB/YUYV are the qualification targets."
+      - "Raw 14/16-bit formats and cameras requiring them are unavailable with this package variant."
+
 cameras:
   dione_ir:
     name: "Dione"

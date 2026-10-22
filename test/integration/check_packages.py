@@ -295,6 +295,9 @@ def main():
     # Discover all .deb files: REPO_ROOT/<version_dir>/*.deb
     # version_dirs start with digits (32.*, 35.*, 36.*)
     all_debs = sorted(REPO_ROOT.glob("[0-9]*/*.deb"))
+    if not all_debs:
+        print('FAIL: no packages found; package coverage is empty')
+        return 1
 
     # Group by (version_dir, som, vendor) — the vendor must be part of the key,
     # otherwise two vendors sharing the same version+SoM collapse into one group
@@ -345,8 +348,9 @@ def main():
         print(f"  {GREEN}ALL OK{NC}")
 
     if fail_details:
-        sys.exit(1)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

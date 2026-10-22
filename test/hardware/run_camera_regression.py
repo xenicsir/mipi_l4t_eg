@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Run paced camera regression tests on a Jetson using its generated commands."""
-from __future__ import annotations
 
 import argparse
 import array
-import dataclasses
 import datetime
 import hashlib
 import json
@@ -20,16 +18,18 @@ import tempfile
 import time
 
 
-@dataclasses.dataclass
 class Camera:
-    port: int
-    name: str
-    connected: bool
-    sysfs: str = ''
-    device: str = ''
-    video: str = ''
-    conformant_y14: bool = False
-    groups: list = dataclasses.field(default_factory=list)
+    """Plain record, compatible with the Python 3.6 runtime on legacy targets."""
+    def __init__(self, port, name, connected, sysfs='', device='', video='',
+                 conformant_y14=False, groups=None):
+        self.port = port
+        self.name = name
+        self.connected = connected
+        self.sysfs = sysfs
+        self.device = device
+        self.video = video
+        self.conformant_y14 = conformant_y14
+        self.groups = [] if groups is None else groups
 
     @property
     def enginecore(self):
@@ -489,7 +489,7 @@ cat /proc/sys/kernel/random/boot_id
         self.setup()
         discovered = self.discover()
         self.idle([c for c in discovered if c.connected])
-        self.event('Discovery', cameras=[dataclasses.asdict(c) for c in discovered])
+        self.event('Discovery', cameras=[vars(c) for c in discovered])
         cameras = [c for c in discovered if c.connected and
                    (not self.options.only or c.key in self.options.only or c.name in self.options.only)]
         if not cameras:
@@ -513,9 +513,18 @@ cat /proc/sys/kernel/random/boot_id
                                   ['v4l2-ctl', '-d', camera.video, '--get-fmt-video'], check=True)
             match = re.search(r"Pixel Format\s*:\s*'([^']+)'", current)
             original_format = match[1] if match else format_spec(camera.groups[0])[2]
+            if camera.enginecore:
+                supported = self.enumerate_formats(camera)
+                # Nano/TX2 cannot capture RAW16. Reject an unusable initial
+                # setup before entering a block that restores camera settings.
+                available_codes = [21, 22]
+                if any(fmt.strip() == 'Y16' for fmt in supported):
+                    available_codes.insert(0, 20)
+                if original_code not in available_codes:
+                    raise RuntimeError('Initial camera format is unsupported by this target')
             try:
                 if camera.enginecore:
-                    codes = [original_code] + [x for x in (20, 21, 22) if x != original_code]
+                    codes = [original_code] + [x for x in available_codes if x != original_code]
                     for code in codes:
                         self.set_ec_format(camera.key, code)
                         current = self.refresh(camera.key)

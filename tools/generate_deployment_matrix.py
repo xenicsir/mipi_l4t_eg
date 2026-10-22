@@ -209,6 +209,9 @@ class DeploymentMatrixGenerator:
           3. Empty (None, None, None)
         """
         l4t_version = str(l4t_version)
+        platform = self.platforms_by_id[platform_id]
+        if camera_id in platform.get('unsupported_cameras', []):
+            return ('not_supported', None, None) if self.platform_available(platform_id, l4t_version) else (None, None, None)
 
         # 1. Explicit entry
         for entry in self.matrix_data:
@@ -222,11 +225,21 @@ class DeploymentMatrixGenerator:
                     break
 
         # 2. Auto-generate from eg_config.yaml platform_ids
-        version_cfg = self.camera_db.get('versions', {}).get(l4t_version, {})
-        if platform_id in version_cfg.get('platform_ids', []):
+        if self.platform_available(platform_id, l4t_version):
             return 'theoretically_supported', None, None
 
         return None, None, None
+
+    def platform_available(self, platform_id, version):
+        """Resolve carrier builds already declared in eg_config, without inventing BSPs."""
+        cfg = self.camera_db.get('versions', {}).get(str(version), {})
+        binding = self.platforms_by_id[platform_id].get('support_source')
+        if not binding:
+            return platform_id in cfg.get('platform_ids', [])
+        vendor = binding['vendor']
+        return (str(version) in binding.get('versions', [str(version)])
+                and vendor in cfg.get('vendors', [])
+                and binding['carrier'] in self.camera_db.get('vendors', {}).get(vendor, {}).get('carriers', []))
 
     def get_all_l4t_versions(self):
         """Get all unique L4T versions: union of eg_config.yaml and deployment_matrix_data.yaml."""
@@ -272,6 +285,8 @@ class DeploymentMatrixGenerator:
 
         filtered = []
         for v in all_versions:
+            if platform.get('support_source') and not self.platform_available(platform_id, v):
+                continue
             if str(v).split('.')[0] not in prefixes:
                 continue
             ver_data = self.data.get('l4t_versions', {}).get(str(v), {})
@@ -353,7 +368,7 @@ class DeploymentMatrixGenerator:
         for vcfg in eg_versions.values():
             all_eg_platform_ids.update(vcfg.get('platform_ids', []))
         for pid in sorted(matrix_platform_ids):
-            if pid not in all_eg_platform_ids:
+            if pid not in all_eg_platform_ids and not any(self.platform_available(pid, v) for v in eg_versions):
                 issues.append(
                     f"⚠️  Platform '{pid}': in deployment_matrix platforms but not in "
                     f"any eg_config version's platform_ids"

@@ -647,6 +647,19 @@ Finally, add the new `platform_id` to the `platform_ids` list of each supported 
 
 ## Scenario D: Adding support for a new Nvidia BSP version
 
+Before changing the support declaration, check the [NVIDIA JetPack archive](https://developer.nvidia.com/embedded/jetpack-archive)
+for the exact JetPack/L4T pairing, then check each carrier independently:
+[Auvidea firmware](https://auvidea.eu/firmware/),
+[Forecr branches and tags](https://github.com/forecr/forecr_xavier_kernel), and
+the Connect Tech BSP for CTI carriers. Record the downloaded archive, revision
+and checksum. A release for one carrier family does not establish availability
+for another carrier from the same vendor. Verify the L4T version inside the BSP
+when a download-page label is ambiguous.
+
+Declare a new version only after its sources, build, packaging and applicable
+carrier profiles are ready. Regenerate the deployment matrix and the
+[release qualification plan](../test/RELEASE_VALIDATION.md) from that declaration.
+
 This covers adding support for an entirely new L4T version (e.g., 36.5.0) that is not yet in the build system.
 
 ### Step 1: Update eg_config.yaml

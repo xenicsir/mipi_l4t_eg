@@ -1,3 +1,8 @@
+> Pour une qualification de release actuelle, utiliser [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
+> et [HOST_TEST_COVERAGE.md](HOST_TEST_COVERAGE.md). Le document ci-dessous conserve
+> le plan historique de développement du framework ; ses listes et compteurs ne
+> définissent pas le support actuel.
+
 # Plan de développement — Framework de tests eg_dt_camera_config_set.sh
 
 ## Vue d'ensemble (mise à jour 2026-04-17)

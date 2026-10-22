@@ -141,6 +141,7 @@ platforms:
   # ─── Forecr DSBOARD-ORNXS (Orin NX carrier, vendor=forecr) ────────────────
   # Shares base DTB with orin_nx_nano_devkit. Base DTBO has its own name.
   forecr_ornxs:
+    build_dir: Linux_for_Tegra_forecr_dsboard_ornxs
     board_short: dsboard-ornxs
     som: null
     vendor: forecr                          # drives which .deb to use (different package)

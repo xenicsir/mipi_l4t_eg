@@ -31,6 +31,21 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Release mode requires ARM64 package execution. Other arguments remain available
+# to the existing Docker runners (for example --no-build).
+runner_args=()
+for arg in "$@"; do
+    if [[ "$arg" == "--release" ]]; then
+        export EG_RELEASE_TESTS=1
+    else
+        runner_args+=("$arg")
+    fi
+done
+set -- "${runner_args[@]}"
+if [[ "${EG_RELEASE_TESTS:-0}" == "1" ]]; then
+    python3 "$SCRIPT_DIR/config/check_release_scope.py"
+fi
+
 echo ""
 echo "══════════════════════════════════════════════════════════════════════"
 echo "  P0 — Matrix coherence (eg_config.yaml ↔ hardware.yaml ↔ .debs)"
@@ -49,6 +64,9 @@ python3 "$SCRIPT_DIR/config/test_titan_driver.py"
 python3 "$SCRIPT_DIR/config/test_ilumos_driver.py"
 python3 "$SCRIPT_DIR/config/test_v4l2_enumeration.py"
 python3 "$SCRIPT_DIR/config/test_camera_regression.py"
+python3 "$SCRIPT_DIR/config/test_camera_endurance.py"
+python3 "$SCRIPT_DIR/config/test_release_validation.py"
+python3 "$SCRIPT_DIR/config/test_dione_ctrl.py"
 python3 "$SCRIPT_DIR/config/test_eg_cam_ctrl.py"
 python3 "$SCRIPT_DIR/config/test_gencp_transport.py"
 python3 "$SCRIPT_DIR/config/test_gencp_exchange.py"
@@ -80,5 +98,5 @@ bash "$SCRIPT_DIR/qemu_install/run_all.sh" "$@"
 
 echo ""
 echo "══════════════════════════════════════════════════════════════════════"
-echo "  All phases passed."
+echo "  Requested phases completed; review skips and expected failures in the reports."
 echo "══════════════════════════════════════════════════════════════════════"

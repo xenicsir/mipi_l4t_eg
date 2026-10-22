@@ -65,6 +65,8 @@ def _load_yaml(path: str) -> dict:
 
 def _lft_dir(hw: dict) -> str:
     """Linux_for_Tegra_* directory name for this platform (t210/t186 variants)."""
+    if hw.get('build_dir'):
+        return hw['build_dir']
     som = hw.get("som")
     return f"Linux_for_Tegra_{som}" if som else "Linux_for_Tegra"
 
@@ -178,17 +180,14 @@ def generate_matrix() -> Iterator[Entry]:
     for version, vcfg in eg["versions"].items():
         default_mode = mode_fallback.get(version)
         if not default_mode:
-            sys.stderr.write(f"WARN: unknown mode for version {version}, skipping\n")
-            continue
+            raise ValueError(f"No test mode declared for supported BSP {version}")
         jetpack = vcfg.get("jetpack", "?")
         vendors = vcfg.get("vendors", ["generic"])
         platform_ids = vcfg.get("platform_ids", [])
 
         for pid in platform_ids:
             if pid not in platforms:
-                sys.stderr.write(f"WARN: platform_id '{pid}' in eg_config "
-                                 f"(version {version}) has no hardware.yaml entry\n")
-                continue
+                raise ValueError(f"Supported platform {version}/{pid} has no hardware.yaml entry")
 
             hw = platforms[pid]
 
@@ -209,8 +208,7 @@ def generate_matrix() -> Iterator[Entry]:
             try:
                 dtb_name, dtb_dir = _pick_base_dtb(hw, version, l4t_mode)
             except KeyError as e:
-                sys.stderr.write(f"WARN: {version}/{pid}: {e}\n")
-                continue
+                raise ValueError(f"Missing test DTB mapping for {version}/{pid}: {e}") from e
 
             # Resolve absolute paths
             if dtb_dir == "auvidea":
@@ -226,6 +224,11 @@ def generate_matrix() -> Iterator[Entry]:
 
             # Per-vendor entries: forecr is only valid when this platform is_forecr
             for vendor in vendors:
+                # A BSP variant only qualifies its actual carrier. In particular,
+                # a CTI package on a NVIDIA fixture is not a Hadron test.
+                allowed_vendors = hw.get('vendors', [hw.get('vendor', 'generic')])
+                if vendor not in allowed_vendors:
+                    continue
                 if is_forecr and vendor != "forecr":
                     continue
                 if not is_forecr and vendor == "forecr":
