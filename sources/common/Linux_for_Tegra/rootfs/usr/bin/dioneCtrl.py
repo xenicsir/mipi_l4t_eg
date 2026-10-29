@@ -11,14 +11,13 @@ or USB/Serial (Windows).
 Two wire protocols are implemented. The plain register protocol (4-byte
 address, 2-byte length, both little endian) is what the Dione speaks on
 I2C -- it is the default, and it is all that is needed, upload included.
-GenCP framing is available on the USB/Serial path, where the CX3
-converter acts as a GenCP server; the Dione itself does not serve GenCP
-over I2C, so gencp_enable is for the serial path only.
+GenCP framing requires compatible USB/Serial firmware. Use gencp_enable
+only for that path; Dione I2C uses the plain register protocol.
 
 Requirements
 ------------
 - Python 3
-- Dependencies: pyserial, numpy
+- Dependencies: pyserial, numpy; Pillow for XCA conversion
 
     pip install pyserial numpy
 or  sudo apt install python3-serial
@@ -100,17 +99,16 @@ command, it runs it and exits:
         correction    Upload shutterless .xca (converted automatically) or prepared Dione binary (selector = 3)
 
     Use download for backup/readback when supported by the device. Some Dione
-    firmware reports zero-length Correction on export; that is not a backup. Close Xeneth; the COM port is held exclusively during transfer.
+    firmware reports zero-length Correction on export; that is not a backup.
+    Close other camera applications; the COM port is held exclusively during transfer.
 
     Upload works over plain I2C; do not pass --gencp-enable for it.
 
         python dioneCtrl.py upload app.bin application \\
                             --device-type I2C --bus 9 --dev-addr 0x5a
 
-    The camera address option is --dev-addr, never --addr: every register
-    subcommand takes a positional 'addr', both would land on the same
-    namespace attribute, and the register address would reach the
-    I2C_SLAVE ioctl. Passing --addr reports this instead of failing.
+    Use --dev-addr for the I2C device address and the positional <addr>
+    for a register address.
 
 Firmware Upload (programmatic)
 -------------------------------
@@ -200,7 +198,7 @@ Platform Notes
   permissions or add user to i2c group.
 - Windows: Requires COM port access. Install appropriate USB-Serial drivers.
 - I2C Address: one per model -- Dione 320 = 0x5c, 640 = 0x5a, 1024 = 0x5d,
-  1280 = 0x5b (user manual ENG-2021-UMN008-R013). The default here is 0x5a.
+  1280 = 0x5b. The default here is 0x5a.
 - I2C Bus: Depends on the camera port on Jetson/RPi (check with i2cdetect).
   If the dione_ir driver is loaded, the bus and address are both in the name
   of the node it creates: /dev/dioneir-i2c-<bus>-000e-<address>.
@@ -249,18 +247,13 @@ class FAC_SEL(IntEnum):
 
 
 class CameraError(Exception):
-  """The camera answered and refused the request.
-
-  Distinct from OSError, which means the transport itself failed (no such bus,
-  address rejected, permission denied). IOError is not usable here: in Python 3
-  it is an alias of OSError, so the two cases could not be told apart."""
+  """The camera rejected a request or returned an invalid response."""
 
 
 def convert_dione_xca(blob, version=1):
     """Return (Dione binary, metadata) for a shutterless XCA, version 1 or 3.
 
-    Reference: F128/interface_ext.lua, xc_lua_snuc_data.cpp,
-    xc_snuc_from_scene.cpp, xc_replace_pixels.cpp, xc_dione_calibration_data.cpp.
+    Supports Dione 320, 640, 1024 and 1280 shutterless calibration archives.
     Firmware/application packages never pass through this conversion.
     """
     import io
@@ -311,8 +304,7 @@ def convert_dione_xca(blob, version=1):
         gain = image_data('rej3_gainfactors.bin')
         ambient = image_data('rej4_ambient_d.bin')
         startup = image_data('rej5_startup.bin') if 'rej5_startup.bin' in archive.namelist() else None
-        # BIN_START_UP has varied in old Xeneth releases: only the exact reference
-        # member is used; absent startup data falls back to C in version 3.
+        # Version 3 uses the cold image when no startup image is provided.
         if 'rej_startup.bin' in archive.namelist():
             raise ValueError('Unrecognised startup-image name; verify the XCA format')
         grey = archive.read('rej3_greylevel.bin')
@@ -322,13 +314,19 @@ def convert_dione_xca(blob, version=1):
         if nominal_gain <= 0:
             raise ValueError('Invalid nominal gain level')
         settings_xml = archive.read('camerapack.xcf')
-        # Xeneth XCF files can declare XML version="2.0.0.0". ElementTree rejects
-        # that declaration; its body is ordinary UTF-8 XML.
+        # Accept settings files with a nonstandard XML version declaration.
         if settings_xml.startswith(b'<?xml'):
             settings_xml = settings_xml[settings_xml.index(b'?>')+2:]
         settings_root = ET.fromstring(settings_xml)
-        if settings_root.attrib.get('productid') != 'F128':
-            raise ValueError('XCA camera settings are not for Dione F128')
+        # Check archive product and dimensions before conversion.
+        product = settings_root.attrib.get('productid')
+        products = {'F220': (320, 240), 'F128': (640, 480),
+                    'F221': (1024, 768), 'F12C': (1280, 1024)}
+        if product not in products:
+            raise ValueError('XCA camera settings are not for a supported Dione product '
+                             '(F220, F128, F221, F12C)')
+        if products[product] != (width, height):
+            raise ValueError(f'XCA product {product} does not match image geometry {width}x{height}')
         settings = {}
         for node in settings_root:
             name = node.attrib.get('brief')
@@ -340,8 +338,7 @@ def convert_dione_xca(blob, version=1):
                     raise ValueError('Non-finite calibration setting: ' + name)
                 settings[name] = value
 
-    # XSNucFromSceneModel::CorrectDataImages uses Vertical replacement on rounded
-    # uint16 frames, then changes only the bad elements of the float64 image.
+    # Replace rejected pixels using rounded neighbouring samples.
     bad_y, bad_x = np.nonzero(bad)
     for image in (cold, gain, ambient, startup):
         if image is None:
@@ -435,8 +432,7 @@ def convert_dione_xca(blob, version=1):
     misc += b'\xff'*(4096-len(misc))
     result = binary_image(cold)+binary_image(gain)+binary_image(ambient)+bytes(bad_records)+misc+bytes(settings_blob)
     if version == 3:
-        # Match ToBinaryImage<uint32_t>(..., 10), including its retained final
-        # lane when the sample count is not divisible by three.
+        # Pack three 10-bit samples per word, padding an incomplete group.
         image = cold if startup is None else startup
         values = np.floor(np.clip(image.ravel(), 0, 65535)+.5).astype(np.uint32)
         target = ((count+1023)//1024)*1024
@@ -498,11 +494,7 @@ class dioneCtrl(object):
         self.ser.close()
 
   def close(self):
-    """Release the I2C file descriptors. Idempotent, and safe to call twice.
-
-    open_device()/close_device() only ever acted on the serial port; in I2C mode
-    the two descriptors opened by __init__ used to live until the process died,
-    which leaks one pair per instance in a console or a loop."""
+    """Release I2C file descriptors. Safe to call more than once."""
     for attr in ("fr", "fw"):
       f = getattr(self, attr, None)
       if f is not None and not f.closed:
@@ -543,9 +535,7 @@ class dioneCtrl(object):
     return data
 
   # -------------------------------------------------------------------------
-  # Transport -- one place where the GenCP / raw split and the endianness live.
-  # The six public accessors below are thin wrappers over _read_raw/_write_raw;
-  # keep it that way, a fix applied to one accessor only is a fix half made.
+  # Register transport
   # -------------------------------------------------------------------------
 
   def _gencp_endpoints(self):
@@ -563,9 +553,7 @@ class dioneCtrl(object):
     return '>f' if self.gencp_enable else '<f'
 
   def _check_status(self, status, what):
-    """Raise on a camera error. Reads used to ignore this entirely and hand back
-    whatever bytes came in, so a failed transfer was indistinguishable from a
-    real value."""
+    """Raise CameraError for a missing response or a nonzero camera status."""
     if status is None:
       raise CameraError(f"{what}: no answer from the camera")
     if status:
@@ -585,9 +573,7 @@ class dioneCtrl(object):
         self.write_device(bytearray(reg_addr.to_bytes(4, 'little'))
                           + bytearray(nbytes.to_bytes(2, 'little')))
         raw = self._poll_read(2 + nbytes)
-        # The raw protocol has no error packet: on a refused read the CX3
-        # firmware NAKs the endpoint and sends nothing at all, so an empty or
-        # truncated answer *is* the error report.
+        # A missing or truncated basic response is a failed read.
         status = struct.unpack_from('<H', raw)[0] if len(raw) >= 2 else None
         data = bytes(raw[2:])
     finally:
@@ -597,9 +583,7 @@ class dioneCtrl(object):
 
     self._check_status(status, f"read of 0x{reg_addr:08X}")
     if len(data) != nbytes:
-      # A success status with the wrong byte count means the answer was cut
-      # short. Say so, rather than letting struct.unpack raise about a buffer
-      # length several frames away from the cause.
+      # Validate length even when the camera reports success.
       raise CameraError(f"read of 0x{reg_addr:08X}: got {len(data)} bytes, "
                         f"expected {nbytes}")
     return bytes(data)
@@ -633,20 +617,13 @@ class dioneCtrl(object):
     return struct.unpack(self._u32_fmt(), self._read_raw(reg_addr, 4))[0]
 
   def read_reg32f(self, reg_addr):
-    """Read a 32-bit IEEE-754 float.
-
-    The previous implementation round-tripped through a hex string
-    (bytes.fromhex(f'{val:x}')), which drops leading zeros and can yield an
-    odd-length string: every value below 0x10000000 raised ValueError or
-    struct.error instead of returning a number -- 6.2 % of all bit patterns,
-    and every integer register read through this method by mistake."""
+    """Read a 32-bit IEEE-754 float."""
     return struct.unpack(self._f32_fmt(), self._read_raw(reg_addr, 4))[0]
 
   def read_buf(self, reg_addr, length):
     """Read <length> bytes from <reg_addr>.
 
-    Returns a 2-byte status header followed by the payload, so callers keep
-    slicing [2:] as they always have."""
+    Returns a 2-byte status header followed by the payload."""
     return b'\x00\x00' + self._read_raw(reg_addr, length)
 
   def write_reg32(self, reg_addr, val):
@@ -660,7 +637,7 @@ class dioneCtrl(object):
     return self._write_raw(reg_addr, buf)
 
   # -------------------------------------------------------------------------
-  # File access (ENG-2021-ICD001-R004, p12; Dione manual R005, p45)
+  # File access
   # -------------------------------------------------------------------------
 
   @contextmanager
@@ -687,7 +664,7 @@ class dioneCtrl(object):
     status = self.write_reg32(0x1001000C, 1)
     if status not in (0, GencpStatus['GENCP_BUSY']):
       self._check_status(status, 'FileOperationExecute')
-    # Same 10 s deadline as before; poll completion instead of a fixed 500 ms wait.
+    # Poll completion until the configured deadline.
     deadline = time.monotonic() + self.FILE_OPERATION_TIMEOUT
     while time.monotonic() < deadline:
       time.sleep(self.FILE_POLL_INTERVAL)
@@ -710,7 +687,7 @@ class dioneCtrl(object):
     self._fac_write_checked(0x10010020, len(chunk_data))
     for offset in range(0, len(chunk_data), self.UPLOAD_PACKSIZE):
       part = chunk_data[offset:offset+self.UPLOAD_PACKSIZE]
-      # The CX3 treats every <=4-byte GenCP transfer as a scalar and swaps it.
+      # Short GenCP transfers use scalar byte order.
       wire = part[::-1] if self.gencp_enable and len(part) <= 4 else part
       self._check_status(self.write_buf(0x10011000+offset, wire), 'file buffer write')
     self._fac_execute_operation(3)
@@ -768,7 +745,7 @@ class dioneCtrl(object):
   def upload_file(self, filepath, selector):
     """Upload firmware, application, shutterless XCA or prepared Dione binary.
 
-    XCA conversion follows Xeneth F128; the source file is never changed.
+    XCA conversion supports Dione 320/640/1024/1280; the source file is unchanged.
     Pillow is required only for XCA rejection masks. Correction version and
     sensor geometry are read before any camera setting or file is written.
 
@@ -815,7 +792,7 @@ class dioneCtrl(object):
             blob, calibration = convert_dione_xca(xca_source, version)
           print(f'Converted XCA to Dione v{version}: {len(blob)} bytes, {calibration["bad_pixels"]} bad pixels', flush=True)
         was_running = selector == FAC_SEL.CORRECTION and bool(self.read_reg32(0x8010C) & 1)
-        self._fac_write_checked(0x80104, 0x202)  # existing acquisition-stop sequence
+        self._fac_write_checked(0x80104, 0x202)  # stop acquisition
         time.sleep(1)
         self._fac_write_checked(0x10010000, int(selector))
         self._fac_write_checked(0x10010004, 1)
@@ -827,8 +804,7 @@ class dioneCtrl(object):
             return False
           print(f'\rSent {offset+len(data)}/{len(blob)}', end='', flush=True)
         if selector == FAC_SEL.CORRECTION:
-          # Observed in the successful Xeneth 2.8 Dione upload: final size is
-          # written before CLOSE, although the supplied camera XML labels it RO.
+          # Set the completed correction file size before closing it.
           self._fac_write_checked(0x10010018, len(blob))
         if not self._fac_execute_operation(1):
           return False
@@ -1035,35 +1011,8 @@ if __name__ == "__main__":
       formatter_class=argparse.RawDescriptionHelpFormatter,
   )
 
-  # Connection options -- exactly one per dioneCtrl() constructor parameter, and
-  # named the same, so that a command line and an interactive call read alike:
-  #     dioneCtrl(bus=7, dev_addr=0x5d, device_type="I2C", gencp_enable=False)
-  #     dioneCtrl.py --bus 7 --dev-addr 0x5d --device-type I2C
-  # Keep that mapping when adding a parameter on either side.
-  #
-  # The address option must NOT be called --addr: every subcommand takes a
-  # positional 'addr' (a register address), both would land on the same
-  # namespace attribute, and the positional -- parsed second -- would win. The
-  # register address then reached the I2C_SLAVE ioctl, which rejected it with
-  # EINVAL. That was the state of the CLI until this was fixed.
-  #
-  # These options are added twice: on the main parser with their real defaults,
-  # and again on every subcommand with default=argparse.SUPPRESS, so that both
-  # orders work --
-  #     dioneCtrl.py --bus 9 --dev-addr 0x5a upload pkg.bin application
-  #     dioneCtrl.py upload pkg.bin application --bus 9 --dev-addr 0x5a
-  # The second is the order people actually type (the command first, then how to
-  # reach the camera), and with the options declared only on the main parser
-  # argparse hands everything after the subcommand name to the subparser, which
-  # knows nothing about them: they come back as "unrecognized arguments".
-  #
-  # SUPPRESS on the subcommand copies is what makes the duplication safe. A
-  # subparser parses into a namespace of its own and then copies every attribute
-  # that namespace holds onto the main one (CPython's
-  # _SubParsersAction.__call__), so a real default there would silently
-  # overwrite an option given *before* the subcommand with that default --
-  # `--bus 9 upload ...` would go back to bus 6. SUPPRESS leaves the attribute
-  # unset unless the user typed it, so the main parser's value survives.
+  # Accept connection options before or after the subcommand.
+  # Suppress subcommand defaults to preserve options supplied earlier.
   def add_conn_options(p, suppress=False):
     default = (lambda v: argparse.SUPPRESS) if suppress else (lambda v: v)
     conn = p.add_argument_group('connection')
@@ -1124,15 +1073,11 @@ if __name__ == "__main__":
   p.add_argument('addr',   type=hex_int, help='Register address')
   p.add_argument('length', type=int,     help='Number of bytes to read')
 
-  # Applied to every subcommand in one loop rather than at each add_parser()
-  # call, so a subcommand added later cannot be forgotten -- the failure mode is
-  # a confusing "unrecognized arguments" on that one command only.
+  # Share connection options across all subcommands.
   for sub in subparsers.choices.values():
     add_conn_options(sub, suppress=True)
 
-  # --addr was renamed --dev-addr to break the collision described above, but it
-  # is the name still in shell histories and in older notes. argparse would only
-  # say "unrecognized arguments", which does not point at the new name.
+  # Give the correct option name for an obsolete spelling.
   for arg in sys.argv[1:]:
     if arg == '--addr' or arg.startswith('--addr='):
       parser.error("--addr no longer exists: use --dev-addr for the camera's I2C "
@@ -1142,14 +1087,10 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   if args.command:
-    # Every failure path below must exit non-zero: a caller in a shell script
-    # has no other way to tell a written register from a refused one. Errors are
-    # reported as one line on stderr rather than as a Python traceback -- an
-    # unreachable bus or a wrong address is a user mistake, not a crash.
+    # Return a nonzero exit status and a concise message on failure.
     def fail(msg):
       print(f'Error: {msg}', file=sys.stderr)
       sys.exit(1)
-
     try:
       with dioneCtrl(
           bus=args.bus,
@@ -1201,8 +1142,7 @@ if __name__ == "__main__":
     except PermissionError as e:
       fail(f'{e.filename}: permission denied -- run as root or join the i2c group.')
     except OSError as e:
-      # pyserial raises SerialException, a subclass of OSError, so a missing
-      # port used to be answered with I2C advice about --dev-addr.
+      # Report USB and I2C connection errors with the appropriate options.
       if args.device_type == 'USB':
         fail(f'{e.strerror or e} -- check --com-device.')
       fail(f'{e.strerror or e} -- check --dev-addr, and whether a kernel driver '
