@@ -56,6 +56,7 @@ sudo reboot
   - [Reinstalling, upgrading, version mismatches](#reinstalling-upgrading-version-mismatches)
 - [Configuring camera ports](#configuring-camera-ports)
 - [Testing the camera](#testing-the-camera)
+- [Hardware video pipelines](#hardware-video-pipelines)
 - [Boot configuration and device trees](#boot-configuration-and-device-trees)
 - [Y14 pixel layout](#y14-pixel-layout)
 - [Choosing a pixel format](#choosing-a-pixel-format)
@@ -356,6 +357,14 @@ v4l2-ctl -d /dev/video0 --stream-mmap \
 For more streaming examples, see `/opt/eg/doc/streaming_examples.txt` on the target after package installation.
 
 ---
+
+## Hardware video pipelines
+
+The `egv4l2camerasrc` plugin captures into NVIDIA memory, with VIC/CUDA processing
+and GPU display for compatible YUYV, RGB and grayscale formats. See [Hardware video pipelines on Jetson](docs/JETSON_HARDWARE_VIDEO_PIPELINE.md)
+for availability, host/target builds, streaming commands and Python/C examples.
+The guide also distinguishes hardware capture from CPU pixel processing and
+explains automatic NVMM selection and pixel-analysis options in `rt_frame_monitor.py`.
 
 ## Boot configuration and device trees
 

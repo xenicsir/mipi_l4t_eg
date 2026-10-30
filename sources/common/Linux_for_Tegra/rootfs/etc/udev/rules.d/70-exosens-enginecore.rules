@@ -1,0 +1,2 @@
+# EngineCore control access follows the standard I2C device group policy.
+SUBSYSTEM=="eg-ec-mipi-*", KERNEL=="eg-ec-mipi-*", GROUP="i2c", MODE="0660"

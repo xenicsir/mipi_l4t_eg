@@ -27,6 +27,8 @@ fichiers de configuration, et doit être archivée avec chaque candidat.
 | P2/P2b | preinst/postinst, install/upgrade, garde version/vendor, forçage L4T et nettoyage | Déploiement dans un conteneur, depmod simulé, pas d'initramfs réellement booté ni d'UEFI |
 | P3/P3b | Exécution ARM64 dpkg et comportement apt/Recommends, plusieurs états de dépendances | QEMU et rootfs de test ne sont pas les différents Ubuntu/BSP de la matrice. XFAIL jetson-io et détection Forecr ne qualifient pas le vrai chemin d'installation |
 | Tests des outils HW | Découverte, commandes, pacing, récupération bornée, lecture de registres/SDK, arrêt des enfants | Un test de l'orchestrateur ne constitue pas un résultat matériel de la campagne qu'il pilote |
+| `rt_frame_monitor` backends/CPU | Refus CLI/JSON avant I/O, auto/classic/NVMM, absence de repli après erreur, routes Windows/Linux générique simulées, CPU portable et CSV | Les mocks ne qualifient ni Windows/Raspberry Pi réels ni les surfaces/accélérateurs NVIDIA ; compléter par le runner sur cible. Ces tests nécessitent les dépendances Python du moniteur (`numpy`, `opencv`) sur l'hôte |
+| Runner d'endurance multi-source NVMM | Construction de branches indépendantes, périphériques conservés, comptage source/sortie, corruption, cadence, cas indisponible/obligatoire | Ne prouve pas la concurrence GPU réelle ; test cible en double Y16 normalisé et en combinaison Y16/YUYV |
 
 ## Garde-fous ajoutés
 

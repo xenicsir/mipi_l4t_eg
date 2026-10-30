@@ -1,0 +1,809 @@
+--- a/gstnvv4l2camerasrc.cpp
++++ b/gstnvv4l2camerasrc.cpp
+@@ -61,7 +61,7 @@
+   "video/x-raw(memory:NVMM), " \
+   "width = (int) [ 1, MAX ], " \
+   "height = (int) [ 1, MAX ], " \
+-  "format = (string) { UYVY }, " \
++  "format = (string) { UYVY, YUY2, RGBA, BGRA, BGRx, GRAY16_LE }, " \
+   "interlace-mode = (string) { progressive, interlaced }, " \
+   "framerate = (fraction) [ 0, MAX ];"
+ 
+@@ -74,7 +74,11 @@
+ {
+   PROP_0,
+   PROP_DEVICE,
+-  PROP_CAPTURE_BUFFERS
++  PROP_CAPTURE_BUFFERS,
++  PROP_CAPTURE_FORMAT,
++  PROP_PREVIEW,
++  PROP_NORMALIZE,
++  PROP_CAPTURE_BITS
+ };
+ 
+ struct _GstNVV4l2Memory
+@@ -134,7 +138,8 @@
+     goto error;
+   }
+ 
+-  return (gpointer)(nvmm_mem->nvcam_buf->surface);
++  return (gpointer)(nvmm_mem->nvcam_buf->processed_surface
++      ? nvmm_mem->nvcam_buf->processed_surface : nvmm_mem->nvcam_buf->surface);
+ 
+ error:
+   return NULL;
+@@ -161,6 +166,7 @@
+     gsize size, GstAllocationParams * params)
+ {
+   gint ret = 0;
++  std::string cuda_error;
+   GstNVV4l2Memory *mem = NULL;
+   GstNvV4l2CameraSrcBuffer *nvbuf = NULL;
+   GstMemoryFlags flags = GST_MEMORY_FLAG_NO_SHARE;
+@@ -183,7 +189,7 @@
+   param.params.layout = NVBUF_LAYOUT_PITCH;
+   param.params.memType = NVBUF_MEM_DEFAULT;
+   param.params.gpuId = 0;
+-  param.params.colorFormat = NVBUF_COLOR_FORMAT_UYVY;
++  param.params.colorFormat = self->surface_format;
+ 
+   if (self->interlaced_flag)
+   {
+@@ -196,6 +202,33 @@
+   if (ret != 0) {
+     GST_ERROR ("%s: NvBufSurfaceAllocate Failed \n", __func__);
+     goto error;
++  }
++
++  if (nvbuf->surface->surfaceList[0].pitch != self->fmt->fmt.pix.bytesperline ||
++      nvbuf->surface->surfaceList[0].dataSize < self->fmt->fmt.pix.sizeimage) {
++    GST_ERROR_OBJECT(self, "NVMM pitch/size does not match negotiated V4L2 buffer");
++    goto error;
++  }
++  GST_INFO_OBJECT(self, "capture surface fd=%" G_GUINT64_FORMAT " format=%u pitch=%u size=%u",
++      nvbuf->surface->surfaceList[0].bufferDesc,
++      nvbuf->surface->surfaceList[0].colorFormat,
++      nvbuf->surface->surfaceList[0].pitch,
++      nvbuf->surface->surfaceList[0].dataSize);
++
++  nvbuf->surface->numFilled = 1;
++  if (self->preview || self->byte_swap) {
++    param.params.colorFormat = self->preview ? NVBUF_COLOR_FORMAT_RGBA : NVBUF_COLOR_FORMAT_GRAY16_LE;
++    if (NvBufSurfaceAllocate(&nvbuf->processed_surface, 1, &param)) {
++      GST_ERROR_OBJECT(self, "Cannot allocate CUDA output surface");
++      goto error;
++    }
++    nvbuf->processed_surface->numFilled = 1;
++    nvbuf->cuda_frame = eg_cuda_frame_create(self->cuda, nvbuf->surface,
++                                            nvbuf->processed_surface, cuda_error);
++    if (!nvbuf->cuda_frame) {
++      GST_ERROR_OBJECT(self, "%s", cuda_error.c_str());
++      goto error;
++    }
+   }
+ 
+   nvbuf->surface->numFilled = 1;
+@@ -225,6 +258,9 @@
+   return GST_MEMORY_CAST (mem);
+ 
+ error:
++  eg_cuda_frame_destroy(nvbuf->cuda_frame);
++  if (nvbuf->processed_surface) NvBufSurfaceDestroy(nvbuf->processed_surface);
++  if (nvbuf->surface) NvBufSurfaceDestroy(nvbuf->surface);
+   GST_DEBUG ("%s: FAILED\n", __func__);
+   g_slice_free (GstNvV4l2CameraSrcBuffer, nvbuf);
+   g_slice_free (GstNVV4l2Memory, mem);
+@@ -253,6 +289,8 @@
+     return;
+   }
+ 
++  eg_cuda_frame_destroy(nvbuf->cuda_frame);
++  if (nvbuf->processed_surface) NvBufSurfaceDestroy(nvbuf->processed_surface);
+   ret = NvBufSurfaceDestroy (nvbuf->surface);
+   if (ret != 0)
+     GST_ERROR ("%s: NvBufSurfaceDestroy Failed \n", __func__);
+@@ -320,12 +358,10 @@
+     return GST_FLOW_ERROR;
+   }
+ 
+-  /*
+-   * Currently, we are using base class version because we are not attaching
+-   * anything extra to buffers. If we need to do so We will modify this function
+-   * accordingly.
+-   */
++  /* Acquire a reusable buffer wrapper before dequeuing the camera frame. */
+   ret = GST_BUFFER_POOL_CLASS (bpool_parent_class)->acquire_buffer (bpool, buffer, params);
++  if (ret != GST_FLOW_OK)
++    return ret;
+ 
+   mem = gst_buffer_peek_memory (*buffer, 0);
+   if (!mem) {
+@@ -334,6 +370,9 @@
+ 
+   /* Setting timeout value of select to 5, this can be configured as required */
+   src->tv.tv_sec = DEQUE_TIMEOUT;
++  src->tv.tv_usec = 0;
++  FD_ZERO(&(src->read_set));
++  FD_SET(pool->video_fd, &(src->read_set));
+ 
+   /* select the ready descriptor */
+   r = select(pool->video_fd + 1, &(src->read_set), NULL, NULL, &(src->tv));
+@@ -363,6 +402,8 @@
+ 
+       GST_BUFFER_POOL_CLASS (bpool_parent_class)->release_buffer (bpool, *buffer);
+       ret = GST_BUFFER_POOL_CLASS (bpool_parent_class)->acquire_buffer (bpool, buffer, params);
++      if (ret != GST_FLOW_OK)
++        return ret;
+ 
+       mem = gst_buffer_peek_memory (*buffer, 0);
+       if (!mem) {
+@@ -376,6 +417,24 @@
+     memcpy (nv_mem->nvcam_buf->buffer, &tmp_v4l2_buf, sizeof (struct v4l2_buffer));
+   }
+ 
++  if (nv_mem->nvcam_buf->cuda_frame) {
++    std::string cuda_error;
++    if (!eg_cuda_gray(nv_mem->nvcam_buf->cuda_frame, src->width, src->height,
++                      src->capture_bits, src->byte_swap, src->preview, cuda_error, src->normalize)) {
++      GST_ELEMENT_ERROR(src, RESOURCE, FAILED, ("CUDA grayscale processing failed"),
++                        ("%s", cuda_error.c_str()));
++      gst_buffer_unref(*buffer);
++      *buffer = NULL;
++      return GST_FLOW_ERROR;
++    }
++  }
++
++  GST_BUFFER_OFFSET(*buffer) = nv_mem->nvcam_buf->buffer->sequence;
++  if (nv_mem->nvcam_buf->buffer->flags & V4L2_BUF_FLAG_ERROR)
++    GST_BUFFER_FLAG_SET(*buffer, GST_BUFFER_FLAG_CORRUPTED);
++  else
++    GST_BUFFER_FLAG_UNSET(*buffer, GST_BUFFER_FLAG_CORRUPTED);
++
+   return ret;
+ 
+ no_memblk:
+@@ -388,23 +447,26 @@
+   {
+     GST_ERROR_OBJECT(pool, "VIDIOC_DQBUF failed");
+     src->stop_requested = TRUE;
+-    ret = GST_FLOW_OK;
+-    return ret;
++    gst_buffer_unref(*buffer);
++    *buffer = NULL;
++    return GST_FLOW_ERROR;
+   }
+ timeout_error:
+   {
+     GST_ERROR_OBJECT(pool, "Timeout Error");
+     src->stop_requested = TRUE;
+-    ret = GST_FLOW_OK;
+-    return ret;
++    gst_buffer_unref(*buffer);
++    *buffer = NULL;
++    return GST_FLOW_ERROR;
+   }
+ select_error:
+   {
+     perror ("select");
+     GST_ERROR_OBJECT(pool, "Select Error");
+     src->stop_requested = TRUE;
+-    ret = GST_FLOW_OK;
+-    return ret;
++    gst_buffer_unref(*buffer);
++    *buffer = NULL;
++    return GST_FLOW_ERROR;
+   }
+ no_buffer:
+   {
+@@ -678,7 +740,21 @@
+   /* Default fixated to progressive mode */
+   ret = gst_structure_fixate_field_nearest_int (structure, "width", 1920);
+   ret = gst_structure_fixate_field_nearest_int (structure, "height", 1080);
+-  ret = gst_structure_fixate_field_nearest_fraction (structure, "framerate", 30, 1);
++  // Use the capture interval reported by V4L2; zero means unknown/variable.
++  // Explicit caller caps remain fixed. This does not change the camera rate.
++  auto *self = GST_NVV4L2CAMERASRC(src);
++  struct v4l2_streamparm streamparm = {};
++  streamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++  gint fps_n = 0, fps_d = 1;
++  if (self->video_fd >= 0 && ioctl(self->video_fd, VIDIOC_G_PARM, &streamparm) == 0) {
++    const auto &interval = streamparm.parm.capture.timeperframe;
++    if (interval.numerator && interval.denominator &&
++        interval.numerator <= G_MAXINT && interval.denominator <= G_MAXINT) {
++      fps_n = interval.denominator;
++      fps_d = interval.numerator;
++    }
++  }
++  ret = gst_structure_fixate_field_nearest_fraction(structure, "framerate", fps_n, fps_d);
+ 
+   if (!ret)
+     GST_WARNING_OBJECT (src, "Unable to fixate caps structure");
+@@ -688,9 +764,25 @@
+   return caps;
+ }
+ 
++static GstCaps *gst_nv_v4l2_camera_get_caps(GstBaseSrc *base, GstCaps *filter)
++{
++  auto *src = GST_NVV4L2CAMERASRC(base);
++  GstCaps *caps = gst_caps_make_writable(gst_pad_get_pad_template_caps(GST_BASE_SRC_PAD(base)));
++  if (src->preview || g_ascii_strcasecmp(src->capture_format, "auto"))
++    gst_structure_set(gst_caps_get_structure(caps, 0), "format", G_TYPE_STRING,
++                      src->preview ? "RGBA" : "GRAY16_LE", NULL);
++  if (filter) {
++    GstCaps *intersection = gst_caps_intersect_full(filter, caps, GST_CAPS_INTERSECT_FIRST);
++    gst_caps_unref(caps);
++    caps = intersection;
++  }
++  return caps;
++}
++
+ static gboolean gst_nv_v4l2_camera_set_caps (GstBaseSrc *base, GstCaps *caps)
+ {
+   GstVideoInfo info = {0};
++  std::string cuda_error;
+   GstCaps *old = NULL;
+   GstStructure *config = NULL;
+   GstNVV4l2MemoryAllocator *allocator = NULL;
+@@ -728,6 +820,70 @@
+   } else {
+     GST_DEBUG_OBJECT (src, "interlace-mode field not present in sink caps, setting to progressive mode\n");
+     src->interlaced_flag = FALSE;
++  }
++
++  src->pixel_format = GST_VIDEO_INFO_FORMAT(&info);
++  src->byte_swap = FALSE;
++  src->capture_bits = 16;
++  if (src->preview || src->pixel_format == GST_VIDEO_FORMAT_GRAY16_LE) {
++    if (src->preview && src->pixel_format != GST_VIDEO_FORMAT_RGBA) {
++      GST_ERROR_OBJECT(src, "Grayscale preview requires RGBA output caps");
++      return FALSE;
++    }
++    if (!g_ascii_strcasecmp(src->capture_format, "Y14"))
++      src->capture_fourcc = V4L2_PIX_FMT_Y14;
++    else if (!g_ascii_strcasecmp(src->capture_format, "Y16_BE"))
++      src->capture_fourcc = V4L2_PIX_FMT_Y16_BE;
++    else if (!g_ascii_strcasecmp(src->capture_format, "Y16"))
++      src->capture_fourcc = V4L2_PIX_FMT_Y16;
++    else if (!g_ascii_strcasecmp(src->capture_format, "auto")) {
++      guint32 current = src->fmt->fmt.pix.pixelformat;
++      if (current == V4L2_PIX_FMT_Y14 || current == V4L2_PIX_FMT_Y16_BE || current == V4L2_PIX_FMT_Y16)
++        src->capture_fourcc = current;
++      else {
++        GST_ERROR_OBJECT(src, "Select the camera's grayscale format before capture");
++        return FALSE;
++      }
++    } else {
++      GST_ERROR_OBJECT(src, "Unsupported capture-format: %s", src->capture_format);
++      return FALSE;
++    }
++    src->surface_format = NVBUF_COLOR_FORMAT_GRAY16_LE;
++    src->bytes_per_pixel = 2;
++    src->capture_bits = src->capture_fourcc == V4L2_PIX_FMT_Y14 ? 14 : 16;
++    src->byte_swap = src->capture_fourcc == V4L2_PIX_FMT_Y16_BE;
++  } else {
++    if (g_ascii_strcasecmp(src->capture_format, "auto")) {
++      GST_ERROR_OBJECT(src, "capture-format overrides require grayscale or preview caps");
++      return FALSE;
++    }
++    switch (src->pixel_format) {
++      case GST_VIDEO_FORMAT_YUY2:
++        src->capture_fourcc = V4L2_PIX_FMT_YUYV;
++        src->surface_format = NVBUF_COLOR_FORMAT_YUYV;
++        src->bytes_per_pixel = 2;
++        break;
++      case GST_VIDEO_FORMAT_UYVY:
++        src->capture_fourcc = V4L2_PIX_FMT_UYVY;
++        src->surface_format = NVBUF_COLOR_FORMAT_UYVY;
++        src->bytes_per_pixel = 2;
++        break;
++      case GST_VIDEO_FORMAT_RGBA:
++        src->capture_fourcc = V4L2_PIX_FMT_RGBA32; /* AB24: R,G,B,A bytes */
++        src->surface_format = NVBUF_COLOR_FORMAT_RGBA;
++        src->bytes_per_pixel = 4;
++        break;
++      case GST_VIDEO_FORMAT_BGRA:
++      case GST_VIDEO_FORMAT_BGRx:
++        src->capture_fourcc = V4L2_PIX_FMT_ABGR32; /* AR24: B,G,R,A bytes */
++        src->surface_format = src->pixel_format == GST_VIDEO_FORMAT_BGRA
++            ? NVBUF_COLOR_FORMAT_BGRA : NVBUF_COLOR_FORMAT_BGRx;
++        src->bytes_per_pixel = 4;
++        break;
++      default:
++        GST_ERROR_OBJECT(src, "Unsupported pixel format");
++        return FALSE;
++    }
+   }
+ 
+   src->width  = info.width;
+@@ -752,13 +908,41 @@
+   }
+ 
+    /* VIDIOC_S_FMT IOCTL on v4l2 device */
+-   src->fmt->fmt.pix_mp.width = src->width;
+-   src->fmt->fmt.pix_mp.height = src->height;
+-   src->fmt->fmt.pix.bytesperline = src->width * 2;
++   src->fmt->fmt.pix.width = src->width;
++   src->fmt->fmt.pix.height = src->height;
++   src->fmt->fmt.pix.pixelformat = src->capture_fourcc;
++   src->fmt->fmt.pix.bytesperline = src->width * src->bytes_per_pixel;
+    if (-1 == ioctl(src->video_fd, VIDIOC_S_FMT, src->fmt)) {
+     GST_ERROR_OBJECT(src, "VIDIOC_S_FMT on %s device", src->videodev);
+     goto fmt_error;
+    }
++
++  if (src->fmt->fmt.pix.width != (guint)src->width ||
++      src->fmt->fmt.pix.height != (guint)src->height ||
++      src->fmt->fmt.pix.pixelformat != src->capture_fourcc) {
++    GST_ERROR_OBJECT(src, "Driver changed the requested size or pixel format");
++    goto fmt_error;
++  }
++  GST_INFO_OBJECT(src, "V4L2 format=%c%c%c%c stride=%u size=%u",
++      src->fmt->fmt.pix.pixelformat & 255, (src->fmt->fmt.pix.pixelformat >> 8) & 255,
++      (src->fmt->fmt.pix.pixelformat >> 16) & 255, (src->fmt->fmt.pix.pixelformat >> 24) & 255,
++      src->fmt->fmt.pix.bytesperline, src->fmt->fmt.pix.sizeimage);
++
++  if ((src->preview || src->byte_swap) && !src->cuda) {
++    src->cuda = eg_cuda_create(cuda_error);
++    if (!src->cuda) {
++      GST_ERROR_OBJECT(src, "%s", cuda_error.c_str());
++      goto fmt_error;
++    }
++  }
++
++  if (src->preview)
++    g_print("nvv4l2camerasrc: pixel processing: %s on GPU to RGBA; captured values unchanged\n",
++        src->normalize ? "per-frame min/max normalization" : "fixed-range grayscale scaling");
++  else if (src->byte_swap)
++    g_print("nvv4l2camerasrc: pixel processing: GPU byte-order conversion to little-endian; numeric values unchanged\n");
++  else
++    g_print("nvv4l2camerasrc: pixel processing: none in the capture source\n");
+ 
+   /* Requesting buffers for camera */
+   src->req = (struct v4l2_requestbuffers *) g_malloc (sizeof (struct v4l2_requestbuffers));
+@@ -873,6 +1057,8 @@
+   /* TODO, move this opening code to gst_nv_v4l2_camera_change_state */
+   GstNvV4l2CameraSrc *src = (GstNvV4l2CameraSrc *) src_base;
+   src->index = 0;
++  src->stop_requested = FALSE;
++  src->unlock_requested = FALSE;
+ 
+   /* open the device */
+   src->video_fd = open (src->videodev, O_RDWR /* | O_NONBLOCK */ );
+@@ -1009,6 +1195,8 @@
+     gst_caps_unref (src->outcaps);
+     src->outcaps = NULL;
+   }
++  eg_cuda_release(src->cuda);
++  src->cuda = NULL;
+   return TRUE;
+ }
+ 
+@@ -1051,6 +1239,7 @@
+   gobject_class->get_property = gst_nv_v4l2_camera_src_get_property;
+   gobject_class->finalize     = gst_nv_v4l2_camera_src_finalize;
+ 
++  base_src_class->get_caps    = GST_DEBUG_FUNCPTR (gst_nv_v4l2_camera_get_caps);
+   base_src_class->set_caps    = GST_DEBUG_FUNCPTR (gst_nv_v4l2_camera_set_caps);
+   base_src_class->fixate      = GST_DEBUG_FUNCPTR (gst_nv_v4l2_camera_fixate);
+   base_src_class->start       = GST_DEBUG_FUNCPTR (gst_nv_v4l2_camera_start);
+@@ -1068,6 +1257,22 @@
+           "number of capture buffers",
+           2, MAX_BUFFERS, MIN_BUFFERS, (GParamFlags) G_PARAM_READWRITE));
+ 
++  g_object_class_install_property(gobject_class, PROP_CAPTURE_FORMAT,
++      g_param_spec_string("capture-format", "Grayscale capture format",
++          "auto, Y16, Y14 (right-aligned), or Y16_BE; NVMM grayscale output is little endian",
++          "auto", (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_MUTABLE_READY)));
++  g_object_class_install_property(gobject_class, PROP_PREVIEW,
++      g_param_spec_boolean("preview", "GPU grayscale preview",
++          "Convert grayscale capture to full-range RGBA on CUDA; raw capture remains unchanged",
++          FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_MUTABLE_READY)));
++  g_object_class_install_property(gobject_class, PROP_NORMALIZE,
++      g_param_spec_boolean("normalize", "Adaptive grayscale preview",
++          "Normalize each preview frame using GPU min/max; false uses the full declared range. Raw output is unchanged.",
++          FALSE, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
++  g_object_class_install_property(gobject_class, PROP_CAPTURE_BITS,
++      g_param_spec_uint("capture-bits", "Capture precision", "Valid grayscale bits before preview",
++                       8, 16, 16, (GParamFlags)G_PARAM_READABLE));
++
+   gst_element_class_set_details_simple(gstelement_class,
+     "NvV4l2CameraSrc",
+     "Video/Capture",
+@@ -1087,6 +1292,12 @@
+ gst_nv_v4l2_camera_src_init (GstNvV4l2CameraSrc * src)
+ {
+   src->cap_buf = MIN_BUFFERS;
++  src->capture_format = g_strdup("auto");
++  src->preview = FALSE;
++  src->normalize = FALSE;
++  src->byte_swap = FALSE;
++  src->capture_bits = 16;
++  src->cuda = NULL;
+   src->width = 1920;
+   src->height = 1080;
+   src->fps_n = 30;
+@@ -1119,6 +1330,10 @@
+     src->videodev = NULL;
+   }
+ 
++  g_free(src->capture_format);
++  src->capture_format = NULL;
++  eg_cuda_release(src->cuda);
++  src->cuda = NULL;
+   G_OBJECT_CLASS (parent_class)->finalize (object);
+ }
+ 
+@@ -1141,6 +1356,20 @@
+     }
+       break;
+ 
++    case PROP_CAPTURE_FORMAT:
++      if (GST_STATE(src) > GST_STATE_READY) { GST_WARNING_OBJECT(src, "Stop capture before changing capture-format"); break; }
++      g_free(src->capture_format);
++      src->capture_format = g_value_dup_string(value);
++      if (!src->capture_format) src->capture_format = g_strdup("auto");
++      break;
++    case PROP_NORMALIZE:
++      if (GST_STATE(src) > GST_STATE_READY) { GST_WARNING_OBJECT(src, "Stop capture before changing normalization"); break; }
++      src->normalize = g_value_get_boolean(value);
++      break;
++    case PROP_PREVIEW:
++      if (GST_STATE(src) > GST_STATE_READY) { GST_WARNING_OBJECT(src, "Stop capture before changing preview"); break; }
++      src->preview = g_value_get_boolean(value);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -1163,6 +1392,10 @@
+       g_value_set_uint (value, src->cap_buf);
+       break;
+ 
++    case PROP_CAPTURE_FORMAT: g_value_set_string(value, src->capture_format); break;
++    case PROP_NORMALIZE: g_value_set_boolean(value, src->normalize); break;
++    case PROP_PREVIEW: g_value_set_boolean(value, src->preview); break;
++    case PROP_CAPTURE_BITS: g_value_set_uint(value, src->capture_bits); break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+--- a/gstnvv4l2camerasrc.hpp
++++ b/gstnvv4l2camerasrc.hpp
+@@ -30,6 +30,7 @@
+ #define __GST_NVV4L2CAMERASRC_H__
+ 
+ #include <gst/gst.h>
++#include "eg_cuda_gray.h"
+ 
+ G_BEGIN_DECLS
+ 
+@@ -63,6 +64,8 @@
+   gint dmabuf_fd;
+   GstBuffer *gst_buf;
+   NvBufSurface *surface;
++  NvBufSurface *processed_surface;
++  EgCudaFrame *cuda_frame;
+   struct v4l2_buffer *buffer;
+ };
+ 
+@@ -85,6 +88,16 @@
+ 
+   GstCaps *outcaps;
+ 
++  GstVideoFormat pixel_format;
++  guint32 capture_fourcc;
++  NvBufSurfaceColorFormat surface_format;
++  guint bytes_per_pixel;
++  gchar *capture_format;
++  gboolean preview;
++  gboolean normalize;
++  gboolean byte_swap;
++  guint capture_bits;
++  EgCudaEngine *cuda;
+   gint width;
+   gint height;
+   gint fps_n;
+--- /dev/null
++++ b/eg_cuda_gray.cpp
+@@ -0,0 +1,285 @@
++#include "eg_cuda_gray.h"
++#include <atomic>
++#include <cstddef>
++#include <cstdint>
++#include <dlfcn.h>
++#include <stdexcept>
++
++// Only the stable CUDA Driver C ABI used here is declared. No CUDA Toolkit,
++// runtime compiler or CPU pixel mapping is required by the deployed plugin.
++namespace cuda_abi {
++using Handle = void *;
++struct EglFrame {
++  union { Handle array[3]; void *pitch[3]; } frame;
++  unsigned width, height, depth, pitch, plane_count, channels;
++  int frame_type, color_format, channel_format;
++};
++static_assert(sizeof(EglFrame) == 64 && offsetof(EglFrame, frame_type) == 48,
++              "CUDA EGL frame ABI requires LP64");
++struct Driver {
++  void *library = nullptr;
++  int (*init)(unsigned) = nullptr;
++  int (*retain)(Handle *, int) = nullptr;
++  int (*release)(int) = nullptr;
++  int (*push)(Handle) = nullptr;
++  int (*pop)(Handle *) = nullptr;
++  int (*load)(Handle *, const void *) = nullptr;
++  int (*unload)(Handle) = nullptr;
++  int (*function)(Handle *, Handle, const char *) = nullptr;
++  int (*register_image)(Handle *, void *, unsigned) = nullptr;
++  int (*get_frame)(EglFrame *, Handle, unsigned, unsigned) = nullptr;
++  int (*unregister_image)(Handle) = nullptr;
++  int (*launch)(Handle, unsigned, unsigned, unsigned, unsigned, unsigned, unsigned,
++                unsigned, Handle, void **, void **) = nullptr;
++  int (*sync)() = nullptr;
++  int (*allocate)(uint64_t *, size_t) = nullptr;
++  int (*free)(uint64_t) = nullptr;
++  int (*error_name)(int, const char **) = nullptr;
++  template<typename T> void symbol(T &target, const char *name) {
++    target = reinterpret_cast<T>(dlsym(library, name));
++    if (!target) throw std::runtime_error(std::string("Missing CUDA entry: ") + name);
++  }
++  void open() {
++    library = dlopen("libcuda.so.1", RTLD_NOW | RTLD_LOCAL);
++    if (!library) throw std::runtime_error("CUDA driver library unavailable");
++    symbol(init, "cuInit"); symbol(retain, "cuDevicePrimaryCtxRetain");
++    symbol(release, "cuDevicePrimaryCtxRelease_v2");
++    symbol(push, "cuCtxPushCurrent_v2"); symbol(pop, "cuCtxPopCurrent_v2");
++    symbol(load, "cuModuleLoadData"); symbol(unload, "cuModuleUnload");
++    symbol(function, "cuModuleGetFunction");
++    symbol(register_image, "cuGraphicsEGLRegisterImage");
++    symbol(get_frame, "cuGraphicsResourceGetMappedEglFrame");
++    symbol(unregister_image, "cuGraphicsUnregisterResource");
++    symbol(launch, "cuLaunchKernel"); symbol(sync, "cuCtxSynchronize");
++    symbol(allocate, "cuMemAlloc_v2"); symbol(free, "cuMemFree_v2");
++    symbol(error_name, "cuGetErrorName");
++  }
++  void check(int result, const char *operation) {
++    if (!result) return;
++    const char *name = nullptr;
++    if (error_name) error_name(result, &name);
++    throw std::runtime_error(std::string(operation) + ": " +
++                             (name ? name : "CUDA error") + " (" + std::to_string(result) + ")");
++  }
++  ~Driver() { if (library) dlclose(library); }
++};
++}
++
++// Equivalent pixel operation, with independent input/output pitches:
++//   value = input16[y][x]; if (swap) value = byteswap16(value);
++//   if (rgba) { level = min(value >> (valid_bits - 8), 255); output = (level,level,level,255); }
++//   else output16 = value;
++// PTX is JIT-compiled by the installed driver. No frame data returns to the CPU.
++static const char gray_ptx[] = R"ptx(
++.version 7.0
++.target sm_53
++.address_size 64
++.visible .entry eg_gray(
++ .param .u64 src, .param .u64 dst,
++ .param .u32 sp, .param .u32 dp, .param .u32 w, .param .u32 h,
++ .param .u32 shift, .param .u32 swap, .param .u32 rgba,
++ .param .u64 range, .param .u32 normalize)
++{
++ .reg .pred %p<7>;
++ .reg .b32 %r<32>;
++ .reg .b64 %rd<12>;
++ .reg .f32 %f<5>;
++ ld.param.u64 %rd0, [src]; ld.param.u64 %rd1, [dst];
++ ld.param.u32 %r0, [sp]; ld.param.u32 %r1, [dp];
++ ld.param.u32 %r2, [w]; ld.param.u32 %r3, [h];
++ ld.param.u32 %r4, [shift]; ld.param.u32 %r5, [swap]; ld.param.u32 %r6, [rgba];
++ mov.u32 %r7, %ctaid.x; mov.u32 %r8, %ntid.x; mov.u32 %r9, %tid.x;
++ mad.lo.u32 %r10, %r7, %r8, %r9;
++ mov.u32 %r7, %ctaid.y; mov.u32 %r8, %ntid.y; mov.u32 %r9, %tid.y;
++ mad.lo.u32 %r11, %r7, %r8, %r9;
++ setp.ge.u32 %p0, %r10, %r2; setp.ge.u32 %p1, %r11, %r3;
++ or.pred %p0, %p0, %p1; @%p0 bra done;
++ mul.wide.u32 %rd2, %r11, %r0;
++ mad.wide.u32 %rd3, %r10, 2, %rd2; add.u64 %rd3, %rd0, %rd3;
++ ld.global.u16 %r12, [%rd3];
++ shr.u32 %r13, %r12, 8; shl.b32 %r14, %r12, 8;
++ or.b32 %r13, %r13, %r14; and.b32 %r13, %r13, 65535;
++ setp.ne.u32 %p2, %r5, 0; selp.b32 %r12, %r13, %r12, %p2;
++ mul.wide.u32 %rd4, %r11, %r1;
++ setp.ne.u32 %p3, %r6, 0; @!%p3 bra raw;
++ mad.wide.u32 %rd5, %r10, 4, %rd4; add.u64 %rd5, %rd1, %rd5;
++ ld.param.u32 %r20, [normalize]; setp.eq.u32 %p4, %r20, 0;
++ @%p4 bra fixed_range;
++ ld.param.u64 %rd9, [range];
++ ld.global.u32 %r21, [%rd9]; ld.global.u32 %r22, [%rd9+4];
++ sub.u32 %r23, %r22, %r21; mov.u32 %r15, 0;
++ setp.eq.u32 %p5, %r23, 0; @%p5 bra store_rgba;
++ sub.u32 %r24, %r12, %r21;
++ cvt.rn.f32.u32 %f0, %r24; cvt.rn.f32.u32 %f1, %r23;
++ mov.f32 %f2, 0f437f0000;
++ div.rn.f32 %f3, %f2, %f1; mul.rn.f32 %f4, %f0, %f3;
++ cvt.rni.u32.f32 %r15, %f4; min.u32 %r15, %r15, 255;
++ bra store_rgba;
++fixed_range:
++ shr.u32 %r15, %r12, %r4; min.u32 %r15, %r15, 255;
++store_rgba:
++ mul.lo.u32 %r16, %r15, 65793; or.b32 %r16, %r16, 0xff000000;
++ st.global.u32 [%rd5], %r16; bra done;
++raw:
++ mad.wide.u32 %rd5, %r10, 2, %rd4; add.u64 %rd5, %rd1, %rd5;
++ st.global.u16 [%rd5], %r12;
++done:
++ ret;
++}
++.visible .entry eg_range_init(.param .u64 range)
++{
++ .reg .b64 %rd; .reg .b32 %lo, %hi;
++ ld.param.u64 %rd, [range]; mov.u32 %lo, 65535; mov.u32 %hi, 0;
++ st.global.u32 [%rd], %lo; st.global.u32 [%rd+4], %hi;
++ ret;
++}
++// 64 blocks, 256 threads per block; only two global atomics per block.
++.visible .entry eg_range_reduce(
++ .param .u64 src, .param .u64 range, .param .u32 pitch,
++ .param .u32 width, .param .u32 height, .param .u32 swap)
++{
++ .shared .align 4 .b8 values[2048];
++ .reg .pred %p<5>; .reg .b32 %r<30>; .reg .b64 %rd<8>;
++ ld.param.u64 %rd0, [src]; ld.param.u64 %rd1, [range];
++ ld.param.u32 %r0, [pitch]; ld.param.u32 %r1, [width];
++ ld.param.u32 %r2, [height]; ld.param.u32 %r3, [swap];
++ mov.u32 %r4, %tid.x; mov.u32 %r5, %ctaid.x;
++ mad.lo.u32 %r6, %r5, 256, %r4; mul.lo.u32 %r7, %r1, %r2;
++ mov.u32 %r8, 65535; mov.u32 %r9, 0;
++scan:
++ setp.ge.u32 %p0, %r6, %r7; @%p0 bra shared_reduce;
++ div.u32 %r10, %r6, %r1; mul.lo.u32 %r11, %r10, %r1;
++ sub.u32 %r11, %r6, %r11;
++ mul.wide.u32 %rd2, %r10, %r0; mad.wide.u32 %rd3, %r11, 2, %rd2;
++ add.u64 %rd3, %rd0, %rd3; ld.global.u16 %r12, [%rd3];
++ shr.u32 %r13, %r12, 8; shl.b32 %r14, %r12, 8;
++ or.b32 %r13, %r13, %r14; and.b32 %r13, %r13, 65535;
++ setp.ne.u32 %p1, %r3, 0; selp.b32 %r12, %r13, %r12, %p1;
++ min.u32 %r8, %r8, %r12; max.u32 %r9, %r9, %r12;
++ add.u32 %r6, %r6, 16384; bra scan;
++shared_reduce:
++ mov.u32 %r15, values; mad.lo.u32 %r16, %r4, 4, %r15;
++ st.shared.u32 [%r16], %r8; st.shared.u32 [%r16+1024], %r9;
++ bar.sync 0; mov.u32 %r17, 128;
++reduce_step:
++ setp.ge.u32 %p2, %r4, %r17; @%p2 bra next_step;
++ mad.lo.u32 %r18, %r17, 4, %r16;
++ ld.shared.u32 %r19, [%r18]; ld.shared.u32 %r20, [%r18+1024];
++ min.u32 %r8, %r8, %r19; max.u32 %r9, %r9, %r20;
++ st.shared.u32 [%r16], %r8; st.shared.u32 [%r16+1024], %r9;
++next_step:
++ bar.sync 0; shr.u32 %r17, %r17, 1;
++ setp.ne.u32 %p3, %r17, 0; @%p3 bra reduce_step;
++ setp.ne.u32 %p4, %r4, 0; @%p4 bra reduce_done;
++ atom.global.min.u32 %r21, [%rd1], %r8;
++ atom.global.max.u32 %r22, [%rd1+4], %r9;
++reduce_done:
++ ret;
++}
++)ptx";
++
++struct EgCudaEngine {
++  cuda_abi::Driver api;
++  cuda_abi::Handle context = nullptr, module = nullptr, kernel = nullptr;
++  cuda_abi::Handle range_init = nullptr, range_reduce = nullptr;
++  std::atomic<unsigned> references{1};
++  bool retained = false;
++};
++struct ContextGuard {
++  EgCudaEngine *engine;
++  explicit ContextGuard(EgCudaEngine *e) : engine(e) { e->api.check(e->api.push(e->context), "cuCtxPushCurrent"); }
++  ~ContextGuard() { cuda_abi::Handle previous; engine->api.pop(&previous); }
++};
++struct EgCudaFrame {
++  EgCudaEngine *engine;
++  NvBufSurface *input = nullptr, *output = nullptr;
++  cuda_abi::Handle in_resource = nullptr, out_resource = nullptr;
++  cuda_abi::EglFrame in_frame{}, out_frame{};
++  bool input_mapped = false, output_mapped = false;
++  uint64_t range = 0;
++  explicit EgCudaFrame(EgCudaEngine *e) : engine(e) { ++e->references; }
++};
++
++EgCudaEngine *eg_cuda_create(std::string &error) {
++  auto *e = new EgCudaEngine();
++  try {
++    e->api.open(); e->api.check(e->api.init(0), "cuInit");
++    e->api.check(e->api.retain(&e->context, 0), "cuDevicePrimaryCtxRetain");
++    e->retained = true;
++    ContextGuard guard(e);
++    e->api.check(e->api.load(&e->module, gray_ptx), "cuModuleLoadData");
++    e->api.check(e->api.function(&e->kernel, e->module, "eg_gray"), "cuModuleGetFunction");
++    e->api.check(e->api.function(&e->range_init, e->module, "eg_range_init"), "cuModuleGetFunction(range init)");
++    e->api.check(e->api.function(&e->range_reduce, e->module, "eg_range_reduce"), "cuModuleGetFunction(range reduce)");
++    return e;
++  } catch (const std::exception &ex) { error = ex.what(); eg_cuda_release(e); return nullptr; }
++}
++void eg_cuda_release(EgCudaEngine *e) {
++  if (!e || --e->references) return;
++  if (e->retained) {
++    try { ContextGuard guard(e); if (e->module) e->api.unload(e->module); } catch (...) {}
++    e->api.release(0);
++  }
++  delete e;
++}
++EgCudaFrame *eg_cuda_frame_create(EgCudaEngine *e, NvBufSurface *input,
++                                  NvBufSurface *output, std::string &error) {
++  auto *f = new EgCudaFrame(e); f->input = input; f->output = output;
++  try {
++    ContextGuard guard(e);
++    if (NvBufSurfaceMapEglImage(input, 0)) throw std::runtime_error("Cannot export input EGL image");
++    f->input_mapped = true;
++    if (NvBufSurfaceMapEglImage(output, 0)) throw std::runtime_error("Cannot export output EGL image");
++    f->output_mapped = true;
++    e->api.check(e->api.register_image(&f->in_resource, input->surfaceList[0].mappedAddr.eglImage, 1), "cuGraphicsEGLRegisterImage(input)");
++    e->api.check(e->api.register_image(&f->out_resource, output->surfaceList[0].mappedAddr.eglImage, 2), "cuGraphicsEGLRegisterImage(output)");
++    e->api.check(e->api.get_frame(&f->in_frame, f->in_resource, 0, 0), "cuGraphicsResourceGetMappedEglFrame(input)");
++    e->api.check(e->api.get_frame(&f->out_frame, f->out_resource, 0, 0), "cuGraphicsResourceGetMappedEglFrame(output)");
++    for (auto *frame : {&f->in_frame, &f->out_frame})
++      if (frame->frame_type != 1 || frame->plane_count != 1 || !frame->frame.pitch[0])
++        throw std::runtime_error("Expected a single-plane pitch-linear CUDA surface");
++    if (output->surfaceList[0].colorFormat == NVBUF_COLOR_FORMAT_RGBA)
++      e->api.check(e->api.allocate(&f->range, 8), "cuMemAlloc(range)");
++    return f;
++  } catch (const std::exception &ex) { error = ex.what(); eg_cuda_frame_destroy(f); return nullptr; }
++}
++void eg_cuda_frame_destroy(EgCudaFrame *f) {
++  if (!f) return;
++  auto *e = f->engine;
++  try {
++    ContextGuard guard(e);
++    if (f->range) e->api.free(f->range);
++    if (f->in_resource) e->api.unregister_image(f->in_resource);
++    if (f->out_resource) e->api.unregister_image(f->out_resource);
++  } catch (...) {}
++  if (f->input_mapped) NvBufSurfaceUnMapEglImage(f->input, 0);
++  if (f->output_mapped) NvBufSurfaceUnMapEglImage(f->output, 0);
++  delete f; eg_cuda_release(e);
++}
++bool eg_cuda_gray(EgCudaFrame *f, unsigned width, unsigned height,
++                  unsigned valid_bits, bool byte_swap, bool rgba, std::string &error, bool normalize) {
++  try {
++    if (valid_bits < 8 || valid_bits > 16 || width > f->in_frame.width ||
++        width > f->out_frame.width || height > f->in_frame.height || height > f->out_frame.height ||
++        f->in_frame.pitch < width * 2 || f->out_frame.pitch < width * (rgba ? 4 : 2))
++      throw std::runtime_error("Invalid CUDA grayscale dimensions or precision");
++    auto *e = f->engine; ContextGuard guard(e);
++    uint64_t input = reinterpret_cast<uint64_t>(f->in_frame.frame.pitch[0]);
++    uint64_t output = reinterpret_cast<uint64_t>(f->out_frame.frame.pitch[0]);
++    unsigned shift = valid_bits - 8, swap = byte_swap, rgba_flag = rgba;
++    unsigned normalized = rgba && normalize;
++    if (normalized) {
++      if (!f->range) throw std::runtime_error("Missing GPU normalization workspace");
++      void *init_args[] = {&f->range};
++      e->api.check(e->api.launch(e->range_init, 1, 1, 1, 1, 1, 1, 0, nullptr, init_args, nullptr), "cuLaunchKernel(range init)");
++      void *reduce_args[] = {&input, &f->range, &f->in_frame.pitch, &width, &height, &swap};
++      e->api.check(e->api.launch(e->range_reduce, 64, 1, 1, 256, 1, 1, 0, nullptr, reduce_args, nullptr), "cuLaunchKernel(range reduce)");
++    }
++    void *arguments[] = {&input, &output, &f->in_frame.pitch, &f->out_frame.pitch,
++                         &width, &height, &shift, &swap, &rgba_flag, &f->range, &normalized};
++    e->api.check(e->api.launch(e->kernel, (width+15)/16, (height+15)/16, 1,
++                              16, 16, 1, 0, nullptr, arguments, nullptr), "cuLaunchKernel");
++    e->api.check(e->api.sync(), "cuCtxSynchronize");
++    return true;
++  } catch (const std::exception &ex) { error = ex.what(); return false; }
++}
+--- /dev/null
++++ b/eg_cuda_gray.h
+@@ -0,0 +1,15 @@
++#ifndef EG_CUDA_GRAY_H
++#define EG_CUDA_GRAY_H
++#include "nvbufsurface.h"
++#include <string>
++struct EgCudaEngine;
++struct EgCudaFrame;
++EgCudaEngine *eg_cuda_create(std::string &error);
++void eg_cuda_release(EgCudaEngine *engine);
++EgCudaFrame *eg_cuda_frame_create(EgCudaEngine *engine, NvBufSurface *input,
++                                  NvBufSurface *output, std::string &error);
++void eg_cuda_frame_destroy(EgCudaFrame *frame);
++bool eg_cuda_gray(EgCudaFrame *frame, unsigned width, unsigned height,
++                  unsigned valid_bits, bool byte_swap, bool rgba, std::string &error,
++                  bool normalize = false);
++#endif

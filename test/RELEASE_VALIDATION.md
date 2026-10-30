@@ -209,8 +209,8 @@ statuts `UNKNOWN` (0), flags/error-data nuls, à moins de 0,5 s d'un arrêt qu'i
 mesuré. Le header NVIDIA les définit comme requêtes non exécutées/en cours ;
 leurs autres champs ne sont pas interprétables. Le même message en plein flux,
 un statut d'erreur effectif, un timeout ou des trames manquantes restent des échecs.
-Pour isoler une anomalie, `--cycles 0` teste les
-flux simultanés seuls et `--only` sélectionne une caméra.
+Pour isoler une anomalie, `--cycles 0` omet les cycles alternés et `--only`
+sélectionne une caméra ; `--skip-nvmm` isole les captures V4L2.
 
 Le second script vérifie les caméras attendues et le BSP, enchaîne des captures
 courtes, puis lance les flux sélectionnés simultanément. Il détecte sorties
@@ -219,6 +219,23 @@ nouvelles erreurs noyau. Il conserve les formats déjà réglés. Une valeur
 `--min-fps` doit venir de la spécification ou d'une référence mesurée, pas du
 framerate parfois approximatif du DT. Ne pas interpréter le débit d'affichage
 comme la cadence physique du capteur.
+
+Après les flux V4L2, le runner tente automatiquement un contrôle fini multi-source
+NVMM si au moins deux caméras sélectionnées disposent des commandes matérielles
+générées. Chaque branche du même processus GStreamer est vérifiée à la source et
+à la sortie : nombre de buffers, corruption, cadence mesurée. Les références
+EngineCore proviennent de `rf 0x210`, avec les pauses de contrôle de 5 secondes.
+Les formats courants sont conservés ; aucune bascule de format n'est faite par
+le runner d'endurance.
+
+Ajouter `--require-nvmm` aux visites où le plugin doit être présent. Son absence,
+un format non pris en charge ou une seule caméra sont sinon consignés « non
+applicable », jamais comme une validation NVMM. `--nvmm-frames` règle le nombre
+par branche (180 par défaut), `--nvmm-timeout` son délai (30 s par défaut,
+adapté si une référence de cadence lente est connue). Ce contrôle fini n'est pas
+une endurance NVMM d'une heure. Il est sans affichage ; la validation graphique
+reste celle du runner fonctionnel. La charge CPU mesurée couvre l'ensemble du
+processus GStreamer, pas chaque branche séparément.
 
 Collecter aussi températures, throttling, mémoire et cadence avec `tegrastats`
 lors des soaks. Pour GenCP, répéter les lectures pendant le flux avec deux clients

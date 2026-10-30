@@ -1,4 +1,10 @@
 # Camera Format Benchmark — Executive Summary
+
+> **Scope:** these scenarios all start with `v4l2src`. Their comparison does not
+> cover direct DMABUF/NVMM capture through `nvv4l2camerasrc`, so it cannot establish
+> that the two capture paths have equivalent CPU use or latency. See
+> [the YUYV/NVMM prototype](../jetson-hw-pipeline/README.md) for that separate path.
+
 **Date:** February 24, 2026
 **Status:** ✅ COMPLETE AND VALIDATED
 

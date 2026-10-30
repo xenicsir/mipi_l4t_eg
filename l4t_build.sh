@@ -372,6 +372,19 @@ if [[ -f ./tools/l4t_update_initrd.sh ]]; then
 fi
 popd
 
+# Build version-specific userspace camera plugin on the host.
+EG_GST_SOURCE="$L4T_SRC/gst-egv4l2camera"
+if [[ -d "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/gst-egv4l2camera" ]]; then
+   EG_GST_TMP=$(mktemp -d "$JETSON_DIR/eg-gst-build.XXXXXX")
+   run_build_step "Building EG NVMM camera source" python3 "$ROOT_DIR/tools/jetson-hw-pipeline/build_camera_plugin.py" \
+      --source-dir "$EG_GST_SOURCE" --sysroot "$JETSON_DIR/$LINUX_FOR_TEGRA_DIR/rootfs" \
+      --cxx "${TOOLCHAIN_PREFIX}g++" --output "$EG_GST_TMP/plugin"
+   run_build_step "Installing EG camera plugin" sudo install -D -m 0644 "$EG_GST_TMP/plugin/libgstegv4l2camerasrc.so" \
+      "$JETSON_DIR/$LINUX_FOR_TEGRA_DIR/rootfs/usr/lib/aarch64-linux-gnu/gstreamer-1.0/libgstegv4l2camerasrc.so"
+   run_build_step "Recording EG camera plugin build" sudo install -m 0644 "$EG_GST_TMP/plugin/manifest.json" "$L4T_SRC/gst-egv4l2camera/build-manifest.json"
+   rm -rf "$EG_GST_TMP"
+fi
+
 #******************************************************************************
 # Generate initramfs for standalone builds
 # For standalone builds (-eg suffix), we generate a specific initramfs that

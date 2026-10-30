@@ -45,12 +45,17 @@ CAMERA_DATABASE=(
 # Output mode
 VERBOSE=0
 JSON_OUTPUT=0
+ALL_STREAMING_BACKENDS=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -v|--verbose)
             VERBOSE=1
+            shift
+            ;;
+        --all-streaming-backends)
+            ALL_STREAMING_BACKENDS=1
             shift
             ;;
         --json)
@@ -63,6 +68,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  -v, --verbose    Print detailed information"
             echo "  --json          Output in JSON format"
+            echo "  --all-streaming-backends  Include comparison commands for regression tests"
             echo "  -h, --help      Show this help message"
             echo ""
             echo "Exit codes:"
@@ -551,6 +557,20 @@ else
     GST_DISPLAY_SINK="autovideosink"
 fi
 
+# Probe only the plugins relevant to local display examples, never for JSON/X11 forwarding.
+GST_HW_CAPS=""
+GST_HW_DISPLAY=0
+GST_HW_VIC=0
+if [[ "$JSON_OUTPUT" == "0" ]] && [[ "${DISPLAY:-}" =~ ^(:|unix:|unix/:)[0-9]+(\.[0-9]+)?$ ]] && command -v gst-inspect-1.0 >/dev/null 2>&1; then
+    GST_HW_CAPS=$(gst-inspect-1.0 egv4l2camerasrc 2>/dev/null) || GST_HW_CAPS=""
+    if [[ "$GST_HW_CAPS" == *"memory:NVMM"* ]] && gst-inspect-1.0 nv3dsink >/dev/null 2>&1; then
+        GST_HW_DISPLAY=1
+        if gst-inspect-1.0 nvvidconv >/dev/null 2>&1; then
+            GST_HW_VIC=1
+        fi
+    fi
+fi
+
 if [[ $VERBOSE -eq 1 ]]; then
     echo "Board Type: $BOARD_TYPE" >&2
     echo "SoM Type: $SOM_TYPE" >&2
@@ -746,11 +766,8 @@ else
                     # one was streamed last, not the one this block is about.
                     _v4l2fmt="" ; _gstfmt="" ; _rtfmt=""
                     case "$_code" in
-                        # GStreamer has no GRAY14_LE (no 14-bit raw video format exists in
-                        # GstVideoFormat, any version) — leave _gstfmt empty so only the
-                        # v4l2-ctl command is shown. Spoofing GRAY16_LE while the camera is
-                        # actually in Y14 corrupts the capture (mismatched DT pix_clk_hz
-                        # between the Y14/Y16 modes) — see microlynx_y14_colorfmt_gstreamer.
+                        # Stock GStreamer has no Y14 format. The EG source can explicitly
+                        # select V4L2 Y14 and produce an RGBA preview on the GPU.
                         "Y14 "|"Y14") _v4l2fmt='"Y14 "' ; _rtfmt="Y14" ;;
                         "Y16 "|"Y16") _v4l2fmt='"Y16 "' ; _gstfmt="GRAY16_LE" ; _rtfmt="Y16" ;;
                         "Y16 -BE")    _v4l2fmt='"Y16 -BE"' ; _gstfmt="GRAY16_BE"  ; _rtfmt="Y16_BE" ;;
@@ -774,6 +791,26 @@ else
                             #    history and cannot be recalled with the up arrow or Ctrl-R.
                             #    The comment lines are flush too, so selecting the comment
                             #    plus its command still pastes cleanly.
+                            _hw_gstfmt=""
+                            _hw_options=""
+                            _hw_convert=""
+                            if [[ "$GST_HW_DISPLAY" == "1" ]]; then
+                                case "$_rtfmt" in
+                                    YUYV) [[ "$GST_HW_CAPS" == *"YUY2"* && "$GST_HW_VIC" == "1" ]] && _hw_gstfmt="YUY2" ;;
+                                    AB24) [[ "$GST_HW_CAPS" == *"RGBA"* ]] && _hw_gstfmt="RGBA" ;;
+                                    AR24) [[ "$GST_HW_CAPS" == *"BGRx"* && "$GST_HW_VIC" == "1" ]] && _hw_gstfmt="BGRx" ;;
+                                    Y16|Y16_BE|Y14)
+                                        if [[ "$GST_HW_CAPS" == *"GRAY16_LE"* && "$GST_HW_CAPS" == *"capture-format"* && "$GST_HW_CAPS" == *"preview"* ]]; then
+                                            _hw_gstfmt="RGBA"
+                                            _hw_options=" capture-format=$_rtfmt preview=true"
+                                            [[ "$GST_HW_CAPS" == *"normalize"* ]] && _hw_options+=" normalize=true"
+                                        fi
+                                        ;;
+                                esac
+                                if [[ "$_hw_gstfmt" == "YUY2" || "$_hw_gstfmt" == "BGRx" ]]; then
+                                    _hw_convert=' ! nvvidconv compute-hw=2 ! "video/x-raw(memory:NVMM), format=NV12"'
+                                fi
+                            fi
                             _cmdno=0
                             _caps="\"video/x-raw, format=(string)$_gstfmt, width=$_w, height=$_h\""
                             # With several formats the blocks must not run into
@@ -802,18 +839,27 @@ else
                             # device's currently active pixel format and resolution itself.
                             _cmdno=$((_cmdno + 1))
                             echo "# $_cmdno. Live display + frame-rate/drop monitoring:"
+                            _normalize_arg=""
+                            case "$_rtfmt" in Y16|Y16_BE|Y14|Y10) _normalize_arg=" --normalize" ;; esac
                             if [[ ${#_fmt_list[@]} -gt 1 ]] && [[ -n "$_rtfmt" ]]; then
-                                echo "rt_frame_monitor.py -d $video_dev --display --fmt $_rtfmt"
+                                echo "rt_frame_monitor.py -d $video_dev --display --fmt $_rtfmt$_normalize_arg"
                             else
-                                echo "rt_frame_monitor.py -d $video_dev --display"
+                                echo "rt_frame_monitor.py -d $video_dev --display$_normalize_arg"
                             fi
-                            if [[ -z "$_gstfmt" ]]; then
+                            if [[ -z "$_gstfmt" && -z "$_hw_gstfmt" ]]; then
                                 echo "    Note: GStreamer has no 14-bit greyscale format — use command 1 or 2"
                                 echo "          above (rt_frame_monitor.py needs python3-opencv) to display Y14."
                             else
-                                _cmdno=$((_cmdno + 1))
-                                echo "# $_cmdno. Live display through GStreamer:"
-                                echo "gst-launch-1.0 -v v4l2src device=$video_dev ! $_caps ! videoconvert ! $GST_DISPLAY_SINK sync=false"
+                                if [[ -n "$_gstfmt" ]] && [[ -z "$_hw_gstfmt" || "$ALL_STREAMING_BACKENDS" == "1" ]]; then
+                                    _cmdno=$((_cmdno + 1))
+                                    echo "# $_cmdno. Live display through GStreamer:"
+                                    echo "gst-launch-1.0 -v v4l2src device=$video_dev ! $_caps ! videoconvert ! $GST_DISPLAY_SINK sync=false"
+                                fi
+                                if [[ -n "$_hw_gstfmt" ]]; then
+                                    _cmdno=$((_cmdno + 1))
+                                    echo "# $_cmdno. Hardware capture/display (NVMM, VIC or CUDA as needed):"
+                                    echo "env __GL_YIELD=USLEEP gst-launch-1.0 -e -v egv4l2camerasrc device=$video_dev$_hw_options ! \"video/x-raw(memory:NVMM), format=$_hw_gstfmt, width=$_w, height=$_h\"$_hw_convert ! nv3dsink sync=false processing-deadline=0"
+                                fi
                                 if [[ "$cam_type" == "Microlynx" ]]; then
                                     _cmdno=$((_cmdno + 1))
                                     echo "# $_cmdno. Live display through GStreamer, first line only:"

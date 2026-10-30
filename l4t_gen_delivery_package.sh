@@ -174,10 +174,29 @@ update_status "Copying Exosens sources..."
 
 copy_from_sources "rootfs/usr" "usr"
 copy_from_sources "rootfs/opt/eg" "opt/eg"
+copy_from_sources "rootfs/etc/udev/rules.d" "etc/udev/rules.d"
 # Public control ABI is copied from its single canonical source.
 sudo install -D -m 0644 "$ROOT_DIR/sources/common/source/nvidia-oot/drivers/media/i2c/gencp-over-i2c/eg_camera_gencp.h" \
    "${PACKAGE_NAME}/usr/include/exosens/eg_camera_gencp.h"
 
+
+# Stage the optional plugin only for BSPs carrying its source overlay.
+EG_GST_RECOMMENDS=()
+if [[ -d "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/gst-egv4l2camera" ]]; then
+   if ! copy_from_rootfs "usr/lib/aarch64-linux-gnu/gstreamer-1.0/libgstegv4l2camerasrc.so" "usr/lib/aarch64-linux-gnu/gstreamer-1.0"; then
+      echo "ERROR: EG camera plugin missing; run l4t_build.sh for this BSP first" >&2
+      exit 1
+   fi
+   sudo install -D -m 0644 "$ROOT_DIR/sources/$L4T_VERSION/Linux_for_Tegra/source/gst-egv4l2camera/LICENSE" \
+      "${PACKAGE_NAME}/usr/share/doc/${PACKAGE_NAME}/copyright-egv4l2camerasrc"
+   EG_L4T_RUNTIME=$(dpkg-query --admindir="$ROOTFS_DIR/var/lib/dpkg" -W -f='${Version}' nvidia-l4t-core)
+   [[ -n "$EG_L4T_RUNTIME" ]] || { echo "ERROR: Cannot determine BSP runtime version" >&2; exit 1; }
+   EG_GST_RECOMMENDS=(--deb-recommends "nvidia-l4t-gstreamer (= $EG_L4T_RUNTIME)"
+      --deb-recommends "nvidia-l4t-cuda (= $EG_L4T_RUNTIME)"
+      --deb-recommends "nvidia-l4t-3d-core (= $EG_L4T_RUNTIME)"
+      --deb-recommends python3-gi --deb-recommends gir1.2-gstreamer-1.0
+      --deb-recommends gir1.2-gst-plugins-base-1.0)
+fi
 
 #******************************************************************************
 # Step 2: Determine package version
@@ -556,6 +575,23 @@ EOT
 cat > "$_POSTINST" << 'EOT'
 #!/bin/bash
 depmod
+
+# Apply the EngineCore group rule to devices already present, without reloading
+# camera modules. udev also applies it on subsequent device creation.
+if ! getent group i2c >/dev/null 2>&1; then
+    groupadd --system i2c || echo "Warning: could not create the i2c group" >&2
+fi
+if command -v udevadm >/dev/null 2>&1 && [[ -d /run/udev ]]; then
+    if udevadm control --reload-rules; then
+        for _EC_DEVICE in /sys/class/eg-ec-mipi-*/eg-ec-mipi-*; do
+            [[ -f "$_EC_DEVICE/dev" ]] || continue
+            udevadm trigger --action=change "$_EC_DEVICE" || echo "Warning: could not apply EngineCore permissions to $_EC_DEVICE" >&2
+        done
+        udevadm settle --timeout=5 || echo "Warning: pending udev events remain" >&2
+    else
+        echo "Warning: could not reload udev rules; EngineCore permissions require a later device event" >&2
+    fi
+fi
 EOT
 
 # Inject L4T version and package identity into postinst (unquoted EOT for variable expansion)
@@ -842,6 +878,7 @@ fpm -v ${DEB_VERSION} \
    --deb-recommends python3-serial \
    --deb-recommends python3-numpy \
    --deb-suggests ecswctrl \
+   "${EG_GST_RECOMMENDS[@]}" \
    --before-install "$_PREINST" \
    --after-install "$_POSTINST" \
    --after-remove "$_POSTRM" \

@@ -1,13 +1,18 @@
 #!/usr/bin/python3
 import csv
+import importlib
 import argparse
 import json
 import logging
+import math
+from pathlib import Path
 import os
 import platform
 import queue
 import re
 import select
+import signal
+import shutil
 import subprocess
 import sys
 import threading
@@ -17,13 +22,27 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict
 
-import cv2  # requires to install python3-opencv Linux package (not libopencv-python)
-import numpy as np
+class _ClassicModule:
+    """Load pixel-processing libraries only when the classic path uses them."""
+    def __init__(self, name, alias):
+        self.name, self.alias = name, alias
 
-try:
-    cv2.setLogLevel(0)   # silence OpenCV/GStreamer internal warnings (OpenCV ≥ 4.2)
-except AttributeError:
-    pass
+    def load(self):
+        module = importlib.import_module(self.name)
+        if self.name == 'cv2':
+            try:
+                module.setLogLevel(0)
+            except AttributeError:
+                pass
+        globals()[self.alias] = module
+        return module
+
+    def __getattr__(self, attribute):
+        return getattr(self.load(), attribute)
+
+
+cv2 = _ClassicModule('cv2', 'cv2')
+np = _ClassicModule('numpy', 'np')
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +67,191 @@ FORMAT_V4L2_REV = {v.strip(): k for k, v in FORMAT_V4L2.items()}  # actual V4L2 
 # Y14 is packed in the same 2-byte container (upper bits unused) — see
 # _V4L2RawStreamCapture.
 Y16_LIKE_FMTS = ("Y16", "Y16_BE", "Y10", "Y14")
+
+
+class FrameCadence:
+    """Measured arrival cadence; keep startup average separate from steady rate."""
+    def __init__(self, window_seconds=1.0, warmup_seconds=1.0):
+        self.window_seconds, self.warmup_seconds = window_seconds, warmup_seconds
+        self.times = deque()
+        self.first = self.last = self.steady_first = None
+        self.count = self.steady_count = 0
+        self.interval = None
+        self.lock = threading.Lock()
+
+    def add(self, timestamp):
+        with self.lock:
+            if self.first is None:
+                self.first = timestamp
+            self.interval = timestamp - self.last if self.last is not None else 0.0
+            self.last = timestamp
+            self.count += 1
+            self.times.append(timestamp)
+            while len(self.times) > 2 and self.times[1] <= timestamp - self.window_seconds:
+                self.times.popleft()
+            if timestamp - self.first >= self.warmup_seconds:
+                if self.steady_first is None:
+                    self.steady_first = timestamp
+                self.steady_count += 1
+
+    def summary(self, now=None):
+        with self.lock:
+            span = self.last - self.first if self.count > 1 else 0
+            steady_span = self.last - self.steady_first if self.steady_count > 1 else 0
+            recent_span = self.times[-1] - self.times[0] if len(self.times) > 1 else 0
+            rate = (len(self.times) - 1) / recent_span if recent_span > 0 else 0.0
+            if now is not None and self.last is not None and now - self.last > self.window_seconds:
+                rate = 0.0
+            return dict(frames=self.count, window_fps=rate,
+                        elapsed_seconds=span if self.count else None,
+                        interval_ms=self.interval * 1000 if self.interval is not None else None,
+                        overall_fps=(self.count - 1) / span if span > 0 else None,
+                        steady_fps=(self.steady_count - 1) / steady_span if steady_span > 0 else None,
+                        steady_frames=self.steady_count, steady_seconds=steady_span,
+                        warmup_seconds=self.warmup_seconds)
+
+
+class CaptureCounters:
+    """Driver buffer metadata only; missing sequence numbers are not pixel checks."""
+    def __init__(self):
+        self.corrupt = self.sequence_gaps = 0
+        self.sequence = None
+        self.sequence_available = False
+        self.lock = threading.Lock()
+
+    def add(self, sequence, corrupt):
+        with self.lock:
+            self.corrupt += int(corrupt)
+            self.sequence_available = self.sequence_available or sequence is not None
+            if sequence is not None and self.sequence is not None:
+                delta = (sequence - self.sequence) & 0xffffffff
+                if 1 < delta < 0x80000000:
+                    self.sequence_gaps += delta - 1
+            self.sequence = sequence
+
+    def summary(self):
+        with self.lock:
+            return dict(corrupt=self.corrupt, sequence_gaps=self.sequence_gaps,
+                        sequence_available=self.sequence_available)
+
+
+def format_status(frame, ts, dt, fps, cpu, expected_fps=None, gst_drop=None,
+                  corrupt=None, sequence_gaps=None, extra='', gpu=None, show_gpu=False):
+    def number(value, width, precision=None):
+        if value is None:
+            return '--'.rjust(width)
+        return (('%' + str(width) + 'd') % value if precision is None else
+                ('%' + str(width) + '.' + str(precision) + 'f') % value)
+    gpu_part = '  gpu=%s%%' % number(gpu, 5, 1) if show_gpu else ''
+    return ('  frame=%s  ts=%ss  dt=%sms  expected_fps=%s  actual_fps=%s  cpu=%s%%%s'
+            '  gst_drop=%s  corrupt=%s  sequence_gaps=%s%s' %
+            (number(frame, 6), number(ts, 8, 3), number(dt, 6, 1), number(expected_fps, 5, 1),
+             number(fps, 5, 1), number(cpu, 5, 1), gpu_part, number(gst_drop, 4),
+             number(corrupt, 3), number(sequence_gaps, 4), extra))
+
+
+class StatusOutput:
+    """One terminal line, or periodic log lines when output is redirected."""
+    def __init__(self, stream=None):
+        self.stream = sys.stdout if stream is None else stream
+        self.interactive = self.stream.isatty()
+        self.interval = 0.1 if self.interactive else 1.0
+        self.last_report = None
+        self.last_line = None
+        self.width = 0
+
+    def write(self, line, force=False):
+        now = time.monotonic()
+        self.last_line = line
+        if not force and self.last_report is not None and now - self.last_report < self.interval:
+            return
+        self.width = max(self.width, len(line))
+        self.stream.write(('\r' + line.ljust(self.width)) if self.interactive else (line + '\n'))
+        self.stream.flush()
+        self.last_report = now
+
+    def finish(self):
+        if self.last_line is not None:
+            self.write(self.last_line, force=True)
+            if self.interactive:
+                self.stream.write('\n')
+                self.stream.flush()
+
+
+class ProcessCpuLoad:
+    """Process CPU over wall time, all threads, 100% per occupied core.
+
+    Refresh at most once a second; sample() only reads a CPU clock when due.
+    This excludes child processes and GPU/VIC utilization.
+    """
+    def __init__(self):
+        self.started = self.previous_wall = time.monotonic()
+        self.initial_cpu = self.previous_cpu = time.process_time()
+        self.percent = None
+        self.lock = threading.Lock()
+
+    def sample(self):
+        with self.lock:
+            return self._sample()
+
+    def _sample(self):
+        now = time.monotonic()
+        elapsed = now - self.previous_wall
+        if elapsed >= 1.0:
+            cpu = time.process_time()
+            self.percent = 100.0 * (cpu - self.previous_cpu) / elapsed
+            self.previous_wall, self.previous_cpu = now, cpu
+        return self.percent
+
+    def average(self):
+        elapsed = time.monotonic() - self.started
+        return 100.0 * (time.process_time() - self.initial_cpu) / elapsed if elapsed > 0 else 0.0
+
+    def field(self):
+        value = self.sample()
+        return '--' if value is None else '%.1f' % value
+
+
+class JetsonGpuLoad:
+    """Board-wide nvgpu activity, not per-process GPU use or VIC activity.
+
+    The Jetson nvgpu 'load' ABI reports 0..1000. Read at most once a second;
+    no external utility, pixel access or privileged device handle is needed.
+    """
+    def __init__(self, enabled, path=None):
+        self.enabled = enabled
+        self.path = None
+        self.percent = None
+        self.previous_wall = float('-inf')
+        self.lock = threading.Lock()
+        if not enabled or platform.system() != 'Linux':
+            return
+        if path is not None:
+            self.path = Path(path)
+            return
+        candidates = [Path('/sys/devices/platform/bus@0/17000000.gpu/load'),
+                      Path('/sys/devices/platform/17000000.ga10b/load'),
+                      Path('/sys/devices/platform/17000000.gv11b/load'),
+                      Path('/sys/devices/platform/57000000.gpu/load')]
+        try:
+            candidates += [p / 'device/load' for p in Path('/sys/class/devfreq').glob('*')
+                           if any(name in p.name for name in ('gpu', 'ga10b', 'gv11b', 'gp10b', 'gk20a'))]
+            self.path = next((p for p in candidates if p.is_file()), None)
+        except OSError:
+            pass
+
+    def sample(self):
+        with self.lock:
+            now = time.monotonic()
+            if not self.enabled or self.path is None or now - self.previous_wall < 1.0:
+                return self.percent
+            self.previous_wall = now
+            try:
+                raw = int(self.path.read_text().strip())
+                self.percent = raw / 10.0 if 0 <= raw <= 1000 else None
+            except (OSError, ValueError):
+                self.percent = None
+            return self.percent
 
 
 class _NullWriter:
@@ -504,10 +708,13 @@ class FpnDetector:
 
 @dataclass
 class Config:
+    backend:                str            = "auto"
     # Camera
     cam_index:              int            = 0
     device:                 str            = "/dev/video0"  # V4L2 device path (Linux) or ignored on Windows
     target_fps:             int            = 60
+    expected_fps:           Optional[float] = None
+    expected_fps_source:    str            = "unavailable"
     height:                 int            = 480
     width:                  int            = 640
     num_frames:             Optional[int]  = None    # None / <=0 = infinite
@@ -550,6 +757,7 @@ class Config:
     log_enabled:            bool           = False   # write rt_log + events_log to disk
 
     # Live display
+    normalize:              bool           = False  # display-only min/max stretch, opt-in
     show_video:             bool           = False   # show live video window (ignored in test mode)
     # Resizable by default (WINDOW_NORMAL + resizeWindow). On this platform's
     # GTK/X11 backend this costs ~2x the display fps (60->26 at 1280x1024) —
@@ -560,7 +768,7 @@ class Config:
 
     # Stats (mean/std/row_noise/col_noise) are OFF by default: computing and
     # printing them on the status line is the main cost of the display loop
-    # (see compte-rendu §12). Only frame/ts/dt/fps (+ cam_fps, image if
+    # (see compte-rendu §12). Only timing/rate metadata (+ image if
     # --display) are produced by default. Pass --stats to force them on, or
     # just pass --log / --fpn-detect / --drop-detect, which need the stats
     # (or the gray buffer) internally and enable them automatically.
@@ -628,11 +836,11 @@ class _GstAppSinkCapture:
     # formats; _sample_to_array() converts to native order right after, so
     # everything downstream sees plain native uint16 regardless of source.
     _GST_FMT_NP = {
-        "GRAY16_LE": (np.dtype("<u2"), 1),
-        "GRAY16_BE": (np.dtype(">u2"), 1),
-        "YUY2":      (np.dtype("u1"), 2),
-        "BGRA":      (np.dtype("u1"), 4),
-        "RGBA":      (np.dtype("u1"), 4),
+        "GRAY16_LE": ("<u2", 1),
+        "GRAY16_BE": (">u2", 1),
+        "YUY2":      ("u1", 2),
+        "BGRA":      ("u1", 4),
+        "RGBA":      ("u1", 4),
     }
 
     # Interval between non-blocking appsink polls in _pull_sample() -- see there
@@ -653,7 +861,8 @@ class _GstAppSinkCapture:
             raise ValueError(f"Unsupported GStreamer format for direct capture: {gst_fmt}")
 
         self._Gst = Gst
-        self._dtype, self._channels = self._GST_FMT_NP[gst_fmt]
+        dtype_name, self._channels = self._GST_FMT_NP[gst_fmt]
+        self._dtype = np.dtype(dtype_name)
         self._width, self._height = width, height
         # App-level format name (e.g. "Y16_BE"), as opposed to gst_fmt which is
         # only the GStreamer caps string used to pick the read dtype above —
@@ -670,8 +879,10 @@ class _GstAppSinkCapture:
         # drop=true", so it stays accurate even when the app can't drain the
         # appsink fast enough and frames get silently dropped before read().
         self._capture_times = deque(maxlen=120)
+        self.cadence = FrameCadence()
         self._capture_total = 0
         self._capture_lock = threading.Lock()
+        self.capture_counters = CaptureCounters()
 
         Gst.init(None)
         pipeline_str = (
@@ -711,8 +922,14 @@ class _GstAppSinkCapture:
     def _on_src_buffer(self, pad, info):
         # Runs on the GStreamer streaming thread, not the caller's thread.
         with self._capture_lock:
-            self._capture_times.append(time.monotonic())
+            timestamp = time.monotonic()
+            self._capture_times.append(timestamp)
+            self.cadence.add(timestamp)
             self._capture_total += 1
+            buffer = info.get_buffer()
+            if buffer is not None:
+                sequence = int(buffer.offset) if buffer.offset != self._Gst.BUFFER_OFFSET_NONE else None
+                self.capture_counters.add(sequence, buffer.has_flags(self._Gst.BufferFlags.CORRUPTED))
         return self._Gst.PadProbeReturn.OK
 
     def _pull_sample(self):
@@ -849,6 +1066,7 @@ class _V4L2RawStreamCapture:
         )
         self._opened = True
         self._capture_times = deque(maxlen=120)
+        self.cadence = FrameCadence()
         self._capture_total = 0
 
         # Prime with an actual read so a device that can't stream this format
@@ -894,7 +1112,9 @@ class _V4L2RawStreamCapture:
             if not chunk:   # subprocess exited / pipe closed
                 return False, None
             buf.extend(chunk)
-        self._capture_times.append(time.monotonic())
+        timestamp = time.monotonic()
+        self._capture_times.append(timestamp)
+        self.cadence.add(timestamp)
         self._capture_total += 1
         arr = np.frombuffer(bytes(buf), dtype="<u2").reshape(self._height, self._width)
         return True, arr
@@ -917,6 +1137,55 @@ class _V4L2RawStreamCapture:
 
     def isOpened(self):
         return self._opened
+
+
+def _enginecore_control_device(device, sysfs_root='/sys'):
+    """Identify the sensor bound to this video node, without guessing an I2C bus."""
+    video = Path(device).resolve().name
+    if not re.fullmatch(r'video[0-9]+', video):
+        return None
+    root = Path(sysfs_root)
+    try:
+        name = (root / 'class/video4linux' / video / 'name').read_text().strip()
+        match = re.search(r'\beg-ec-mipi\s+([0-9]+-[0-9a-fA-F]{4})\b', name)
+        if match and (root / 'bus/i2c/devices' / match[1] / 'driver').resolve().name == 'eg-ec-mipi':
+            return '/dev/eg-ec-mipi-' + match[1]
+    except OSError:
+        pass
+    return None
+
+
+def _resolve_expected_fps(cfg):
+    """Camera reference, never a measured rate or a hardcoded driver default."""
+    control = (_enginecore_control_device(cfg.device)
+               if platform.system() == 'Linux' and not cfg.multicam_file else None)
+    if control:
+        tool = shutil.which('ECSwCtrl')
+        if tool is None:
+            log.warning('ECSwCtrl is unavailable; expected_fps remains unknown')
+            return None, 'ECSwCtrl unavailable'
+        for attempt in range(2):
+            try:
+                result = subprocess.run([tool, '-i', 'i2c', '-d', control, '-c', 'rf 0x210'],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    universal_newlines=True, timeout=3, check=True)
+                value = result.stdout.strip()
+                if value == '!-128' and attempt == 0:
+                    log.info('EngineCore reference read rejected; retrying once')
+                    time.sleep(2)
+                    continue
+                if not re.fullmatch(r'[+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?', value):
+                    raise ValueError('invalid camera response: ' + repr(value))
+                rate = float(value)
+                if not math.isfinite(rate) or rate <= 0:
+                    raise ValueError('invalid camera framerate')
+                return rate, 'EngineCore rf 0x210'
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                log.warning('Cannot read EngineCore expected framerate: %s; check ECSwCtrl and device access permissions', error)
+                return None, 'EngineCore reference unavailable'
+    if cfg.expected_fps is not None:
+        return cfg.expected_fps, 'explicit user reference'
+    return None, 'no verified camera framerate reader; use --expected-fps if known'
 
 
 def _v4l2_get_fmt(device):
@@ -1180,6 +1449,31 @@ def to_luma(frame, fmt):
     raise ValueError(f"Unknown format: {fmt}")
 
 
+def grayscale_preview(frame, fmt, normalize=False):
+    """Map grayscale to 8-bit for display without modifying captured samples."""
+    if normalize:
+        return cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    bits = {'Y10': 10, 'Y14': 14}.get(fmt, 16)
+    scale = 1.0 / (1 << (bits - 8))
+    # For nonnegative integer samples, this bias turns rounding into the exact
+    # right-shift mapping (with saturation), in one optimized OpenCV pass.
+    return cv2.convertScaleAbs(frame, alpha=scale, beta=scale * 0.5 - 0.5)
+
+
+def report_display_mapping(fmt, backend, display, requested, supported=True):
+    applicable = display and fmt in Y16_LIKE_FMTS and supported
+    if requested and not applicable:
+        reason = 'no display requested' if not display else ('unsupported pixel format' if fmt not in Y16_LIKE_FMTS else 'normalization unavailable in the capture plugin')
+        log.info('Normalization not applied: %s', reason)
+    if display and fmt in Y16_LIKE_FMTS:
+        mapping = 'automatic per-frame min/max normalization' if requested and applicable else 'fixed full-range scaling'
+        log.info('Display pixel processing: %s to 0..255 (%s); captured values unchanged',
+                 mapping, 'GPU' if backend == 'nvmm' else 'CPU')
+    elif display:
+        log.info('Display mapping: native color, no grayscale normalization')
+    return requested and applicable
+
+
 def to_display_bgr(frame, fmt):
     """Return an 8-bit BGR image for cv2.imshow, or None if there is no colour.
 
@@ -1196,7 +1490,7 @@ def to_display_bgr(frame, fmt):
     all along, only the preview was lying.
 
     Returns None for Y16-like formats, where there is nothing to preserve and the
-    caller's normalize() path is the right one.
+    caller's grayscale display mapping handles scaling/normalization.
     """
     if fmt in ("AR24", "AB24"):
         if frame.ndim == 3 and frame.shape[2] == 4:
@@ -1343,6 +1637,12 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                  When provided, the camera is not opened and timing is driven
                  by dt_ms values.  Used exclusively for testing.
     """
+    if _frame_iter is None:
+        for alias in ("np", "cv2"):
+            dependency = globals()[alias]
+            if isinstance(dependency, _ClassicModule):
+                dependency.load()
+    cpu_load = ProcessCpuLoad()
     # Unpack top-level config fields
     cam_index             = cfg.cam_index
     device                = cfg.device
@@ -1392,6 +1692,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         fmt = cap.pixel_fmt
     if cap is not None and hasattr(cap, 'width'):
         width, height = cap.width, cap.height
+    report_display_mapping(fmt, 'classic', show_video, cfg.normalize)
 
     # Dedicated capture thread — only when a real camera is open (not _frame_iter).
     # Keeps cap.read() running at full speed regardless of main-loop processing time.
@@ -1461,7 +1762,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         fname = f"rt_log_{ts}.csv"
         f = open(os.path.join(run_dir, fname), "w", newline="")
         w = csv.writer(f)
-        w.writerow(["timestamp_s", "dt_ms", *_STATS])
+        w.writerow(["timestamp_s", "dt_ms", *_STATS, "cpu_percent_one_core"])
         return f, w, fname
 
     if log_enabled:
@@ -1483,7 +1784,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         msg = f"total_mb={total_mb:.2f} limit_mb={limit_mb:.2f}"
         events_writer.writerow([f"{ts_val:.6f}", "storage_full", msg, current_log_name])
         fevents.flush()
-        writer.writerow([f"{ts_val:.6f}", "STORAGE FULL", *("" for _ in _STATS)])
+        writer.writerow([f"{ts_val:.6f}", "STORAGE FULL", *("" for _ in _STATS), cpu_load.sample()])
         flog.flush()
         sys.stdout.write(
             f"\n  [STORAGE FULL] Recording stopped"
@@ -1500,7 +1801,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         events_writer.writerow([f"{ts_val:.6f}", "frames_full",
                                  f"limit_mb={limit_mb:.2f}", current_log_name])
         fevents.flush()
-        writer.writerow([f"{ts_val:.6f}", "FRAMES FULL", *("" for _ in _STATS)])
+        writer.writerow([f"{ts_val:.6f}", "FRAMES FULL", *("" for _ in _STATS), cpu_load.sample()])
         flog.flush()
         sys.stdout.write(
             f"\n  [FRAMES FULL] Event frame recording stopped"
@@ -1561,6 +1862,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     grab_fail_since    = None
     freeze_count       = 0
     spike_count        = 0   # local mirror of detector.spike_count for the display line
+    processing_cadence = FrameCadence()
+    status_output = StatusOutput()
     fps_window         = deque(maxlen=target_fps)   # 1-second sliding window
     fps_smooth         = 0.0
 
@@ -1652,6 +1955,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                 ts = now - t0
                 dt = (now - prev_time) * 1000  # ms
                 prev_time = now
+                processing_cadence.add(now)
                 fps_window.append(now)
                 if len(fps_window) >= 2:
                     fps_smooth = (len(fps_window) - 1) / (fps_window[-1] - fps_window[0])
@@ -1728,7 +2032,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
 
             # ── CSV logging ───────────────────────────────────────────────
             if log_enabled and not storage_full[0]:
-                writer.writerow([f"{ts:.6f}", f"{dt:.3f}", *(results[s] for s in _STATS)])
+                writer.writerow([f"{ts:.6f}", f"{dt:.3f}", *(results[s] for s in _STATS), cpu_load.sample()])
                 log_line_count += 1
                 if max_global_bytes > 0 and _total_bytes() >= max_global_bytes:
                     _trigger_storage_full(ts)
@@ -1804,8 +2108,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                 if _disp is None:
                     if gray is not None:
                         if fmt in Y16_LIKE_FMTS or gray.dtype == np.uint16:
-                            _disp = cv2.normalize(gray, None, 0, 255,
-                                                  cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                            _disp = grayscale_preview(gray, fmt, cfg.normalize)
                         else:
                             _disp = gray.clip(0, 255).astype(np.uint8)
                     else:
@@ -1823,21 +2126,18 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                             _raw = np.ascontiguousarray(frame).view(np.uint16)
                         else:
                             _raw = frame
-                        _disp = cv2.normalize(_raw, None, 0, 255,
-                                              cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+                        _disp = grayscale_preview(_raw, fmt, cfg.normalize)
                 cv2.imshow(_win_title, _disp)
                 if cv2.waitKey(1) == 27:   # ESC → stop
                     break
 
-            # cam_fps = true camera/hardware capture rate (from GStreamer, upstream
-            # of appsink drop=true); gst_drop = frames the camera delivered but this
-            # loop never got to (dropped because it wasn't calling read() fast enough).
-            cam_part = ""
-            if cap is not None and hasattr(cap, "capture_fps"):
-                gst_dropped = cap.capture_total - (frame_count + 1)
-                cam_part = f"  cam_fps={cap.capture_fps:5.1f}"
-                if gst_dropped > 0:
-                    cam_part += f"  gst_drop={gst_dropped:4d}"
+            gst_dropped = None
+            counters = {}
+            if cap is not None and hasattr(cap, 'capture_total'):
+                # This legacy estimate also includes queued/in-flight frames.
+                gst_dropped = max(0, cap.capture_total - (frame_count + 1))
+            if cap is not None and hasattr(cap, 'capture_counters'):
+                counters = cap.capture_counters.summary()
 
             dropped_part = f"  dropped={dropped_total:4d}" if drop_detect and dropped_total else ""
             fpn_part     = f"  spikes={spike_count:3d}" if fpn_detect and spike_count else ""
@@ -1845,17 +2145,17 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
             frames_part  = "  [FRAMES FULL]" if frames_full[0] and not storage_full[0] else ""
             storage_part = "  [STORAGE FULL]" if storage_full[0] else ""
             stats_part   = ("  " + "  ".join(f"{s}={results[s]:8.2f}" for s in _STATS)) if (stats_enabled and results is not None) else ""
-            sys.stdout.write(
-                f"\r  frame={frame_count:6d}  ts={ts:8.3f}s  dt={dt:6.1f}ms  fps={fps_smooth:5.1f}"
-                f"{cam_part}{dropped_part}{fpn_part}{freeze_part}{frames_part}{storage_part}{stats_part}"
-            )
-            sys.stdout.flush()
+            status_output.write(format_status(
+                frame_count, ts, dt, fps_smooth, cpu_load.sample(), cfg.expected_fps, gst_dropped,
+                counters.get('corrupt'), counters.get('sequence_gaps') if counters.get('sequence_available') else None,
+                dropped_part + fpn_part + freeze_part + frames_part + storage_part + stats_part))
             frame_count += 1
 
     except KeyboardInterrupt:
         print("\nStopping...")
 
     finally:
+        status_output.finish()
         dispatch_pending()      # flush any in-progress drop event collection
         save_queue.put(None)    # signal save thread to stop
         save_thread.join()      # wait for all frames to be written to disk
@@ -1866,6 +2166,11 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
             cv2.destroyAllWindows()
         flog.close()
         fevents.close()
+        if cap is not None:
+            capture_rate = cap.cadence.summary() if hasattr(cap, 'cadence') else processing_cadence.summary()
+            log.info('FPS_RESULT %s', json.dumps(dict(capture=capture_rate, processing=processing_cadence.summary(),
+                expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source)))
+        log.info("CPU average=%.1f%% (process, 100%% per core)", cpu_load.average())
 
     return run_dir
 
@@ -1882,8 +2187,455 @@ def _parse_device_arg(value):
     return n, value
 
 
+# NVMM capture uses buffer metadata only; no GstBuffer.map or NumPy conversion.
+def _nvmm_pixel_requests(args, config_data=None, argv=None):
+    config_data = config_data or {}
+    argv = sys.argv[1:] if argv is None else argv
+    requested = []
+    for name, active in [('stats', args.stats), ('save-images', args.save_images),
+                         ('fpn-detect', args.fpn_detect), ('multicam-file', args.multicam_file),
+                         ('no-resize', args.no_resize)]:
+        if active:
+            requested.append('--' + name)
+    pixel_tuning = ('--image-format', '--event-half', '--max-save-mb', '--max-frames-mb', '--freeze-recovery')
+    for value in argv:
+        flag = value.split('=', 1)[0]
+        if flag.startswith('--fpn-') or flag in pixel_tuning:
+            requested.append(flag)
+    # Honor JSON requests even when they are not repeated on the CLI.
+    defaults = Config()
+    fpn_defaults = ConfigFPN()
+    for name, value in config_data.items():
+        if name.startswith('fpn_'):
+            field_name = name[4:]
+            default = getattr(fpn_defaults, field_name, None)
+            if value != default:
+                requested.append('config:' + name)
+        elif name in ('event_half', 'image_format', 'max_save_mb', 'max_frames_mb', 'save_queue_maxsize', 'freeze_recovery_frames', 'reopen_interval_s'):
+            if value != getattr(defaults, name, None):
+                requested.append('config:' + name)
+    return sorted(set(requested))
+
+
+def _validate_backend_args(parser, args, config_data, argv=None):
+    if args.expected_fps is not None and (not math.isfinite(args.expected_fps) or args.expected_fps <= 0):
+        parser.error('expected-fps must be finite and positive')
+    if args.backend not in ('auto', 'classic', 'nvmm'):
+        parser.error('backend must be auto, classic or nvmm')
+    if args.max_log_lines < 0 or args.max_save_mb < 0 or (args.max_frames_mb is not None and args.max_frames_mb < 0):
+        parser.error('log/storage limits must be non-negative')
+    if args.num_frames < 0 or args.fps <= 0 or args.freeze_threshold < 0:
+        parser.error('num-frames/freeze-threshold must be nonnegative and fps positive')
+    if any(value is not None and value <= 0 for value in (args.width, args.height)):
+        parser.error('width and height must be positive')
+    conflicts = _nvmm_pixel_requests(args, config_data, argv)
+    if args.backend == 'nvmm':
+        if conflicts:
+            parser.error('--backend nvmm is incompatible with ' + ', '.join(conflicts))
+        if platform.system() != 'Linux':
+            parser.error('--backend nvmm requires Linux on a supported Jetson')
+        if args.fmt is not None and args.fmt not in NVMM_FORMATS:
+            parser.error('--backend nvmm does not support this pixel format')
+        display_reason = _nvmm_display_reason(args.display)
+        if display_reason:
+            parser.error(display_reason)
+    return conflicts
+
+
+NVMM_FORMATS = {'YUYV': 'YUY2', 'AB24': 'RGBA', 'AR24': 'BGRx',
+                'Y16': 'GRAY16_LE', 'Y14': 'GRAY16_LE', 'Y16_BE': 'GRAY16_LE'}
+NVMM_GRAY_FORMATS = ('Y16', 'Y14', 'Y16_BE')
+
+
+def _nvmm_plan(pixel_format, display, normalize=False):
+    """Describe capture and processing separately; grayscale retains its V4L2 mode."""
+    if pixel_format not in NVMM_FORMATS:
+        return None
+    gray = pixel_format in NVMM_GRAY_FORMATS
+    return dict(format='RGBA' if gray and display else NVMM_FORMATS[pixel_format],
+                properties=dict({'capture-format': pixel_format, 'preview': display},
+                                **({'normalize': True} if display and normalize else {})) if gray else {},
+                vic=display and pixel_format in ('YUYV', 'AR24'),
+                processing='cuda-preview' if gray and display else
+                           ('cuda-endian' if pixel_format == 'Y16_BE' else 'none'))
+
+
+def _nvmm_requested_format(cfg, actual):
+    return cfg.fmt or FORMAT_V4L2_REV.get((actual or '').strip())
+
+
+def _nvmm_display_reason(show_video, environment=None):
+    if not show_video:
+        return None
+    environment = os.environ if environment is None else environment
+    display = environment.get('DISPLAY', '')
+    if not re.fullmatch(r'(?:unix/?)?:[0-9]+(?:\.[0-9]+)?', display):
+        return ('NVMM rendering requires local X11; DISPLAY=%r is not supported '
+                '(use classic for SSH X11 forwarding, or omit --display)' % display)
+    return None
+
+
+def _nvmm_available(cfg):
+    if platform.system() != 'Linux':
+        return False, 'NVMM is only available on supported Jetson Linux systems'
+    display_reason = _nvmm_display_reason(cfg.show_video)
+    if display_reason:
+        return False, display_reason
+    try:
+        import gi
+        gi.require_version('Gst', '1.0')
+        from gi.repository import Gst
+        Gst.init(None)
+        factory = Gst.ElementFactory.find('egv4l2camerasrc')
+        factory = factory.load() if factory is not None else None
+        if factory is None:
+            return False, 'missing or unloadable plugin egv4l2camerasrc'
+        _, _, actual = _v4l2_get_fmt(cfg.device)
+        pixel_format = _nvmm_requested_format(cfg, actual)
+        plan = _nvmm_plan(pixel_format, cfg.show_video, cfg.normalize)
+        if plan is None:
+            return False, 'current/requested format is not supported by NVMM'
+        needed = (['nv3dsink'] if cfg.show_video else []) + (['nvvidconv'] if plan['vic'] else [])
+        for name in needed:
+            feature = Gst.ElementFactory.find(name)
+            if feature is None or feature.load() is None:
+                return False, 'missing or unloadable plugin ' + name
+        required_formats = [NVMM_FORMATS[pixel_format], plan['format']]
+        for required in required_formats:
+            desired = Gst.Caps.from_string('video/x-raw(memory:NVMM),format=' + required)
+            if not any(t.direction == Gst.PadDirection.SRC and t.get_caps().can_intersect(desired)
+                       for t in factory.get_static_pad_templates()):
+                return False, 'egv4l2camerasrc does not advertise ' + required + '/NVMM'
+        if pixel_format in NVMM_GRAY_FORMATS:
+            probe = factory.create(None)
+            if probe is None or any(probe.find_property(name) is None for name in ('capture-format', 'preview', 'capture-bits')):
+                return False, 'egv4l2camerasrc lacks grayscale mode selection'
+        if plan['processing'].startswith('cuda-'):
+            import ctypes
+            ctypes.CDLL('libcuda.so.1')
+    except (ImportError, ValueError, RuntimeError, OSError) as error:
+        return False, 'GStreamer/NVMM unavailable: ' + str(error)
+    return True, 'compatible %s NVMM capture' % pixel_format
+
+
+def _stop_capture_process(process, grace=2.0):
+    """Stop only our capture process group, even if native cleanup is blocked."""
+    for sig, seconds in ((signal.SIGINT, grace), (signal.SIGTERM, 1.0), (signal.SIGKILL, 1.0)):
+        if process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, signal.SIGCONT)
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            return
+        try:
+            process.wait(timeout=seconds)
+            return
+        except (subprocess.TimeoutExpired, KeyboardInterrupt):
+            continue
+    raise RuntimeError('Capture process could not be stopped after SIGKILL')
+
+
+def _supervise_capture(command, heartbeat_read, heartbeat_write, startup_timeout=10.0,
+                       heartbeat_timeout=5.0, stop_grace=2.0, input_data=None):
+    # A separate process keeps Python signals responsive even when a native
+    # renderer blocks while holding the GIL. Heartbeats contain no image data.
+    try:
+        process = subprocess.Popen(command, start_new_session=True,
+                                   stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL,
+                                   pass_fds=(heartbeat_write,))
+    except BaseException:
+        os.close(heartbeat_read)
+        os.close(heartbeat_write)
+        raise
+    os.close(heartbeat_write)
+    os.set_blocking(heartbeat_read, False)
+    last_beat = time.monotonic()
+    seen_beat = False
+    handlers = {}
+    def stop_requested(_signum, _frame):
+        raise KeyboardInterrupt
+    def suspend(_signum, _frame):
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGSTOP)
+        os.kill(os.getpid(), signal.SIGSTOP)
+    def resume(_signum, _frame):
+        nonlocal last_beat
+        last_beat = time.monotonic()
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGCONT)
+    try:
+        for sig, handler in ((signal.SIGTERM, stop_requested), (signal.SIGTSTP, suspend),
+                             (signal.SIGCONT, resume)):
+            handlers[sig] = signal.signal(sig, handler)
+        if input_data is not None:
+            process.stdin.write(input_data)
+            process.stdin.close()
+        while process.poll() is None:
+            ready, _, _ = select.select([heartbeat_read], [], [], 0.1)
+            if ready:
+                if os.read(heartbeat_read, 4096):
+                    last_beat, seen_beat = time.monotonic(), True
+                else:
+                    # EOF can precede final process exit by a few milliseconds.
+                    time.sleep(0.05)
+            limit = heartbeat_timeout if seen_beat else startup_timeout
+            if time.monotonic() - last_beat > limit:
+                raise RuntimeError('NVMM capture/cleanup stopped responding; terminating capture process')
+        if process.returncode:
+            raise RuntimeError('NVMM capture process exited with status %s' % process.returncode)
+    except KeyboardInterrupt:
+        print('\nStopping NVMM capture...', flush=True)
+    finally:
+        try:
+            _stop_capture_process(process, stop_grace)
+        finally:
+            os.close(heartbeat_read)
+            for sig, previous in handlers.items():
+                signal.signal(sig, previous)
+
+
+def _run_nvmm_monitor(cfg):
+    # Spawn through this same standalone script; no external helper dependency.
+    data = dict(cfg.__dict__)
+    data['fpn'] = dict(cfg.fpn.__dict__)
+    read_fd, write_fd = os.pipe()
+    _supervise_capture([sys.executable, os.path.abspath(__file__), '--_nvmm-worker', str(write_fd)],
+                       read_fd, write_fd, input_data=json.dumps(data).encode())
+
+
+def _prepare_nvmm_environment(show_video):
+    if show_video:
+        os.environ.setdefault('__GL_YIELD', 'USLEEP')
+    else:
+        # CUDA/EGL buffer import must not select a forwarded X11 server.
+        # This runs only inside the capture worker, leaving the caller unchanged.
+        os.environ.pop('DISPLAY', None)
+
+
+def _run_nvmm_worker(cfg, heartbeat_fd=None):
+    def heartbeat():
+        if heartbeat_fd is not None:
+            os.write(heartbeat_fd, b'.')
+    heartbeat()
+    cpu_load = ProcessCpuLoad()
+    _prepare_nvmm_environment(cfg.show_video)
+    import gi
+    gi.require_version('Gst', '1.0')
+    from gi.repository import Gst
+    Gst.init(None)
+    w, h, fourcc = _v4l2_get_fmt(cfg.device)
+    pixel_format = _nvmm_requested_format(cfg, fourcc)
+    plan = _nvmm_plan(pixel_format, cfg.show_video, cfg.normalize)
+    if plan is None:
+        raise RuntimeError('NVMM does not support the requested camera format')
+    if (w, h) != (cfg.width, cfg.height):
+        raise RuntimeError('NVMM requested dimensions differ from the active camera format')
+    source = ('egv4l2camerasrc name=src ! video/x-raw(memory:NVMM),format=%s,'
+              'width=%d,height=%d,framerate=%d/1' % (plan['format'], w, h, cfg.target_fps))
+    downstream = ''
+    if plan['vic']:
+        downstream += ' ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=NV12'
+    downstream += (' ! nv3dsink name=out sync=false processing-deadline=0' if cfg.show_video
+                   else ' ! fakesink name=out sync=false')
+    pipeline = Gst.parse_launch(source + downstream)
+    camera = pipeline.get_by_name('src')
+    camera.set_property('device', cfg.device)
+    camera.set_property('num-buffers', cfg.num_frames or -1)
+    gpu_load = JetsonGpuLoad(cfg.show_video or plan['processing'].startswith('cuda-'))
+    if gpu_load.enabled:
+        log.info('GPU activity: board-wide NVIDIA GPU load; includes other applications, excludes VIC')
+    normalized = report_display_mapping(pixel_format, 'nvmm', cfg.show_video, cfg.normalize,
+                                        camera.find_property('normalize') is not None)
+    if not normalized:
+        plan['properties'].pop('normalize', None)
+    for name, value in plan['properties'].items():
+        camera.set_property(name, value)
+    state = dict(frames=0, corrupt=0, sequence_gaps=0, timestamp_gap_estimates=0,
+                 first_time=None, last_time=None, last_pts=None, last_sequence=None)
+    csv_file = None
+    writer = None
+    output_dir = None
+    if cfg.log_enabled or cfg.base_dir:
+        output_dir = os.path.join(cfg.base_dir or '.', 'nvmm-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
+        os.makedirs(output_dir, exist_ok=False)
+    if cfg.log_enabled:
+        csv_file = open(os.path.join(output_dir, 'frames.csv'), 'w', newline='')
+        writer = csv.writer(csv_file)
+        writer.writerow(['frame', 'pts_ns', 'sequence', 'corrupt', 'arrival_monotonic_s', 'cpu_percent_one_core', 'gpu_percent_global'])
+    csv_rows, csv_segment = 0, 0
+    started = time.monotonic()
+    cadence = FrameCadence()
+    processed_cadence = FrameCadence()
+    capture_counters = CaptureCounters()
+    status_output = StatusOutput()
+    def observe(_pad, info):
+        nonlocal writer, csv_file, csv_rows, csv_segment
+        buffer = info.get_buffer()
+        if buffer is None:
+            return Gst.PadProbeReturn.OK
+        now = time.monotonic()
+        cadence.add(now)
+        pts = int(buffer.pts) if buffer.pts != Gst.CLOCK_TIME_NONE else None
+        sequence = int(buffer.offset) if buffer.offset != Gst.BUFFER_OFFSET_NONE else None
+        corrupt = bool(buffer.has_flags(Gst.BufferFlags.CORRUPTED))
+        if state['first_time'] is None:
+            caps = _pad.get_current_caps()
+            state['caps'] = caps.to_string() if caps else None
+            state['nvmm_caps'] = bool(caps and caps.get_features(0).contains('memory:NVMM'))
+            state['nvmm_allocator'] = bool(buffer.n_memory() == 1 and
+                buffer.peek_memory(0).is_type('egV4l2Memory'))
+            if not state['nvmm_caps'] or not state['nvmm_allocator']:
+                state['metadata_error'] = 'Capture did not supply the expected NVMM surface'
+            if pixel_format in NVMM_GRAY_FORMATS:
+                state['capture_bits'] = camera.get_property('capture-bits')
+            state['first_time'] = now
+        capture_counters.add(sequence, corrupt)
+        if cfg.drop_detect and pts is not None and state['last_pts'] is not None:
+            if pts - state['last_pts'] > 1.5 * Gst.SECOND / cfg.target_fps:
+                state['timestamp_gap_estimates'] += 1
+        if writer:
+            try:
+                if cfg.max_log_lines and csv_rows >= cfg.max_log_lines:
+                    csv_file.close()
+                    csv_segment += 1
+                    csv_file = open(os.path.join(output_dir, 'frames-%04d.csv' % csv_segment), 'w', newline='')
+                    writer = csv.writer(csv_file)
+                    writer.writerow(['frame', 'pts_ns', 'sequence', 'corrupt', 'arrival_monotonic_s', 'cpu_percent_one_core', 'gpu_percent_global'])
+                    csv_rows = 0
+                writer.writerow([state['frames'], pts, sequence, int(corrupt), now, cpu_load.sample(), gpu_load.sample()])
+                csv_rows += 1
+            except OSError as error:
+                state['logging_error'] = str(error)
+        state['frames'] += 1
+        state.update(capture_counters.summary())
+        state['last_time'], state['last_pts'], state['last_sequence'] = now, pts, sequence
+        return Gst.PadProbeReturn.OK
+    camera.get_static_pad('src').add_probe(Gst.PadProbeType.BUFFER, observe)
+    def observe_processed(_pad, info):
+        if info.get_buffer() is not None:
+            processed_cadence.add(time.monotonic())
+        return Gst.PadProbeReturn.OK
+    pipeline.get_by_name('out').get_static_pad('sink').add_probe(Gst.PadProbeType.BUFFER, observe_processed)
+    def report_status(force=False):
+        now = time.monotonic()
+        received = processed_cadence.summary(now)
+        counters = capture_counters.summary()
+        status_output.write(format_status(
+            received['frames'] - 1 if received['frames'] else None,
+            received['elapsed_seconds'], received['interval_ms'], received['window_fps'],
+            cpu_load.sample(), cfg.expected_fps, None,
+            counters['corrupt'], counters['sequence_gaps'] if counters['sequence_available'] else None,
+            gpu=gpu_load.sample(), show_gpu=gpu_load.enabled), force=force)
+    bus = pipeline.get_bus()
+    failure = None
+    interrupted = False
+    try:
+        heartbeat()
+        if pipeline.set_state(Gst.State.PLAYING) == Gst.StateChangeReturn.FAILURE:
+            raise RuntimeError('NVMM pipeline refused PLAYING')
+        while True:
+            message = bus.timed_pop_filtered(100 * Gst.MSECOND, Gst.MessageType.ERROR | Gst.MessageType.EOS)
+            now = time.monotonic()
+            heartbeat()
+            if state.get('metadata_error'):
+                raise RuntimeError(state['metadata_error'])
+            if state.get('logging_error'):
+                raise RuntimeError('Metadata logging failed: ' + state['logging_error'])
+            if message:
+                if message.type == Gst.MessageType.ERROR:
+                    error, details = message.parse_error()
+                    raise RuntimeError('%s: %s (%s)' % (message.src.get_name(), error, details or ''))
+                break
+            # Bounded missing-frame detection. No fallback after a runtime error.
+            threshold = max(5.0, cfg.freeze_threshold_s) if state['last_time'] is None else cfg.freeze_threshold_s
+            if threshold and now - (state['last_time'] or started) > threshold:
+                raise RuntimeError('NVMM capture stalled; no automatic switch to CPU')
+            report_status()
+    except KeyboardInterrupt:
+        interrupted = True
+    except Exception as error:
+        failure = str(error)
+    finally:
+        report_status()
+        status_output.finish()
+        heartbeat()
+        pipeline.set_state(Gst.State.NULL)
+        if csv_file:
+            csv_file.close()
+    measured_rate = cadence.summary()
+    log.info('FPS_RESULT %s', json.dumps(dict(capture=measured_rate, processing=processed_cadence.summary(),
+        expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source)))
+    state['cadence'] = measured_rate
+    state['processed_cadence'] = processed_cadence.summary()
+    state['processed_frames'] = state['processed_cadence']['frames']
+    state.update(backend='nvmm', requested_backend=cfg.backend, format=pixel_format,
+                 expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source,
+                 v4l2_format=FORMAT_V4L2[pixel_format], output_format=plan['format'],
+                 source_processing=plan['processing'],
+                 downstream_processing='vic-conversion' if plan['vic'] else 'none',
+                 display=cfg.show_video, display_normalization=
+                 ('minmax' if normalized else 'fixed') if cfg.show_video and pixel_format in NVMM_GRAY_FORMATS else None,
+                 classic_pixel_modules_loaded=[name for name in ('cv2', 'numpy') if name in sys.modules],
+                 width=w, height=h, failure=failure, interrupted=interrupted, pixel_analysis=False,
+                 gpu_activity_applicable=gpu_load.enabled, gpu_percent_global=gpu_load.sample(), gpu_load_source=str(gpu_load.path) if gpu_load.path else None,
+                 gpu_scope='board-wide NVIDIA GPU activity; includes other applications, excludes VIC',
+                 cpu_average_percent_one_core=cpu_load.average(),
+                 cpu_scope='capture process, all threads; excludes supervisor and GPU/VIC')
+    if cfg.num_frames and state['frames'] != cfg.num_frames and failure is None and not interrupted:
+        state['failure'] = failure = 'Capture ended before the requested frame count'
+    if cfg.num_frames and state['processed_frames'] != cfg.num_frames and failure is None and not interrupted:
+        state['failure'] = failure = 'Downstream did not receive the requested frame count'
+    if state['corrupt'] and failure is None:
+        state['failure'] = failure = 'Corrupted buffers reported by the driver'
+    if output_dir:
+        with open(os.path.join(output_dir, 'summary.json'), 'w') as handle:
+            json.dump(state, handle, indent=2)
+    log.info('Capture complete: frame=%d captured=%d cpu_average=%.1f%% corrupt=%d sequence_gaps=%d',
+             state['frames'] - 1, state['frames'], state['cpu_average_percent_one_core'], state['corrupt'], state['sequence_gaps'])
+    if failure:
+        raise RuntimeError(failure)
+
+
+def _run_selected_backend(cfg, conflicts):
+    if cfg.backend != 'classic' and not conflicts:
+        available, reason = _nvmm_available(cfg)
+        if available:
+            _, _, actual = _v4l2_get_fmt(cfg.device)
+            if _nvmm_plan(_nvmm_requested_format(cfg, actual), cfg.show_video, cfg.normalize) is None:
+                available, reason = False, 'current/requested format is not supported by NVMM'
+        if available:
+            log.info('BACKEND requested=%s selected=nvmm reason=%s', cfg.backend, reason)
+            return _run_nvmm_monitor(cfg)
+        if cfg.backend == 'nvmm':
+            raise RuntimeError(reason)
+    else:
+        reason = 'explicit classic selection' if cfg.backend == 'classic' else 'pixel/classic options: ' + ', '.join(conflicts)
+    log.info('BACKEND requested=%s selected=classic reason=%s', cfg.backend, reason)
+    return camera_main_loop(cfg=cfg)
+
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+
+    # Private worker entry: invoked only after the parent selected NVMM.
+    if len(sys.argv) == 3 and sys.argv[1] == '--_nvmm-worker':
+        # Close capture FDs even if the supervisor is killed rather than interrupted.
+        import ctypes
+        parent_pid = os.getppid()
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(1, signal.SIGKILL, 0, 0, 0) != 0:
+            raise SystemExit('Cannot bind capture process lifetime to its supervisor')
+        if parent_pid == 1 or os.getppid() != parent_pid:
+            raise SystemExit('Capture supervisor has exited')
+        worker_data = json.load(sys.stdin)
+        worker_data['fpn'] = ConfigFPN(**worker_data['fpn'])
+        try:
+            _run_nvmm_worker(Config(**worker_data), int(sys.argv[2]))
+        except (RuntimeError, OSError) as error:
+            raise SystemExit('Capture failed: %s' % error)
+        raise SystemExit(0)
 
     # ── Step 1: pre-parse only --config so we can load the right JSON first ──
     pre = argparse.ArgumentParser(add_help=False)
@@ -1897,12 +2649,54 @@ if __name__ == "__main__":
     # ── Step 3: full argument parser — defaults come from the loaded config ──
     parser = argparse.ArgumentParser(
         description="Real-time camera frame monitor",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        formatter_class=type('HelpFormatter', (argparse.ArgumentDefaultsHelpFormatter,
+                                              argparse.RawDescriptionHelpFormatter), {}),
+        epilog="""Live status fields:
+  frame          Zero-based index of the latest processed frame.
+  ts             Seconds since the first processed frame.
+  dt             Interval between the latest processed frames, in milliseconds.
+  expected_fps   Reference rate: EngineCore rf 0x210, or --expected-fps.
+                 Other cameras show -- unless a reference is supplied.
+  actual_fps     Measured reception rate for processing/display (rolling ~1 s).
+                 This can be lower than the camera's capture rate.
+  cpu            Process CPU usage across all threads: 100% = one CPU core.
+                 NVMM reports its capture worker; GPU/VIC usage is not included.
+  gpu            Board-wide GPU activity (0..100%), when the NVMM path uses GPU.
+                 Includes other applications, excludes VIC; -- if unavailable.
+                 Refreshed at most once per second from Jetson nvgpu sysfs.
+  gst_drop       Classic GStreamer estimate: captured minus processed frames;
+                 includes pending/discarded frames. Unavailable in NVMM.
+  corrupt        Cumulative buffers flagged corrupted by the capture driver.
+                 This does not inspect image pixels or diagnose a CRC error.
+  sequence_gaps  Cumulative missing source sequence numbers, when available.
+                 Distinct from frames discarded later by display/processing.
+Optional fields (classic analysis modes):
+  mean / std     Mean and standard deviation of pixel/luma values.
+  row_noise      Standard deviation of per-row means.
+  col_noise      Standard deviation of per-column means.
+  dropped        Estimated missing frames from timing gaps (--drop-detect).
+  spikes         Detected FPN/statistic spike events (--fpn-detect).
+  freeze         Detected stalled-stream episodes, not identical-image checks.
+  [FRAMES FULL]  Frame-storage budget reached; see --max-frames-mb.
+  [STORAGE FULL] Total storage budget reached; see --max-save-mb.
+  --             Unknown/unavailable, not zero.
+
+Grayscale display may transform pixels for viewing: the startup message states
+whether CPU/GPU min/max normalization or fixed-range scaling is used. Raw
+capture values are unchanged by the display mapping.
+""",
     )
 
     # Config file
     parser.add_argument("--config", default=None, metavar="PATH",
                         help="Path to a JSON config file; if omitted, uses the built-in default")
+
+    parser.add_argument("--backend", choices=["auto", "classic", "nvmm"], default=run_cfg.backend,
+                        help="auto prefers compatible NVMM capture unless pixel analysis is requested")
+
+    parser.add_argument('--normalize', action='store_true', default=run_cfg.normalize,
+                        help='Normalize each grayscale display frame to 0..255 (CPU in classic, GPU in NVMM). '
+                             'Default: fixed full-range scaling. Ignored with an info message when inapplicable.')
 
     # Camera / capture  — likely to override per run
     parser.add_argument("--fmt", "-f", default=run_cfg.fmt, choices=["Y16", "Y16_BE", "Y14", "AR24", "AB24", "YUYV"],
@@ -1920,14 +2714,16 @@ if __name__ == "__main__":
                         help="Frame width in pixels (default: ask the device)")
     parser.add_argument("--height", "-H", type=int, default=None,
                         help="Frame height in pixels (default: ask the device)")
+    parser.add_argument("--expected-fps", type=float, default=run_cfg.expected_fps,
+                        help="Explicit framerate reference for cameras without an automatic reader; EngineCore uses rf 0x210")
     parser.add_argument("--fps", type=int, default=run_cfg.target_fps,
                         help="Target capture frame rate")
-    parser.add_argument("--num-frames", type=int, default=0,
+    parser.add_argument("--num-frames", type=int, default=run_cfg.num_frames or 0,
                         help="Frames to capture; 0 = infinite")
 
     # Display
     parser.add_argument("--display", action="store_true", default=run_cfg.show_video,
-                        help="Show live video window (ESC to quit); Y16/Y10 auto-normalized to 8-bit, "
+                        help="Show video (Ctrl+C to quit; ESC also works with classic); grayscale mapped to 8-bit (use --normalize for automatic contrast), "
                              "AR24/AB24/YUYV shown in colour")
     parser.add_argument("--no-resize", action="store_true", default=run_cfg.window_autosize,
                         help="Fixed-size, non-resizable display window (WINDOW_AUTOSIZE) instead of "
@@ -1974,17 +2770,25 @@ if __name__ == "__main__":
 
     # Logging
     parser.add_argument("--log", action="store_true", default=run_cfg.log_enabled,
-                        help="Write rt_log CSV and events_log to disk (creates a dated run directory)")
+                        help="Write CSV logs (NVMM: metadata only; classic: pixel stats and events)")
 
     # Stats
     parser.add_argument("--stats", action="store_true", default=run_cfg.stats,
                         help="Compute mean/std/row_noise/col_noise and print them on the status "
-                             "line. Off by default (this is the main cost of the display loop — "
-                             "see compte-rendu §12); automatically enabled by --log or "
-                             "--fpn-detect regardless of this flag, though only --stats prints "
-                             "them on the status line.")
+                             "line. Selects classic capture in auto mode. Classic logging/FPN also "
+                             "computes pixel stats; NVMM logging records metadata only.")
 
     args = parser.parse_args()
+
+    config_data = {}
+    if args.config:
+        try:
+            with open(args.config) as config_file:
+                config_data = json.load(config_file)
+        except (OSError, ValueError):
+            pass  # Config.from_json already reports the problem.
+    backend_conflicts = _validate_backend_args(parser, args, config_data)
+    run_cfg.backend = args.backend
 
     # ── Step 4: validate cross-parameter constraints ──
     if (args.max_frames_mb is not None and args.max_save_mb > 0
@@ -1997,6 +2801,7 @@ if __name__ == "__main__":
     run_cfg.fmt                    = args.fmt
     run_cfg.cam_index, run_cfg.device = _parse_device_arg(args.device)
     run_cfg.target_fps             = args.fps
+    run_cfg.expected_fps           = args.expected_fps
     # Resolve the frame size from the device when the user did not ask for one.
     #
     # A hardcoded default is wrong on a fixed-resolution camera: asking a Dione
@@ -2034,6 +2839,7 @@ if __name__ == "__main__":
     run_cfg.freeze_recovery_frames = args.freeze_recovery
     run_cfg.drop_detect            = args.drop_detect
     run_cfg.log_enabled            = args.log
+    run_cfg.normalize              = args.normalize
     run_cfg.show_video             = args.display
     run_cfg.window_autosize        = args.no_resize
     run_cfg.multicam_file          = args.multicam_file
@@ -2050,4 +2856,11 @@ if __name__ == "__main__":
     run_cfg.fpn.baseline_window      = args.fpn_baseline_window
     run_cfg.fpn.baseline_min_frames  = args.fpn_baseline_min_frames
 
-    camera_main_loop(cfg=run_cfg)
+    run_cfg.expected_fps, run_cfg.expected_fps_source = _resolve_expected_fps(run_cfg)
+    log.info('Expected framerate: %s (%s)',
+             '--' if run_cfg.expected_fps is None else '%g fps' % run_cfg.expected_fps,
+             run_cfg.expected_fps_source)
+    try:
+        _run_selected_backend(run_cfg, backend_conflicts)
+    except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
+        parser.exit(1, "Capture failed: %s\n" % error)

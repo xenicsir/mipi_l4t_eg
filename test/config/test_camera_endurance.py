@@ -36,4 +36,36 @@ class EnduranceTests(unittest.TestCase):
  def test_expected_visit_rejects_missing_camera_and_wrong_bsp(self):
   visit=dict(l4t='35.6.0',cameras=[dict(port=0,family='dione_ir',resolution='640x480')])
   self.assertEqual(len(m.validate_visit(visit,[],'36.4.4')),2)
+ def cameras_and_config(self):
+  text='';cameras=[]
+  for port,key,video,fmt,gstfmt in [(0,'10-0016','/dev/video1','Y16 ','RGBA'),(1,'9-0016','/dev/video0','YUYV','YUY2')]:
+   spec='--set-fmt-video=width=640,height=480,pixelformat='+fmt
+   c=Camera(port,'EngineCore',True,sysfs='/sys/'+key,device='/dev/eg-ec-mipi-'+key,video=video);c.stream_spec=spec;cameras.append(c)
+   text+=f'  Port {port}: EngineCore (connected)\n    Video device: {video}\n    I2C device: {c.device}\n    Sysfs: {c.sysfs}\n'
+   text+=f'v4l2-ctl -d {video} --stream-mmap --set-fmt-video=width=640,height=480,pixelformat="{fmt}"\n'
+   text+=f'rt_frame_monitor.py -d {video} --display\n'
+   text+=f'gst-launch-1.0 -e -v egv4l2camerasrc device={video} ! "video/x-raw(memory:NVMM),format={gstfmt},width=640,height=480" ! nvvidconv compute-hw=2 ! nv3dsink sync=false\n'
+  return cameras,text
+ def test_nvmm_branches_keep_devices_and_have_source_and_delivery_probes(self):
+  cameras,text=self.cameras_and_config();command,probes,reason=m.build_nvmm_command(cameras,text,180)
+  self.assertIsNone(reason);self.assertEqual(command.count('egv4l2camerasrc'),2)
+  self.assertEqual(command.count('fakesink'),2);self.assertNotIn('nv3dsink',command)
+  self.assertIn('device=/dev/video0',command);self.assertIn('device=/dev/video1',command)
+  self.assertEqual(len({v for names in probes.values() for v in names.values()}),4)
+  for name in [v for names in probes.values() for v in names.values()]:self.assertIn('name='+name,command)
+ def test_nvmm_unavailable_and_required_skip_are_not_success(self):
+  cameras,text=self.cameras_and_config()
+  self.assertIsNone(m.build_nvmm_command(cameras[:1],text,180)[0])
+  text='\n'.join(l for l in text.splitlines() if not l.startswith('gst-launch'))
+  self.assertIsNone(m.build_nvmm_command(cameras,text,180)[0])
+  self.assertFalse(m.nvmm_accepted({'status':'not_applicable'},True))
+  self.assertFalse(m.nvmm_accepted({'status':'failed'},False))
+  self.assertTrue(m.nvmm_accepted({'status':'not_applicable'},False))
+ def test_nvmm_checks_delivered_frames_and_corruption_independently(self):
+  probes={'cam':{'capture':'input','delivery':'output'}}
+  def trace(name,count=180,corrupt=False):
+   return '\n'.join('/GstPipeline:p/GstIdentity:%s: last-message = chain pts: 0:00:%.9f flags: %s' % (name,i/60,'corrupted' if corrupt and i==0 else '') for i in range(count))
+  self.assertTrue(m.inspect_nvmm_streams(trace('input')+'\n'+trace('output'),probes,180,{'cam':60})['cam']['passed'])
+  self.assertFalse(m.inspect_nvmm_streams(trace('input')+'\n'+trace('output',179),probes,180,{'cam':60})['cam']['passed'])
+  self.assertFalse(m.inspect_nvmm_streams(trace('input')+'\n'+trace('output',180,True),probes,180,{'cam':60})['cam']['passed'])
 if __name__=='__main__':unittest.main()
