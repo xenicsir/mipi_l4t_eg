@@ -457,9 +457,14 @@ class dioneCtrl(object):
 
   UPLOAD_BLOCKSIZE = 4096
   UPLOAD_PACKSIZE  = 1000
-  FILE_TRANSFER_GAP = 0.02  # one completed request at a time, including on USB
+  FILE_TRANSFER_GAP = 0.02
   FILE_POLL_INTERVAL = 0.05
+  # USB GenCP completes each request before the next one is issued.
+  # Keep a small gap, with conservative pacing for the other transports.
+  FILE_USB_GENCP_GAP = 0.005
+  FILE_USB_GENCP_POLL_INTERVAL = 0.01
   FILE_OPERATION_TIMEOUT = 10.0
+  FILE_USB_READ_TIMEOUT = 5.0  # exceeds the bridge's bounded File Access response wait
 
   def __init__(self, bus=6, dev_addr=0x5a, com_device="COM0", device_type="I2C", gencp_enable=False, force_slave=False):
 
@@ -486,7 +491,7 @@ class dioneCtrl(object):
     if (self.device_type == "USB") :
       if getattr(self, '_transfer_depth', 0) and getattr(self, 'ser', None) is not None and self.ser.is_open:
         return
-      self.ser = serial.Serial(self.com_device, timeout=1, write_timeout=1)
+      self.ser = serial.Serial(self.com_device, timeout=getattr(self, '_usb_response_timeout', 1), write_timeout=1)
 
   def close_device(self):
     if (self.device_type == "USB") :
@@ -579,7 +584,7 @@ class dioneCtrl(object):
     finally:
       self.close_device()
       if getattr(self, '_transfer_depth', 0):
-        time.sleep(self.FILE_TRANSFER_GAP)
+        time.sleep(self._file_transfer_gap())
 
     self._check_status(status, f"read of 0x{reg_addr:08X}")
     if len(data) != nbytes:
@@ -606,7 +611,7 @@ class dioneCtrl(object):
     finally:
       self.close_device()
       if getattr(self, '_transfer_depth', 0):
-        time.sleep(self.FILE_TRANSFER_GAP)
+        time.sleep(self._file_transfer_gap())
     return status
 
   # -------------------------------------------------------------------------
@@ -645,14 +650,33 @@ class dioneCtrl(object):
     """Keep exclusive ownership of the COM port for the entire file transfer."""
     outer = not getattr(self, '_transfer_depth', 0)
     if outer:
-      self.open_device()
+      previous_timeout = getattr(self, '_usb_response_timeout', 1)
+      self._usb_response_timeout = self.FILE_USB_READ_TIMEOUT
+      try:
+        self.open_device()
+      except Exception:
+        self._usb_response_timeout = previous_timeout
+        raise
     self._transfer_depth = getattr(self, '_transfer_depth', 0) + 1
     try:
       yield
     finally:
       self._transfer_depth -= 1
       if outer:
-        self.close_device()
+        try:
+          self.close_device()
+        finally:
+          self._usb_response_timeout = previous_timeout
+
+  def _file_transfer_gap(self):
+    if getattr(self, 'device_type', None) == 'USB' and self.gencp_enable:
+      return self.FILE_USB_GENCP_GAP
+    return self.FILE_TRANSFER_GAP
+
+  def _file_poll_interval(self):
+    if getattr(self, 'device_type', None) == 'USB' and self.gencp_enable:
+      return self.FILE_USB_GENCP_POLL_INTERVAL
+    return self.FILE_POLL_INTERVAL
 
   def _fac_write_checked(self, address, value):
     self._check_status(self.write_reg32(address, value), f'file register 0x{address:08X}')
@@ -667,7 +691,7 @@ class dioneCtrl(object):
     # Poll completion until the configured deadline.
     deadline = time.monotonic() + self.FILE_OPERATION_TIMEOUT
     while time.monotonic() < deadline:
-      time.sleep(self.FILE_POLL_INTERVAL)
+      time.sleep(self._file_poll_interval())
       status = self.read_reg32(0x10010010)
       if status == 0:
         return True
