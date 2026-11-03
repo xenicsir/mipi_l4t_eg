@@ -114,6 +114,53 @@ then
    sudo rsync -iahHAXxvz --progress $file ${INSTALL_DIR}/
 fi
 
+# Validate the target before dpkg unpacks any camera files.
+# FORCE_INSTALL_EG_CAMS is an installation-time override, not a build option.
+rm -f /tmp/preinst
+cat > /tmp/preinst <<EOT
+#!/bin/bash
+set -e
+EXPECTED_L4T="${L4T_VERSION}"
+EXPECTED_KERNEL_VERSION="${KERNEL_VERSION}"
+EOT
+cat >> /tmp/preinst <<'EOT'
+
+case "$1" in
+    install|upgrade)
+        if [[ ! -f /etc/nv_tegra_release ]]; then
+            echo "Error: /etc/nv_tegra_release not found." >&2
+            exit 1
+        fi
+        NV_MAJOR=$(sed -n 's/.*# R\([0-9]*\) .*/\1/p' /etc/nv_tegra_release | head -1)
+        NV_REVISION=$(sed -n 's/.*REVISION: \([0-9.]*\).*/\1/p' /etc/nv_tegra_release | head -1)
+        if [[ -z "$NV_MAJOR" || -z "$NV_REVISION" ]]; then
+            echo "Error: Could not parse L4T version from /etc/nv_tegra_release." >&2
+            exit 1
+        fi
+        RUNNING_L4T="${NV_MAJOR}.${NV_REVISION}"
+        if [[ -n "${FORCE_INSTALL_EG_CAMS:-}" ]]; then
+            RUNNING_KERNEL=$(uname -r)
+            if [[ "${RUNNING_KERNEL%-eg}" != "${EXPECTED_KERNEL_VERSION%-eg}" ]]; then
+                echo "Error: Kernel version mismatch (FORCE_INSTALL_EG_CAMS set)." >&2
+                echo "  Package kernel: ${EXPECTED_KERNEL_VERSION}" >&2
+                echo "  Running kernel: ${RUNNING_KERNEL}" >&2
+                exit 1
+            fi
+            echo "FORCE_INSTALL_EG_CAMS: accepting L4T ${RUNNING_L4T} with matching kernel ${RUNNING_KERNEL}."
+        else
+            NCOMP=$(echo "$EXPECTED_L4T" | awk -F'.' '{print NF}')
+            RUNNING_L4T_CMP=$(echo "$RUNNING_L4T" | cut -d'.' -f1-${NCOMP})
+            if [[ "$RUNNING_L4T_CMP" != "$EXPECTED_L4T" ]]; then
+                echo "Error: Incompatible L4T version." >&2
+                echo "  Package L4T: ${EXPECTED_L4T}" >&2
+                echo "  Running L4T: ${RUNNING_L4T}" >&2
+                exit 1
+            fi
+        fi
+        ;;
+esac
+EOT
+
 rm -f /tmp/postinst
 
 tee -a /tmp/postinst > /dev/null <<EOT
@@ -146,6 +193,7 @@ fpm -v ${PACKAGE_VERSION} -C ${PACKAGE_NAME} \
    -s dir \
    -t deb \
    -n ${PACKAGE_NAME} \
+   --before-install /tmp/preinst \
    --after-install /tmp/postinst \
    --after-remove /tmp/postrm \
    --description "Xenics Exosens MIPI camera package" \
