@@ -656,6 +656,44 @@ and checksum. A release for one carrier family does not establish availability
 for another carrier from the same vendor. Verify the L4T version inside the BSP
 when a download-page label is ambiguous.
 
+### Carrier-source checks before porting
+
+For Forecr, inspect the repository's **branches and tags**, not only its Releases
+page. Select the branch matching the exact JetPack/L4T pairing. Keep a clean clone
+outside the EG repository (this project uses a sibling `forecr/` directory), and
+record its remote URL, branch/tag and full commit ID. Check its kernel/BSP contents;
+a download label alone does not establish the version.
+
+After preparing both the NVIDIA generic and Forecr build trees for the new BSP,
+extract the vendor delta against that exact pristine NVIDIA version:
+
+```sh
+./l4t_prepare.sh -v <L4T_VERSION> -V generic
+./l4t_prepare.sh -v <L4T_VERSION> -V forecr -c dsboard_ornxs
+./tools/extract_forecr_sources.sh <L4T_VERSION> ../forecr/<MATCHING_FORECR_CLONE>
+./l4t_copy_sources.sh -v <L4T_VERSION> -V forecr -c dsboard_ornxs
+```
+
+Review the extracted vendor layer and resulting three-way merge before building.
+Do not copy the previous vendor layer blindly or manually edit Forecr Makefiles;
+the extractor and merge workflow preserve the supplier changes. Keep supplier
+clones unchanged so they remain useful comparison references.
+
+For Auvidea, check the exact **carrier/SoM family** on the firmware page and inspect
+the downloaded archive's internal L4T references. AGX Orin X230D support cannot be
+inferred from an Orin NX/Nano release. Availability adds an explicit carrier/BSP
+**target-validation candidate**; it does not by itself require an EG driver change
+or prove hardware qualification. Do not assume a JetPack release supports every
+patch release. Keep the pending board test separate from software availability.
+
+Handle CTI only for versions explicitly in the current project scope. Adding a
+NVIDIA/Forecr version must not automatically copy `cti` or `cti_pristine` support
+from a predecessor. Retain existing CTI declarations until a separate port is requested.
+
+The current integration test matrix is generated from `eg_config.yaml` and
+`test/config/hardware.yaml`. Add the necessary real fixtures or explicit mappings;
+do not maintain an obsolete parallel list in `test/integration/matrix.py`.
+
 Declare a new version only after its sources, build, packaging and applicable
 carrier profiles are ready. Regenerate the deployment matrix and the
 [release qualification plan](../test/RELEASE_VALIDATION.md) from that declaration.
@@ -694,31 +732,44 @@ versions:
 
 Once `platform_ids` is set, `generate_deployment_matrix.py` automatically populates `theoretically_supported` cells for all cameras on those platforms.
 
+Also add the version's link metadata under `l4t_versions` in
+`tools/deployment_matrix_data.yaml`, and its test mode in
+`test/config/hardware.yaml`. Declare the hardware-pipeline profile in
+`eg_config.yaml` only after integrating that BSP's plugin. Regenerate the matrix
+and run `python3 tools/generate_deployment_matrix.py --check`; do not mark new
+camera/carrier combinations as tested based on compilation alone.
+
 No changes are needed to `dtsi_platforms`, `cameras`, `pixel_format_map`, or `platform_restrictions` — those sections describe the shared DTSI files in `sources/common/source/`, which are version-independent.
 
 Download URLs can be found on the [NVIDIA L4T Archive](https://developer.nvidia.com/embedded/jetson-linux-archive).
 
-### Step 2: Create version-specific directory
+### Step 2: Rebase the actual EG changes on pristine vendor sources
 
-```bash
-# Start from the closest existing version
-cp -r sources/<closest_version>/Linux_for_Tegra sources/<new_version>/Linux_for_Tegra
-cp -r sources/<closest_version>/Linux_for_Tegra_<vendor> sources/<new_version>/Linux_for_Tegra_<vendor>
-```
+Prepare the new BSP in an isolated build directory. Obtain the previous and new
+NVIDIA originals from their archives (including the original JetsonIO Debian
+package), not from a tree that has already passed through `--copy-sources`.
+Compare the previous pristine file with its EG overlay to identify the intended
+feature change, then apply only that change to the new pristine file.
 
-The version-specific directory contains only files that differ from `sources/common/`:
+Do not copy old complete snapshots or vendor layers blindly. A clean three-way
+merge can still carry old deletions of NVIDIA features. Review every resulting
+hunk: retain vendor formats, safety checks, compatibility branches and copyright
+headers. If NVIDIA already supplies a feature, avoid adding it again. Omit an
+unchanged file rather than keeping an unnecessary snapshot in `sources/`.
 
-```
-sources/<new_version>/
-├── Linux_for_Tegra/               # Generic (Nvidia) boards
-│   └── source/
-│       ├── hardware/.../overlay/Makefile    # dtbo-y entries (36.x)
-│       ├── nvidia-oot/.../i2c/Makefile      # obj-m entries (36.x)
-│       └── public/kernel/.../i2c/           # Kconfig, Makefile, defconfig (32+/35.x)
-└── Linux_for_Tegra_<vendor>/      # Vendor-specific additions
-    └── source/
-        └── ...                    # Vendor defconfigs, Makefiles, DT
-```
+Persist the result under `sources/<new_version>/Linux_for_Tegra/`, and obtain
+Forecr's layer using the extraction workflow above. Do not edit supplier clones.
+Then run copy-sources and inspect the generated tree's Git diff against its initial
+pristine commit. That diff is verification output, not the ancestor for the next port.
+
+For example, a 36.5.2 review must preserve NVIDIA SMBus block-read support,
+multimaster/ACPI/RT safeguards and Bayer14/WDR formats while retaining the EG I2C
+timeout, monochrome formats and VI queue fixes. Existing modified files can predate
+those NVIDIA additions even when their directory name matches the previous BSP.
+
+Include the NVMM source overlay with this BSP's native NvBufSurface header. Check
+runtime ABI/library changes separately from kernel source changes. A successful
+plugin link does not qualify allocation, pixel integrity or rendering on hardware.
 
 ### Step 3: Adapt version-specific files
 
@@ -743,6 +794,14 @@ Fix any compilation errors. Common issues:
 - Kernel API changes (function signatures, struct fields)
 - Device tree binding changes (new required properties)
 - Makefile structure changes (new directories, renamed targets)
+
+The build runs NVIDIA's initrd updater through `tools/update_bsp_initrd.py`.
+Carrier kernels may link a driver directly into the kernel (`CONFIG_...=y`)
+while NVIDIA's manifest requests its `.ko` file. The helper temporarily omits
+only missing module files recorded in that image's `modules.builtin`. It keeps
+loadable drivers for other images, restores the original manifests after the
+update, and propagates updater failures. A genuinely missing module remains an
+error. Standalone packages also generate their dedicated `/boot/eg/initrd-eg`.
 
 ### Step 5: Build
 

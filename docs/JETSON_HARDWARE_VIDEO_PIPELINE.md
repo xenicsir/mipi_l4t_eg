@@ -3,8 +3,8 @@
 ## Availability
 
 The source tree integrates `egv4l2camerasrc` for every declared L4T 35.x,
-36.x and 39.2 BSP: 35.1, 35.3.1, 35.4.1, 35.5.0, 35.6.0, 35.6.1, 35.6.2,
-35.6.4, 36.4, 36.4.3, 36.4.4, 36.5.0 and 39.2. It is built against each BSP's
+36.x and 39.2.x BSPs: 35.1, 35.3.1, 35.4.1, 35.5.0, 35.6.0, 35.6.1, 35.6.2,
+35.6.4, 36.4, 36.4.3, 36.4.4, 36.5.0, 36.5.2, 39.2 and 39.2.1. It is built against each BSP's
 native NVIDIA headers and runtime libraries and included in packages generated
 from those builds. Generic, Forecr and CTI builds use the matching BSP source.
 Historical packages may predate this integration. L4T 32.x is excluded.

@@ -58,7 +58,7 @@ class HardwareMatrixTests(unittest.TestCase):
  def test_all_declared_nonlegacy_bsps_have_sources_without_new_hw_claims(self):
   expected={v for v in self.g.camera_db['versions'] if int(v.split('.')[0])>=35}
   self.assertEqual(set(self.g.camera_db['hardware_pipeline']['versions']),expected)
-  for version in ('35.3.1','35.5.0','35.6.1','35.6.2','36.4','36.4.3','36.5.0'):
+  for version in ('35.3.1','35.5.0','35.6.1','35.6.2','36.4','36.4.3','36.5.0','36.5.2','39.2.1'):
    value=self.g.get_hardware_pipeline('orin_nx_nano_devkit','microcube',version)
    self.assertTrue(value['available']);self.assertEqual(value['validations'],[])
   for version in expected:

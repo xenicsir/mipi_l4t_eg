@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -131,8 +132,12 @@ int main(void)
 
 class EnumerationTests(unittest.TestCase):
     def test_real_functions_all_supported_framework_versions(self):
-        paths = subprocess.check_output(['git','ls-files','*camera_common.c'],cwd=ROOT,text=True).splitlines()
-        self.assertEqual(len(paths),13)
+        versions = [str(v) for v in yaml.safe_load((ROOT/'eg_config.yaml').read_text())['versions'] if int(str(v).split('.')[0]) >= 35]
+        paths = []
+        for version in versions:
+            files = list((ROOT/'sources'/version/'Linux_for_Tegra').rglob('camera_common.c'))
+            self.assertEqual(len(files), 1, version)
+            paths.append(str(files[0].relative_to(ROOT)))
         for name in paths:
             with self.subTest(version=Path(name).parts[1]), tempfile.TemporaryDirectory() as tmp:
                 path=ROOT/name

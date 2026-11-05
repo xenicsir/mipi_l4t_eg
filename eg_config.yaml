@@ -439,6 +439,37 @@ versions:
       dir: aarch64--glibc--stable-2022.08-1
       prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
 
+  36.5.2:
+    jetpack: 6.2.3
+    platform_ids:
+    - agx_orin_devkit
+    - orin_nx_nano_devkit
+    - forecr_ornxs
+    - seeed_recomputer_j4012
+    vendors:
+    - generic
+    - forecr
+    standalone:
+      forecr:
+        dsboard_ornxs: true
+      generic:
+        generic: true
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.2/sources/public_sources.tbz2
+      release:
+        filename: Jetson_Linux_R36.5.2_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.2/releases/Jetson_Linux_R36.5.2_aarch64.tbz2
+      sample_fs:
+        filename: Tegra_Linux_Sample-Root-Filesystem_R36.5.2_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v5.2/releases/Tegra_Linux_Sample-Root-Filesystem_R36.5.2_aarch64.tbz2
+    toolchain:
+      archive: aarch64--glibc--stable-2022.08-1.tar.bz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r36_release_v3.0/toolchain/aarch64--glibc--stable-2022.08-1.tar.bz2
+      dir: aarch64--glibc--stable-2022.08-1
+      prefix: aarch64--glibc--stable-2022.08-1/bin/aarch64-buildroot-linux-gnu-
+
   "39.2":
     jetpack: "7.2"
     platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, forecr_ornxs, seeed_recomputer_j4012]
@@ -461,6 +492,37 @@ versions:
       url: https://developer.nvidia.com/downloads/embedded/l4t/r38_release_v2.0/release/x-tools.tbz2
       dir: x-tools
       prefix: x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+  39.2.1:
+    jetpack: 7.2.1
+    platform_ids:
+    - agx_orin_devkit
+    - orin_nx_nano_devkit
+    - forecr_ornxs
+    - seeed_recomputer_j4012
+    vendors:
+    - generic
+    - forecr
+    standalone:
+      forecr:
+        dsboard_ornxs: true
+      generic:
+        generic: true
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/sources/public_sources.tbz2
+      release:
+        filename: Jetson_Linux_R39.2.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Jetson_Linux_R39.2.1_aarch64.tbz2
+      sample_fs:
+        filename: Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2
+    toolchain:
+      archive: x-tools.tbz2
+      url: https://developer.nvidia.com/downloads/embedded/l4t/r38_release_v2.0/release/x-tools.tbz2
+      dir: x-tools
+      prefix: x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+
 
 # ---------------------------------------------------------------------------
 # Vendors and carriers
@@ -590,6 +652,10 @@ hardware_pipeline:
     "36.5.0":
       formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
     "39.2":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "36.5.2":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "39.2.1":
       formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
 
 # ---------------------------------------------------------------------------
