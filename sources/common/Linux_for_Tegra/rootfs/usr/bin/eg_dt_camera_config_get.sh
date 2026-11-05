@@ -794,13 +794,20 @@ else
                             _hw_gstfmt=""
                             _hw_options=""
                             _hw_convert=""
-                            if [[ "$GST_HW_DISPLAY" == "1" ]]; then
+                            if [[ "$GST_HW_DISPLAY" == "1" ]] && ! [[ "$_rtfmt" == "Y14" && "$TEGRA_SOC" == "t194" ]]; then
                                 case "$_rtfmt" in
-                                    YUYV) [[ "$GST_HW_CAPS" == *"YUY2"* && "$GST_HW_VIC" == "1" ]] && _hw_gstfmt="YUY2" ;;
+                                    YUYV)
+                                        if [[ "$GST_HW_CAPS" == *"yuyv-preview"* ]]; then
+                                            _hw_gstfmt="RGBA"
+                                            _hw_options=" capture-format=YUYV preview=true"
+                                        elif [[ "$GST_HW_CAPS" == *"YUY2"* && "$GST_HW_VIC" == "1" ]]; then
+                                            _hw_gstfmt="YUY2"
+                                        fi
+                                        ;;
                                     AB24) [[ "$GST_HW_CAPS" == *"RGBA"* ]] && _hw_gstfmt="RGBA" ;;
                                     AR24) [[ "$GST_HW_CAPS" == *"BGRx"* && "$GST_HW_VIC" == "1" ]] && _hw_gstfmt="BGRx" ;;
                                     Y16|Y16_BE|Y14)
-                                        if [[ "$GST_HW_CAPS" == *"GRAY16_LE"* && "$GST_HW_CAPS" == *"capture-format"* && "$GST_HW_CAPS" == *"preview"* ]]; then
+                                        if [[ "$GST_HW_CAPS" == *"RGBA"* && "$GST_HW_CAPS" == *"capture-format"* && "$GST_HW_CAPS" == *"preview"* ]]; then
                                             _hw_gstfmt="RGBA"
                                             _hw_options=" capture-format=$_rtfmt preview=true"
                                             [[ "$GST_HW_CAPS" == *"normalize"* ]] && _hw_options+=" normalize=true"
@@ -808,7 +815,7 @@ else
                                         ;;
                                 esac
                                 if [[ "$_hw_gstfmt" == "YUY2" || "$_hw_gstfmt" == "BGRx" ]]; then
-                                    _hw_convert=' ! nvvidconv compute-hw=2 ! "video/x-raw(memory:NVMM), format=NV12"'
+                                    _hw_convert=' ! nvvidconv compute-hw=2 ! "video/x-raw(memory:NVMM), format=RGBA"'
                                 fi
                             fi
                             _cmdno=0
@@ -831,6 +838,9 @@ else
                             # applied to that one.
                             if [[ "$pixfmt" == "'Y14 '"* ]] && [[ -n "$sysfs_path" ]]; then
                                 describe_y14_layout "$sysfs_path" "$_w" "$_h"
+                            fi
+                            if [[ "$_rtfmt" == "Y14" && "$TEGRA_SOC" == "t194" ]]; then
+                                echo "    NVMM unavailable for Y14: Xavier/T194 samples are not right-aligned; use classic or Y16_BE."
                             fi
                             _cmdno=$((_cmdno + 1))
                             echo "# $_cmdno. Capture only, no display — check the stream is alive:"

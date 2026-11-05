@@ -115,12 +115,19 @@ class CaptureCounters:
     """Driver buffer metadata only; missing sequence numbers are not pixel checks."""
     def __init__(self):
         self.corrupt = self.sequence_gaps = 0
+        self.buffers = 0
+        self.first_corrupt_index = self.last_corrupt_index = None
         self.sequence = None
         self.sequence_available = False
         self.lock = threading.Lock()
 
     def add(self, sequence, corrupt):
         with self.lock:
+            if corrupt:
+                if self.first_corrupt_index is None:
+                    self.first_corrupt_index = self.buffers
+                self.last_corrupt_index = self.buffers
+            self.buffers += 1
             self.corrupt += int(corrupt)
             self.sequence_available = self.sequence_available or sequence is not None
             if sequence is not None and self.sequence is not None:
@@ -131,7 +138,10 @@ class CaptureCounters:
 
     def summary(self):
         with self.lock:
-            return dict(corrupt=self.corrupt, sequence_gaps=self.sequence_gaps,
+            return dict(corrupt=self.corrupt, buffers=self.buffers,
+                        first_corrupt_index=self.first_corrupt_index,
+                        last_corrupt_index=self.last_corrupt_index,
+                        sequence_gaps=self.sequence_gaps,
                         sequence_available=self.sequence_available)
 
 
@@ -1687,36 +1697,6 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     # below), so skip the cast entirely when nothing else needs it.
     need_gray      = need_stats or need_frame_buf or save_images or fmt not in Y16_LIKE_FMTS
 
-    cap = None if _frame_iter is not None else open_capture(cam_index, device, fmt, width, height, target_fps, multicam_file)
-    if cap is not None and hasattr(cap, 'pixel_fmt'):
-        fmt = cap.pixel_fmt
-    if cap is not None and hasattr(cap, 'width'):
-        width, height = cap.width, cap.height
-    report_display_mapping(fmt, 'classic', show_video, cfg.normalize)
-
-    # Dedicated capture thread — only when a real camera is open (not _frame_iter).
-    # Keeps cap.read() running at full speed regardless of main-loop processing time.
-    _cap_ref        = [cap]
-    _frame_queue    = queue.Queue(maxsize=2)
-    _stop_reader    = threading.Event()
-    _reader_thread  = None
-    if cap is not None:
-        _reader_thread = threading.Thread(
-            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
-        _reader_thread.start()
-
-    def _restart_reader(new_cap):
-        nonlocal _reader_thread
-        # Signal reader to stop, release old cap (interrupts blocking read()),
-        # then wait for the thread to exit before handing it a new cap.
-        _stop_reader.set()
-        _reader_thread.join(timeout=4.0)
-        _stop_reader.clear()
-        _cap_ref[0] = new_cap
-        _reader_thread = threading.Thread(
-            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
-        _reader_thread.start()
-
     if _frame_iter is not None:
         device_tag = ""
     elif platform.system() == "Linux":
@@ -1741,7 +1721,53 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
             # path (~26 fps instead of 60 at 1280x1024). Pass --no-resize if
             # you want the full framerate instead of mouse-resizing.
             cv2.namedWindow(_win_title, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(_win_title, width, height)
+            cv2.resizeWindow(_win_title, max(1, width or 1), max(1, height or 1))
+
+    if show_video:
+        # Initialize and paint the GUI before capture starts. Window-system
+        # initialization can block the capture callbacks, especially over X11.
+        cv2.imshow(_win_title, np.zeros((max(1, height or 1), max(1, width or 1), 3), dtype=np.uint8))
+        cv2.waitKey(1)
+    initial_size = (width, height)
+    try:
+        cap = None if _frame_iter is not None else open_capture(cam_index, device, fmt, width, height, target_fps, multicam_file)
+    except BaseException:
+        if show_video:
+            try:
+                cv2.destroyWindow(_win_title)
+            except cv2.error:
+                pass
+        raise
+    if cap is not None and hasattr(cap, 'pixel_fmt'):
+        fmt = cap.pixel_fmt
+    if cap is not None and hasattr(cap, 'width'):
+        width, height = cap.width, cap.height
+    if show_video and not cfg.window_autosize and (width, height) != initial_size:
+        cv2.resizeWindow(_win_title, width, height)
+    report_display_mapping(fmt, 'classic', show_video, cfg.normalize)
+
+    # Dedicated capture thread — only when a real camera is open (not _frame_iter).
+    # Keeps cap.read() running at full speed regardless of main-loop processing time.
+    _cap_ref        = [cap]
+    _frame_queue    = queue.Queue(maxsize=2)
+    _stop_reader    = threading.Event()
+    _reader_thread  = None
+    if cap is not None:
+        _reader_thread = threading.Thread(
+            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
+        _reader_thread.start()
+
+    def _restart_reader(new_cap):
+        nonlocal _reader_thread
+        # Signal reader to stop, release old cap (interrupts blocking read()),
+        # then wait for the thread to exit before handing it a new cap.
+        _stop_reader.set()
+        _reader_thread.join(timeout=4.0)
+        _stop_reader.clear()
+        _cap_ref[0] = new_cap
+        _reader_thread = threading.Thread(
+            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
+        _reader_thread.start()
 
     start_ts     = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     run_dir_name = start_ts + device_tag
@@ -2170,6 +2196,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
             capture_rate = cap.cadence.summary() if hasattr(cap, 'cadence') else processing_cadence.summary()
             log.info('FPS_RESULT %s', json.dumps(dict(capture=capture_rate, processing=processing_cadence.summary(),
                 expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source)))
+        if cap is not None and hasattr(cap, 'capture_counters'):
+            log.info('CAPTURE_INTEGRITY %s', json.dumps(cap.capture_counters.summary()))
         log.info("CPU average=%.1f%% (process, 100%% per core)", cpu_load.average())
 
     return run_dir
@@ -2247,17 +2275,29 @@ NVMM_FORMATS = {'YUYV': 'YUY2', 'AB24': 'RGBA', 'AR24': 'BGRx',
 NVMM_GRAY_FORMATS = ('Y16', 'Y14', 'Y16_BE')
 
 
-def _nvmm_plan(pixel_format, display, normalize=False):
+def _nvmm_plan(pixel_format, display, normalize=False, raw_grayscale=True, yuyv_preview=False):
     """Describe capture and processing separately; grayscale retains its V4L2 mode."""
     if pixel_format not in NVMM_FORMATS:
         return None
     gray = pixel_format in NVMM_GRAY_FORMATS
-    return dict(format='RGBA' if gray and display else NVMM_FORMATS[pixel_format],
-                properties=dict({'capture-format': pixel_format, 'preview': display},
-                                **({'normalize': True} if display and normalize else {})) if gray else {},
-                vic=display and pixel_format in ('YUYV', 'AR24'),
-                processing='cuda-preview' if gray and display else
+    yuv = pixel_format == 'YUYV' and display and yuyv_preview
+    preview = (gray and (display or not raw_grayscale)) or yuv
+    return dict(format='RGBA' if preview else NVMM_FORMATS[pixel_format],
+                properties=dict({'capture-format': pixel_format, 'preview': preview},
+                                **({'normalize': True} if display and normalize else {})) if gray or yuv else {},
+                vic=not yuv and display and pixel_format in ('YUYV', 'AR24'),
+                vic_output='RGBA',
+                processing='cuda-yuyv-preview' if yuv else 'cuda-preview' if preview else
                            ('cuda-endian' if pixel_format == 'Y16_BE' else 'none'))
+
+
+def _nvmm_factory_plan(Gst, factory, pixel_format, display, normalize=False):
+    raw = Gst.Caps.from_string('video/x-raw(memory:NVMM),format=GRAY16_LE')
+    raw_grayscale = any(t.direction == Gst.PadDirection.SRC and t.get_caps().can_intersect(raw)
+                        for t in factory.get_static_pad_templates())
+    probe = factory.create(None)
+    yuyv_preview = probe is not None and probe.find_property('yuyv-preview') is not None and probe.get_property('yuyv-preview')
+    return _nvmm_plan(pixel_format, display, normalize, raw_grayscale, yuyv_preview)
 
 
 def _nvmm_requested_format(cfg, actual):
@@ -2272,6 +2312,19 @@ def _nvmm_display_reason(show_video, environment=None):
     if not re.fullmatch(r'(?:unix/?)?:[0-9]+(?:\.[0-9]+)?', display):
         return ('NVMM rendering requires local X11; DISPLAY=%r is not supported '
                 '(use classic for SSH X11 forwarding, or omit --display)' % display)
+    return None
+
+
+def _nvmm_format_reason(pixel_format):
+    if pixel_format != 'Y14':
+        return None
+    try:
+        compatible = Path('/proc/device-tree/compatible').read_bytes().split(b'\0')
+    except OSError:
+        return None
+    if b'nvidia,tegra194' in compatible:
+        return ('Y14 NVMM preview is unavailable on Xavier/T194: samples are '
+                'full-scale, not right-aligned; use classic or Y16_BE')
     return None
 
 
@@ -2292,7 +2345,10 @@ def _nvmm_available(cfg):
             return False, 'missing or unloadable plugin egv4l2camerasrc'
         _, _, actual = _v4l2_get_fmt(cfg.device)
         pixel_format = _nvmm_requested_format(cfg, actual)
-        plan = _nvmm_plan(pixel_format, cfg.show_video, cfg.normalize)
+        format_reason = _nvmm_format_reason(pixel_format)
+        if format_reason:
+            return False, format_reason
+        plan = _nvmm_factory_plan(Gst, factory, pixel_format, cfg.show_video, cfg.normalize)
         if plan is None:
             return False, 'current/requested format is not supported by NVMM'
         needed = (['nv3dsink'] if cfg.show_video else []) + (['nvvidconv'] if plan['vic'] else [])
@@ -2300,7 +2356,7 @@ def _nvmm_available(cfg):
             feature = Gst.ElementFactory.find(name)
             if feature is None or feature.load() is None:
                 return False, 'missing or unloadable plugin ' + name
-        required_formats = [NVMM_FORMATS[pixel_format], plan['format']]
+        required_formats = [plan['format']]
         for required in required_formats:
             desired = Gst.Caps.from_string('video/x-raw(memory:NVMM),format=' + required)
             if not any(t.direction == Gst.PadDirection.SRC and t.get_caps().can_intersect(desired)
@@ -2426,7 +2482,10 @@ def _run_nvmm_worker(cfg, heartbeat_fd=None):
     Gst.init(None)
     w, h, fourcc = _v4l2_get_fmt(cfg.device)
     pixel_format = _nvmm_requested_format(cfg, fourcc)
-    plan = _nvmm_plan(pixel_format, cfg.show_video, cfg.normalize)
+    factory = Gst.ElementFactory.find('egv4l2camerasrc')
+    if factory is None:
+        raise RuntimeError('Missing egv4l2camerasrc plugin')
+    plan = _nvmm_factory_plan(Gst, factory, pixel_format, cfg.show_video, cfg.normalize)
     if plan is None:
         raise RuntimeError('NVMM does not support the requested camera format')
     if (w, h) != (cfg.width, cfg.height):
@@ -2435,7 +2494,7 @@ def _run_nvmm_worker(cfg, heartbeat_fd=None):
               'width=%d,height=%d,framerate=%d/1' % (plan['format'], w, h, cfg.target_fps))
     downstream = ''
     if plan['vic']:
-        downstream += ' ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=NV12'
+        downstream += ' ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=' + plan['vic_output']
     downstream += (' ! nv3dsink name=out sync=false processing-deadline=0' if cfg.show_video
                    else ' ! fakesink name=out sync=false')
     pipeline = Gst.parse_launch(source + downstream)
@@ -2563,6 +2622,7 @@ def _run_nvmm_worker(cfg, heartbeat_fd=None):
         pipeline.set_state(Gst.State.NULL)
         if csv_file:
             csv_file.close()
+    log.info('CAPTURE_INTEGRITY %s', json.dumps(capture_counters.summary()))
     measured_rate = cadence.summary()
     log.info('FPS_RESULT %s', json.dumps(dict(capture=measured_rate, processing=processed_cadence.summary(),
         expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source)))

@@ -357,7 +357,7 @@ static inline int eg_ec_chnod_register_device(int i2c_ind)
 
 static inline int eg_ec_mipi_write_reg(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, int size)
 {
-   ecctrl_i2c_t args;
+   ecctrl_i2c_t args = { .deviceType = ECCTRL_I2C_TYPE };
    int i;
    int err;
    for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
@@ -389,7 +389,7 @@ static inline int eg_ec_mipi_write_reg(struct i2c_client * i2c_client, uint16_t 
 
 static inline int eg_ec_mipi_read_reg(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, uint8_t size)
 {
-   ecctrl_i2c_t args;
+   ecctrl_i2c_t args = { .deviceType = ECCTRL_I2C_TYPE };
    int i;
    int err;
    for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
@@ -421,7 +421,7 @@ static inline int eg_ec_mipi_read_reg(struct i2c_client * i2c_client, uint16_t a
 
 static inline int eg_ec_mipi_write_fifo(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, uint32_t size)
 {
-   ecctrl_i2c_t args;
+   ecctrl_i2c_t args = { .deviceType = ECCTRL_I2C_TYPE };
    int i;
    int err;
    for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)
@@ -455,7 +455,7 @@ static inline int eg_ec_mipi_write_fifo(struct i2c_client * i2c_client, uint16_t
 
 static inline int eg_ec_mipi_read_fifo(struct i2c_client * i2c_client, uint16_t address, uint8_t *data, uint32_t size)
 {
-   ecctrl_i2c_t args;
+   ecctrl_i2c_t args = { .deviceType = ECCTRL_I2C_TYPE };
    int i;
    int err;
    for (i = 0; i < MAX_I2C_CLIENTS_NUMBER; i++)

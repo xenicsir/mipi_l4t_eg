@@ -11,8 +11,9 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import time
-from run_camera_regression import parse_configuration, parse_negotiated_format, format_spec, register_read_plan, validate_register_read, streaming_command, stream_cadence, parse_frame_rate, rate_matches
+from run_camera_regression import parse_configuration, parse_negotiated_format, format_spec, register_read_plan, validate_register_read, streaming_command, timestamp_cadence, parse_frame_rate, rate_matches
 
 KERNEL_ERRORS=re.compile(r'BUG:|Oops:|Kernel panic|uncorr_err|corr_err|CHANSEL_(?:NOMATCH|SHORT_FRAME)|CSIMUX_STREAM|uncorrectable|capture.*timed out',re.I)
 
@@ -92,9 +93,17 @@ def run_window(commands,seconds,folder,stall_seconds=15):
 
 def kernel_delta(before,after):
     before=before.splitlines();after=after.splitlines()
-    if after[:len(before)]!=before:
-        return None # Wrapped/cleared ring: no unqualified "no new errors" claim.
-    return after[len(before):]
+    if after[:len(before)]==before:
+        return after[len(before):]
+    # Old records may be evicted while the complete test window is retained.
+    # Require an exact timestamped suffix/prefix overlap, including the last
+    # pre-test record. Without it, missing records cannot be ruled out.
+    for cut in range(max(1,len(before)-len(after)),len(before)):
+        overlap=before[cut:]
+        if (after[:len(overlap)]==overlap and
+                any(re.match(r'^\[\s*\d+\.\d+\]',line) for line in overlap)):
+            return after[len(overlap):]
+    return None
 
 def validate_visit(visit,cameras,l4t):
     errors=[]
@@ -136,22 +145,72 @@ def build_nvmm_command(cameras, configuration, frames):
     return command,probes,None
 
 
-def inspect_nvmm_streams(text, probes, frames, references, min_fps=0):
+def inspect_nvmm_streams(telemetry, probes, frames, references, min_fps=0):
     checks={}
     for key,names in probes.items():
         entry={}
         for stage,name in names.items():
-            lines='\n'.join(line for line in text.splitlines() if '/GstIdentity:'+name+':' in line)
-            count=lines.count('last-message = chain')
-            corrupt=sum('corrupted' in line for line in lines.splitlines() if 'last-message = chain' in line)
-            cadence=stream_cadence('gst_nvmm',lines)['capture'];fps=cadence.get('steady_fps')
-            passed=count==frames and corrupt==0 and fps is not None
+            data=telemetry.get(name,{})
+            pts=data.get('pts_ns',[]);count=len(pts);corrupt=data.get('corrupt')
+            cadence=timestamp_cadence([v/1e9 for v in pts]) if pts and all(v is not None for v in pts) else dict(steady_fps=None)
+            fps=cadence.get('steady_fps')
+            passed=count==frames and corrupt==0 and fps is not None and data.get('nvmm_caps') is True
+            if stage=='capture':passed=passed and data.get('source_allocator') is True
             if key in references:passed=passed and rate_matches(cadence,references[key],.03)
             if min_fps:passed=passed and fps is not None and fps>=min_fps
             entry[stage]=dict(frames=count,corrupt=corrupt,cadence=cadence,passed=bool(passed))
         entry['passed']=all(x['passed'] for x in entry.values())
         checks[key]=entry
     return checks
+
+
+def nvmm_worker(config_path):
+    """Observe buffers directly; verbose property notifications are not counters."""
+    import gi
+    gi.require_version('Gst','1.0')
+    from gi.repository import Gst
+    Gst.init(None)
+    config=json.loads(Path(config_path).read_text());output=Path(config['output'])
+    result=dict(eos=False,probes={},error=None);pipeline=None
+    try:
+        pipeline=Gst.parse_launch(' '.join(config['pipeline']))
+        for names in config['probes'].values():
+            for stage,name in names.items():
+                element=pipeline.get_by_name(name)
+                if element is None:raise RuntimeError('Missing probe element: '+name)
+                element.set_property('silent',True)
+                pad=element.get_static_pad('src')
+                data=dict(pts_ns=[],sequences=[],corrupt=0,nvmm_caps=True,source_allocator=True)
+                result['probes'][name]=data
+                def observe(pad,info,unused=None,data=data,stage=stage):
+                    buffer=info.get_buffer()
+                    if buffer is None:return Gst.PadProbeReturn.OK
+                    data['pts_ns'].append(None if buffer.pts==Gst.CLOCK_TIME_NONE else int(buffer.pts))
+                    data['sequences'].append(None if buffer.offset==Gst.BUFFER_OFFSET_NONE else int(buffer.offset))
+                    data['corrupt']+=int(buffer.has_flags(Gst.BufferFlags.CORRUPTED))
+                    caps=pad.get_current_caps()
+                    data['nvmm_caps']=data['nvmm_caps'] and bool(caps and caps.get_features(0).contains('memory:NVMM'))
+                    if stage=='capture':
+                        memory=buffer.peek_memory(0) if buffer.n_memory() else None
+                        data['source_allocator']=data['source_allocator'] and bool(memory and memory.is_type('egV4l2Memory'))
+                    return Gst.PadProbeReturn.OK
+                pad.add_probe(Gst.PadProbeType.BUFFER,observe)
+        if pipeline.set_state(Gst.State.PLAYING)==Gst.StateChangeReturn.FAILURE:
+            raise RuntimeError('Cannot start concurrent NVMM pipeline')
+        bus=pipeline.get_bus()
+        while True:
+            message=bus.timed_pop_filtered(500*Gst.MSECOND,Gst.MessageType.ERROR|Gst.MessageType.EOS)
+            if message is None:continue
+            if message.type==Gst.MessageType.ERROR:
+                error,debug=message.parse_error();raise RuntimeError(str(error)+' '+str(debug))
+            result['eos']=True;break
+    except (Exception,KeyboardInterrupt) as error:
+        result['error']=repr(error)
+    finally:
+        if pipeline is not None:pipeline.set_state(Gst.State.NULL)
+        output.write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps(dict(eos=result['eos'],error=result['error'],counts={k:len(v['pts_ns']) for k,v in result['probes'].items()})),flush=True)
+    return 0 if result['eos'] and result['error'] is None else 1
 
 
 def nvmm_accepted(result, required):
@@ -184,21 +243,26 @@ def concurrent_nvmm(cameras, args, folder):
     time.sleep(args.gap)
     usage=resource.getrusage(resource.RUSAGE_CHILDREN);started=time.monotonic();timed_out=False
     path=folder/'nvmm-concurrent.log'
+    config=folder/'nvmm-worker.json';telemetry_path=folder/'nvmm-telemetry.json'
+    assert command[:3]==['gst-launch-1.0','-e','-v']
+    config.write_text(json.dumps(dict(pipeline=command[3:],probes=probes,output=str(telemetry_path)),indent=2)+'\n')
+    worker_command=[sys.executable,str(Path(__file__).resolve()),'--nvmm-worker',str(config)]
     with path.open('w') as log:
-        process=subprocess.Popen(command,env=environment,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        process=subprocess.Popen(worker_command,env=environment,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
         try:
             try:process.wait(timeout=timeout)
             except subprocess.TimeoutExpired:timed_out=True
         finally:
             stopped=boot_seconds();stop_process(process)
     elapsed=time.monotonic()-started;after=resource.getrusage(resource.RUSAGE_CHILDREN)
-    text=path.read_text(errors='replace');checks=inspect_nvmm_streams(text,probes,frames,references,args.min_fps)
-    passed=not timed_out and process.returncode==0 and 'Got EOS' in text and all(x['passed'] for x in checks.values())
+    telemetry=json.loads(telemetry_path.read_text()) if telemetry_path.is_file() else dict(eos=False,error='Missing probe telemetry',probes={})
+    checks=inspect_nvmm_streams(telemetry.get('probes',{}),probes,frames,references,args.min_fps)
+    passed=not timed_out and process.returncode==0 and telemetry.get('eos') is True and telemetry.get('error') is None and all(x['passed'] for x in checks.values())
     return dict(status='passed' if passed else 'failed',command=command,returncode=process.returncode,
         frames=frames,reference_fps=references,checks=checks,seconds=round(elapsed,3),timed_out=timed_out,
         cpu_percent_one_core=round(100*((after.ru_utime-usage.ru_utime)+(after.ru_stime-usage.ru_stime))/elapsed,3),
         cpu_scope='one GStreamer process, all source branches and threads; startup/shutdown included',
-        stop_time=stopped,log=path.name)
+        stop_time=stopped,log=path.name,worker_command=worker_command,telemetry=telemetry_path.name,worker_error=telemetry.get('error'))
 
 
 def main():
@@ -299,4 +363,4 @@ def main():
 if __name__=='__main__':
     def stop(signum,frame):raise KeyboardInterrupt
     signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
-    raise SystemExit(main())
+    raise SystemExit(nvmm_worker(sys.argv[2]) if len(sys.argv)==3 and sys.argv[1]=='--nvmm-worker' else main())

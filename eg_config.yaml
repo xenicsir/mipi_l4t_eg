@@ -543,6 +543,55 @@ pixel_format_map:
   RGB888: {mode_type: "rgb", pixel_phase: "rgb888", csi_pixel_bit_depth: 24}
   YUYV:   {mode_type: "yuv", pixel_phase: "yuyv",   csi_pixel_bit_depth: 16}
 
+# NVMM/VIC/CUDA pixel pipelines integrated in the current source tree.
+# This is software availability, not target qualification or package inspection.
+# Missing versions are disabled; compile-only experiments must not enable them.
+hardware_pipeline:
+  plugin: egv4l2camerasrc
+  versions:
+    "35.1":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.3.1":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.4.1":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.5.0":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.6.0":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.6.1":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.6.2":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "35.6.4":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+      unsupported_formats:
+        xavier_nx: [Y14]
+    "36.4":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "36.4.3":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "36.4.4":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "36.5.0":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "39.2":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+
 # ---------------------------------------------------------------------------
 # Platform restrictions
 #
@@ -828,7 +877,6 @@ cameras:
             line_length: 1280
             pix_clk_hz: 148750000
           - pixel_format: "Y14"
-            enabled: false      # not shipped yet (2026-08-21)
             line_length: 1280
             pix_clk_hz: 148750000
 

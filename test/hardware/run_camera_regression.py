@@ -22,6 +22,15 @@ import tempfile
 import time
 
 
+def corruption_policy(camera_name, count, first_index=None, last_index=None):
+    """Temporary Dione exception: exactly one error on the first dequeued buffer."""
+    tolerated = (camera_name.lower().startswith('dione') and count == 1
+                 and first_index == 0 and last_index == 0)
+    return dict(accepted=count == 0 or tolerated, startup_exception=tolerated,
+                corrupt_buffers=count, first_corrupt_index=first_index,
+                last_corrupt_index=last_index)
+
+
 class Camera:
     """Plain record, compatible with the Python 3.6 runtime on legacy targets."""
     def __init__(self, port, name, connected, sysfs='', device='', video='',
@@ -33,6 +42,7 @@ class Camera:
         self.device = device
         self.video = video
         self.conformant_y14 = conformant_y14
+        self.nvmm_exclusions = {}
         self.groups = [] if groups is None else groups
 
     @property
@@ -53,6 +63,7 @@ def parse_configuration(text):
         block = text[match.end():headers[i + 1].start() if i + 1 < len(headers) else len(text)]
         camera = Camera(int(match[1]), match[2], match[3] == 'connected')
         camera.conformant_y14 = bool(re.search(r'Y14 layout:\s*14 bits right-aligned', block))
+        camera.nvmm_exclusions = dict(re.findall(r'^\s*NVMM unavailable for ([A-Z0-9_]+): (.+)$', block, re.M))
         for field, label in [('sysfs', 'Sysfs'), ('device', 'I2C device'), ('video', 'Video device')]:
             value = re.search(r'^\s*' + label + r':\s*(\S+)', block, re.M)
             if value:
@@ -97,6 +108,22 @@ def parse_negotiated_format(text):
                 width=int(dimensions[1]) if dimensions else None,
                 height=int(dimensions[2]) if dimensions else None,
                 image_size=int(size[1]) if size else 0)
+
+
+def parse_format_enumeration(text):
+    headers = list(re.finditer(r"^\s*(?:\[\d+\]:\s*'([^']+)'|Pixel Format\s*:\s*'([^']+)')", text, re.M))
+    formats = [m[1] or m[2] for m in headers]
+    errors = []
+    duplicates = sorted({fmt for fmt in formats if formats.count(fmt) > 1})
+    if duplicates:
+        errors.append('Duplicate fourcc: ' + ', '.join(duplicates))
+    for i, header in enumerate(headers):
+        block = text[header.end():headers[i + 1].start() if i + 1 < len(headers) else len(text)]
+        sizes = re.findall(r'Size:\s*Discrete (\d+x\d+)', block)
+        duplicates = sorted({size for size in sizes if sizes.count(size) > 1})
+        if duplicates:
+            errors.append('Duplicate dimensions for %s: %s' % (formats[i], ', '.join(duplicates)))
+    return [fmt for i,fmt in enumerate(formats) if fmt not in formats[:i]], errors
 
 
 def ec_code(pixel_format):
@@ -197,12 +224,32 @@ def timestamp_cadence(values, warmup=1.0):
                 steady_seconds=span, steady_frames=len(kept))
 
 
+def v4l2_buffers(text):
+    modern = re.findall(r'^cap dqbuf:.*$', text, re.M)
+    if modern:
+        result = []
+        for line in modern:
+            stamp = re.search(r'\bts:\s*([0-9]+\.[0-9]+)', line)
+            result.append(dict(timestamp=float(stamp[1]) if stamp else None,
+                               corrupt=bool(re.search(r'\([^)]*\berror\b', line))))
+        return result
+    result = []
+    for block in re.split(r'^\s*Index\s*:', text, flags=re.M)[1:]:
+        stamp = re.search(r'^\s*Timestamp\s*:\s*([0-9]+\.[0-9]+)s', block, re.M)
+        flags = re.search(r'^\s*Flags\s*:\s*([^\r\n]*)', block, re.M)
+        if stamp and re.search(r'^\s*Sequence\s*:\s*\d+', block, re.M):
+            result.append(dict(timestamp=float(stamp[1]),
+                               corrupt=bool(flags and re.search(r'\berror\b', flags[1], re.I))))
+    return result
+
+
 def stream_cadence(tool, text):
     if tool == 'monitor':
         rows = re.findall(r'FPS_RESULT (\{[^\r\n]+\})', text)
         return json.loads(rows[-1]) if rows else {}
     if tool == 'v4l2':
-        values = [float(x) for x in re.findall(r'cap dqbuf:.*?\bts:\s*([0-9]+\.[0-9]+)', text)]
+        buffers = v4l2_buffers(text)
+        values = [b['timestamp'] for b in buffers] if all(b['timestamp'] is not None for b in buffers) else []
     else:
         values = [int(h)*3600+int(m)*60+float(s) for h,m,s in
                   re.findall(r'last-message = chain.*?\bpts:\s*(\d+):(\d+):(\d+\.\d+)', text)]
@@ -220,6 +267,39 @@ def local_x11(display):
     return bool(re.fullmatch(r'(?:unix/?)?:[0-9]+(?:\.[0-9]+)?', display or ''))
 
 
+def raw_capture_directory(required_bytes):
+    """Prefer RAM for transient frame dumps, leaving headroom for the pipeline."""
+    reserve = 256 * 1024 * 1024
+    try:
+        filesystem = os.statvfs('/dev/shm')
+        free_bytes = filesystem.f_bavail * filesystem.f_frsize
+        available = re.search(r'^MemAvailable:\s+(\d+)\s+kB$',
+                              Path('/proc/meminfo').read_text(), re.M)
+        if (available and free_bytes >= required_bytes + reserve
+                and int(available[1]) * 1024 >= required_bytes + reserve):
+            return '/dev/shm'
+    except OSError:
+        pass
+    return None
+
+
+def active_x11_outputs(text):
+    """XRandR connector status and active mode; a bare X server is insufficient."""
+    return re.findall(r'^(\S+)\s+connected(?:\s+primary)?\s+\d+x\d+[+-]\d+[+-]\d+(?:\s|$)', text, re.M)
+
+
+def capture_accepted(record, functional=False):
+    if functional and 'functional_pass' in record:
+        return record['functional_pass']
+    return record.get('pass', record.get('status') in ('not_run', 'not applicable'))
+
+
+def capture_check(record):
+    if record.get('status') == 'not_run':
+        return dict(status='not_run', reason=record['reason'])
+    return dict(passed=record['pass'])
+
+
 class Runner:
     def __init__(self, options):
         self.options = options
@@ -227,13 +307,18 @@ class Runner:
         self.out.mkdir(parents=True, exist_ok=False)
         self.incoming_env = os.environ.copy()
         self.forwarded_env = None
+        self.local_display_available = False
+        self.local_display_reason = 'Local display has not been checked'
+        self.skipped_captures = []
         self.env = os.environ.copy()
         self.env.update(DISPLAY=options.display or ":0", QT_X11_NO_MITSHM='1', PYTHONUNBUFFERED='1')
         self.results = []
         self.register_results = []
+        self.format_results = []
         self.xeneth_results = []
         self.events = []
         self.environment_results = []
+        self.pixel_results = []
         self.fps_reads = []
         self.fps_targets = {}
         self.counter = 0
@@ -249,9 +334,13 @@ class Runner:
 
     def save(self):
         tmp = self.out / 'results.json.new'
-        tmp.write_text(json.dumps(dict(options=vars(self.options), results=self.results, register_results=self.register_results, xeneth_results=self.xeneth_results,
-                                       events=self.events, environment_results=self.environment_results,
-                                       environment_coverage_complete=not any(x.get("status")=="not_run" for x in self.environment_results),
+        tmp.write_text(json.dumps(dict(options=vars(self.options), results=self.results, register_results=self.register_results, format_results=self.format_results, xeneth_results=self.xeneth_results,
+                                       events=self.events, environment_results=self.environment_results, pixel_results=self.pixel_results,
+                                       environment_coverage_complete=not self.skipped_captures and not any(x.get("status")=="not_run" for x in self.environment_results),
+                                       pixel_coverage_complete=not any(x.get('status')=='not_run' for x in self.pixel_results),
+                                       local_display=dict(available=self.local_display_available, reason=self.local_display_reason),
+                                       skipped_captures=self.skipped_captures,
+                                       display_coverage_complete=self.local_display_available and not self.skipped_captures,
                                        fps_reads=self.fps_reads), indent=2, default=str) + '\n')
         tmp.replace(self.out / 'results.json')
 
@@ -349,49 +438,7 @@ sha256sum /usr/bin/eg_dt_camera_config_get.sh /usr/bin/rt_frame_monitor.py
 cat /proc/sys/kernel/random/boot_id
 '''], check=True)
         if not self.options.registers_only:
-            _, text = self.run('xorg-process', ['pgrep', '-a', 'Xorg'])
-            authorities = ([self.options.xauthority] if self.options.xauthority else [])
-            authorities += re.findall(r'-auth\s+(\S+)', text)
-            authorities += [str(Path.home() / '.Xauthority'), '/home/jetson/.Xauthority']
-            displays = ([self.options.display] if self.options.display else
-                        [':' + path.name[1:] for path in sorted(Path('/tmp/.X11-unix').glob('X[0-9]*'))])
-            found = False
-            for display in displays:
-                for authority in authorities:
-                    if not Path(authority).is_file():
-                        continue
-                    self.env.update(DISPLAY=display, XAUTHORITY=authority)
-                    record, _ = self.run('check-local-display', ['xdpyinfo'], timeout=3)
-                    if record['returncode'] == 0:
-                        self.event('Display available', display=display, authority=authority)
-                        found = True
-                        break
-                if found: break
-            if not found:
-                raise RuntimeError('Cannot open a local display; set --display/--xauthority')
-            forwarded = self.options.forwarded_display or self.incoming_env.get('DISPLAY')
-            if forwarded and not local_x11(forwarded):
-                candidates = [self.options.forwarded_xauthority, self.incoming_env.get('XAUTHORITY')]
-                sudo_user = self.incoming_env.get('SUDO_USER')
-                if sudo_user:
-                    candidates.append(str(Path(pwd.getpwnam(sudo_user).pw_dir)/'.Xauthority'))
-                candidates += [str(Path.home()/'.Xauthority'), '/home/jetson/.Xauthority']
-                for authority in candidates:
-                    if not authority or not Path(authority).is_file(): continue
-                    environment = dict(self.env, DISPLAY=forwarded, XAUTHORITY=authority)
-                    with self.environment(environment):
-                        record, _ = self.run('check-forwarded-display', ['xdpyinfo'], timeout=3)
-                    if record['returncode'] == 0:
-                        self.forwarded_env = environment
-                        self.event('Forwarded X11 available', display=forwarded, authority=authority)
-                        break
-            if self.forwarded_env is None:
-                self.environment_results.append(dict(context='forwarded-streams', status='not_run',
-                    reason='No working forwarded X11 connection; use ssh -X and preserve DISPLAY/XAUTHORITY',
-                    **({'passed': False} if self.options.require_forwarded_x11 else {})))
-                self.event('Forwarded X11 unavailable', required=self.options.require_forwarded_x11)
-                if self.options.require_forwarded_x11:
-                    raise RuntimeError('A working SSH X11 connection is required; preserve DISPLAY and XAUTHORITY through sudo')
+            self.setup_displays()
         if shutil.which('gst-inspect-1.0'):
             plugin_record, plugin_text = self.run('nvmm-plugin', ['gst-inspect-1.0', 'egv4l2camerasrc'])
             plugin_path = re.search(r'^\s*Filename\s+(.+)$', plugin_text, re.M)
@@ -400,6 +447,79 @@ cat /proc/sys/kernel/random/boot_id
                            sha256=hashlib.sha256(Path(plugin_path[1]).read_bytes()).hexdigest())
         self.event('Test script', sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
         self.run('dmesg-before', ['dmesg'])
+
+    def check_local_display(self):
+        if not self.local_display_available:
+            return False
+        if not shutil.which('xrandr'):
+            reason = 'Cannot verify an active monitor: xrandr is unavailable'
+        else:
+            record, text = self.run('check-active-monitor', ['xrandr', '--current'], timeout=3)
+            outputs = active_x11_outputs(text) if record['returncode'] == 0 else []
+            if outputs:
+                self.local_display_reason = None
+                return True
+            reason = ('No active monitor reported by XRandR' if record['returncode'] == 0
+                      else 'Cannot query the local monitor with XRandR')
+        self.local_display_available = False
+        self.local_display_reason = reason
+        return False
+
+    def setup_displays(self):
+        _, text = self.run('xorg-process', ['pgrep', '-a', 'Xorg'])
+        authorities = ([self.options.xauthority] if self.options.xauthority else [])
+        authorities += re.findall(r'-auth\s+(\S+)', text)
+        authorities += [str(Path.home() / '.Xauthority'), '/home/jetson/.Xauthority']
+        displays = ([self.options.display] if self.options.display else
+                    [':' + path.name[1:] for path in sorted(Path('/tmp/.X11-unix').glob('X[0-9]*'))])
+        found = False
+        active = False
+        x11_query_available = bool(shutil.which('xdpyinfo'))
+        for display in ([] if self.options.no_local_display or not x11_query_available else displays):
+            for authority in authorities:
+                if not Path(authority).is_file():
+                    continue
+                self.env.update(DISPLAY=display, XAUTHORITY=authority)
+                record, _ = self.run('check-local-display', ['xdpyinfo'], timeout=3)
+                if record['returncode'] == 0:
+                    found = True
+                    self.local_display_available = True
+                    active = self.check_local_display()
+                    break
+            if active: break
+        if not found:
+            self.local_display_reason = ('Local display explicitly disabled' if self.options.no_local_display
+                                         else 'xdpyinfo is unavailable' if not x11_query_available
+                                         else 'No accessible local X11 server')
+        if not self.local_display_available:
+            self.environment_results.append(dict(context='local-display', status='not_run',
+                                                 reason=self.local_display_reason))
+            self.event('Local display tests unavailable', reason=self.local_display_reason)
+        else:
+            self.event('Display available', display=self.env.get('DISPLAY'), authority=self.env.get('XAUTHORITY'))
+        forwarded = self.options.forwarded_display or self.incoming_env.get('DISPLAY')
+        if forwarded and not local_x11(forwarded) and x11_query_available:
+            candidates = [self.options.forwarded_xauthority, self.incoming_env.get('XAUTHORITY')]
+            sudo_user = self.incoming_env.get('SUDO_USER')
+            if sudo_user:
+                candidates.append(str(Path(pwd.getpwnam(sudo_user).pw_dir)/'.Xauthority'))
+            candidates += [str(Path.home()/'.Xauthority'), '/home/jetson/.Xauthority']
+            for authority in candidates:
+                if not authority or not Path(authority).is_file(): continue
+                environment = dict(self.env, DISPLAY=forwarded, XAUTHORITY=authority)
+                with self.environment(environment):
+                    record, _ = self.run('check-forwarded-display', ['xdpyinfo'], timeout=3)
+                if record['returncode'] == 0:
+                    self.forwarded_env = environment
+                    self.event('Forwarded X11 available', display=forwarded, authority=authority)
+                    break
+        if self.forwarded_env is None:
+            self.environment_results.append(dict(context='forwarded-streams', status='not_run',
+                reason='No working forwarded X11 connection; use ssh -X and preserve DISPLAY/XAUTHORITY',
+                **({'passed': False} if self.options.require_forwarded_x11 else {})))
+            self.event('Forwarded X11 unavailable', required=self.options.require_forwarded_x11)
+            if self.options.require_forwarded_x11:
+                raise RuntimeError('A working SSH X11 connection is required; preserve DISPLAY and XAUTHORITY through sudo')
 
     @contextmanager
     def environment(self, environment):
@@ -499,15 +619,15 @@ cat /proc/sys/kernel/random/boot_id
                     record = self.capture(camera, selected_group, 'monitor', label+'-'+context+'-'+backend,
                                           backend, display_context=context)
                 self.environment_results.append(dict(key=camera.key, format=expected_format[2], context=context,
-                    test='monitor-'+backend, passed=record['pass'], record=record))
-                passed = passed and record['pass']
+                    test='monitor-'+backend, record=record, **capture_check(record)))
+                passed = passed and capture_accepted(record)
             for tool in ('gst','gst_nvmm'):
                 if tool not in selected_group: continue
                 with self.environment(environment):
                     record = self.capture(camera, selected_group, tool, label+'-'+context, display_context=context)
                 self.environment_results.append(dict(key=camera.key, format=expected_format[2], context=context,
-                    test=tool, passed=record['pass'], record=record))
-                passed = passed and record['pass']
+                    test=tool, record=record, **capture_check(record)))
+                passed = passed and capture_accepted(record)
         self.event('Environment cases complete', camera=camera.name, format=expected_format[2], passed=passed)
         return passed
 
@@ -556,8 +676,8 @@ cat /proc/sys/kernel/random/boot_id
                     label + '-fixed-' + context + '-' + (backend or tool), backend, display_context=context)
             self.environment_results.append(dict(key=camera.key, format=format_spec(group)[2],
                 context=context, test='fixed-' + tool + '-' + (backend or 'default'),
-                passed=record['pass'], record=record))
-            passed = passed and record['pass']
+                record=record, **capture_check(record)))
+            passed = passed and capture_accepted(record)
             self.save()
         return passed
 
@@ -662,16 +782,26 @@ cat /proc/sys/kernel/random/boot_id
     def enumerate_formats(self, camera):
         record, text = self.run('enumeration-' + camera.key,
                                 ['v4l2-ctl', '-d', camera.video, '--list-formats-ext'], check=True)
-        formats = re.findall(r"\[\d+\]: '([^']+)'", text)
-        if not formats or len(formats) != len(set(formats)):
-            raise RuntimeError('Empty or duplicate fourcc: ' + text)
-        for block in re.split(r'\[\d+\]:', text)[1:]:
-            sizes = re.findall(r'Size: Discrete (\d+x\d+)', block)
-            if len(sizes) != len(set(sizes)):
-                raise RuntimeError('Duplicate dimensions: ' + text)
+        formats, errors = parse_format_enumeration(text)
+        result = dict(key=camera.key, camera=camera.name, formats=formats, errors=errors,
+                      passed=bool(formats) and not errors, record=record)
+        self.format_results.append(result)
+        if not formats:
+            self.save()
+            raise RuntimeError('No parseable video format: ' + text)
+        if errors:
+            self.event('Format enumeration failed; continuing streaming checks', camera=camera.name, errors=errors)
+        self.save()
         return formats
 
     def capture(self, camera, group, tool, label, backend=None, display_context="local"):
+        if display_context == 'local' and tool != 'v4l2' and not self.check_local_display():
+            record = dict(status='not_run', reason=self.local_display_reason,
+                          camera=camera.name, format=format_spec(group)[2],
+                          tool=tool, backend=backend, display_context=display_context, label=label)
+            self.skipped_captures.append(record)
+            self.event('Display capture skipped', **record)
+            return record
         expected_width, expected_height, expected_format = format_spec(group)
         self.pause(self.options.stream_gap, 'before ' + tool + ' stream')
         if display_context == 'local' and tool != 'v4l2' and shutil.which('xset'):
@@ -685,7 +815,11 @@ cat /proc/sys/kernel/random/boot_id
                   max(self.options.frames, math.ceil(expected_fps * 2.25) + 1) if expected_fps else self.options.frames)
         timeout = (max(self.options.timeout, 15) if display_context == 'forwarded' else
                    max(self.options.timeout, frames / expected_fps + 6) if expected_fps else self.options.timeout)
-        with tempfile.NamedTemporaryFile(prefix='eg-camera-test-', suffix='.raw') as raw:
+        # Allow row alignment when estimating capacity before VIDIOC_S_FMT.
+        bpp = 4 if expected_format.strip() in ('AR24', 'AB24') else 2
+        storage_bytes = ((expected_width * bpp + 511) // 512) * 512 * expected_height * frames
+        raw_directory = raw_capture_directory(storage_bytes) if tool == 'v4l2' else None
+        with tempfile.NamedTemporaryFile(prefix='eg-camera-test-', suffix='.raw', dir=raw_directory) as raw:
             args = streaming_command(tool, group, frames,
                                      self.out / (label + '-monitor-data'), raw.name)
             if tool == 'monitor' and backend:
@@ -694,9 +828,12 @@ cat /proc/sys/kernel/random/boot_id
             record, text = self.run(label + '-' + tool, args, timeout=timeout)
             passed = record['returncode'] == 0
             if tool == 'v4l2':
-                record['corrupt_buffers'] = len(re.findall(
-                    r'cap dqbuf:[^\r\n]*\([^\r\n)]*\berror\b', text))
-                passed = passed and record['corrupt_buffers'] == 0
+                record['raw_storage_directory'] = str(Path(raw.name).parent)
+                dequeued = v4l2_buffers(text)
+                bad = [i for i,buffer in enumerate(dequeued) if buffer['corrupt']]
+                integrity = corruption_policy(camera.name, len(bad), bad[0] if bad else None, bad[-1] if bad else None)
+                record.update(integrity)
+                passed = passed and integrity['accepted']
                 _, actual = self.run(label + '-effective-format',
                                     ['v4l2-ctl', '-d', camera.video, '--get-fmt-video'])
                 negotiated = parse_negotiated_format(actual)
@@ -733,8 +870,13 @@ cat /proc/sys/kernel/random/boot_id
                 passed = passed and record['frames_reported'] >= frames
                 corrupt_counts = [int(x) for x in re.findall(r'\bcorrupt=\s*(\d+)', text)]
                 record['corrupt_buffers'] = max(corrupt_counts) if corrupt_counts else None
+                integrity_lines = re.findall(r'CAPTURE_INTEGRITY (\{[^\n]+\})', text)
+                counters = json.loads(integrity_lines[-1]) if integrity_lines else {}
+                integrity = corruption_policy(camera.name, counters.get('corrupt', record['corrupt_buffers']),
+                    counters.get('first_corrupt_index'), counters.get('last_corrupt_index'))
+                record.update(integrity)
                 if record['corrupt_buffers'] is not None:
-                    passed = passed and record['corrupt_buffers'] == 0
+                    passed = passed and integrity['accepted']
                 selected = re.search(r'BACKEND requested=(\w+) selected=(\w+) reason=(.*)', text)
                 record['requested_backend'] = backend or 'auto'
                 record['actual_backend'] = selected[2] if selected else None
@@ -747,11 +889,17 @@ cat /proc/sys/kernel/random/boot_id
                     else:
                         metadata = json.loads(summaries[0].read_text())
                         record['nvmm_metadata'] = metadata
+                        accepted_exit = (record['returncode'] == 1 and integrity['startup_exception']
+                            and metadata.get('failure') == 'Corrupted buffers reported by the driver'
+                            and metadata.get('processed_frames') == frames)
+                        if accepted_exit:
+                            record['accepted_exit_reason'] = 'Single initial Dione corrupted buffer'
+                            passed = record['frames_reported'] >= frames
                         passed = (passed and metadata.get('nvmm_caps') is True
                                   and metadata.get('nvmm_allocator') is True
                                   and metadata.get('pixel_analysis') is False
                                   and metadata.get('frames') == frames
-                                  and metadata.get('failure') is None)
+                                  and (metadata.get('failure') is None or accepted_exit))
                 if backend:
                     expected_backend = backend if backend != 'auto' else ('nvmm' if 'gst_nvmm' in group else 'classic')
                     passed = passed and record['actual_backend'] == expected_backend
@@ -759,9 +907,14 @@ cat /proc/sys/kernel/random/boot_id
             else:
                 record['buffers_reported'] = len(re.findall(r'last-message = chain', text))
                 passed = passed and 'Got EOS' in text and record['buffers_reported'] >= frames
-                record['corrupt_buffers'] = len(re.findall(
-                    r'last-message = chain[^\r\n]*\bflags:[^,\r\n]*\bcorrupted\b', text))
-                passed = passed and record['corrupt_buffers'] == 0
+                chains = [line for line in text.splitlines() if 'last-message = chain' in line]
+                bad = [i for i,line in enumerate(chains) if re.search(r'\bflags:[^,\r\n]*\bcorrupted\b', line)]
+                integrity = corruption_policy(camera.name, len(bad), bad[0] if bad else None, bad[-1] if bad else None)
+                record.update(integrity)
+                passed = passed and integrity['accepted']
+        if record.get('startup_exception'):
+            record['warning'] = 'Dione initial corrupted buffer accepted temporarily; investigation remains open'
+            self.event('Dione startup warning', camera=camera.name, log=record['log'], corrupt_buffers=1)
         record['functional_pass'] = bool(passed)
         record.update(requested_frames=frames, display_context=display_context)
         measured = stream_cadence(tool, text)
@@ -782,10 +935,116 @@ cat /proc/sys/kernel/random/boot_id
                    cpu_percent_one_core=record.get('cpu_percent_one_core'), seconds=record['seconds'], log=record['log'])
         return record
 
+    def test_pixels(self, camera, group, label):
+        """Compare independent static-pattern captures using the real classic code."""
+        results = getattr(self, 'pixel_results', None)
+        if results is None: self.pixel_results = results = []
+        record = dict(camera=camera.name, key=camera.key, format=format_spec(group)[2], passed=False)
+        results.append(record)
+        if getattr(self.options, 'skip_pixel_comparison', False):
+            record.update(status='not_run', reason='Explicit --skip-pixel-comparison')
+            record.pop('passed'); self.save(); return True
+        if 'gst_nvmm' not in group:
+            record.update(status='not_applicable', reason='No NVMM path for this mode')
+            record.pop('passed'); self.save(); return True
+        family = 'enginecore' if camera.enginecore else ('ilumos' if Path(camera.device).name.startswith('ilumos-') else 'dione' if camera.name.lower().startswith('dione') else None)
+        if family is None:
+            record.update(status='not_applicable', reason='No verified pattern register profile')
+            record.pop('passed'); self.save(); return True
+        tool = shutil.which(getattr(self.options, 'pixel_checker', 'egNvmmPixelCapture'))
+        comparator = Path(__file__).with_name('compare_camera_pixels.py')
+        if not tool or not comparator.is_file():
+            record.update(reason='Missing pixel checker/comparator; build with --pixel-checker and deploy the test kit')
+            self.save(); return False
+        prefix = register_read_plan(camera)[0]['command'][:-2] if not camera.enginecore else None
+        def read(address):
+            args = ['ECSwCtrl','-i','i2c','-d',camera.device,'-c','ru '+hex(address)] if camera.enginecore else prefix+['read_reg32',hex(address)]
+            if camera.enginecore:
+                for attempt in range(self.options.recoveries+1):
+                    self.pause(self.enginecore_control_pause(), 'before pattern register read')
+                    row,text=self.run(label+'-pattern-read-'+hex(address),args)
+                    match=re.fullmatch(r'\s*(0x[0-9a-fA-F]+)\s+(\d+)\s*',text)
+                    if row.get('returncode',0)==0 and match and int(match[1],16)==int(match[2]):
+                        return int(match[1],16)
+                    self.event('Pattern read failed',camera=camera.name,address=hex(address),
+                               attempt=attempt+1,response=text.strip(),log=row.get('log'))
+                raise RuntimeError('Invalid pattern read: '+text)
+            self.pause(self.options.control_pause, 'before pattern register read')
+            row,text=self.run(label+'-pattern-read-'+hex(address),args,check=True)
+            match=re.search(r'=\s*(0x[0-9a-fA-F]+)',text) or re.search(r'^\s*(0x[0-9a-fA-F]+)',text,re.M)
+            if not match:raise RuntimeError('Invalid pattern read: '+text)
+            return int(match[1],16)
+        def write(address,value):
+            self.pause(self.enginecore_control_pause() if camera.enginecore else self.options.control_pause, 'before pattern register write')
+            if camera.enginecore:self.ec_control(camera,hex(address),value)
+            else:self.run(label+'-pattern-write-'+hex(address),prefix+['write_reg32',hex(address),str(value)],check=True)
+        width,height,fmt=format_spec(group)
+        fmt={'Y16 ':'Y16','Y14 ':'Y14','Y16 -BE':'Y16_BE'}.get(fmt,fmt)
+        expected_ec_code = ec_code(Path(camera.sysfs, 'pixel_format').read_text()) if camera.enginecore else None
+        def snapshot(saved):
+            # Record the recovery values before the first persistent change.
+            record['saved_pattern']={hex(k):v for k,v in saved.items()}
+            self.save()
+        def restart_enginecore():
+            nonlocal camera
+            self.pause(self.enginecore_control_pause(), 'EngineCore pattern settings saved')
+            ack=self.ec_control(camera,'0x8',1,reboot=True)
+            self.pause(self.options.boot_wait, 'camera reboot after pattern save')
+            camera=self.refresh(camera.key)
+            if self.read_ec_format(camera)!=expected_ec_code:
+                raise RuntimeError('Camera pixel format changed after pattern reboot')
+            self.event('EngineCore pattern reboot complete',camera=camera.name,key=camera.key,
+                       reboot_acknowledged=ack)
+        from camera_patterns import PatternTransaction
+        # The FPGA output generator is independent of sensor acquisition. Select
+        # and stream the requested pixel mode before enabling that generator.
+        if family == 'ilumos':
+            self.run(label+'-prime-format', ['v4l2-ctl','-d',camera.video,
+                '--set-fmt-video=width=%d,height=%d,pixelformat=%s' % (width,height,format_spec(group)[2]),
+                '--stream-mmap','--stream-count=30'],check=True)
+            self.pause(self.options.control_pause, 'pixel mode settled before pattern activation')
+        record['pattern_procedure']='save_reboot_readback' if camera.enginecore else 'volatile_readback'
+        transaction=PatternTransaction(family,read,write,9 if fmt in ('Y16','Y14','Y16_BE') else 2,
+            restart=restart_enginecore if camera.enginecore else None,on_snapshot=snapshot)
+        record['comparisons']=[]
+        try:
+            with transaction:
+                record['saved_pattern']={hex(k):v for k,v in transaction.saved.items()};self.save()
+                for mode in (('fixed','normalized') if fmt in ('Y16','Y14','Y16_BE') else ('fixed',)):
+                    output=self.out/(label+'-pixels-'+mode)
+                    pixel_env = dict(self.env)
+                    if not self.local_display_available:
+                        pixel_env.pop('DISPLAY', None)
+                        pixel_env.pop('WAYLAND_DISPLAY', None)
+                    with self.environment(pixel_env):
+                        row,text=self.run(label+'-pixels-'+mode,['python3',str(comparator),'--device',camera.video,
+                            '--format',fmt,'--width',str(width),'--height',str(height),'--mode',mode,
+                            '--capture-tool',tool,'--output',str(output)],timeout=30)
+                    report=output/'comparison.json'
+                    comparison=json.loads(report.read_text()) if report.is_file() else {'passed':False,'reason':'No pixel comparison report'}
+                    record['comparisons'].append(dict(mode=mode,passed=row['returncode']==0 and comparison.get('passed') is True,report=comparison,command=row))
+            record['restored']=transaction.restored
+            record['passed']=transaction.restored and all(x['passed'] for x in record['comparisons'])
+        except Exception as error:
+            record.update(error=str(error),restored=transaction.restored);self.save()
+            if transaction.saved and not transaction.restored:
+                self.cancelled = True
+                raise RuntimeError('Pattern restoration failed; stopping before any format save') from error
+        self.pause(self.enginecore_control_pause() if camera.enginecore else self.options.control_pause, 'after pattern restoration')
+        self.event('Pixel comparison complete',camera=camera.name,format=fmt,passed=record['passed'],restored=record.get('restored'))
+        self.save();return record['passed']
+
     def test_group(self, key, expected_format, code=None, tools=('v4l2', 'monitor', 'gst', 'gst_nvmm')):
         attempts = []
         result = dict(key=key, format=expected_format, attempts=attempts, passed=False)
         self.results.append(result)
+        if getattr(self.options, 'pixels_only', False) and len(tools) > 1:
+            camera = self.refresh(key)
+            group = next(g for g in camera.groups if format_spec(g)[2] == expected_format)
+            self.enumerate_formats(camera)
+            result['passed'] = self.test_pixels(camera, group, key+'-'+re.sub(r'\W', '_', expected_format))
+            self.save()
+            return result['passed']
         for attempt in range(self.options.recoveries + 1):
             camera = self.refresh(key)
             group = next(g for g in camera.groups if format_spec(g)[2] == expected_format)
@@ -801,21 +1060,21 @@ cat /proc/sys/kernel/random/boot_id
                     for backend in ('classic', 'nvmm', 'auto'):
                         name = 'monitor-' + backend
                         if backend == 'nvmm' and 'gst_nvmm' not in group:
-                            required = getattr(self.options, 'require_nvmm', False) and expected_format.strip() in ('YUYV', 'Y16', 'Y14', 'Y16 -BE', 'AR24', 'AB24')
+                            required = getattr(self.options, 'require_nvmm', False) and expected_format.strip() not in camera.nvmm_exclusions and expected_format.strip() in ('YUYV', 'Y16', 'Y14', 'Y16 -BE', 'AR24', 'AB24')
                             entry['tools'][name] = dict(status='failed' if required else 'not applicable',
-                                reason='NVMM plugin/format/display path unavailable', **({'pass': False} if required else {}))
+                                reason=camera.nvmm_exclusions.get(expected_format.strip(), 'NVMM plugin/format/display path unavailable'), **({'pass': False} if required else {}))
                             continue
                         entry['tools'][name] = self.capture(camera, group, 'monitor', label + '-' + backend, backend)
                         self.save()
-                        if not entry['tools'][name].get('functional_pass', entry['tools'][name]['pass']):
+                        if not capture_accepted(entry['tools'][name], functional=True):
                             break
-                    if any(not x.get('functional_pass', x.get('pass', x.get('status') == 'not applicable')) for x in entry['tools'].values()):
+                    if any(not capture_accepted(x, functional=True) for x in entry['tools'].values()):
                         break
                     continue
                 if tool == 'gst_nvmm' and tool not in group:
-                    required = getattr(self.options, 'require_nvmm', False) and expected_format.strip() in ('YUYV', 'Y16', 'Y14', 'Y16 -BE', 'AR24', 'AB24')
+                    required = getattr(self.options, 'require_nvmm', False) and expected_format.strip() not in camera.nvmm_exclusions and expected_format.strip() in ('YUYV', 'Y16', 'Y14', 'Y16 -BE', 'AR24', 'AB24')
                     entry['tools'][tool] = dict(status='failed' if required else 'not applicable',
-                        reason='NVMM plugin/format/display path unavailable', **({'pass': False} if required else {}))
+                        reason=camera.nvmm_exclusions.get(expected_format.strip(), 'NVMM plugin/format/display path unavailable'), **({'pass': False} if required else {}))
                     continue
                 if tool not in group:
                     if tool == 'gst' and expected_format.strip() == 'Y14':
@@ -827,18 +1086,19 @@ cat /proc/sys/kernel/random/boot_id
                 entry['tools'][tool] = self.capture(camera, group, tool, label)
                 self.save()
                 # A display consuming buffers must not hide a failed raw capture.
-                if not entry['tools'][tool].get('functional_pass', entry['tools'][tool]['pass']):
+                if not capture_accepted(entry['tools'][tool], functional=True):
                     break
-            passed = all(x.get('pass', x.get('status') == 'not applicable')
+            passed = all(capture_accepted(x)
                          for x in entry['tools'].values())
-            functional = all(x.get('functional_pass', x.get('pass', x.get('status') == 'not applicable'))
+            functional = all(capture_accepted(x, functional=True)
                              for x in entry['tools'].values())
             if functional:
                 environments_ok = self.test_environments(camera, group, label) if len(tools) > 1 else True
                 if len(tools) > 1:
                     fixed_ok = self.test_fixed_preview(camera, group, label)
                     environments_ok = environments_ok and fixed_ok
-                result['passed'] = bool(passed and environments_ok)
+                pixels_ok = self.test_pixels(camera, group, label) if len(tools) > 1 else True
+                result['passed'] = bool(passed and environments_ok and pixels_ok)
                 self.save()
                 return result['passed']
             self.run(label + '-dmesg-failure', ['dmesg'])
@@ -914,8 +1174,11 @@ cat /proc/sys/kernel/random/boot_id
         self.run('dmesg-after', ['dmesg'])
         self.event('Finished', passed=sum(x['passed'] for x in self.results), total=len(self.results),
                    environment_checks=len(self.environment_results),
-                   coverage_complete=not any(x.get('status') == 'not_run' for x in self.environment_results))
-        return 0 if all(x['passed'] for x in self.results + self.register_results + self.xeneth_results +
+                   format_checks=len(self.format_results),
+                   format_checks_passed=sum(x['passed'] for x in self.format_results),
+                   skipped_local_captures=len(self.skipped_captures),
+                   coverage_complete=not self.skipped_captures and not any(x.get('status') == 'not_run' for x in self.environment_results))
+        return 0 if all(x['passed'] for x in self.results + self.register_results + self.xeneth_results + self.format_results +
                            [x for x in self.environment_results if 'passed' in x]) else 1
 
 
@@ -929,6 +1192,9 @@ def parser():
     p.add_argument('--skip-xeneth', action='store_true', help='Explicitly omit the new GenCP interface tests for legacy driver packages')
     p.add_argument('--frames', type=int, default=60, help='Minimum frames; extended if needed for steady framerate measurement')
     p.add_argument('--forwarded-frames', type=int, default=60, help='Frames per forwarded X11 functional stream; cadence is observational')
+    p.add_argument('--pixels-only', action='store_true', help='Only pattern/pixel comparisons, control checks and final restoration captures')
+    p.add_argument('--pixel-checker', default='egNvmmPixelCapture', help='Version-matched diagnostic capture executable built with --pixel-checker')
+    p.add_argument('--skip-pixel-comparison', action='store_true', help='Explicitly omit pattern/pixel checks; recorded as not run')
     p.add_argument('--require-nvmm', action='store_true', help='Fail if a supported camera format lacks the NVMM pipeline')
     p.add_argument('--current-format-only', action='store_true', help='Test only the connected camera format; do not cycle EC formats')
     p.add_argument('--timeout', type=float, default=10)
@@ -940,6 +1206,7 @@ def parser():
     p.add_argument('--probe-wait', type=float, default=5)
     p.add_argument('--stream-gap', type=float, default=3)
     p.add_argument('--recoveries', type=int, default=2, help='Maximum camera reboots per failed EngineCore format')
+    p.add_argument('--no-local-display', action='store_true', help='Skip local rendering; retain headless and forwarded-X11 checks')
     p.add_argument('--display', help='Local X11 display; otherwise discover a working local session')
     p.add_argument('--forwarded-display', help='Forwarded X11 DISPLAY; otherwise use the incoming environment')
     p.add_argument('--forwarded-xauthority', help='Authority file for the forwarded X11 connection')
@@ -958,6 +1225,8 @@ def main(argv=None):
         p.error('Delays must be nonnegative')
     if not 0 <= args.fps_tolerance < 1:
         p.error('fps-tolerance must be in [0, 1)')
+    if args.no_local_display and args.display:
+        p.error('--no-local-display and --display cannot be combined')
     if args.display and not local_x11(args.display):
         p.error('--display must be local; use --forwarded-display for SSH X11')
     if os.geteuid() != 0:

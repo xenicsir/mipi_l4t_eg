@@ -43,7 +43,11 @@ int main(int argc, char **argv)
     }
     const gchar *fmt = pixel_format ? pixel_format : "YUYV";
     gboolean gray = g_str_equal(fmt, "Y16") || g_str_equal(fmt, "Y14") || g_str_equal(fmt, "Y16_BE");
-    const gchar *gst_fmt = gray || g_str_equal(fmt, "AB24") ? "RGBA" :
+    GstElement *source_probe = gst_element_factory_make("egv4l2camerasrc", NULL);
+    gboolean yuv = g_str_equal(fmt, "YUYV") && source_probe &&
+        g_object_class_find_property(G_OBJECT_GET_CLASS(source_probe), "yuyv-preview");
+    if (source_probe) gst_object_unref(source_probe);
+    const gchar *gst_fmt = gray || yuv || g_str_equal(fmt, "AB24") ? "RGBA" :
                            g_str_equal(fmt, "AR24") ? "BGRx" :
                            g_str_equal(fmt, "YUYV") ? "YUY2" : NULL;
     if (!gst_fmt) { fprintf(stderr, "Unsupported format\n"); g_free(device); return 2; }
@@ -54,8 +58,8 @@ int main(int argc, char **argv)
         g_free(device); return 2;
     }
     if (!headless) g_setenv("__GL_YIELD", "USLEEP", FALSE);
-    const gchar *conversion = g_str_equal(fmt, "YUYV") || g_str_equal(fmt, "AR24") ?
-        " ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=NV12" : "";
+    const gchar *conversion = (g_str_equal(fmt, "YUYV") && !yuv) || g_str_equal(fmt, "AR24") ?
+        " ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=RGBA" : "";
     gchar *description = g_strdup_printf(
         "egv4l2camerasrc name=camera ! "
         "video/x-raw(memory:NVMM),format=%s,width=%d,height=%d,framerate=%d/1%s ! %s",
@@ -70,7 +74,7 @@ int main(int argc, char **argv)
         g_free(device); return 1;
     }
     GstElement *camera = gst_bin_get_by_name(GST_BIN(pipeline), "camera");
-    if (gray) g_object_set(camera, "capture-format", fmt, "preview", TRUE, NULL);
+    if (gray || yuv) g_object_set(camera, "capture-format", fmt, "preview", TRUE, NULL);
     g_object_set(camera, "device", device ? device : "/dev/video0",
                  "num-buffers", frames ? frames : -1, NULL);
     g_free(device);

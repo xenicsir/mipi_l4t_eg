@@ -78,7 +78,7 @@ static const char gray_ptx[] = R"ptx(
  .param .u64 src, .param .u64 dst,
  .param .u32 sp, .param .u32 dp, .param .u32 w, .param .u32 h,
  .param .u32 shift, .param .u32 swap, .param .u32 rgba,
- .param .u64 range, .param .u32 normalize)
+ .param .u64 range, .param .u32 normalize, .param .u32 yuyv)
 {
  .reg .pred %p<7>;
  .reg .b32 %r<32>;
@@ -96,6 +96,30 @@ static const char gray_ptx[] = R"ptx(
  or.pred %p0, %p0, %p1; @%p0 bra done;
  mul.wide.u32 %rd2, %r11, %r0;
  mad.wide.u32 %rd3, %r10, 2, %rd2; add.u64 %rd3, %rd0, %rd3;
+ ld.param.u32 %r31, [yuyv];
+ setp.eq.u32 %p6, %r31, 0; @%p6 bra gray_input;
+ // BT.601 limited-range YUYV, integer coefficients used by the classic preview.
+ and.b32 %r25, %r10, 0xfffffffe;
+ mad.wide.u32 %rd8, %r25, 2, %rd2; add.u64 %rd8, %rd0, %rd8;
+ ld.global.u8 %r26, [%rd3]; ld.global.u8 %r27, [%rd8+1]; ld.global.u8 %r28, [%rd8+3];
+ sub.s32 %r26, %r26, 16; max.s32 %r26, %r26, 0;
+ sub.s32 %r27, %r27, 128; sub.s32 %r28, %r28, 128;
+ mul.lo.s32 %r29, %r26, 1220542;
+ mad.lo.s32 %r12, %r28, 1673527, %r29;
+ mad.lo.s32 %r13, %r27, -409993, %r29;
+ mad.lo.s32 %r13, %r28, -852492, %r13;
+ mad.lo.s32 %r14, %r27, 2116026, %r29;
+ add.s32 %r12, %r12, 524288; shr.s32 %r12, %r12, 20;
+ add.s32 %r13, %r13, 524288; shr.s32 %r13, %r13, 20;
+ add.s32 %r14, %r14, 524288; shr.s32 %r14, %r14, 20;
+ max.s32 %r12, %r12, 0; min.s32 %r12, %r12, 255;
+ max.s32 %r13, %r13, 0; min.s32 %r13, %r13, 255;
+ max.s32 %r14, %r14, 0; min.s32 %r14, %r14, 255;
+ shl.b32 %r13, %r13, 8; shl.b32 %r14, %r14, 16;
+ or.b32 %r12, %r12, %r13; or.b32 %r12, %r12, %r14; or.b32 %r12, %r12, 0xff000000;
+ mul.wide.u32 %rd4, %r11, %r1; mad.wide.u32 %rd5, %r10, 4, %rd4;
+ add.u64 %rd5, %rd1, %rd5; st.global.u32 [%rd5], %r12; bra done;
+gray_input:
  ld.global.u16 %r12, [%rd3];
  shr.u32 %r13, %r12, 8; shl.b32 %r14, %r12, 8;
  or.b32 %r13, %r13, %r14; and.b32 %r13, %r13, 65535;
@@ -257,7 +281,7 @@ void eg_cuda_frame_destroy(EgCudaFrame *f) {
   delete f; eg_cuda_release(e);
 }
 bool eg_cuda_gray(EgCudaFrame *f, unsigned width, unsigned height,
-                  unsigned valid_bits, bool byte_swap, bool rgba, std::string &error, bool normalize) {
+                  unsigned valid_bits, bool byte_swap, bool rgba, std::string &error, bool normalize, bool yuyv) {
   try {
     if (valid_bits < 8 || valid_bits > 16 || width > f->in_frame.width ||
         width > f->out_frame.width || height > f->in_frame.height || height > f->out_frame.height ||
@@ -267,7 +291,8 @@ bool eg_cuda_gray(EgCudaFrame *f, unsigned width, unsigned height,
     uint64_t input = reinterpret_cast<uint64_t>(f->in_frame.frame.pitch[0]);
     uint64_t output = reinterpret_cast<uint64_t>(f->out_frame.frame.pitch[0]);
     unsigned shift = valid_bits - 8, swap = byte_swap, rgba_flag = rgba;
-    unsigned normalized = rgba && normalize;
+    unsigned normalized = rgba && normalize && !yuyv;
+    unsigned yuyv_flag = yuyv;
     if (normalized) {
       if (!f->range) throw std::runtime_error("Missing GPU normalization workspace");
       void *init_args[] = {&f->range};
@@ -276,7 +301,7 @@ bool eg_cuda_gray(EgCudaFrame *f, unsigned width, unsigned height,
       e->api.check(e->api.launch(e->range_reduce, 64, 1, 1, 256, 1, 1, 0, nullptr, reduce_args, nullptr), "cuLaunchKernel(range reduce)");
     }
     void *arguments[] = {&input, &output, &f->in_frame.pitch, &f->out_frame.pitch,
-                         &width, &height, &shift, &swap, &rgba_flag, &f->range, &normalized};
+                         &width, &height, &shift, &swap, &rgba_flag, &f->range, &normalized, &yuyv_flag};
     e->api.check(e->api.launch(e->kernel, (width+15)/16, (height+15)/16, 1,
                               16, 16, 1, 0, nullptr, arguments, nullptr), "cuLaunchKernel");
     e->api.check(e->api.sync(), "cuCtxSynchronize");

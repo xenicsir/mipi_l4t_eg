@@ -11,5 +11,5 @@ EgCudaFrame *eg_cuda_frame_create(EgCudaEngine *engine, NvBufSurface *input,
 void eg_cuda_frame_destroy(EgCudaFrame *frame);
 bool eg_cuda_gray(EgCudaFrame *frame, unsigned width, unsigned height,
                   unsigned valid_bits, bool byte_swap, bool rgba, std::string &error,
-                  bool normalize = false);
+                  bool normalize = false, bool yuyv = false);
 #endif

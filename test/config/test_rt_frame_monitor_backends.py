@@ -24,6 +24,46 @@ spec.loader.exec_module(M)
 
 
 class BackendTests(unittest.TestCase):
+    def test_xavier_y14_restriction_preserves_other_formats_and_platforms(self):
+        with patch.object(M.Path, 'read_bytes', return_value=b'nvidia,p3509\0nvidia,tegra194\0') as read:
+            self.assertIn('Xavier/T194', M._nvmm_format_reason('Y14'))
+            read.reset_mock()
+            for fmt in ('Y16', 'Y16_BE', 'YUYV', 'AR24', None):
+                self.assertIsNone(M._nvmm_format_reason(fmt))
+            read.assert_not_called()
+        with patch.object(M.Path, 'read_bytes', return_value=b'nvidia,tegra234\0'):
+            self.assertIsNone(M._nvmm_format_reason('Y14'))
+        with patch.object(M.Path, 'read_bytes', side_effect=FileNotFoundError):
+            self.assertIsNone(M._nvmm_format_reason('Y14'))
+        with patch.object(M.platform, 'system', return_value='Windows'), \
+             patch.object(M.Path, 'read_bytes') as read:
+            self.assertFalse(M._nvmm_available(Mock())[0])
+            read.assert_not_called()
+
+    def test_classic_gui_is_ready_before_capture_and_closed_on_open_failure(self):
+        for alias in ('np','cv2'):
+            dependency=getattr(M,alias)
+            if isinstance(dependency,M._ClassicModule):dependency.load()
+        for platform in ('Linux','Windows'):
+            with self.subTest(platform=platform):
+                events=[]
+                def open_camera(*args,**kwargs):
+                    self.assertEqual(events,['window','paint','events'])
+                    events.append('capture')
+                    raise RuntimeError('camera open failed')
+                with patch.object(M.platform,'system',return_value=platform), \
+                     patch.object(M.cv2,'namedWindow',side_effect=lambda *a:events.append('window')), \
+                     patch.object(M.cv2,'resizeWindow'), \
+                     patch.object(M.cv2,'imshow',side_effect=lambda *a:events.append('paint')), \
+                     patch.object(M.cv2,'waitKey',side_effect=lambda *a:events.append('events')), \
+                     patch.object(M.cv2,'destroyWindow',side_effect=lambda *a:events.append('close')), \
+                     patch.object(M,'open_capture',side_effect=open_camera), \
+                     patch.object(M.threading.Thread,'start') as start:
+                    with self.assertRaisesRegex(RuntimeError,'camera open failed'):
+                        M.camera_main_loop(M.Config(show_video=True,width=4,height=3))
+                    self.assertEqual(events,['window','paint','events','capture','close'])
+                    start.assert_not_called()
+
     def test_gpu_load_is_cached_and_read_errors_remain_unknown(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(M.platform, 'system', return_value='Linux'):
             path = Path(tmp) / 'load'
@@ -155,6 +195,14 @@ class BackendTests(unittest.TestCase):
         self.assertNotIn('\r', stream.getvalue())
         self.assertNotIn('frame=1', stream.getvalue())
         self.assertTrue(stream.getvalue().endswith('frame=2\n'))
+
+    def test_corruption_telemetry_distinguishes_startup_from_later_errors(self):
+        c=M.CaptureCounters();c.add(0,True);c.add(1,False)
+        self.assertEqual(c.summary()['first_corrupt_index'],0)
+        self.assertEqual(c.summary()['last_corrupt_index'],0)
+        c.add(2,True)
+        self.assertEqual(c.summary()['last_corrupt_index'],2)
+        self.assertEqual(c.summary()['buffers'],3)
 
     def test_counters_use_metadata_and_handle_sequence_wrap(self):
         counters = M.CaptureCounters()
@@ -384,6 +432,25 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(preview['format'], 'RGBA')
             self.assertEqual(preview['processing'], 'cuda-preview')
             self.assertFalse(preview['vic'])
+
+    def test_grayscale_preview_only_bsp_preserves_camera_format(self):
+        for fmt in ('Y16', 'Y14', 'Y16_BE'):
+            for display in (False, True):
+                plan = M._nvmm_plan(fmt, display, True, raw_grayscale=False)
+                self.assertEqual(plan['format'], 'RGBA')
+                self.assertEqual(plan['properties']['capture-format'], fmt)
+                self.assertTrue(plan['properties']['preview'])
+                self.assertEqual(plan['processing'], 'cuda-preview')
+                self.assertEqual(plan['properties'].get('normalize', False), display)
+
+    def test_yuyv_preview_uses_cuda_only_when_advertised(self):
+        p=M._nvmm_plan('YUYV',True,yuyv_preview=True)
+        self.assertEqual(p['format'],'RGBA');self.assertFalse(p['vic'])
+        self.assertEqual(p['properties']['capture-format'],'YUYV')
+        self.assertEqual(p['processing'],'cuda-yuyv-preview')
+        raw=M._nvmm_plan('YUYV',False,yuyv_preview=True)
+        self.assertEqual(raw['format'],'YUY2');self.assertEqual(raw['processing'],'none')
+        self.assertTrue(M._nvmm_plan('YUYV',True)['vic'])
 
     def test_rgb_byte_order_and_conversion_plan(self):
         self.assertEqual(M._nvmm_plan('AB24', True)['format'], 'RGBA')

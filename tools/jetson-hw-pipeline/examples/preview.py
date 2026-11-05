@@ -31,15 +31,17 @@ def main():
     Gst.init(None)
     sink = 'fakesink sync=false' if args.headless else 'nv3dsink sync=false processing-deadline=0'
     gray = args.format in ('Y16', 'Y14', 'Y16_BE')
-    fmt = {'YUYV': 'YUY2', 'AB24': 'RGBA', 'AR24': 'BGRx'}.get(args.format, 'RGBA')
-    conversion = (' ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=NV12'
-                  if args.format in ('YUYV', 'AR24') else '')
+    source_probe = Gst.ElementFactory.make('egv4l2camerasrc')
+    yuv = args.format == 'YUYV' and source_probe is not None and source_probe.find_property('yuyv-preview') is not None
+    fmt = {'YUYV': 'RGBA' if yuv else 'YUY2', 'AB24': 'RGBA', 'AR24': 'BGRx'}.get(args.format, 'RGBA')
+    conversion = (' ! nvvidconv compute-hw=2 ! video/x-raw(memory:NVMM),format=RGBA'
+                  if args.format == 'AR24' or (args.format == 'YUYV' and not yuv) else '')
     pipeline = Gst.parse_launch(
         'egv4l2camerasrc name=camera ! '
         'video/x-raw(memory:NVMM),format=%s,width=%d,height=%d,framerate=%d/1%s ! %s'
         % (fmt, args.width, args.height, args.fps, conversion, sink))
     camera = pipeline.get_by_name('camera')
-    if gray:
+    if gray or yuv:
         camera.set_property('capture-format', args.format)
         camera.set_property('preview', True)
     camera.set_property('device', args.device)

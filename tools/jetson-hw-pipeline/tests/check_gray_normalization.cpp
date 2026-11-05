@@ -18,10 +18,19 @@ static bool run(EgCudaEngine *engine, unsigned w, unsigned h, unsigned bits,
                 bool be, unsigned pattern, bool normalize, bool rgba) {
   NvBufSurfaceAllocateParams p={};p.params.width=w;p.params.height=h;
   p.params.layout=NVBUF_LAYOUT_PITCH;p.params.memType=NVBUF_MEM_SURFACE_ARRAY;
-  p.params.colorFormat=NVBUF_COLOR_FORMAT_GRAY16_LE;
+#ifdef EG_GRAY8_STORAGE
+  const auto raw_format=NVBUF_COLOR_FORMAT_GRAY8;
+  p.params.width=w*2;
+#else
+  const auto raw_format=NVBUF_COLOR_FORMAT_GRAY16_LE;
+#endif
+  p.params.colorFormat=raw_format;
   NvBufSurface *input=nullptr,*output=nullptr;
   if (NvBufSurfaceAllocate(&input,1,&p)) return false;
-  p.params.colorFormat=rgba?NVBUF_COLOR_FORMAT_RGBA:NVBUF_COLOR_FORMAT_GRAY16_LE;
+#ifdef EG_GRAY8_STORAGE
+  p.params.width=rgba?w:w*2;
+#endif
+  p.params.colorFormat=rgba?NVBUF_COLOR_FORMAT_RGBA:raw_format;
   if (NvBufSurfaceAllocate(&output,1,&p)) return false;
   input->numFilled=output->numFilled=1;
   if (NvBufSurfaceMap(input,0,0,NVBUF_MAP_WRITE)) return false;

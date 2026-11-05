@@ -11,6 +11,7 @@ import yaml
 import sys
 import re
 import base64
+from html import escape
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote
@@ -110,6 +111,10 @@ class DeploymentMatrixGenerator:
         with open(camera_db_path, 'r') as f:
             self.camera_db = yaml.safe_load(f)
 
+        self._all_camera_modes = {
+            cid: {r['res']: {m['pixel_format'] for m in r.get('modes', [])} for r in cam.get('resolutions', [])}
+            for cid, cam in self.camera_db.get('cameras', {}).items()
+        }
         self._apply_enabled_flags()
 
     def _apply_enabled_flags(self):
@@ -229,6 +234,79 @@ class DeploymentMatrixGenerator:
             return 'theoretically_supported', None, None
 
         return None, None, None
+
+    def get_hardware_pipeline(self, platform_id, camera_id, l4t_version):
+        """Software availability, filtered by enabled camera modes and platform limits."""
+        result = {'available': False, 'formats': [], 'camera_formats': [], 'validations': []}
+        version = str(l4t_version)
+        if camera_id not in self.camera_db.get('cameras', {}):
+            return result
+        if not self.platform_available(platform_id, version):
+            return result
+        if self.get_status(platform_id, camera_id, version)[0] in (None, 'not_supported'):
+            return result
+        profile = self.camera_db.get('hardware_pipeline', {}).get('versions', {}).get(version, {})
+        supported = profile.get('formats', [])
+        restrictions = set(self.platforms_by_id[platform_id].get('unsupported_formats', []))
+        restrictions.update(self.camera_db.get('platform_restrictions', {}).get(platform_id, {}).get('unsupported_formats', []))
+        resolutions = self.camera_db['cameras'][camera_id].get('resolutions', [])
+        active = {r['res']: {m['pixel_format'] for m in r.get('modes', []) if m.get('enabled', True)}
+                  for r in resolutions if r.get('enabled', True)}
+        enabled = set().union(*active.values()) if active else set()
+        hw_restrictions = set(profile.get('unsupported_formats', {}).get(platform_id, []))
+        formats = [fmt for fmt in supported if fmt in enabled and fmt not in restrictions and fmt not in hw_restrictions]
+        result.update(available=bool(formats), formats=formats,
+                      camera_formats=[fmt for fmt in self.camera_db['pixel_format_map'] if fmt in enabled and fmt not in restrictions])
+        for record in self.data.get('hardware_pipeline_validations', []):
+            if (str(record['l4t']), record['platform'], record['camera']) != (version, platform_id, camera_id):
+                continue
+            selected = [fmt for fmt in record['formats'] if fmt in formats and fmt in active.get(record['resolution'], set())]
+            if selected:
+                result['validations'].append(dict(record, formats=selected))
+        return result
+
+    def _hardware_label(self, platform_id, camera_id, version):
+        hw = self.get_hardware_pipeline(platform_id, camera_id, version)
+        return 'HW: Yes — ' + ', '.join(hw['formats']) if hw['available'] else 'HW: No'
+
+    def _hardware_cell_html(self, platform_id, camera_id, version):
+        hw = self.get_hardware_pipeline(platform_id, camera_id, version)
+        modes = ('Formats: ' + ', '.join(hw['camera_formats'])) if hw['camera_formats'] else ''
+        return (escape(modes) + '<br>' if modes else '') + escape(self._hardware_label(platform_id, camera_id, version))
+
+    HW_NOTE = ('HW means the NVMM/VIC/CUDA pixel pipeline in the current source configuration, '
+               'not basic CSI/VI capture. Yes requires a package containing egv4l2camerasrc and matching NVIDIA libraries; '
+               'historical package links may predate this feature. No means not enabled for this combination. '
+               'The camera-driver Tested status is independent of HW qualification. '
+               'Lists exclude disabled modes and platform restrictions. RGB888 is the camera format '
+               '(V4L2 AR24/AB24 according to the driver). On L4T 35.x, HW grayscale uses CUDA RGBA preview; '
+               'raw GRAY16 NVMM output is unavailable, while raw V4L2 capture is unchanged.')
+
+    def hardware_validation_rows(self):
+        rows = []
+        for record in self.data.get('hardware_pipeline_validations', []):
+            if record['platform'] not in self.platforms_by_id or record['camera'] not in self.cameras_by_id:
+                continue
+            hw = self.get_hardware_pipeline(record['platform'], record['camera'], record['l4t'])
+            for active in hw['validations']:
+                if active['resolution'] != record['resolution'] or active['hardware'] != record['hardware']:
+                    continue
+                row = [str(active['l4t']), active['hardware'], self.cameras_by_id[active['camera']]['name'],
+                             active['resolution'], ', '.join(active['formats']),
+                             'Qualified' if active['result'] == 'qualified' else 'Issues observed', active.get('notes', '')]
+                if row not in rows:
+                    rows.append(row)
+        return rows
+
+    def _hardware_section_html(self):
+        header = '<h2>Hardware pixel pipeline</h2><p>' + escape(self.HW_NOTE) + '</p>'
+        header += '<p>Target checks below apply only to the named hardware, resolution and formats. '
+        header += 'Unlisted combinations are not qualified by these checks.</p>'
+        header += '<table><thead><tr>' + ''.join('<th>'+x+'</th>' for x in
+                  ['L4T', 'Hardware tested', 'Camera', 'Resolution', 'HW formats checked', 'Result', 'Notes']) + '</tr></thead><tbody>'
+        for row in self.hardware_validation_rows():
+            header += '<tr>' + ''.join('<td>'+escape(value)+'</td>' for value in row) + '</tr>'
+        return header + '</tbody></table>'
 
     def platform_available(self, platform_id, version):
         """Resolve carrier builds already declared in eg_config, without inventing BSPs."""
@@ -350,6 +428,37 @@ class DeploymentMatrixGenerator:
           4. (Informational) platform+version combos covered only by auto-generation
         """
         issues = []
+        hw_versions = self.camera_db.get('hardware_pipeline', {}).get('versions', {})
+        for version, profile in hw_versions.items():
+            if str(version) not in self.camera_db.get('versions', {}):
+                issues.append(f"⚠️ HW pipeline names undeclared L4T {version}")
+            for fmt in profile.get('formats', []):
+                if fmt not in self.camera_db.get('pixel_format_map', {}):
+                    issues.append(f"⚠️ HW pipeline {version}: unknown pixel format {fmt}")
+            for platform, excluded in profile.get('unsupported_formats', {}).items():
+                if platform not in self.platforms_by_id:
+                    issues.append(f"⚠️ HW pipeline {version}: unknown excluded platform {platform}")
+                for fmt in excluded:
+                    if fmt not in self.camera_db.get('pixel_format_map', {}):
+                        issues.append(f"⚠️ HW pipeline {version}: unknown excluded format {fmt}")
+        source_root = Path(__file__).resolve().parent.parent / 'sources'
+        for version in self.camera_db.get('versions', {}):
+            integrated = (source_root / str(version) / 'Linux_for_Tegra/source/gst-egv4l2camera').is_dir()
+            declared = bool(hw_versions.get(str(version), {}).get('formats'))
+            if integrated != declared:
+                issues.append(f"⚠️ HW pipeline {version}: source overlay and declared formats disagree")
+        for record in self.data.get('hardware_pipeline_validations', []):
+            if record['platform'] not in self.platforms_by_id:
+                issues.append('⚠️ Unknown HW qualification platform: ' + record['platform'])
+            if record['camera'] not in self._all_camera_modes:
+                issues.append('⚠️ Unknown HW qualification camera: ' + record['camera'])
+            if str(record['l4t']) not in hw_versions:
+                issues.append('⚠️ HW qualification references a pipeline not enabled in this L4T: ' + str(record['l4t']))
+            known = self._all_camera_modes.get(record['camera'], {}).get(record['resolution'], set())
+            if not known or set(record['formats']) - known:
+                issues.append('⚠️ Unknown camera resolution/format in HW qualification: ' + record['camera'])
+            if record['result'] not in ('qualified', 'issues'):
+                issues.append('⚠️ Unknown HW qualification result: ' + record['result'])
         eg_versions = self.camera_db.get('versions', {})
         matrix_l4t = self.data.get('l4t_versions', {})
         matrix_platform_ids = {p['id'] for p in self.data['platforms']}
@@ -540,6 +649,14 @@ class DeploymentMatrixGenerator:
             f.write("- (empty) - Data not available\n\n")
             f.write("**Acronyms:** EG = Exosens Group\n\n")
 
+            f.write("## Hardware pixel pipeline\n\n" + self.HW_NOTE + "\n\n")
+            f.write("HW qualification applies only to the hardware, resolution and formats below; unlisted cases are not qualified.\n\n")
+            f.write("| L4T | Hardware tested | Camera | Resolution | HW formats checked | Result | Notes |\n")
+            f.write("| --- | --- | --- | --- | --- | --- | --- |\n")
+            for row in self.hardware_validation_rows():
+                f.write('| ' + ' | '.join(row) + ' |\n')
+            f.write('\n')
+
             # For each platform
             for platform in self.data['platforms']:
                 platform_id = platform['id']
@@ -592,7 +709,7 @@ class DeploymentMatrixGenerator:
                         if status:
                             icon = self.STATUS_ICONS.get(status, '❓')
                             label = self.STATUS_LABELS.get(status, status)
-                            f.write(f" {icon} {label} |")
+                            f.write(f" {icon} {label}<br>{self._hardware_cell_html(platform_id, cam_id, version)} |")
 
                             # Git link
                             git_url = self.get_git_link(version, git_branch)
@@ -870,6 +987,8 @@ class DeploymentMatrixGenerator:
     </div>
 """
 
+        html_content += self._hardware_section_html()
+
         # Generate platform sections
         for platform in self.data['platforms']:
             platform_id = platform['id']
@@ -958,7 +1077,7 @@ class DeploymentMatrixGenerator:
                             icon = '❌'
                             label = 'Not Supported'
 
-                        html_content += f'                    <td class="{css_class}"><span class="icon">{icon}</span> {label}</td>\n'
+                        html_content += f'                    <td class="{css_class}"><span class="icon">{icon}</span> {label}<br><small>{self._hardware_cell_html(platform_id, cam_id, version)}</small></td>\n'
 
                         # Git link
                         git_url = self.get_git_link(version, git_branch)
@@ -1097,6 +1216,8 @@ class DeploymentMatrixGenerator:
             "</div>",
         ]
 
+        lines.append(self._hardware_section_html())
+
         for platform in self.data['platforms']:
             pid  = platform['id']
             lines.append("<div class='platform-block'>")
@@ -1141,9 +1262,9 @@ class DeploymentMatrixGenerator:
                 for cam_id in camera_ids:
                     status, _, _ = self.get_status(pid, cam_id, version)
                     if status == 'tested':
-                        lines.append(f"<td class='tested'>✅ {SHORT_LABEL['tested']}</td>")
+                        lines.append(f"<td class='tested'>✅ {SHORT_LABEL['tested']}<br><small>{self._hardware_cell_html(pid, cam_id, version)}</small></td>")
                     elif status == 'theoretically_supported':
-                        lines.append(f"<td class='theoretical'>⚠️ {SHORT_LABEL['theoretically_supported']}</td>")
+                        lines.append(f"<td class='theoretical'>⚠️ {SHORT_LABEL['theoretically_supported']}<br><small>{self._hardware_cell_html(pid, cam_id, version)}</small></td>")
                     elif status == 'not_supported':
                         lines.append(f"<td class='unsupported'>❌</td>")
                     else:

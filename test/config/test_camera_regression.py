@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'test/hardware'))
 SPEC = importlib.util.spec_from_file_location('camera_regression', ROOT/'test/hardware/run_camera_regression.py')
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -26,6 +27,153 @@ gst-launch-1.0 -v v4l2src device=/dev/video7 ! "video/x-raw, format=(string)GRAY
 
 
 class RegressionTests(unittest.TestCase):
+    def test_legacy_buffer_details_preserve_rate_and_corruption(self):
+        old=''.join('\n Index : %d\n Type : Video Capture\n Flags : mapped%s\n Sequence : %d\n Bytesused: 16\n Timestamp: %.6fs (Monotonic, End-of-Frame)\n' % (i%4,', error' if i==0 else '',i,100+i/60) for i in range(180))
+        new='\n'.join('cap dqbuf: %d seq: %d bytesused: 16 ts: %.6f (%sts-monotonic)' % (i%4,i,100+i/60,'error, ' if i==0 else '') for i in range(180))
+        self.assertEqual(MODULE.v4l2_buffers(old),MODULE.v4l2_buffers(new))
+        self.assertTrue(MODULE.rate_matches(MODULE.stream_cadence('v4l2',old)['capture'],60,.03))
+        bad=[i for i,b in enumerate(MODULE.v4l2_buffers(old)) if b['corrupt']]
+        self.assertEqual(bad,[0])
+        self.assertFalse(MODULE.corruption_policy('Crius1280',1,0,0)['accepted'])
+        self.assertTrue(MODULE.corruption_policy('Dione1024',1,0,0)['accepted'])
+
+    def test_enumeration_failure_keeps_the_campaign_exit_unsuccessful(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r=self.runner(tmp);camera=r.refresh.return_value
+            r.setup=Mock();r.idle=Mock();r.discover=Mock(return_value=[camera])
+            r.test_registers=Mock(return_value=True);r.test_xeneth=Mock(return_value=True)
+            r.test_group=Mock(return_value=True)
+            r.format_results=[dict(passed=False,errors=['Duplicate fourcc: YUYV'])]
+            self.assertEqual(r.execute(),1)
+            self.assertTrue(r.test_group.called)
+
+    def test_old_and_new_v4l2_output_keep_duplicate_errors_visible(self):
+        modern = "[0]: 'AR24' (BGRA)\n Size: Discrete 1024x768\n[1]: 'YUYV'\n Size: Discrete 640x480\n"
+        old = "Index : 0\nPixel Format: 'AR24'\n Size: Discrete 1024x768\nIndex : 1\nPixel Format: 'YUYV'\n Size: Discrete 640x480\n"
+        for text in (modern,old):
+            self.assertEqual(MODULE.parse_format_enumeration(text),(['AR24','YUYV'],[]))
+        broken = old + "Index : 2\nPixel Format: 'YUYV'\n Size: Discrete 640x480\n Size: Discrete 640x480\n"
+        formats,errors=MODULE.parse_format_enumeration(broken)
+        self.assertEqual(formats,['AR24','YUYV'])
+        self.assertEqual(len(errors),2)
+        with tempfile.TemporaryDirectory() as tmp:
+            r=self.runner(tmp);r.run=Mock(return_value=({'returncode':0},broken))
+            self.assertEqual(MODULE.Runner.enumerate_formats(r,r.refresh.return_value),formats)
+            self.assertFalse(r.format_results[0]['passed'])
+            self.assertEqual(r.format_results[0]['errors'],errors)
+
+    def test_raw_dump_uses_ram_only_with_filesystem_and_physical_memory_headroom(self):
+        gib=1024**3
+        fs=Mock(f_bavail=2*gib//4096,f_frsize=4096)
+        cases=[(fs,'MemAvailable: 2097152 kB\n','/dev/shm'),
+               (fs,'MemAvailable: 102400 kB\n',None),
+               (Mock(f_bavail=100,f_frsize=4096),'MemAvailable: 2097152 kB\n',None),
+               (fs,'MemFree: 2097152 kB\n',None)]
+        for filesystem,text,expected in cases:
+            with self.subTest(text=text,expected=expected), \
+                 patch.object(MODULE.os,'statvfs',return_value=filesystem), \
+                 patch.object(MODULE.Path,'read_text',return_value=text):
+                self.assertEqual(MODULE.raw_capture_directory(700*1024**2),expected)
+        with patch.object(MODULE.os,'statvfs',side_effect=FileNotFoundError):
+            self.assertIsNone(MODULE.raw_capture_directory(700*1024**2))
+
+    def test_active_monitor_requires_a_connected_output_with_an_active_mode(self):
+        self.assertEqual(MODULE.active_x11_outputs('DP-0 connected primary 1920x1080+0+0 (normal)\nHDMI-0 disconnected\n'), ['DP-0'])
+        self.assertEqual(MODULE.active_x11_outputs('HDMI-1 connected 1280x720-1280+0 (normal)\n'), ['HDMI-1'])
+        for text in ('Screen 0: current 640 x 480\nDP-0 disconnected\n',
+                     'DP-0 connected (normal left inverted right x axis y axis)\n', ''):
+            self.assertEqual(MODULE.active_x11_outputs(text), [])
+
+    def test_no_monitor_or_no_x_server_does_not_block_forwarded_tests(self):
+        for accessible_x in (False, True):
+            with self.subTest(accessible_x=accessible_x), tempfile.TemporaryDirectory() as tmp:
+                auth = Path(tmp)/'authority';auth.touch()
+                args=MODULE.parser().parse_args(['--output',str(Path(tmp)/'report'), '--display',':0',
+                    '--xauthority',str(auth),'--forwarded-display','localhost:10.0',
+                    '--forwarded-xauthority',str(auth),'--require-forwarded-x11'])
+                r=MODULE.Runner(args)
+                def run(label,args,**kwargs):
+                    if label=='check-local-display':return {'returncode':0 if accessible_x else 1},''
+                    if args[0]=='xrandr':return {'returncode':0},'DP-0 disconnected\n'
+                    return {'returncode':0},''
+                r.run=Mock(side_effect=run)
+                with patch.object(MODULE.shutil,'which',return_value='/usr/bin/xrandr'):
+                    r.setup_displays()
+                self.assertFalse(r.local_display_available)
+                self.assertIsNotNone(r.forwarded_env)
+                skip=next(x for x in r.environment_results if x['context']=='local-display')
+                self.assertEqual(skip['status'],'not_run');self.assertNotIn('passed',skip)
+                c=MODULE.parse_configuration(CONFIG)[0];r.run.reset_mock()
+                record=r.capture(c,c.groups[0],'monitor','missing-screen','classic')
+                r.run.assert_not_called()
+                self.assertEqual(record['status'],'not_run');self.assertNotIn('pass',record)
+                self.assertTrue(MODULE.capture_accepted(record))
+                self.assertFalse(json.loads((r.out/'results.json').read_text())['display_coverage_complete'])
+
+    def test_screen_search_continues_past_an_accessible_headless_x_server(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            auth=Path(tmp)/'authority';auth.touch()
+            r=MODULE.Runner(MODULE.parser().parse_args(['--output',str(Path(tmp)/'report'),'--xauthority',str(auth)]))
+            r.incoming_env={}
+            def run(label,args,**kwargs):
+                if args[0]=='xrandr':
+                    return {'returncode':0}, ('DP-0 disconnected\n' if r.env['DISPLAY']==':0'
+                        else 'DP-0 connected primary 1920x1080+0+0 (normal)\n')
+                return {'returncode':0},''
+            r.run=Mock(side_effect=run)
+            with patch.object(MODULE.Path,'glob',return_value=[Path('/tmp/.X11-unix/X0'),Path('/tmp/.X11-unix/X1')]), \
+                 patch.object(MODULE.shutil,'which',return_value='/usr/bin/xrandr'):
+                r.setup_displays()
+            self.assertTrue(r.local_display_available)
+            self.assertEqual(r.env['DISPLAY'],':1')
+
+    def test_unplugged_monitor_is_detected_before_starting_gui(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r=MODULE.Runner(MODULE.parser().parse_args(['--output',str(Path(tmp)/'report')]))
+            r.local_display_available=True
+            r.run=Mock(return_value=({'returncode':0},'DP-0 disconnected\n'))
+            c=MODULE.parse_configuration(CONFIG)[0]
+            with patch.object(MODULE.shutil,'which',return_value='/usr/bin/xrandr'):
+                record=r.capture(c,c.groups[0],'gst','unplugged')
+            self.assertEqual(record['status'],'not_run')
+            self.assertEqual(r.run.call_count,1)
+            self.assertEqual(r.run.call_args.args[1],['xrandr','--current'])
+
+    def test_skipped_local_gui_keeps_raw_and_headless_failures_fatal(self):
+        for headless_ok in (False,True):
+            with self.subTest(headless_ok=headless_ok), tempfile.TemporaryDirectory() as tmp:
+                r=self.runner(tmp)
+                r.capture=Mock(side_effect=lambda c,g,tool,*a,**k: {'pass':True} if tool=='v4l2'
+                    else {'status':'not_run','reason':'No active monitor'})
+                r.test_environments=Mock(return_value=headless_ok)
+                r.test_fixed_preview=Mock(return_value=True);r.test_pixels=Mock(return_value=True)
+                self.assertEqual(r.test_group('42-0016','Y16 '),headless_ok)
+                r.test_environments.assert_called_once()
+                self.assertTrue(any(call.args[2]=='v4l2' for call in r.capture.call_args_list))
+
+    def test_declared_y14_exclusion_is_not_confused_with_missing_plugin(self):
+        text = CONFIG.replace('Y16 ', 'Y14 ').replace('  Port 1:',
+            '    NVMM unavailable for Y14: Xavier/T194 samples are not right-aligned.\n  Port 1:')
+        camera = MODULE.parse_configuration(text)[0]
+        self.assertIn('Y14', camera.nvmm_exclusions)
+        for fmt, excluded in [('Y14 ', True), ('Y16 ', False)]:
+            with self.subTest(fmt=fmt), tempfile.TemporaryDirectory() as tmp:
+                runner = self.runner(tmp)
+                runner.options.require_nvmm = True
+                current = MODULE.parse_configuration(text.replace('Y14 ', fmt))[0]
+                runner.refresh.return_value = current
+                runner.capture = Mock(return_value={'pass': True})
+                self.assertEqual(runner.test_group(current.key, fmt, tools=('monitor','gst_nvmm')), excluded)
+                checks = runner.results[0]['attempts'][0]['tools']
+                for key in ('monitor-nvmm','gst_nvmm'):
+                    if key not in checks: continue
+                    if excluded:
+                        self.assertEqual(checks[key]['status'],'not applicable')
+                        self.assertNotIn('pass',checks[key])
+                        self.assertIn('Xavier/T194', checks[key]['reason'])
+                    else:
+                        self.assertFalse(checks[key]['pass'])
+
     def test_discovery_uses_generated_devices_and_skips_disconnected(self):
         cameras = MODULE.parse_configuration(CONFIG.replace('connected)', '\x1b[32mconnected\x1b[0m)'))
         self.assertEqual(len(cameras), 2)
@@ -163,6 +311,8 @@ class RegressionTests(unittest.TestCase):
     def runner(self, path):
         options = MODULE.parser().parse_args(['--output', str(Path(path)/'logs'), '--recoveries', '2'])
         runner = MODULE.Runner(options)
+        runner.local_display_available = True
+        runner.check_local_display = Mock(return_value=True)
         runner.refresh = Mock(return_value=MODULE.parse_configuration(CONFIG)[0])
         runner.enumerate_formats = Mock(return_value=['Y16 ', 'AR24', 'AB24', 'YUYV'])
         runner.run = Mock(return_value=({}, ''))
@@ -173,6 +323,74 @@ class RegressionTests(unittest.TestCase):
         runner.test_environments = Mock(return_value=True)
         return runner
 
+    def test_pixel_runner_persists_reboots_and_stops_on_restore_failure(self):
+        for fail_restore,transient_read in ((False,False),(True,False),(False,True)):
+            with self.subTest(fail_restore=fail_restore,transient_read=transient_read), tempfile.TemporaryDirectory() as tmp:
+                runner=self.runner(tmp);runner.pause=Mock()
+                camera=runner.refresh.return_value
+                camera.sysfs=str(Path(tmp)/camera.key);Path(camera.sysfs).mkdir()
+                Path(camera.sysfs,'pixel_format').write_text("'Y16 ' (16-bit Greyscale)")
+                group=camera.groups[0];group['gst_nvmm']=['egv4l2camerasrc']
+                live={0x190:0,0x194:8};bank=dict(live);saves=0;boots=0;compared=[];injected=False
+                def control(current,address,value,reboot=False):
+                    nonlocal saves,boots
+                    snapshot=json.loads((runner.out/'results.json').read_text())['pixel_results'][0]
+                    self.assertEqual(snapshot['saved_pattern'],{'0x190':0,'0x194':8})
+                    address=int(address,16)
+                    if address==0x2f0:
+                        saves+=1
+                        if fail_restore and saves==2:raise RuntimeError('restore save failed')
+                        bank.clear();bank.update(live)
+                    elif address==0x8:
+                        self.assertTrue(reboot);boots+=1;live.clear();live.update(bank)
+                    else:live[address]=value
+                    return True
+                def run(label,args,**kwargs):
+                    nonlocal injected
+                    if args[0]=='ECSwCtrl':
+                        if transient_read and not injected and args[-1]=='ru 0x194':
+                            injected=True
+                            return {'returncode':0},'!-128'
+                        value=live[int(args[-1].split()[1],16)]
+                        return {'returncode':0},'%s %d'%(hex(value),value)
+                    self.assertEqual(live,{0x190:1,0x194:9})
+                    self.assertEqual(boots,1)
+                    compared.append(args)
+                    output=Path(args[args.index('--output')+1]);output.mkdir()
+                    (output/'comparison.json').write_text('{"passed":true}')
+                    return {'returncode':0},''
+                runner.ec_control=Mock(side_effect=control);runner.run=Mock(side_effect=run)
+                with patch.object(MODULE.shutil,'which',return_value='/test/egNvmmPixelCapture'):
+                    if fail_restore:
+                        with self.assertRaisesRegex(RuntimeError,'Pattern restoration failed'):
+                            runner.test_pixels(camera,group,'persisted')
+                        self.assertTrue(runner.cancelled)
+                        self.assertFalse(runner.pixel_results[0]['restored'])
+                    else:
+                        self.assertTrue(runner.test_pixels(camera,group,'persisted'))
+                        self.assertEqual(live,{0x190:0,0x194:8});self.assertEqual(bank,live)
+                        self.assertEqual(boots,2)
+                self.assertEqual(len(compared),2)
+                self.assertEqual(runner.pixel_results[0]['pattern_procedure'],'save_reboot_readback')
+                if transient_read:
+                    self.assertTrue(injected)
+                    self.assertTrue(any(c.args[0]=='Pattern read failed' for c in runner.event.call_args_list))
+
+    def test_pattern_read_retry_is_bounded_and_never_writes_unknown_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner=self.runner(tmp);runner.pause=Mock()
+            camera=runner.refresh.return_value
+            camera.sysfs=str(Path(tmp)/camera.key);Path(camera.sysfs).mkdir()
+            Path(camera.sysfs,'pixel_format').write_text("'Y16 '")
+            group=camera.groups[0];group['gst_nvmm']=['egv4l2camerasrc']
+            runner.run=Mock(return_value=({'returncode':0},'!-128'))
+            runner.ec_control=Mock()
+            with patch.object(MODULE.shutil,'which',return_value='/test/checker'):
+                self.assertFalse(runner.test_pixels(camera,group,'failed-read'))
+            self.assertEqual(runner.run.call_count,runner.options.recoveries+1)
+            runner.ec_control.assert_not_called()
+            self.assertEqual(runner.pixel_results[0]['comparisons'],[])
+
     def test_failed_capture_is_not_hidden_and_recovery_is_bounded(self):
         with tempfile.TemporaryDirectory() as tmp:
             runner = self.runner(tmp)
@@ -182,6 +400,45 @@ class RegressionTests(unittest.TestCase):
             self.assertEqual(runner.capture.call_count, 3)
             self.assertTrue(all(call.args[2] == 'v4l2' for call in runner.capture.call_args_list))
             self.assertEqual(len(runner.results[0]['attempts']), 3)
+
+    def test_dione_startup_exception_is_narrow(self):
+        self.assertTrue(MODULE.corruption_policy('Dione 1280',1,0,0)['startup_exception'])
+        for args in [('MicroCube',1,0,0),('Dione 1280',1,1,1),
+                     ('Dione 1280',2,0,1),('Dione 1280',1,None,None)]:
+            self.assertFalse(MODULE.corruption_policy(*args)['accepted'])
+        self.assertTrue(MODULE.corruption_policy('Dione 640',0)['accepted'])
+
+    def test_dione_classic_only_initial_corruption_is_warning(self):
+        for bad in (0,1):
+            with self.subTest(bad=bad), tempfile.TemporaryDirectory() as tmp:
+                runner=self.runner(tmp);runner.pause=Mock()
+                camera=runner.refresh.return_value;camera.name='Dione 1280'
+                text=('BACKEND requested=classic selected=classic reason=test\n'
+                      'frame=59 corrupt=1 sequence_gaps=0\nCAPTURE_INTEGRITY '+
+                      json.dumps(dict(corrupt=1,buffers=60,first_corrupt_index=bad,last_corrupt_index=bad)))
+                runner.run=Mock(return_value=({'returncode':0,'seconds':2,'log':'test.log'},text))
+                r=runner.capture(camera,camera.groups[0],'monitor','test','classic',display_context='headless')
+                self.assertEqual(r['pass'],bad==0)
+                self.assertEqual(r['corrupt_buffers'],1)
+                self.assertEqual(r.get('startup_exception'),bad==0)
+
+    def test_dione_nvmm_accepts_only_the_known_startup_exit(self):
+        for first,failure,delivered,okay in [(0,'Corrupted buffers reported by the driver',60,True),
+                                            (1,'Corrupted buffers reported by the driver',60,False),
+                                            (0,'CUDA failed',60,False),
+                                            (0,'Corrupted buffers reported by the driver',59,False)]:
+            with self.subTest(first=first,failure=failure,delivered=delivered), tempfile.TemporaryDirectory() as tmp:
+                runner=self.runner(tmp);runner.pause=Mock()
+                camera=runner.refresh.return_value;camera.name='Dione 1280'
+                folder=runner.out/'test-monitor-data/nvmm-test';folder.mkdir(parents=True)
+                (folder/'summary.json').write_text(json.dumps(dict(nvmm_caps=True,nvmm_allocator=True,
+                    pixel_analysis=False,frames=60,processed_frames=delivered,failure=failure)))
+                text=('BACKEND requested=nvmm selected=nvmm reason=test\nframe=59 corrupt=1\n'
+                      'CAPTURE_INTEGRITY '+json.dumps(dict(corrupt=1,first_corrupt_index=first,last_corrupt_index=first)))
+                runner.run=Mock(return_value=({'returncode':1,'seconds':2,'log':'test.log'},text))
+                result=runner.capture(camera,camera.groups[0],'monitor','test','nvmm',display_context='headless')
+                self.assertEqual(result['pass'],okay)
+                self.assertEqual(result['returncode'],1)
 
     def test_classic_monitor_corruption_fails_even_with_zero_exit_and_all_frames(self):
         for corrupt in (0, 1):

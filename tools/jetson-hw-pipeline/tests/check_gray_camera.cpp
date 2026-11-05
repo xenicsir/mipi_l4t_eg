@@ -35,11 +35,21 @@ static GstPadProbeReturn check_frame(GstPad *, GstPadProbeInfo *info, gpointer a
   NvBufSurface *raw = camera->surface;
   NvBufSurface *out = camera->processed_surface;
   const bool processed = c.preview || c.big_endian;
-  if (!raw || raw->surfaceList[0].width != c.width || raw->surfaceList[0].height != c.height ||
-      raw->surfaceList[0].colorFormat != NVBUF_COLOR_FORMAT_GRAY16_LE ||
+#ifdef EG_GRAY8_STORAGE
+  const unsigned raw_width = c.width * 2;
+  const auto raw_format = NVBUF_COLOR_FORMAT_GRAY8;
+  const auto output_format = NVBUF_COLOR_FORMAT_RGBA;
+  if (!c.preview) { ++c.errors; return GST_PAD_PROBE_OK; }
+#else
+  const unsigned raw_width = c.width;
+  const auto raw_format = NVBUF_COLOR_FORMAT_GRAY16_LE;
+  const auto output_format = c.preview ? NVBUF_COLOR_FORMAT_RGBA : NVBUF_COLOR_FORMAT_GRAY16_LE;
+#endif
+  if (!raw || raw->surfaceList[0].width != raw_width || raw->surfaceList[0].height != c.height ||
+      raw->surfaceList[0].colorFormat != raw_format ||
       (processed && (!out || !camera->cuda_frame || out->surfaceList[0].width != c.width ||
        out->surfaceList[0].height != c.height || out->surfaceList[0].colorFormat !=
-       (c.preview ? NVBUF_COLOR_FORMAT_RGBA : NVBUF_COLOR_FORMAT_GRAY16_LE))) ||
+       output_format)) ||
       (!processed && (out || camera->cuda_frame))) {
     ++c.errors; return GST_PAD_PROBE_OK;
   }

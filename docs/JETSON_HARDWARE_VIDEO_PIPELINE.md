@@ -2,24 +2,56 @@
 
 ## Availability
 
-The L4T 36.4.4 package includes `egv4l2camerasrc`, a V4L2 DMABUF source using
-NVIDIA surfaces. YUYV, RGB (AB24) and Y16 paths have been tested with SmartIR640
-at 640×480 on Orin Nano. Crius1280 covers these formats at 1280×1024;
-Y14 and Y16-BE paths have also been tested at 1280×1024. Other BSP ports are not enabled.
+The source tree integrates `egv4l2camerasrc` for every declared L4T 35.x,
+36.x and 39.2 BSP: 35.1, 35.3.1, 35.4.1, 35.5.0, 35.6.0, 35.6.1, 35.6.2,
+35.6.4, 36.4, 36.4.3, 36.4.4, 36.5.0 and 39.2. It is built against each BSP's
+native NVIDIA headers and runtime libraries and included in packages generated
+from those builds. Generic, Forecr and CTI builds use the matching BSP source.
+Historical packages may predate this integration. L4T 32.x is excluded.
+
+Software availability is separate from target qualification. Target checks cover
+Orin Nano 36.4.4/39.2, Forecr 35.6.0/35.6.4, Xavier NX 35.1 and AGX Orin on
+Auvidea X230D 35.4.1, with the cameras and formats recorded in the deployment
+matrix. The additional BSP ports have host compilation checks; they still
+require hardware qualification. No physical NVIDIA AGX Orin devkit qualification
+is implied. CTI pristine keeps its vendor kernel and its camera-format restrictions.
 
 | V4L2 input | NVMM capture output | Display path | Qualification |
 | --- | --- | --- | --- |
-| YUYV | YUY2 | VIC → NV12 → GPU | Tested |
+| YUYV | YUY2 raw or RGBA preview | CUDA BT.601 → RGBA → GPU | Tested |
 | AB24 (RGBA bytes) | RGBA | GPU display directly | Tested |
-| AR24 (BGRA bytes) | BGRA or BGRx | BGRx → VIC → NV12 → GPU | Requires target qualification |
-| Y16 | GRAY16_LE, 16 bits retained | CUDA → RGBA → GPU | Tested |
-| Y14 | GRAY16_LE storage, 14 valid bits | CUDA → RGBA → GPU | Tested at 1280×1024 |
-| Y16-BE | GRAY16_LE after GPU byte swap | CUDA → RGBA → GPU | Tested at 1280×1024 |
+| AR24 (BGRA bytes) | BGRA or BGRx | BGRx → VIC → RGBA → GPU | Tested on Forecr 35.6.0 |
+| Y16 | GRAY16_LE on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
+| Y14 | GRAY16_LE storage on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
+| Y16-BE | GRAY16_LE after GPU byte swap on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
 | UYVY | UYVY | VIC → NV12 → GPU | Requires target qualification |
+
+On **L4T 35.x**, YUYV and RGB use native NVIDIA surfaces. Y16, Y14 and
+Y16-BE require `preview=true` and output RGBA, with optional GPU normalization.
+The camera's two bytes per pixel are kept in an internal byte surface and read
+by CUDA; no CPU pixel copy or conversion is used. Raw `GRAY16_LE` NVMM output
+is unavailable on this BSP. Use V4L2 for raw measurements. The monitor detects
+this capability and also uses fixed-range RGBA conversion for headless NVMM
+monitoring; its startup message reports the pixel processing.
+Y14 requires right-aligned samples. Xavier/T194's different Y14 layout is
+excluded from this hardware preview support until a separate adaptation is validated.
+The monitor selects classic capture for Y14 on Xavier/T194 and explains this
+restriction; forcing NVMM reports an error. The configuration helper omits the
+Y14 hardware command on that SoC. Use `--normalize` for classic Y14 display
+on T194: fixed Y14 scaling also assumes right-aligned samples and can saturate
+with this layout. Raw captured values are unchanged. Y16-BE remains available
+through NVMM.
 
 The plugin requires the matching NVIDIA multimedia runtime. CUDA grayscale
 processing uses the BSP's CUDA driver. No separate CUDA Toolkit, nvcc or NVRTC
 dependency is needed: the installed driver JIT-compiles a small embedded PTX kernel.
+
+On L4T 39.2, capture and processing surfaces use `NVBUF_MEM_SURFACE_ARRAY`
+with the camera memory tag. The `NvBufSurface` structures differ from 36.x;
+use the binary built for the target BSP. The target's NVIDIA loader configuration
+selects the GPU provider. Installing the camera package through APT installs the
+recommended GStreamer, CUDA and 3D runtimes at the matching BSP version; `dpkg -i`
+alone does not download them.
 Source and output surfaces remain in NVIDIA memory.
 
 The plugin installs in the standard GStreamer directory and can coexist with
@@ -61,10 +93,8 @@ does not reprogram the camera's frame rate. For 640×480 YUYV:
 gst-inspect-1.0 egv4l2camerasrc
 
 env __GL_YIELD=USLEEP gst-launch-1.0 -e -v \
-  egv4l2camerasrc device=/dev/video0 ! \
-  'video/x-raw(memory:NVMM),format=YUY2,width=640,height=480,framerate=60/1' ! \
-  nvvidconv compute-hw=2 ! \
-  'video/x-raw(memory:NVMM),format=NV12' ! \
+  egv4l2camerasrc device=/dev/video0 capture-format=YUYV preview=true ! \
+  'video/x-raw(memory:NVMM),format=RGBA,width=640,height=480,framerate=60/1' ! \
   nv3dsink sync=false processing-deadline=0
 ```
 
@@ -262,11 +292,11 @@ applicable, never as a successful hardware capture.
 its memory container and GStreamer representation are 16-bit. Y14 input must be
 right-aligned, as specified by V4L2; the `capture-bits` property reports 14 or 16.
 
-Without `preview`, output remains 16-bit grayscale. Y16-BE is converted to
+On L4T 36.x and 39.2, without `preview`, output remains 16-bit grayscale. Y16-BE is converted to
 little-endian on the GPU while retaining every bit of its sample values. Native
 V4L2 capture outside this plugin retains its original byte order.
 
-For raw Y16 capture without CPU pixel access:
+For raw Y16 capture without CPU pixel access on L4T 36.x or 39.2:
 
 ```sh
 env -u DISPLAY gst-launch-1.0 -e egv4l2camerasrc device=/dev/video0 capture-format=Y16 ! \
@@ -295,8 +325,8 @@ The monitor and capture plugin describe their pixel processing at startup.
 `rt_frame_monitor.py --help` also describes every live status field.
 
 There is no native GStreamer Y14 format in the classic `v4l2src` path. The EG
-source selects Y14 through V4L2 and outputs GRAY16_LE storage or GPU-converted
-RGBA; downstream elements therefore do not need native Y14 support.
+source selects Y14 through V4L2 and outputs GRAY16_LE storage (36.x/39.2) or GPU-converted
+RGBA (35.x/36.x/39.2); downstream elements therefore do not need native Y14 support.
 Use the raw path when preserving measurement precision.
 
 ```sh
@@ -318,7 +348,11 @@ caps alone does not reconfigure a fixed-format EngineCore camera.
 
 The target runner tests classic, forced NVMM and automatic selection separately,
 records actual backend, CPU usage and surface metadata, and retains register
-checks for cameras with the supported control interfaces. `--require-nvmm`
+checks for cameras with the supported control interfaces. An absent monitor
+or inaccessible local X server skips local rendering without failing the run.
+The report marks those cases `not_run` and display coverage incomplete; raw,
+headless and available forwarded-X11 tests continue. `--no-local-display` can
+request this mode explicitly. `--require-nvmm`
 requires the hardware path for the tested format. Unsupported paths are explicit
 not-applicable cases when that option is absent. `--current-format-only` limits
 EngineCore tests to its active format.
@@ -328,6 +362,39 @@ above. Grayscale checks include per-pixel GPU byte-order normalization and previ
 scaling against the same captured input buffers. Other cameras, resolutions,
 end-to-end latency and long-duration reliability require separate qualification.
 
+On the tested Orin Nano with L4T 39.2, NVIDIA `nv3dsink` and `nveglglessink`
+maintain 60 fps but consume roughly one CPU core during local display. A direct
+YUYV GStreamer pipeline measured about 1.6% of one core for NVMM capture alone,
+5% with CUDA RGBA conversion and no display, and 95% with NVIDIA display.
+These are process measurements over 600 frames, including startup and shutdown;
+they are not whole-system CPU percentages. The elevated display cost does not
+indicate CPU pixel conversion in the camera source. Profile capture/processing
+and display separately when sizing an application.
+
+Profiling on this runtime identified CPU polling in NVIDIA EGL's
+`eglSwapBuffers` vertical-synchronization wait. For applications that can accept
+possible tearing, disabling that wait reduced a 600-frame, 60-fps GStreamer run
+to about 9% of one CPU core (about 16% with the monitor and its instrumentation):
+
+```sh
+env __GL_SYNC_TO_VBLANK=0 rt_frame_monitor.py -d /dev/video0 --display
+```
+
+The same environment prefix can be used with a GStreamer display command. Set
+it before initializing the graphics libraries in Python/C applications. This is
+an optional rendering policy, not a change to captured pixels; synchronization
+remains enabled by default. `sync=false` on a GStreamer sink and the graphics
+driver's vertical synchronization are separate controls.
+
+
+On Xavier NX with L4T 35.1 and a local X server without a connected HDMI/DP
+monitor, NVMM rendering measured about 54 fps with the default synchronization.
+The same option restored 60 fps in the YUYV, RGB/AR24 and Y16 GStreamer
+and monitor paths, including fixed and normalized grayscale previews;
+headless capture already sustained 60 fps. With a DP display connected at
+1920×1080 and 60 Hz, the same SmartIR640 paths sustained 60 fps with default
+vertical synchronization, including fixed and normalized Y16 previews.
+
 
 When an NVMM path uses GPU processing or display, the monitor shows `gpu=...%`
 after `cpu`. This is board-wide NVIDIA GPU activity, including other applications;
@@ -335,3 +402,22 @@ it excludes VIC and is not a per-process counter. The monitor reads the Jetson
 nvgpu sysfs value at most once per second, without invoking tegrastats. An
 unavailable reading appears as `--`; paths that do not use GPU omit the field.
 Other platforms retain their existing monitoring behavior.
+
+## Pixel-equivalent previews
+
+`capture-format=YUYV preview=true` converts BT.601 limited-range YUYV to RGBA
+on CUDA using the same numerical convention as the classic monitor. Native
+YUY2 capture without preview preserves the packed camera samples. The read-only
+`yuyv-preview` capability allows applications to detect this conversion.
+
+AR24/BGRx preview uses VIC directly to RGBA. Avoid an NV12 intermediate when
+preserving RGB pixel values: NV12 subsamples chroma and conversion can alter
+the image. An encoding pipeline may deliberately choose NV12 instead.
+
+The target regression runner can compare static camera patterns through the
+actual classic capture/display code and NVMM. It checks raw samples exactly,
+fixed grayscale exactly, normalized grayscale within one 8-bit level, and
+colour conversion within three levels. Pattern settings are restored and read
+back. Five initial buffers are excluded from pixel comparisons for settling;
+any corrupted warm-up buffers are counted separately. Normal streaming tests
+still reject corrupted buffers from startup. See [target tests](../test/hardware/README.md).

@@ -15,6 +15,24 @@
 github_repo: "https://github.com/xenicsir/mipi_l4t_eg"
 package_repo_base: "https://releases.example.com/mipi-drivers"
 
+# HW qualification is independent of the camera-driver status grid below.
+# Scope names the actual tested hardware, not every SoM/carrier in a platform.
+hardware_pipeline_validations:
+  - {l4t: "35.4.1", platform: agx_orin_x230d, hardware: "AGX Orin / Auvidea X230D, CAM0", camera: smartir640, resolution: "640x480", formats: [YUYV, RGB888, Y16], result: qualified, notes: "Native NVMM color and CUDA grayscale previews; four pixel comparisons exact. Short fixed-Y16 display cadence miss passed two 600-frame repeats. Multi-source NVMM validated."}
+  - {l4t: "35.4.1", platform: agx_orin_x230d, hardware: "AGX Orin / Auvidea X230D, CAM1", camera: crius1280, resolution: "1280x1024", formats: [YUYV, RGB888, Y16], result: issues, notes: "NVMM at 60 fps and four exact pixel comparisons; classic display limited to 15-39 fps in some cases. One incomplete I2C probe at initial boot, not reproduced on subsequent boots. Internal I2C descriptor initialization fixed; causal link to that probe failure not established."}
+  - {l4t: "35.1", platform: xavier_nx, hardware: "Xavier NX / NVIDIA P3509", camera: ilumos, resolution: "1280x1024", formats: ["Y16 -BE"], result: issues, notes: "Y16-BE NVMM sustains 60 fps; fixed/normalized previews match classic pixels exactly. GenCP/Xeneth passed. Intermittent classic normalized display corruption and reduced rate remain under investigation. Y14 uses classic on T194; NVMM is explicitly excluded."}
+  - {l4t: "35.6.4", platform: forecr_ornxs, hardware: "Forecr DSBOARD-ORNXS / Orin NX", camera: ilumos, resolution: "1280x1024", formats: ["Y16 -BE", Y14], result: qualified, notes: "34 captures and 42 environment checks passed. Fixed and normalized CUDA RGBA previews match classic pixels exactly; GenCP/Xeneth controls passed before and after streaming. Monitor script revalidated after direct update; package/plugin unchanged."}
+  - {l4t: "35.1", platform: xavier_nx, hardware: "Xavier NX / NVIDIA P3509", camera: smartir640, resolution: "640x480", formats: [Y16, RGB888, YUYV], result: qualified, notes: "Four pixel comparisons exact. With DP display at 60 Hz, default NVMM rendering sustains 60 fps for all three formats, including fixed/normalized Y16. Without a connected display, the tested X server rendered at about 54 fps unless vertical synchronization was disabled. Y14/T194 excluded."}
+  - {l4t: "35.6.0", platform: forecr_ornxs, hardware: "Forecr DSBOARD-ORNXS / Orin", camera: crius1280, resolution: "1280x1024", formats: [Y16, RGB888, YUYV], result: qualified, notes: "RGB checked as AR24. Grayscale uses CUDA RGBA preview. NVMM sustains 60 fps; classic paths have throughput limits."}
+  - {l4t: "35.6.0", platform: forecr_ornxs, hardware: "Forecr DSBOARD-ORNXS / Orin", camera: ilumos, resolution: "1280x1024", formats: ["Y16 -BE", Y14], result: qualified, notes: "CUDA RGBA preview, fixed range and GPU normalization. Raw GRAY16 NVMM output unavailable."}
+  - {l4t: "36.4.4", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: microcube, resolution: "640x480", formats: [Y16, RGB888, YUYV], result: qualified}
+  - {l4t: "36.4.4", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: smartir640, resolution: "640x480", formats: [Y16, RGB888, YUYV], result: qualified}
+  - {l4t: "36.4.4", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: crius1280, resolution: "1280x1024", formats: [Y16, RGB888, YUYV], result: qualified}
+  - {l4t: "36.4.4", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: ilumos, resolution: "1280x1024", formats: ["Y16 -BE", Y14], result: qualified}
+  - {l4t: "36.4.4", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: dione_ir, resolution: "1280x1024", formats: [RGB888], result: issues, notes: "One corrupted buffer at stream startup; not a clean qualification."}
+  - {l4t: "39.2", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: microcube, resolution: "640x480", formats: [Y16, RGB888, YUYV], result: issues, notes: "Capture and pixel comparisons passed; EngineCore patterns saved and loaded at reboot. NVIDIA local display sinks consume about one CPU core; headless capture/CUDA remains low-CPU. Classic GUI is initialized before capture."}
+  - {l4t: "39.2", platform: orin_nx_nano_devkit, hardware: "Orin Nano / NVIDIA P3768", camera: ilumos, resolution: "1280x1024", formats: ["Y16 -BE", Y14], result: issues, notes: "Raw capture, fixed/normalized GPU previews and GenCP controls passed. NVIDIA local display has elevated CPU use; headless capture/processing passed. Classic GUI is initialized before capture."}
+
 platforms:
   - id: nano_t210
     name: "Jetson Nano (T210)"

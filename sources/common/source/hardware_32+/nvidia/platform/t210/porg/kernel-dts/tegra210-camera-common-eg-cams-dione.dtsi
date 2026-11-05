@@ -333,7 +333,8 @@
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
-							cil_settletime = "0";
+							/* 118 ns with the T210 102 MHz CIL clock, for the 498 MHz link. */
+							cil_settletime = "7";
 
 							active_w = "1024";
 							active_h = "768";
@@ -738,7 +739,8 @@
 							phy_mode = "DPHY";
 							discontinuous_clk = "no";
 							dpcm_enable = "false";
-							cil_settletime = "0";
+							/* 118 ns with the T210 102 MHz CIL clock, for the 498 MHz link. */
+							cil_settletime = "7";
 
 							active_w = "1024";
 							active_h = "768";

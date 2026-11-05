@@ -26,6 +26,13 @@ class EnduranceTests(unittest.TestCase):
  def test_kernel_ring_wrap_cannot_claim_clean_logs(self):
   self.assertEqual(m.kernel_delta('old\n','old\nnew\n'),['new'])
   self.assertIsNone(m.kernel_delta('old\n','different\n'))
+ def test_evicted_old_records_keep_a_provable_complete_test_window(self):
+  before='[ 1.000000] old\n[ 2.000000] retained\n[ 3.000000] last\n'
+  after='[ 2.000000] retained\n[ 3.000000] last\n[ 4.000000] new error\n'
+  self.assertEqual(m.kernel_delta(before,after),['[ 4.000000] new error'])
+  self.assertIsNone(m.kernel_delta(before,'[ 4.000000] new error\n'))
+  self.assertIsNone(m.kernel_delta('old\nseparator\n','separator\nnew\n'))
+  self.assertIsNone(m.kernel_delta(before,'[ 2.000000] retained\n[ 4.000000] new error\n'))
  def test_only_unknown_descriptors_at_measured_stop_are_observations(self):
   line='[ 99.900] vi: corr_err: discarding frame 3840, status 0, flags: 0, err_data 0x00000000'
   errors,observations=m.classify_kernel_lines([line],[100.0])
@@ -63,9 +70,13 @@ class EnduranceTests(unittest.TestCase):
   self.assertTrue(m.nvmm_accepted({'status':'not_applicable'},False))
  def test_nvmm_checks_delivered_frames_and_corruption_independently(self):
   probes={'cam':{'capture':'input','delivery':'output'}}
-  def trace(name,count=180,corrupt=False):
-   return '\n'.join('/GstPipeline:p/GstIdentity:%s: last-message = chain pts: 0:00:%.9f flags: %s' % (name,i/60,'corrupted' if corrupt and i==0 else '') for i in range(count))
-  self.assertTrue(m.inspect_nvmm_streams(trace('input')+'\n'+trace('output'),probes,180,{'cam':60})['cam']['passed'])
-  self.assertFalse(m.inspect_nvmm_streams(trace('input')+'\n'+trace('output',179),probes,180,{'cam':60})['cam']['passed'])
-  self.assertFalse(m.inspect_nvmm_streams(trace('input')+'\n'+trace('output',180,True),probes,180,{'cam':60})['cam']['passed'])
+  def data(count=180,corrupt=0):
+   return dict(pts_ns=[round(i*1e9/60) for i in range(count)],corrupt=corrupt,nvmm_caps=True,source_allocator=True)
+  good={'input':data(),'output':data()}
+  self.assertTrue(m.inspect_nvmm_streams(good,probes,180,{'cam':60})['cam']['passed'])
+  for bad in (data(179),data(181),data(corrupt=1),dict(data(),nvmm_caps=False),{}):
+   self.assertFalse(m.inspect_nvmm_streams(dict(good,output=bad),probes,180,{'cam':60})['cam']['passed'])
+  duplicate=data();duplicate['pts_ns'][30]=duplicate['pts_ns'][29]
+  self.assertFalse(m.inspect_nvmm_streams(dict(good,output=duplicate),probes,180,{'cam':60})['cam']['passed'])
+  self.assertFalse(m.inspect_nvmm_streams(dict(good,input=dict(data(),source_allocator=False)),probes,180,{'cam':60})['cam']['passed'])
 if __name__=='__main__':unittest.main()

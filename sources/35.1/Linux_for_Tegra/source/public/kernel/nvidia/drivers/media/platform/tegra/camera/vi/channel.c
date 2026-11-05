@@ -706,6 +706,17 @@ tegra_channel_queue_setup(struct vb2_queue *vq,
 	struct tegra_channel *chan = vb2_get_drv_priv(vq);
 	struct tegra_mc_vi *vi = chan->vi;
 
+	/* CREATE_BUFS may add buffers while capture is running. The VI
+	 * descriptor ring belongs to the initial queue setup: rebuilding it
+	 * here changes its depth and resets outstanding capture requests.
+	 */
+	if (vq->num_buffers) {
+		if (*nplanes != 1 || sizes[0] < chan->format.sizeimage)
+			return -EINVAL;
+		alloc_devs[0] = tegra_channel_get_vi_unit(chan);
+		return 0;
+	}
+
 	*nplanes = 1;
 
 	sizes[0] = chan->format.sizeimage;

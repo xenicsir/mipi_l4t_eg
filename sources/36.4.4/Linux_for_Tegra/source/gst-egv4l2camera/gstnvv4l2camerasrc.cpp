@@ -78,7 +78,8 @@ enum
   PROP_CAPTURE_FORMAT,
   PROP_PREVIEW,
   PROP_NORMALIZE,
-  PROP_CAPTURE_BITS
+  PROP_CAPTURE_BITS,
+  PROP_YUYV_PREVIEW
 };
 
 struct _GstEGV4l2Memory
@@ -184,7 +185,7 @@ gst_eg_memory_allocator_alloc (GstAllocator * allocator,
   nvbuf = g_slice_new0 (GstEgV4l2CameraSrcBuffer);
 
   NvBufSurfaceAllocateParams param = {{0}};
-  param.params.width = self->width;
+  param.params.width = self->surface_format == NVBUF_COLOR_FORMAT_GRAY8 ? self->width * 2 : self->width;
   param.params.height = self->height;
   param.params.layout = NVBUF_LAYOUT_PITCH;
   param.params.memType = NVBUF_MEM_DEFAULT;
@@ -217,6 +218,7 @@ gst_eg_memory_allocator_alloc (GstAllocator * allocator,
 
   nvbuf->surface->numFilled = 1;
   if (self->preview || self->byte_swap) {
+    param.params.width = self->width;
     param.params.colorFormat = self->preview ? NVBUF_COLOR_FORMAT_RGBA : NVBUF_COLOR_FORMAT_GRAY16_LE;
     if (NvBufSurfaceAllocate(&nvbuf->processed_surface, 1, &param)) {
       GST_ERROR_OBJECT(self, "Cannot allocate CUDA output surface");
@@ -420,7 +422,7 @@ static GstFlowReturn gst_egv4l2camera_buffer_pool_acquire_buffer (
   if (nv_mem->nvcam_buf->cuda_frame) {
     std::string cuda_error;
     if (!eg_cuda_gray(nv_mem->nvcam_buf->cuda_frame, src->width, src->height,
-                      src->capture_bits, src->byte_swap, src->preview, cuda_error, src->normalize)) {
+                      src->capture_bits, src->byte_swap, src->preview, cuda_error, src->normalize, src->capture_fourcc == V4L2_PIX_FMT_YUYV)) {
       GST_ELEMENT_ERROR(src, RESOURCE, FAILED, ("CUDA grayscale processing failed"),
                         ("%s", cuda_error.c_str()));
       gst_buffer_unref(*buffer);
@@ -825,7 +827,16 @@ static gboolean gst_eg_v4l2_camera_set_caps (GstBaseSrc *base, GstCaps *caps)
   src->pixel_format = GST_VIDEO_INFO_FORMAT(&info);
   src->byte_swap = FALSE;
   src->capture_bits = 16;
-  if (src->preview || src->pixel_format == GST_VIDEO_FORMAT_GRAY16_LE) {
+  if (src->preview && !g_ascii_strcasecmp(src->capture_format, "YUYV")) {
+    if (src->pixel_format != GST_VIDEO_FORMAT_RGBA || info.width % 2) {
+      GST_ERROR_OBJECT(src, "YUYV preview requires RGBA output and an even width");
+      return FALSE;
+    }
+    src->capture_fourcc = V4L2_PIX_FMT_YUYV;
+    src->surface_format = NVBUF_COLOR_FORMAT_GRAY8;
+    src->bytes_per_pixel = 2;
+    src->capture_bits = 8;
+  } else if (src->preview || src->pixel_format == GST_VIDEO_FORMAT_GRAY16_LE) {
     if (src->preview && src->pixel_format != GST_VIDEO_FORMAT_RGBA) {
       GST_ERROR_OBJECT(src, "Grayscale preview requires RGBA output caps");
       return FALSE;
@@ -936,7 +947,9 @@ static gboolean gst_eg_v4l2_camera_set_caps (GstBaseSrc *base, GstCaps *caps)
     }
   }
 
-  if (src->preview)
+  if (src->preview && src->capture_fourcc == V4L2_PIX_FMT_YUYV)
+    g_print("egv4l2camerasrc: pixel processing: BT.601 limited-range YUYV to RGBA on GPU\n");
+  else if (src->preview)
     g_print("egv4l2camerasrc: pixel processing: %s on GPU to RGBA; captured values unchanged\n",
         src->normalize ? "per-frame min/max normalization" : "fixed-range grayscale scaling");
   else if (src->byte_swap)
@@ -1258,19 +1271,23 @@ gst_eg_v4l2_camera_src_class_init (GstEgV4l2CameraSrcClass * klass)
           2, MAX_BUFFERS, MIN_BUFFERS, (GParamFlags) G_PARAM_READWRITE));
 
   g_object_class_install_property(gobject_class, PROP_CAPTURE_FORMAT,
-      g_param_spec_string("capture-format", "Grayscale capture format",
+      g_param_spec_string("capture-format", "Preview capture format",
           "auto, Y16, Y14 (right-aligned), or Y16_BE; NVMM grayscale output is little endian",
           "auto", (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_MUTABLE_READY)));
   g_object_class_install_property(gobject_class, PROP_PREVIEW,
-      g_param_spec_boolean("preview", "GPU grayscale preview",
+      g_param_spec_boolean("preview", "GPU preview",
           "Convert grayscale capture to full-range RGBA on CUDA; raw capture remains unchanged",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_MUTABLE_READY)));
   g_object_class_install_property(gobject_class, PROP_NORMALIZE,
       g_param_spec_boolean("normalize", "Adaptive grayscale preview",
           "Normalize each preview frame using GPU min/max; false uses the full declared range. Raw output is unchanged.",
           FALSE, (GParamFlags)(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+  g_object_class_install_property(gobject_class, PROP_YUYV_PREVIEW,
+      g_param_spec_boolean("yuyv-preview", "CUDA YUYV preview",
+          "Supports capture-format=YUYV preview=true with BT.601 limited-range conversion",
+          TRUE, (GParamFlags)(G_PARAM_READABLE | G_PARAM_STATIC_STRINGS)));
   g_object_class_install_property(gobject_class, PROP_CAPTURE_BITS,
-      g_param_spec_uint("capture-bits", "Capture precision", "Valid grayscale bits before preview",
+      g_param_spec_uint("capture-bits", "Capture precision", "Valid grayscale or luma bits before preview",
                        8, 16, 16, (GParamFlags)G_PARAM_READABLE));
 
   gst_element_class_set_details_simple(gstelement_class,
@@ -1395,6 +1412,7 @@ gst_eg_v4l2_camera_src_get_property (GObject * object, guint prop_id,
     case PROP_CAPTURE_FORMAT: g_value_set_string(value, src->capture_format); break;
     case PROP_NORMALIZE: g_value_set_boolean(value, src->normalize); break;
     case PROP_PREVIEW: g_value_set_boolean(value, src->preview); break;
+    case PROP_YUYV_PREVIEW: g_value_set_boolean(value, TRUE); break;
     case PROP_CAPTURE_BITS: g_value_set_uint(value, src->capture_bits); break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

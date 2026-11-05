@@ -172,7 +172,11 @@ _live_node_active() {
     local glob="$1"
     local d status
     for d in $(find -L /proc/device-tree -iname "$glob" -type d 2>/dev/null); do
-        status=$(tr -d '\0' < "$d/status" 2>/dev/null)
+        # An absent status property means available in the device tree.
+        status=""
+        if [[ -r "$d/status" ]]; then
+            status=$(tr -d '\0' < "$d/status")
+        fi
         [[ "$status" != "disabled" ]] && return 0
     done
     return 1

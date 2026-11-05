@@ -436,7 +436,7 @@ On TX2 and Nano — L4T 32.x only — the VI format table carries no 14-bit grey
 
 `V4L2_PIX_FMT_Y14` is defined as 14 bits **right-aligned, padding set to 0**. A full-scale buffer holds the same information, but every value is 4× larger — in practice it is a Y16 with 14 bits of resolution.
 
-This changes nothing about the image content and everything about the numbers. A viewer that converts 16-bit to 8-bit with a fixed shift renders a full-scale buffer normally and a right-aligned one 4× too dark. `rt_frame_monitor.py --display` normalizes every frame, so both look identical — trust the values, not your eyes.
+This changes nothing about the image content and everything about the numbers. A viewer that converts 16-bit to 8-bit with a fixed shift renders a full-scale buffer normally and a right-aligned one 4× too dark. `rt_frame_monitor.py --display --normalize` normalizes every frame, so both look identical — trust the values, not your eyes. Without `--normalize`, the monitor uses fixed-range scaling for the selected pixel format.
 
 **Checking what you get** (both stay silent if the SoM is not recognised):
 

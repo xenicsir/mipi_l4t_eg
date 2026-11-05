@@ -1,19 +1,22 @@
 # Camera capture in NVIDIA memory
 
 `egv4l2camerasrc` provides V4L2 DMABUF capture into NVIDIA surfaces. The prepared
-sources for L4T 36.4.4 add RGB and grayscale modes to the YUYV path. The original
+sources cover every declared L4T 35.x, 36.x and 39.2 BSP, with RGB and grayscale
+modes alongside YUYV. L4T 32.x is excluded. The original
 NVIDIA factory remains unchanged. See [the client guide](../../docs/JETSON_HARDWARE_VIDEO_PIPELINE.md)
 for format qualification, byte order, grayscale precision and generated commands.
 
 Validated camera paths: SmartIR640, 640×480 YUYV, AB24/RGBA and Y16 on Orin Nano
 L4T 36.4.4. Y14 and Y16-BE camera paths are tested with iLumos at 1280×1024.
-VIC converts YUYV; RGB can be rendered directly. Grayscale preview and big-endian
+YUYV preview uses CUDA BT.601 conversion; RGB uses direct display or VIC. Grayscale preview and big-endian
 normalization use CUDA, without mapping image pixels into CPU memory.
 
 The source checks negotiated V4L2 format/dimensions and surface pitch/capacity.
 `capture-format` preserves the actual grayscale V4L2 mode; `preview` selects
 8-bit RGBA display output. Without preview, grayscale retains its 16-bit sample
-values, in little-endian NVMM storage. No image data crosses the monitor's process
+values, in little-endian NVMM storage on L4T 36.x/39.2. L4T 35.x requires
+`preview=true` for grayscale and exposes only RGBA output; the captured
+16-bit data remains internal. No image data crosses the monitor's process
 supervision channel.
 
 ## Build on the host or the Jetson
@@ -37,7 +40,9 @@ used `nvidia-l4t-gstreamer=36.4.4-20250616085344`.
 
 For prepared sources, replace the archive arguments below with
 `--source-dir /path/to/sources/36.4.4/Linux_for_Tegra/source/gst-egv4l2camera`.
-Both input methods produce the same source files and ARM64 binary.
+Always use the source directory matching the target BSP; the legacy archive patch
+is for 36.4.4 only. The builder detects `tegra` or `nvidia` library paths
+in the target sysroot.
 
 For a native target build:
 
@@ -65,7 +70,8 @@ renames the factory, GTypes and allocator symbols so `egv4l2camerasrc` and the
 original `nvv4l2camerasrc` can coexist in one process.
 
 The output directory must be new. The builder extracts selected source files,
-applies the patch without fuzzy matching, builds the ARM64 library and writes hashes to
+uses the prepared sources (or applies the legacy archive patch without fuzzy
+matching), builds the ARM64 library and writes hashes to
 `manifest.json`. NVIDIA's source license headers are preserved in extracted files.
 The patch was tested against 36.4.4 only.
 
