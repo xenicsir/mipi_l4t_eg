@@ -314,13 +314,15 @@ class BackendTests(unittest.TestCase):
     def test_pixel_options_rejected_before_device_access(self):
         for args in [['--stats'], ['--save-images'], ['--fpn-detect'], ['--fpn-window=11'],
                      ['--multicam-file=x.cam'], ['--no-resize'], ['--event-half=5'],
-                     ['--freeze-recovery=5'], ['--image-format=raw']]:
+                     ['--freeze-recovery=5'], ['--image-format=raw'],
+                     ['--save-images-cube', '--image-format=raw']]:
             with self.subTest(args=args):
                 self.reject(args, 'incompatible')
 
     def test_json_conflicts_are_not_silently_ignored(self):
         for data in [{'stats': True}, {'save_images': True}, {'fpn_enabled': True},
-                     {'fpn_window': 55}, {'window_autosize': True}, {'reopen_interval_s': 9}]:
+                     {'fpn_window': 55}, {'window_autosize': True}, {'reopen_interval_s': 9},
+                     {'save_images_cube': True, 'image_format': 'raw'}]:
             with self.subTest(config=data):
                 self.reject([], 'incompatible', data)
 
@@ -466,6 +468,336 @@ class BackendTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'plugin missing'):
                 M._run_selected_backend(M.Config(backend='nvmm'), [])
             classic.assert_not_called()
+
+
+
+class RawRecordingTests(unittest.TestCase):
+    def setUp(self):
+        for name in ('np', 'cv2'):
+            dependency = getattr(M, name)
+            if isinstance(dependency, M._ClassicModule):
+                dependency.load()
+
+    def test_y16_single_frame_has_native_size_and_exact_bytes(self):
+        frame = M.np.arange(640 * 480, dtype=M.np.uint16).reshape(480, 640)
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            cfg = M.Config(width=640, height=480, fmt='Y16', num_frames=1,
+                           save_images=True, image_format='raw', base_dir=directory)
+            M.camera_main_loop(cfg, _frame_iter=iter([(frame, 0)]))
+            files = list(Path(directory).rglob('frame_0001.raw'))
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0].stat().st_size, 614400)
+            self.assertEqual(files[0].read_bytes(), frame.tobytes())
+
+    def test_all_native_formats_keep_every_channel_bit_and_byte_order(self):
+        for fmt, dtype, channels in [('Y16', '<u2', 1), ('Y16_BE', '>u2', 1),
+                                     ('Y14', '<u2', 1), ('Y10', '<u2', 1),
+                                     ('YUYV', 'u1', 2), ('AR24', 'u1', 4), ('AB24', 'u1', 4)]:
+            with self.subTest(fmt=fmt), tempfile.TemporaryDirectory() as directory, \
+                 contextlib.redirect_stdout(io.StringIO()):
+                if channels == 1:
+                    frame = M.np.array([0, 1, 0x1234, 0x8000, 0xFFFF, 7, 15, 255], dtype=dtype).reshape(2, 4)
+                else:
+                    frame = M.np.arange(8 * channels, dtype=dtype).reshape(2, 4, channels)
+                original = frame.tobytes()
+                cfg = M.Config(width=4, height=2, fmt=fmt, num_frames=1,
+                               save_images=True, image_format='raw', base_dir=directory,
+                               normalize=True)
+                M.camera_main_loop(cfg, _frame_iter=iter([(frame, 0)]))
+                self.assertEqual(next(Path(directory).rglob('frame_0001.raw')).read_bytes(), original)
+                self.assertEqual(frame.tobytes(), original)
+
+    def test_converted_or_noncontiguous_images_are_rejected_without_cast(self):
+        for fmt, frame in [('Y16', M.np.ones((2, 4), dtype=M.np.float32)),
+                           ('Y16', M.np.ones((2, 4, 3), dtype=M.np.uint8)),
+                           ('YUYV', M.np.ones((2, 4, 3), dtype=M.np.uint8)),
+                           ('AR24', M.np.ones((2, 4, 3), dtype=M.np.uint8)),
+                           ('Y16_BE', M.np.ones((2, 4), dtype='<u2')),
+                           ('Y16', M.np.ones((2, 8), dtype='<u2')[:, ::2])]:
+            with self.subTest(fmt=fmt, shape=frame.shape, dtype=frame.dtype):
+                with self.assertRaisesRegex(RuntimeError, 'Cannot save unmodified'):
+                    M._raw_capture_payload(frame, fmt, 4, 2)
+
+    def test_windows_raw_byte_containers_are_preserved(self):
+        payload = bytes(range(16))
+        for shape in ((1, 16), (2, 8), (2, 4, 2)):
+            frame = M.np.frombuffer(payload, dtype='u1').reshape(shape)
+            _, result = M._raw_capture_payload(frame, 'Y16', 4, 2)
+            self.assertEqual(result, payload)
+
+    def test_gstreamer_raw_is_copied_before_unmap_without_endian_conversion(self):
+        from types import SimpleNamespace
+        cap = M._GstAppSinkCapture.__new__(M._GstAppSinkCapture)
+        cap._Gst = SimpleNamespace(MapFlags=SimpleNamespace(READ=1))
+        cap._height, cap._width, cap._channels = 2, 4, 1
+        cap._dtype = M.np.dtype('>u2')
+        payload = bytes.fromhex('0123abcdffff800000000001010200ff')
+        for keep_raw in (False, True):
+            data = bytearray(payload)
+            buffer = Mock()
+            buffer.map.return_value = (True, SimpleNamespace(data=data))
+            buffer.unmap.side_effect = lambda info: info.data.__setitem__(slice(None), b'\x00' * len(info.data))
+            sample = Mock(); sample.get_buffer.return_value = buffer
+            result = cap._sample_to_array(sample, keep_raw=keep_raw)
+            if keep_raw:
+                self.assertIsInstance(result, M._FrameWithRaw)
+                self.assertEqual(result.payload, payload)
+                self.assertEqual(result.image.dtype, M.np.dtype('>u2'))
+                self.assertEqual(result.image.tobytes(), payload)
+            else:
+                self.assertTrue(result.dtype.isnative)
+                self.assertEqual(result.tolist()[0], [0x0123, 0xabcd, 0xffff, 0x8000])
+            buffer.unmap.assert_called_once()
+
+    def test_cameralink_retains_packed_buffer_before_unpacking(self):
+        from types import SimpleNamespace
+        cap = M._EuresysCLCapture.__new__(M._EuresysCLCapture)
+        cap._MC = SimpleNamespace(MCSIGNALINFO=lambda: SimpleNamespace(SignalInfo=1),
+                                  McWaitSignal=lambda *args: 0, SIG_SURFACE_FILLED=1)
+        cap._chan = SimpleNamespace(instance=1)
+        cap._byref = lambda value: value
+        cap._width, cap._height, cap.pixel_fmt = 4, 2, 'Y10'
+        payload = bytearray(range(10))
+        cap._SURFACE = lambda value: SimpleNamespace(get_DataNoUnpacking=lambda: payload)
+        def unpack(*args):
+            payload[:] = b'\xff' * len(payload)
+            return M.np.zeros((2, 4), dtype='u2')
+        cap._unpack = unpack
+        ok, captured = cap.read_raw()
+        self.assertTrue(ok)
+        self.assertEqual(captured.payload, bytes(range(10)))
+        self.assertEqual(M._raw_capture_payload(captured, 'Y10', 4, 2)[1], bytes(range(10)))
+
+    def test_reader_selects_raw_and_propagates_capture_errors(self):
+        import queue, threading
+        stop = threading.Event(); frames = queue.Queue(2)
+        normal = Mock()
+        def read_raw():
+            stop.set()
+            return True, M._FrameWithRaw(None, b'capture')
+        cap = Mock(spec=['read', 'read_raw']);cap.read=normal;cap.read_raw=read_raw
+        M._frame_reader([cap], frames, stop, True)
+        self.assertEqual(frames.get()[2].payload, b'capture')
+        normal.assert_not_called()
+        stop.clear();cap.read_raw=Mock(side_effect=RuntimeError('unsupported raw buffer'))
+        M._frame_reader([cap], frames, stop, True)
+        self.assertIsInstance(frames.get()[2], RuntimeError)
+
+    def test_raw_event_frames_and_quota_use_actual_payload(self):
+        import queue, threading
+        events = io.StringIO(); frames = [(0, b'abcd'), (1, b'efgh')]
+        pending = queue.Queue(); committed = [0]; full = [False]
+        with tempfile.TemporaryDirectory() as directory:
+            M._dispatch_event_frames(pending, committed, threading.Lock(), 8,
+                                     directory, 'test', 0, frames, 'raw', 'Y16',
+                                     1, 2, csv.writer(events), events, frames_full_flag=full)
+            self.assertEqual(committed[0], 8);self.assertFalse(full[0])
+            pending.put(None);M._save_worker(pending)
+            self.assertEqual([p.read_bytes() for p in sorted(Path(directory).rglob('*.raw'))],
+                             [b'abcd', b'efgh'])
+
+    def test_drop_event_records_native_frames_not_luma(self):
+        frames = [M.np.full((2, 4), v, dtype='<u2') for v in (1, 0x8000, 0xFFFF, 0x1234, 7)]
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            cfg = M.Config(width=4, height=2, fmt='Y16', num_frames=5, log_enabled=True,
+                           drop_detect=True, event_half=1, image_format='raw', base_dir=directory)
+            M.camera_main_loop(cfg, _frame_iter=iter(zip(frames, (0, 16.7, 100, 16.7, 16.7))))
+            saved = sorted(Path(directory).rglob('*.raw'))
+            self.assertEqual([p.read_bytes() for p in saved], [f.tobytes() for f in frames[1:4]])
+
+    def test_raw_only_capture_does_not_compute_or_cast_luma(self):
+        from types import SimpleNamespace
+        frame = M.np.array([[0, 0xffff], [0x1234, 0x8001]], dtype='<u2')
+        payload = frame.tobytes()
+        def read_raw():
+            time.sleep(0.001)
+            return True, M._FrameWithRaw(frame, payload)
+        for system in ('Linux', 'Windows'):
+            cap = SimpleNamespace(width=2, height=2, pixel_fmt='Y16', read=Mock(),
+                                  read_raw=read_raw, release=Mock())
+            with self.subTest(system=system), tempfile.TemporaryDirectory() as directory, \
+                 contextlib.redirect_stdout(io.StringIO()), \
+                 patch.object(M.platform, 'system', return_value=system), \
+                 patch.object(M, 'open_capture', return_value=cap), \
+                 patch.object(M, 'frame_to_gray', side_effect=AssertionError('RAW-only capture must not compute luma')):
+                cfg = M.Config(width=2, height=2, fmt='Y16', num_frames=1,
+                               save_images=True, image_format='raw', base_dir=directory)
+                M.camera_main_loop(cfg)
+                self.assertEqual(next(Path(directory).rglob('frame_0001.raw')).read_bytes(), payload)
+                cap.read.assert_not_called()
+                cap.release.assert_called()
+
+    def test_tiff_keeps_existing_uint16_values(self):
+        frame = M.np.array([[0, 65535], [1, 0x1234]], dtype='u2')
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            cfg = M.Config(width=2, height=2, fmt='Y16', num_frames=1,
+                           save_images=True, image_format='tif', base_dir=directory)
+            M.camera_main_loop(cfg, _frame_iter=iter([(frame, 0)]))
+            actual = M.cv2.imread(str(next(Path(directory).rglob('*.tif'))), M.cv2.IMREAD_UNCHANGED)
+            M.np.testing.assert_array_equal(actual, frame)
+
+
+
+class CubeRecordingTests(unittest.TestCase):
+    def setUp(self):
+        for name in ('np', 'cv2'):
+            dependency = getattr(M, name)
+            if isinstance(dependency, M._ClassicModule):
+                dependency.load()
+
+    def test_cube_concatenates_exact_frames_and_implies_saving(self):
+        for fmt, dtype in [('Y16', '<u2'), ('Y16_BE', '>u2')]:
+            for save_images in (False, True):
+                with self.subTest(fmt=fmt, save_images=save_images), \
+                     tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+                    frames = [M.np.array([[i, 0x1234], [0x8001, 0xffff-i]], dtype=dtype) for i in range(3)]
+                    cfg = M.Config(width=2, height=2, fmt=fmt, num_frames=3,
+                                   save_images=save_images, save_images_cube=True,
+                                   image_format='raw', base_dir=directory)
+                    M.camera_main_loop(cfg, _frame_iter=iter((f, 16.7) for f in frames))
+                    files = list(Path(directory).rglob('*.raw'))
+                    self.assertEqual([p.name for p in files], ['cube.raw'])
+                    self.assertEqual(files[0].read_bytes(), b''.join(f.tobytes() for f in frames))
+
+    def test_non_cube_still_writes_separate_frames(self):
+        frames = [M.np.full((2, 2), i, dtype='<u2') for i in range(3)]
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            cfg = M.Config(width=2, height=2, fmt='Y16', num_frames=3,
+                           save_images=True, image_format='raw', base_dir=directory)
+            M.camera_main_loop(cfg, _frame_iter=iter((f, 16.7) for f in frames))
+            files = sorted(Path(directory).rglob('*.raw'))
+            self.assertEqual([p.name for p in files], ['frame_0001.raw', 'frame_0002.raw', 'frame_0003.raw'])
+            self.assertEqual([p.read_bytes() for p in files], [f.tobytes() for f in frames])
+
+    def test_non_raw_cube_is_rejected_before_any_device_access(self):
+        cases = [(['--save-images-cube'], None),
+                 (['--save-images-cube', '--image-format=tif'], None),
+                 ([], {'save_images_cube': True, 'image_format': 'tif'})]
+        for args, config in cases:
+            with self.subTest(args=args, config=config), tempfile.TemporaryDirectory() as directory:
+                if config:
+                    path = Path(directory)/'config.json';path.write_text(json.dumps(config))
+                    args = ['--config', str(path)] + args
+                stderr = io.StringIO()
+                with patch.object(sys, 'argv', [str(PATH)] + args), \
+                     patch('subprocess.run', side_effect=AssertionError('unexpected device I/O')), \
+                     patch('cv2.VideoCapture', side_effect=AssertionError('unexpected capture')), \
+                     contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                    runpy.run_path(str(PATH), run_name='__main__')
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn('--save-images-cube requires --image-format raw', stderr.getvalue())
+        with patch.object(M, 'open_capture') as capture, self.assertRaisesRegex(ValueError, 'requires --image-format raw'):
+            M.camera_main_loop(M.Config(save_images_cube=True))
+        capture.assert_not_called()
+
+    def test_cube_json_configuration(self):
+        frame = M.np.array([[0, 65535], [0x1234, 1]], dtype='<u2')
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            path = Path(directory)/'config.json'
+            path.write_text(json.dumps(dict(width=2, height=2, fmt='Y16', num_frames=1,
+                                            save_images_cube=True, image_format='raw', base_dir=directory)))
+            M.camera_main_loop(M.Config.from_json(str(path)), _frame_iter=iter([(frame, 0)]))
+            self.assertEqual(next(Path(directory).rglob('cube.raw')).read_bytes(), frame.tobytes())
+
+    def test_cube_is_flushed_and_closed_after_interrupt_or_capture_failure(self):
+        frames = [M.np.full((2, 2), i, dtype='<u2') for i in (0x1234, 65535)]
+        real_open = open
+        for error in (KeyboardInterrupt, RuntimeError):
+            handles = []
+            def tracked_open(path, *args, **kwargs):
+                handle = real_open(path, *args, **kwargs)
+                if str(path).endswith('cube.raw'):
+                    handles.append(handle)
+                return handle
+            def interrupted_frames():
+                for frame in frames:
+                    yield frame, 16.7
+                raise error('test interruption')
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as directory, \
+                 contextlib.redirect_stdout(io.StringIO()), patch('builtins.open', side_effect=tracked_open):
+                cfg = M.Config(width=2, height=2, fmt='Y16', save_images_cube=True,
+                               image_format='raw', base_dir=directory)
+                if error is KeyboardInterrupt:
+                    M.camera_main_loop(cfg, _frame_iter=interrupted_frames())
+                else:
+                    with self.assertRaisesRegex(RuntimeError, 'test interruption'):
+                        M.camera_main_loop(cfg, _frame_iter=interrupted_frames())
+                self.assertEqual(len(handles), 1)
+                self.assertTrue(handles[0].closed)
+                self.assertEqual(next(Path(directory).rglob('cube.raw')).read_bytes(),
+                                 b''.join(f.tobytes() for f in frames))
+
+    def test_cube_handles_short_writes_without_changing_data(self):
+        real_open = open
+        class ShortWriter:
+            def __init__(self, handle): self.handle = handle
+            def __getattr__(self, name): return getattr(self.handle, name)
+            def write(self, data): return self.handle.write(data[:3])
+        def short_open(path, *args, **kwargs):
+            handle = real_open(path, *args, **kwargs)
+            return ShortWriter(handle) if str(path).endswith('cube.raw') else handle
+        frames = [M.np.full((2, 2), i, dtype='<u2') for i in (1, 0x1234, 65535)]
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()), \
+             patch('builtins.open', side_effect=short_open):
+            cfg = M.Config(width=2, height=2, fmt='Y16', save_images_cube=True,
+                           image_format='raw', base_dir=directory)
+            M.camera_main_loop(cfg, _frame_iter=iter((f, 16.7) for f in frames))
+            self.assertEqual(next(Path(directory).rglob('cube.raw')).read_bytes(),
+                             b''.join(f.tobytes() for f in frames))
+
+    def test_cube_removes_partial_last_frame_on_write_error_or_interrupt(self):
+        real_open = open
+        frames = [M.np.full((2, 2), i, dtype='<u2') for i in (0x1234, 65535)]
+        for error in (OSError, KeyboardInterrupt):
+            handles = []
+            class FailingWriter:
+                def __init__(self, handle): self.handle, self.calls = handle, 0
+                def __getattr__(self, name): return getattr(self.handle, name)
+                def write(self, data):
+                    self.calls += 1
+                    if self.calls == 2:
+                        self.handle.write(data[:3])
+                        raise error('incomplete write')
+                    return self.handle.write(data)
+            def failing_open(path, *args, **kwargs):
+                handle = real_open(path, *args, **kwargs)
+                if str(path).endswith('cube.raw'):
+                    handles.append(handle)
+                    return FailingWriter(handle)
+                return handle
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as directory, \
+                 contextlib.redirect_stdout(io.StringIO()), patch('builtins.open', side_effect=failing_open):
+                cfg = M.Config(width=2, height=2, fmt='Y16', save_images_cube=True,
+                               image_format='raw', base_dir=directory)
+                if error is KeyboardInterrupt:
+                    M.camera_main_loop(cfg, _frame_iter=iter((f, 16.7) for f in frames))
+                else:
+                    with self.assertRaisesRegex(OSError, 'incomplete write'):
+                        M.camera_main_loop(cfg, _frame_iter=iter((f, 16.7) for f in frames))
+                self.assertEqual(next(Path(directory).rglob('cube.raw')).read_bytes(), frames[0].tobytes())
+                self.assertTrue(handles[0].closed)
+
+    def test_cube_rejects_layout_change_before_appending(self):
+        first = M.np.ones((2, 2), dtype='<u2')
+        changed = M.np.ones((1, 4), dtype='<u2')
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            cfg = M.Config(width=2, height=2, fmt='Y16', save_images_cube=True,
+                           image_format='raw', base_dir=directory)
+            with self.assertRaisesRegex(RuntimeError, 'RAW cube frame format, shape or byte length changed'):
+                M.camera_main_loop(cfg, _frame_iter=iter([(first, 0), (changed, 16.7)]))
+            self.assertEqual(next(Path(directory).rglob('cube.raw')).read_bytes(), first.tobytes())
+
+    def test_existing_cube_is_not_overwritten(self):
+        frame = M.np.ones((2, 2), dtype='<u2')
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()), \
+             patch.object(M, 'datetime') as clock:
+            clock.now.return_value.strftime.return_value = 'fixed-timestamp'
+            cfg = M.Config(width=2, height=2, fmt='Y16', save_images_cube=True,
+                           image_format='raw', base_dir=directory, num_frames=1)
+            M.camera_main_loop(cfg, _frame_iter=iter([(frame, 0)]))
+            with self.assertRaises(FileExistsError):
+                M.camera_main_loop(cfg, _frame_iter=iter([(frame*2, 0)]))
+            self.assertEqual(next(Path(directory).rglob('cube.raw')).read_bytes(), frame.tobytes())
 
 
 if __name__ == '__main__':

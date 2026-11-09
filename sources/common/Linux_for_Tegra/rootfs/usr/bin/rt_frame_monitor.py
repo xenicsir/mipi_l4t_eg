@@ -61,12 +61,38 @@ FORMAT_GST  = {"Y16": "GRAY16_LE", "Y16_BE": "GRAY16_BE", "AR24": "BGRA", "AB24"
 FORMAT_V4L2 = {"Y16": "Y16 ",      "Y16_BE": "Y16 -BE",   "AR24": "AR24", "AB24": "AB24", "YUYV": "YUYV", "Y14": "Y14 "}
 FORMAT_V4L2_REV = {v.strip(): k for k, v in FORMAT_V4L2.items()}  # actual V4L2 pixelformat -> our fmt name
 
-# 16-bit single-channel raw formats: already fully decoded to native uint16 by
-# capture time (see _GstAppSinkCapture._sample_to_array) — no color conversion,
-# 2 bytes/pixel, display via straight normalization instead of clipping.
+# 16-bit single-channel formats. Normal capture decodes to native uint16;
+# RAW recording retains the original capture payload and byte order separately.
 # Y14 is packed in the same 2-byte container (upper bits unused) — see
 # _V4L2RawStreamCapture.
 Y16_LIKE_FMTS = ("Y16", "Y16_BE", "Y10", "Y14")
+
+
+@dataclass
+class _FrameWithRaw:
+    """Keep the capture payload separate from pixels used for analysis."""
+    image: object
+    payload: bytes
+
+
+def _raw_capture_payload(frame, fmt, width, height):
+    """Return capture bytes without casting, unpacking or color conversion."""
+    if isinstance(frame, _FrameWithRaw):
+        return frame.image, frame.payload
+    bpp = 4 if fmt in ("AR24", "AB24") else 2
+    expected = width * height * bpp
+    valid_type = frame.dtype == np.uint8
+    if fmt in Y16_LIKE_FMTS and frame.dtype.kind == 'u' and frame.dtype.itemsize == 2:
+        byte_order = frame.dtype.byteorder
+        big_endian = byte_order == '>' or (byte_order == '=' and sys.byteorder == 'big')
+        valid_type = big_endian == (fmt == 'Y16_BE')
+    if not valid_type or frame.nbytes != expected or not frame.flags.c_contiguous:
+        raise RuntimeError(
+            f"Cannot save unmodified {fmt} RAW: capture returned {frame.shape} "
+            f"{frame.dtype}, {frame.nbytes} bytes; expected {expected} native bytes. "
+            "The capture backend may have converted the image."
+        )
+    return frame, frame.tobytes()
 
 
 class FrameCadence:
@@ -424,6 +450,12 @@ class _EuresysCLCapture:
                  board_index, width, height, self.pixel_fmt, multicam_file)
 
     def read(self):
+        return self._read(keep_raw=False)
+
+    def read_raw(self):
+        return self._read(keep_raw=True)
+
+    def _read(self, keep_raw):
         MC   = self._MC
         info = MC.MCSIGNALINFO()
         st   = MC.McWaitSignal(self._chan.instance, MC.SIG_SURFACE_FILLED,
@@ -445,7 +477,14 @@ class _EuresysCLCapture:
 
         surf = self._SURFACE(info.SignalInfo)
         raw  = surf.get_DataNoUnpacking()
-        return True, self._unpack(raw, self.pixel_fmt, self._width, self._height)
+        payload = None
+        if keep_raw:
+            view = memoryview(raw)
+            if not view.c_contiguous or view.ndim == 0:
+                raise RuntimeError('CameraLink capture did not provide a contiguous RAW buffer')
+            payload = view.tobytes()
+        frame = self._unpack(raw, self.pixel_fmt, self._width, self._height)
+        return True, _FrameWithRaw(frame, payload) if keep_raw else frame
 
     def release(self):
         try:
@@ -731,6 +770,7 @@ class Config:
 
     # Image saving
     save_images:            bool           = False
+    save_images_cube:       bool           = False  # one headerless RAW file
     image_format:           str            = "tif"   # "tif" | "raw"
 
     # FPN spike detection — all parameters delegated to ConfigFPN
@@ -843,8 +883,7 @@ class _GstAppSinkCapture:
     # gst_fmt -> (read dtype, channels). Assumes packed, unpadded rows
     # (bytesperline == width * itemsize * channels), true for v4l2src with
     # these formats. Read dtype carries the wire byte order for 16-bit
-    # formats; _sample_to_array() converts to native order right after, so
-    # everything downstream sees plain native uint16 regardless of source.
+    # formats. Normal reads decode to native order; read_raw retains the bytes.
     _GST_FMT_NP = {
         "GRAY16_LE": ("<u2", 1),
         "GRAY16_BE": (">u2", 1),
@@ -998,18 +1037,18 @@ class _GstAppSinkCapture:
         with self._capture_lock:
             return self._capture_total
 
-    def _sample_to_array(self, sample):
+    def _sample_to_array(self, sample, keep_raw=False):
         buf = sample.get_buffer()
         ok, mapinfo = buf.map(self._Gst.MapFlags.READ)
         if not ok:
             return None
         try:
-            # astype() to the native byte order both copies (detaching from
-            # mapinfo.data, which is invalid after unmap()) and normalizes
-            # away any non-native byte order (e.g. GRAY16_BE) in one step —
-            # downstream code and OpenCV calls can then assume plain
-            # native-order uint16/uint8, never a foreign byte order.
-            arr = np.frombuffer(mapinfo.data, dtype=self._dtype).astype(self._dtype.newbyteorder("="))
+            # RAW owns an exact copy before unmap, including byte order. The
+            # normal analysis/display path retains its native-order decoding.
+            payload = bytes(mapinfo.data) if keep_raw else None
+            arr = np.frombuffer(payload if keep_raw else mapinfo.data, dtype=self._dtype)
+            if not keep_raw:
+                arr = arr.astype(self._dtype.newbyteorder("="))
         finally:
             buf.unmap(mapinfo)
         expected = self._height * self._width * self._channels
@@ -1020,9 +1059,16 @@ class _GstAppSinkCapture:
             )
         shape = (self._height, self._width) if self._channels == 1 \
             else (self._height, self._width, self._channels)
-        return arr.reshape(shape)
+        frame = arr.reshape(shape)
+        return _FrameWithRaw(frame, payload) if keep_raw else frame
 
     def read(self):
+        return self._read(keep_raw=False)
+
+    def read_raw(self):
+        return self._read(keep_raw=True)
+
+    def _read(self, keep_raw):
         if not self._opened:
             return False, None
         if self._first_sample is not None:
@@ -1031,7 +1077,7 @@ class _GstAppSinkCapture:
             sample = self._pull_sample()
         if sample is None:
             return False, None
-        arr = self._sample_to_array(sample)
+        arr = self._sample_to_array(sample, keep_raw=keep_raw)
         return (arr is not None), arr
 
     def release(self):
@@ -1408,7 +1454,7 @@ def open_capture(cam_index, device, fmt, width, height, fps, multicam_file=None)
         return _open_capture_windows(cam_index, fmt, width, height, fps, multicam_file)
 
 
-def _frame_reader(cap_ref, frame_queue, stop_event):
+def _frame_reader(cap_ref, frame_queue, stop_event, keep_raw=False):
     """Dedicated capture thread: calls cap.read() in a tight loop.
 
     Runs independently of the main loop so read() is never delayed by frame
@@ -1420,7 +1466,16 @@ def _frame_reader(cap_ref, frame_queue, stop_event):
     most recent frame.
     """
     while not stop_event.is_set():
-        ret, frame = cap_ref[0].read()
+        cap = cap_ref[0]
+        read = getattr(cap, 'read_raw', cap.read) if keep_raw else cap.read
+        try:
+            ret, frame = read()
+        except Exception as exc:
+            if not keep_raw:
+                raise
+            # RAW capture errors must reach the consumer: never silently
+            # replace an unavailable native payload with converted pixels.
+            ret, frame = True, exc
         now = time.perf_counter()
         if frame_queue.full():
             try:
@@ -1431,6 +1486,8 @@ def _frame_reader(cap_ref, frame_queue, stop_event):
             frame_queue.put_nowait((now, ret, frame))
         except queue.Full:
             pass
+        if isinstance(frame, Exception):
+            break
 
 
 # ---------------------------------------------------------------------------
@@ -1575,14 +1632,14 @@ def _save_worker(save_queue):
         fmt       = task['image_fmt']
         pixel_fmt = task['pixel_fmt']
         os.makedirs(event_dir, exist_ok=True)
-        for i, (fts, gray) in enumerate(frames):
+        for i, (fts, pixels) in enumerate(frames):
             fname = f"frame_{i:02d}_{fts:.3f}s.{fmt}"
             fpath = os.path.join(event_dir, fname)
             if fmt == 'tif':
-                arr = gray.astype(np.uint16) if pixel_fmt in Y16_LIKE_FMTS else gray.astype(np.uint8)
+                arr = pixels.astype(np.uint16) if pixel_fmt in Y16_LIKE_FMTS else pixels.astype(np.uint8)
                 cv2.imwrite(fpath, arr)
             else:
-                gray.astype(np.float32).tofile(fpath)
+                Path(fpath).write_bytes(pixels)
         save_queue.task_done()
 
 
@@ -1599,8 +1656,11 @@ def _dispatch_event_frames(save_queue, committed_bytes, committed_lock, max_byte
     if not frames:
         return
 
-    bpp = 4 if image_format == 'raw' else (2 if pixel_fmt in Y16_LIKE_FMTS else 1)
-    estimated = len(frames) * height * width * bpp
+    if image_format == 'raw':
+        estimated = sum(len(payload) for _, payload in frames)
+    else:
+        bpp = 2 if pixel_fmt in Y16_LIKE_FMTS else 1
+        estimated = len(frames) * height * width * bpp
     event_dir_name = f"{event_type}_{event_ts:09.3f}s"
     event_dir = os.path.join(run_dir, event_dir_name)
 
@@ -1643,10 +1703,13 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     cfg        : Config instance — all tunable parameters.
                  FPN detection is controlled by cfg.fpn (ConfigFPN).
                  Set cfg.fpn.enabled = True to activate FPN spike detection.
-    _frame_iter: optional iterator yielding (gray_float32_2d, dt_ms) tuples.
+    _frame_iter: optional iterator yielding (pixels, dt_ms) tuples. RAW tests
+                 must supply native capture arrays, not float32 metric images.
                  When provided, the camera is not opened and timing is driven
                  by dt_ms values.  Used exclusively for testing.
     """
+    if cfg.save_images_cube and cfg.image_format != 'raw':
+        raise ValueError('--save-images-cube requires --image-format raw')
     if _frame_iter is None:
         for alias in ("np", "cv2"):
             dependency = globals()[alias]
@@ -1660,7 +1723,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     width                 = cfg.width
     height                = cfg.height
     num_frames            = cfg.num_frames
-    save_images           = cfg.save_images
+    save_images_cube      = cfg.save_images_cube
+    save_images           = cfg.save_images or save_images_cube
     image_format          = cfg.image_format
     event_half            = cfg.event_half
     max_save_mb           = cfg.max_save_mb
@@ -1691,11 +1755,15 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     # --stats (to print them on the status line with no other flag).
     need_stats     = stats_enabled or log_enabled or fpn_detect
     need_frame_buf = drop_detect or fpn_detect
+    raw_capture = image_format == 'raw' and (save_images or need_frame_buf)
     # frame_to_gray()/to_luma() casts to float32 (a full-frame copy) — needed
-    # for stats/frame_buf/save_images, but the live preview alone can work
+    # for stats/TIFF images, but the live preview alone can work
     # straight off the raw uint16 capture (see the show_video fast path
     # below), so skip the cast entirely when nothing else needs it.
-    need_gray      = need_stats or need_frame_buf or save_images or fmt not in Y16_LIKE_FMTS
+    need_gray = (need_stats or ((need_frame_buf or save_images) and image_format == 'tif')
+                 or fmt not in Y16_LIKE_FMTS)
+    if raw_capture:
+        need_gray = need_stats or show_video
 
     if _frame_iter is not None:
         device_tag = ""
@@ -1742,6 +1810,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         fmt = cap.pixel_fmt
     if cap is not None and hasattr(cap, 'width'):
         width, height = cap.width, cap.height
+    if raw_capture:
+        log.info('RAW recording: unmodified capture bytes, no header or normalization')
     if show_video and not cfg.window_autosize and (width, height) != initial_size:
         cv2.resizeWindow(_win_title, width, height)
     report_display_mapping(fmt, 'classic', show_video, cfg.normalize)
@@ -1754,7 +1824,7 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
     _reader_thread  = None
     if cap is not None:
         _reader_thread = threading.Thread(
-            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
+            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader, raw_capture), daemon=True)
         _reader_thread.start()
 
     def _restart_reader(new_cap):
@@ -1766,10 +1836,11 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         _stop_reader.clear()
         _cap_ref[0] = new_cap
         _reader_thread = threading.Thread(
-            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader), daemon=True)
+            target=_frame_reader, args=(_cap_ref, _frame_queue, _stop_reader, raw_capture), daemon=True)
         _reader_thread.start()
 
-    start_ts     = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    start_ts     = datetime.now().strftime('%Y-%m-%d_%H-%M-%S.%f' if save_images_cube
+                                          else '%Y-%m-%d_%H-%M-%S')
     run_dir_name = start_ts + device_tag
     run_dir = os.path.join(base_dir, run_dir_name) if base_dir else run_dir_name
     if log_enabled or save_images:
@@ -1778,9 +1849,17 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         log.info("Log directory: %s", run_dir)
 
     image_folder = None
+    cube_file = None
+    cube_layout = None
+    cube_path = None
+    cube_bytes = 0
     if save_images:
         image_folder = os.path.join(run_dir, start_ts)
         os.makedirs(image_folder, exist_ok=True)
+        log.info('Image directory: %s', image_folder)
+        if save_images_cube:
+            cube_path = os.path.join(image_folder, 'cube.raw')
+            log.info('RAW cube: %s', cube_path)
 
     def _open_log_file(ts=None):
         if ts is None:
@@ -1928,6 +2007,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                     gray, dt_override = next(_frame_iter)
                 except StopIteration:
                     break
+                if raw_capture:
+                    frame, raw_data = _raw_capture_payload(gray, fmt, width, height)
                 if t0 is None:
                     t0 = 0.0
                     ts = 0.0
@@ -1941,6 +2022,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                 except queue.Empty:
                     now, ret, frame = time.perf_counter(), False, None
 
+                if isinstance(frame, Exception):
+                    raise frame
                 if not ret:
                     if grab_fail_since is None:
                         # First failure: log camera_freeze immediately (pipeline is broken)
@@ -1974,6 +2057,8 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                 if grab_fail_since is not None:
                     grab_fail_since = None
 
+                if raw_capture:
+                    frame, raw_data = _raw_capture_payload(frame, fmt, width, height)
                 gray = frame_to_gray(frame, fmt, width, height) if need_gray else None
                 if t0 is None:
                     t0 = now
@@ -1999,11 +2084,11 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
                 results = None
 
             if need_frame_buf:
-                frame_buf.append((ts, gray))
+                frame_buf.append((ts, raw_data if raw_capture else gray))
 
             # Collect future frames for an in-progress drop event
             if pending_event is not None:
-                pending_event['frames'].append((ts, gray))
+                pending_event['frames'].append((ts, raw_data if raw_capture else gray))
                 pending_event['remaining'] -= 1
                 if pending_event['remaining'] == 0:
                     dispatch_pending()
@@ -2117,13 +2202,28 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
 
             # ── Per-frame image save (optional) ───────────────────────────
             if save_images:
-                fname = f"frame_{frame_count + 1:04d}.{image_format}"
-                fpath = os.path.join(image_folder, fname)
-                if image_format == "tif":
-                    save_arr = gray.astype(np.uint16) if fmt in Y16_LIKE_FMTS else gray.astype(np.uint8)
-                    cv2.imwrite(fpath, save_arr)
-                elif image_format == "raw":
-                    gray.astype(np.float32).tofile(fpath)
+                if save_images_cube:
+                    layout = (fmt, getattr(frame, 'shape', None), len(raw_data))
+                    if cube_file is None:
+                        cube_file = open(cube_path, 'xb', buffering=0)
+                        cube_layout = layout
+                    elif layout != cube_layout:
+                        raise RuntimeError('RAW cube frame format, shape or byte length changed during capture')
+                    pending = memoryview(raw_data)
+                    while pending:
+                        written = cube_file.write(pending)
+                        if not written:
+                            raise OSError('RAW cube write made no progress')
+                        pending = pending[written:]
+                    cube_bytes += len(raw_data)
+                else:
+                    fname = f"frame_{frame_count + 1:04d}.{image_format}"
+                    fpath = os.path.join(image_folder, fname)
+                    if image_format == "tif":
+                        save_arr = gray.astype(np.uint16) if fmt in Y16_LIKE_FMTS else gray.astype(np.uint8)
+                        cv2.imwrite(fpath, save_arr)
+                    elif image_format == "raw":
+                        Path(fpath).write_bytes(raw_data)
 
             # ── Live display (optional) ───────────────────────────────────
             if show_video:
@@ -2181,24 +2281,33 @@ def camera_main_loop(cfg=default_cfg, _frame_iter=None):
         print("\nStopping...")
 
     finally:
-        status_output.finish()
-        dispatch_pending()      # flush any in-progress drop event collection
-        save_queue.put(None)    # signal save thread to stop
-        save_thread.join()      # wait for all frames to be written to disk
-        _stop_reader.set()      # stop the capture thread before releasing cap
-        if cap is not None:
-            cap.release()
-        if show_video:
-            cv2.destroyAllWindows()
-        flog.close()
-        fevents.close()
-        if cap is not None:
-            capture_rate = cap.cadence.summary() if hasattr(cap, 'cadence') else processing_cadence.summary()
-            log.info('FPS_RESULT %s', json.dumps(dict(capture=capture_rate, processing=processing_cadence.summary(),
-                expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source)))
-        if cap is not None and hasattr(cap, 'capture_counters'):
-            log.info('CAPTURE_INTEGRITY %s', json.dumps(cap.capture_counters.summary()))
-        log.info("CPU average=%.1f%% (process, 100%% per core)", cpu_load.average())
+        try:
+            if cube_file is not None:
+                try:
+                    # Discard a partial last frame after an interrupted or
+                    # failed write. Only complete capture payloads form a cube.
+                    cube_file.truncate(cube_bytes)
+                finally:
+                    cube_file.close()
+        finally:
+            status_output.finish()
+            dispatch_pending()      # flush any in-progress drop event collection
+            save_queue.put(None)    # signal save thread to stop
+            save_thread.join()      # wait for all frames to be written to disk
+            _stop_reader.set()      # stop the capture thread before releasing cap
+            if cap is not None:
+                cap.release()
+            if show_video:
+                cv2.destroyAllWindows()
+            flog.close()
+            fevents.close()
+            if cap is not None:
+                capture_rate = cap.cadence.summary() if hasattr(cap, 'cadence') else processing_cadence.summary()
+                log.info('FPS_RESULT %s', json.dumps(dict(capture=capture_rate, processing=processing_cadence.summary(),
+                    expected_fps=cfg.expected_fps, expected_fps_source=cfg.expected_fps_source)))
+            if cap is not None and hasattr(cap, 'capture_counters'):
+                log.info('CAPTURE_INTEGRITY %s', json.dumps(cap.capture_counters.summary()))
+            log.info("CPU average=%.1f%% (process, 100%% per core)", cpu_load.average())
 
     return run_dir
 
@@ -2221,6 +2330,7 @@ def _nvmm_pixel_requests(args, config_data=None, argv=None):
     argv = sys.argv[1:] if argv is None else argv
     requested = []
     for name, active in [('stats', args.stats), ('save-images', args.save_images),
+                         ('save-images-cube', args.save_images_cube),
                          ('fpn-detect', args.fpn_detect), ('multicam-file', args.multicam_file),
                          ('no-resize', args.no_resize)]:
         if active:
@@ -2246,6 +2356,8 @@ def _nvmm_pixel_requests(args, config_data=None, argv=None):
 
 
 def _validate_backend_args(parser, args, config_data, argv=None):
+    if args.save_images_cube and args.image_format != 'raw':
+        parser.error('--save-images-cube requires --image-format raw')
     if args.expected_fps is not None and (not math.isfinite(args.expected_fps) or args.expected_fps <= 0):
         parser.error('expected-fps must be finite and positive')
     if args.backend not in ('auto', 'classic', 'nvmm'):
@@ -2798,7 +2910,10 @@ capture values are unchanged by the display mapping.
     # Output
     parser.add_argument("--base-dir",      default=run_cfg.base_dir, metavar="DIR")
     parser.add_argument("--save-images",   action="store_true", default=run_cfg.save_images)
-    parser.add_argument("--image-format",  default=run_cfg.image_format, choices=["tif", "raw"])
+    parser.add_argument("--save-images-cube", action="store_true", default=run_cfg.save_images_cube,
+                        help="Record continuous frames in one cube.raw file; requires --image-format raw and implies --save-images")
+    parser.add_argument("--image-format", default=run_cfg.image_format, choices=["tif", "raw"],
+                        help="tif: grayscale image; raw: capture bytes without conversion or header (preserves channels, byte order and packing)")
     parser.add_argument("--max-log-lines", type=int,   default=run_cfg.max_log_lines)
     parser.add_argument("--max-save-mb",   type=float, default=run_cfg.max_save_mb)
     parser.add_argument("--max-frames-mb", type=float, default=run_cfg.max_frames_mb)
@@ -2889,7 +3004,8 @@ capture values are unchanged by the display mapping.
     run_cfg.height                 = args.height
     run_cfg.num_frames             = args.num_frames if args.num_frames > 0 else None
     run_cfg.base_dir               = args.base_dir
-    run_cfg.save_images            = args.save_images
+    run_cfg.save_images            = args.save_images or args.save_images_cube
+    run_cfg.save_images_cube       = args.save_images_cube
     run_cfg.image_format           = args.image_format
     run_cfg.max_log_lines          = args.max_log_lines
     run_cfg.max_save_mb            = args.max_save_mb

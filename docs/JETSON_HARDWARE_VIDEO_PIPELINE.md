@@ -268,6 +268,46 @@ camera, including requests loaded from JSON. CameraLink and classic window or
 recovery tuning are also incompatible with forced NVMM. Metadata logging does
 not imply pixel statistics in NVMM; classic logging retains its pixel metrics.
 
+To save one unmodified capture payload:
+
+```sh
+rt_frame_monitor.py -d /dev/video0 -W 640 -H 480 --fmt Y16 \
+  --num-frames 1 --save-images --image-format raw --base-dir "$HOME/captures"
+```
+
+RAW files have no header and contain the bytes supplied by the capture backend,
+without a pixel cast, color conversion, byte swap or normalization. Channels,
+byte order and packing are retained. A tightly packed 640x480 Y16 frame occupies
+614400 bytes; Y14 in a V4L2 16-bit container also uses two bytes per pixel.
+Analysis and display operate separately and do not modify the recorded bytes.
+A converted layout that cannot represent the requested RAW format is rejected
+explicitly instead of being converted back into a different representation.
+
+The image directory is printed at startup. Images are named `frame_0001.raw`,
+etc., under timestamped subdirectories of `--base-dir` (the current directory
+if omitted). Event-triggered RAW recordings use the same unchanged payloads;
+their storage quota counts the actual byte lengths. TIFF recording retains its
+grayscale representation, using 16-bit samples for grayscale camera formats.
+
+For continuous recording into one RAW cube:
+
+```sh
+rt_frame_monitor.py -d /dev/video0 -W 640 -H 480 --fmt Y16 \
+  --num-frames 10 --save-images-cube --image-format raw --base-dir "$HOME/captures"
+```
+
+`--save-images-cube` enables saving itself; `--save-images` is optional. It requires
+`--image-format raw` and selects classic capture in auto mode. The single
+`cube.raw` file contains the capture payloads concatenated in frame order, with
+no header, separator or pixel conversion. Ten 640x480 Y16 frames occupy 6144000
+bytes. Its path is printed at startup. The file is closed and flushed when the
+frame limit is reached, on Ctrl+C, or on a capture error. A format, shape or
+payload-size change stops recording before appending the incompatible frame.
+A partial last frame from an interrupted write is removed, leaving complete
+capture payloads in the file.
+Cube mode controls continuous image saving; event-triggered snapshots retain
+their independent event directories. Existing cube files are never overwritten.
+
 NVMM capture runs in a supervised process within the same standalone script.
 Ctrl+C requests shutdown, then escalates if native cleanup is blocked. A
 heartbeat watchdog detects unresponsive native calls; killing the supervisor
