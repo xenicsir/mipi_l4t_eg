@@ -59,6 +59,77 @@ Duplicate formats or dimensions remain failed checks in `format_results` and
 make the campaign unsuccessful; they do not prevent the remaining streaming
 and camera tests from running.
 
+For EngineCore and Dione on the patched L4T35+ framework, enumeration describes
+capabilities, whereas `--get-fmt-video` describes the active camera configuration.
+EngineCore advertises its available Y16, AR24 and YUYV modes, each with only the
+connected camera's dimensions. The default RGB alias is AR24/BGRA; AB24/RGBA is
+only appropriate for a camera explicitly configured to produce that byte order.
+The runner reads EngineCore capability modes from the device tree independently
+of enumeration, and compares native dimensions/format with the camera sysfs and
+control-register reports. It checks metadata before and after captures.
+
+iLumos, MicroLynx and Titan also enumerate only their native geometry; their
+existing pixel-format control policies are preserved; in particular, iLumos
+retains runtime Y14/Y16-BE switching. The rejection test
+checks dimensions only for these families, then the normal streaming cases
+exercise each supported pixel format.
+
+The geometry requests include dimensions of other models declared in the DT,
+not just arbitrary unsupported sizes.
+
+Direct TRY_FMT and S_FMT ioctls request incorrect dimensions, other advertised
+formats, the opposite RGB alias and an unknown fourcc. These requests must fail
+with EINVAL without changing the active format. A native capture is attempted
+before these ioctls; another native capture follows. An accepted native S_FMT may
+normalize colorimetry metadata, but must preserve its dimensions, fourcc and
+memory layout. EngineCore format changes still require camera control, save,
+reboot and driver reload. The L4T32 framework is unchanged: rejection behavior
+is recorded as a legacy observation, and metadata defects remain visible.
+
+Frame intervals are also compared with the independent EngineCore `rf 0x210`
+reference. For other cameras, a V4L2 capture records measured cadence against
+the declared intervals; a mismatch is reported separately from pixel integrity.
+Trigger/rate configuration can explain such a mismatch and must be investigated
+before attributing it to dropped or corrupt frames.
+
+`--contracts-only` runs metadata, direct-ioctl and native-capture checks without
+cycling camera configurations. `--skip-format-contract` explicitly omits these
+checks and leaves incomplete coverage.
+
+## Independent camera pixel references
+
+The standard runner additionally verifies known camera-generated values using
+`camera_pixel_oracles.py` and `v4l2_contract.py` (copy these with the other Python
+modules). This detects a shared classic/NVMM channel-labeling error that a simple
+backend comparison cannot detect:
+
+- EngineCore RGB and YUYV use three constant, read-back-verified YCbCr palettes.
+  RGB expectations follow the FPGA fixed-point conversion. The captured bytes
+  must match BGRA/RGBA or Y0-Cb-Y1-Cr ordering as declared by the fourcc.
+- EngineCore Y16 uses input pattern 9, a 16-bit pixel counter. The pattern is
+  saved and the camera rebooted before capture, and again during restoration.
+- Dione RGB uses documented monochrome transport, solid patterns and raw mode
+  to isolate known physical red, green and blue values without relying on LUT
+  channel names. Camera PixelFormat, source, pattern, raw mode, overlay and
+  acquisition state are restored afterwards.
+
+Three complete frames are checked per reference. Row padding is excluded from
+pixel comparisons; the untouched first checked frame is saved compressed as
+`*-native.raw.gz`. RGB padding/alpha is recorded, not treated as a camera colour.
+Palette and register snapshots/readbacks are retained. EngineCore's original
+volatile palette is preserved across the entire format cycle, including reboots.
+Failed restoration stops further format saves. A format-write ACK error followed
+by successful readback is retained as a control failure, while allowing safe
+restoration rather than abandoning a changed camera.
+
+`--camera-references-only` runs these checks, register reads and restoration
+captures without requiring an NVMM checker. `--skip-camera-reference` records
+an explicit coverage gap. An unavailable or unqualified camera-pattern profile
+(currently including absolute iLumos Y14/Y16-BE references) is `not_run`, never a
+pixel pass. Backend pixel comparison remains a separate test. The JSON report
+lists missing reference coverage per camera and advertised format, including
+formats omitted by `--current-format-only`.
+
 ## Temporary raw capture storage
 
 Raw V4L2 checks keep complete frames to verify byte counts and sample integrity.
@@ -101,8 +172,8 @@ The monitor's `corrupt` counter is checked for both classic and NVMM captures.
 A nonzero counter fails the test even if all requested frames arrive and the
 process exits successfully. GStreamer CORRUPTED flags and V4L2 dequeued ERROR
 buffers also fail, including buffers discarded by v4l2-ctl before writing the raw
-file. An initial corrupted buffer is retained as a failure;
-the runner does not silently exclude startup frames from integrity checks.
+file. Startup buffers are included, subject only to the explicit, temporary
+single-first-buffer Dione exception documented below.
 
 When generated grayscale commands contain `--normalize`, the runner additionally
 checks the fixed-range default: classic and NVMM local previews, hardware
@@ -229,6 +300,9 @@ is reported as a failure. EngineCore controls retain their five-second pauses.
 Transient EngineCore read failures are logged and retried within the configured
 recovery limit, with the same pause. An incorrect readback value still fails.
 Pattern configuration is restored **before** changing/saving a video format.
+Dione comparisons also save RawMode (`0x81004`) and overlay (`0x81404`),
+then bypass processing and disable overlays to keep the reference independent
+of scene-dependent corrections between capture sessions. Both are restored.
 Dione source and pattern-control fields are documented in the family ICD;
 hardware qualification of a particular firmware still requires a target run.
 

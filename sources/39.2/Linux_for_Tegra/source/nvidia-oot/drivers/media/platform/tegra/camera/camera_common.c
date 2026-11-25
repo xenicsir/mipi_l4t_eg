@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <media/tegra-v4l2-camera.h>
 #include <media/camera_common.h>
+#include "eg_rgb_capture.h"
 #include <media/mc_common.h>
 #include <linux/of_graph.h>
 #include <linux/string.h>
@@ -120,6 +121,16 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 		MEDIA_BUS_FMT_VYUY8_1X16,
 		V4L2_COLORSPACE_SRGB,
 		V4L2_PIX_FMT_VYUY,
+	},
+	{
+		MEDIA_BUS_FMT_RGB888_1X24,
+		V4L2_COLORSPACE_SRGB,
+		V4L2_PIX_FMT_RGBA32,
+	},
+	{
+		MEDIA_BUS_FMT_RGB888_1X24,
+		V4L2_COLORSPACE_SRGB,
+		V4L2_PIX_FMT_ABGR32,
 	},
 	{
 		MEDIA_BUS_FMT_RGB888_1X24,
@@ -594,6 +605,21 @@ int camera_common_enum_fmt(struct v4l2_subdev *sd, unsigned int index,
 }
 EXPORT_SYMBOL_GPL(camera_common_enum_fmt);
 
+/* These drivers set default dimensions from the connected sensor at probe.
+ * Keep frmfmt and DT mode indices intact: only filter their public selection.
+ */
+static bool camera_common_resolution_supported(struct camera_common_data *s_data,
+		u32 width, u32 height)
+{
+	struct device_node *node = s_data->dev ? s_data->dev->of_node : NULL;
+
+	if (!node || !s_data->def_width || !s_data->def_height)
+		return true;
+	if (eg_camera_native_resolution(node))
+		return width == s_data->def_width && height == s_data->def_height;
+	return true;
+}
+
 static void select_mode(struct camera_common_data *s_data,
 			struct v4l2_mbus_framefmt *mf,
 			unsigned int mode_type)
@@ -637,6 +663,21 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	if (!s_data)
 		return -EINVAL;
 
+	/* Fixed camera integrations must be reconfigured at the camera and
+	 * reprobed, not silently repacked or resized by an application request.
+	 */
+	if (!camera_common_resolution_supported(s_data, mf->width, mf->height))
+		return -EINVAL;
+	if (s_data->dev && eg_camera_fixed_capture(s_data->dev->of_node) &&
+	    (!s_data->colorfmt || mf->code != s_data->colorfmt->code))
+		return -EINVAL;
+	if (s_data->use_sensor_mode_id && s_data->sensor_mode_id >= 0 &&
+	    s_data->sensor_mode_id < s_data->numfmts &&
+	    !camera_common_resolution_supported(s_data,
+		    s_data->frmfmt[s_data->sensor_mode_id].size.width,
+		    s_data->frmfmt[s_data->sensor_mode_id].size.height))
+		return -EINVAL;
+
 	frmfmt = s_data->frmfmt;
 
 	/* check hdr enable ctrl */
@@ -659,7 +700,10 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 
 	if (s_data->use_sensor_mode_id &&
 		s_data->sensor_mode_id >= 0 &&
-		s_data->sensor_mode_id < s_data->numfmts) {
+		s_data->sensor_mode_id < s_data->numfmts &&
+		camera_common_resolution_supported(s_data,
+			frmfmt[s_data->sensor_mode_id].size.width,
+			frmfmt[s_data->sensor_mode_id].size.height)) {
 		dev_dbg(sd->dev, "%s: use_sensor_mode_id %d\n",
 				__func__, s_data->use_sensor_mode_id);
 		s_data->mode = frmfmt[s_data->sensor_mode_id].mode;
@@ -737,7 +781,8 @@ int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 
 	ret = camera_common_try_fmt(sd, mf);
 
-	s_data->colorfmt = camera_common_find_datafmt(mf->code);
+	if (!ret)
+		s_data->colorfmt = camera_common_find_datafmt(mf->code);
 
 	return ret;
 }
@@ -771,48 +816,27 @@ static int camera_common_evaluate_color_format(struct v4l2_subdev *sd,
 					       int code)
 {
 	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
-	const size_t common_fmts_size = ARRAY_SIZE(camera_common_color_fmts);
-	struct sensor_image_properties *cur_props;
-	struct sensor_properties *sensor_props;
-	size_t sensor_num_modes;
-	int i, pixelformat;
+	size_t fmt_index, mode_index;
 
-	if (!s_data)
+	if (!s_data || !s_data->sensor_props.sensor_modes)
 		return -EINVAL;
 
-	sensor_props = &s_data->sensor_props;
-	sensor_num_modes = sensor_props->num_modes;
-
-	for (i = 0; i < common_fmts_size; i++) {
-		if (camera_common_color_fmts[i].code == code)
-			break;
+	/* A bus code can have several memory-format aliases (RGB24/AR24/AB24).
+	 * Match any alias declared by a sensor mode, not just the first one.
+	 */
+	for (fmt_index = 0; fmt_index < ARRAY_SIZE(camera_common_color_fmts);
+	     fmt_index++) {
+		if (camera_common_color_fmts[fmt_index].code != (u32)code)
+			continue;
+		for (mode_index = 0; mode_index < s_data->sensor_props.num_modes;
+		     mode_index++) {
+			if (s_data->sensor_props.sensor_modes[mode_index].image_properties.pixel_format ==
+			    camera_common_color_fmts[fmt_index].pix_fmt)
+				return 0;
+		}
 	}
-
-	if (i == common_fmts_size) {
-		dev_dbg(s_data->dev,
-			"%s: unsupported color format(%08x) for vi\n"
-			, __func__, code);
-		return -EINVAL;
-	}
-
-	pixelformat = camera_common_color_fmts[i].pix_fmt;
-
-	for (i = 0; i < sensor_num_modes; i++) {
-		cur_props = &sensor_props->sensor_modes[i].image_properties;
-		if (cur_props->pixel_format == pixelformat)
-			return 0;
-	}
-
 	spec_bar();
-
-	if (i == sensor_num_modes) {
-		dev_dbg(s_data->dev,
-			"%s: unsupported color format(%08x) for sensor\n"
-			, __func__, code);
-		return -EINVAL;
-	}
-
-	return 0;
+	return -EINVAL;
 }
 
 int camera_common_enum_framesizes(struct v4l2_subdev *sd,
@@ -836,6 +860,9 @@ int camera_common_enum_framesizes(struct v4l2_subdev *sd,
 
 	/* Several format modes can share dimensions; keep their mode IDs intact. */
 	for (i = 0; i < s_data->numfmts; i++) {
+		if (!camera_common_resolution_supported(s_data,
+				s_data->frmfmt[i].size.width, s_data->frmfmt[i].size.height))
+			continue;
 		for (j = 0; j < i; j++) {
 			if (s_data->frmfmt[j].size.width == s_data->frmfmt[i].size.width &&
 					s_data->frmfmt[j].size.height == s_data->frmfmt[i].size.height)
@@ -868,6 +895,9 @@ int camera_common_enum_frameintervals(struct v4l2_subdev *sd,
 	ret = camera_common_evaluate_color_format(sd, fie->code);
 	if (ret)
 		return ret;
+
+	if (!camera_common_resolution_supported(s_data, fie->width, fie->height))
+		return -EINVAL;
 
 	/* Check resolution sizes */
 	for (i = 0; i < s_data->numfmts; i++) {

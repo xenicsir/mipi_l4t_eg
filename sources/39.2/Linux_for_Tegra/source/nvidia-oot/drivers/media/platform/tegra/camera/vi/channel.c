@@ -46,6 +46,7 @@
 #include <media/tegra_camera_platform.h>
 #include <media/v4l2-dv-timings.h>
 #include <media/vi.h>
+#include "../eg_rgb_capture.h"
 
 #include <linux/clk/tegra.h>
 #include <trace/events/camera_common.h>
@@ -335,6 +336,45 @@ static void tegra_channel_update_format(struct tegra_channel *chan,
 		chan->format.sizeimage *= 2;
 }
 
+static bool tegra_channel_rgb_format_allowed(struct tegra_channel *chan,
+		const struct tegra_video_format *format)
+{
+	struct v4l2_subdev *sd = chan->subdev_on_csi;
+	u32 selected;
+
+	if (!format)
+		return false;
+	if (format->code != MEDIA_BUS_FMT_RGB888_1X24)
+		return true;
+	selected = eg_rgb_capture_fourcc(sd && sd->dev ? sd->dev->of_node : NULL);
+	return !selected || selected == format->fourcc;
+}
+
+static const struct tegra_video_format *
+tegra_channel_capture_format(struct tegra_channel *chan, u32 fourcc)
+{
+	const struct tegra_video_format *format;
+
+	format = tegra_core_get_format_by_fourcc(chan, fourcc);
+	return tegra_channel_rgb_format_allowed(chan, format) ? format : NULL;
+}
+
+static const struct tegra_video_format *
+tegra_channel_capture_format_by_code(struct tegra_channel *chan, u32 code)
+{
+	const struct tegra_video_format *format;
+	int index = tegra_core_get_idx_by_code(chan, code, 0);
+
+	while (index >= 0) {
+		format = tegra_channel_capture_format(chan,
+			tegra_core_get_fourcc_by_idx(chan, index));
+		if (format)
+			return format;
+		index = tegra_core_get_idx_by_code(chan, code, index + 1);
+	}
+	return NULL;
+}
+
 static void tegra_channel_fmts_bitmap_init(struct tegra_channel *chan)
 {
 	int ret, pixel_format_index = 0, init_code = 0;
@@ -368,7 +408,9 @@ static void tegra_channel_fmts_bitmap_init(struct tegra_channel *chan)
 		pixel_format_index =
 			tegra_core_get_idx_by_code(chan, code.code, 0);
 		while (pixel_format_index >= 0) {
-			bitmap_set(chan->fmts_bitmap, pixel_format_index, 1);
+			if (tegra_channel_capture_format(chan,
+				tegra_core_get_fourcc_by_idx(chan, pixel_format_index)))
+				bitmap_set(chan->fmts_bitmap, pixel_format_index, 1);
 			/* Set init_code to the first matched format */
 			if (!init_code)
 				init_code = code.code;
@@ -384,7 +426,9 @@ static void tegra_channel_fmts_bitmap_init(struct tegra_channel *chan)
 		pixel_format_index =
 			tegra_core_get_idx_by_code(chan, TEGRA_VF_DEF, 0);
 		if (pixel_format_index >= 0) {
-			bitmap_set(chan->fmts_bitmap, pixel_format_index, 1);
+			if (tegra_channel_capture_format(chan,
+				tegra_core_get_fourcc_by_idx(chan, pixel_format_index)))
+				bitmap_set(chan->fmts_bitmap, pixel_format_index, 1);
 			init_code = TEGRA_VF_DEF;
 		}
 	}
@@ -394,8 +438,7 @@ static void tegra_channel_fmts_bitmap_init(struct tegra_channel *chan)
 		return;
 
 	/* Initiate the channel format to the first matched format */
-	chan->fmtinfo =
-		tegra_core_get_format_by_code(chan, fmt.format.code, 0);
+	chan->fmtinfo = tegra_channel_capture_format_by_code(chan, fmt.format.code);
 	if (!chan->fmtinfo)
 		return;
 
@@ -1167,6 +1210,8 @@ tegra_channel_enum_framesizes(struct file *file, void *fh,
 	int ret = 0;
 
 	/* Convert v4l2 pixel format (fourcc) into media bus format code */
+	if (!tegra_channel_capture_format(chan, sizes->pixel_format))
+		return -EINVAL;
 	fse.code = tegra_core_get_code_by_fourcc(chan, sizes->pixel_format, 0);
 	if (fse.code < 0)
 		return -EINVAL;
@@ -1197,6 +1242,8 @@ tegra_channel_enum_frameintervals(struct file *file, void *fh,
 	int ret = 0;
 
 	/* Convert v4l2 pixel format (fourcc) into media bus format code */
+	if (!tegra_channel_capture_format(chan, intervals->pixel_format))
+		return -EINVAL;
 	fie.code = tegra_core_get_code_by_fourcc(
 		chan, intervals->pixel_format, 0);
 	if (fie.code < 0)
@@ -2253,11 +2300,16 @@ __tegra_channel_try_format(struct tegra_channel *chan,
 	struct v4l2_subdev_state cfg = {.pads = &pad_cfg};
 	int ret = 0;
 
+	if (sd && sd->dev && eg_camera_fixed_capture(sd->dev->of_node) &&
+	    (pix->pixelformat != chan->format.pixelformat ||
+	     pix->width != chan->format.width || pix->height != chan->format.height))
+		return -EINVAL;
+
 	/* Use the channel format if pixformat is not supported */
-	vfmt = tegra_core_get_format_by_fourcc(chan, pix->pixelformat);
+	vfmt = tegra_channel_capture_format(chan, pix->pixelformat);
 	if (!vfmt) {
 		pix->pixelformat = chan->format.pixelformat;
-		vfmt = tegra_core_get_format_by_fourcc(chan, pix->pixelformat);
+		vfmt = tegra_channel_capture_format(chan, pix->pixelformat);
 		if (!vfmt)
 			return -EINVAL;
 	}
@@ -2307,7 +2359,7 @@ __tegra_channel_set_format(struct tegra_channel *chan,
 	struct v4l2_subdev_state cfg = {.pads = &pad_cfg};
 	int ret = 0;
 
-	vfmt = tegra_core_get_format_by_fourcc(chan, pix->pixelformat);
+	vfmt = tegra_channel_capture_format(chan, pix->pixelformat);
 	if (!vfmt)
 		return -EINVAL;
 

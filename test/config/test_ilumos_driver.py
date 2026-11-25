@@ -79,9 +79,6 @@ def camera_shim():
 
 
 def ilumos(text):
-    text = text.replace('assert(titan_find_frmfmt(1280, 1024) == -1); /* superseded placeholder */',
-                        'assert(titan_find_frmfmt(1279, 1024) == -1); /* unsupported width */')
-    text = text.replace('1208', '1280')
     text = text.replace('TITAN', 'ILUMOS').replace('Titan', 'iLumos').replace('titan', 'ilumos')
     for old, new in [('0x500E0010', '0x50000008'), ('0x500E0000', '0x50000000'),
                      ('0x500E0004', '0x50000004'), ('0x500F000C', '0x50000A20'),

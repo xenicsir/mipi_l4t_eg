@@ -9,7 +9,7 @@ class PatternTransaction:
 
     def __enter__(self):
         registers={'enginecore':(0x190,0x194),'ilumos':(0x50003000,0x50003004,0x50000a1c,0x50000504,0x50000508,0x50000510,0x50000a20),
-                   'dione':(0x80108,0x8012c,0x8010c)}[self.family]
+                   'dione':(0x80108,0x8012c,0x8010c,0x81004,0x81404)}[self.family]
         self.saved={address:self.read(address) for address in registers}
         if self.on_snapshot:
             self.on_snapshot(dict(self.saved))
@@ -31,11 +31,15 @@ class PatternTransaction:
                     raise RuntimeError('Input generator readback mismatch')
             else:
                 self.write(0x80104,2)
+                # Bypass scene-dependent corrections and overlays so separate
+                # capture sessions receive the same static reference pixels.
+                self.write(0x81004,1);self.write(0x81404,0)
                 # Selector4: row/column counter; clear moving(bit15) and shift(7:4).
                 mode=(self.saved[0x8012c]&~0x80ff)|4
                 self.write(0x8012c,mode);self.write(0x80108,self.saved[0x80108]&~1)
                 self.write(0x80104,1)
-                if self.read(0x80108)&1 or self.read(0x8012c)!=mode:raise RuntimeError('Dione pattern readback mismatch')
+                if (self.read(0x80108)&1 or self.read(0x8012c)!=mode or
+                    self.read(0x81004)!=1 or self.read(0x81404)!=0):raise RuntimeError('Dione pattern readback mismatch')
         except BaseException:
             self.restore();raise
         return self
@@ -75,8 +79,9 @@ class PatternTransaction:
             verify=(0x50003000,0x50003004,0x50000504,0x50000508,0x50000510,0x50000a1c)
         else:
             self.write(0x80104,2);self.write(0x8012c,self.saved[0x8012c]);self.write(0x80108,self.saved[0x80108])
+            self.write(0x81004,self.saved[0x81004]);self.write(0x81404,self.saved[0x81404])
             if self.saved[0x8010c]&1:self.write(0x80104,1)
-            verify=(0x80108,0x8012c)
+            verify=(0x80108,0x8012c,0x81004,0x81404)
         if any(self.read(a)!=self.saved[a] for a in verify):raise RuntimeError('Test pattern restoration did not match the original registers')
         self.restored=True
 

@@ -55,6 +55,8 @@ struct v4l2_subdev_state {};
 struct v4l2_subdev_pad_config {};
 struct v4l2_subdev_frame_size_enum { u32 index,code,min_width,max_width,min_height,max_height; };
 #define to_camera_common_data(dev) (dev)
+static bool camera_common_resolution_supported(struct camera_common_data *data, u32 w, u32 h)
+{ return true; }
 static int evaluate_result;
 static int camera_common_evaluate_color_format(struct v4l2_subdev *sd, u32 code)
 { (void)sd; (void)code; return evaluate_result; }

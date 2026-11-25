@@ -30,6 +30,7 @@
 
 #include <media/tegra_v4l2_camera.h>
 #include <media/tegracam_core.h>
+#include "eg_rgb_capture_name.h"
 
 #include "../platform/tegra/camera/camera_gpio.h"
 
@@ -1140,7 +1141,7 @@ static int dione_ir_set_mode(struct tegracam_device *tc_dev)
     * so it is the authority here. Match on the media-bus code: it is the one
     * value both sides share -- the device tree gives a V4L2 fourcc that need
     * not equal the requested one (an rgb888 node yields RGB24 while userspace
-    * asks for AB24/ABGR32), but both map to MEDIA_BUS_FMT_RGB888_1X24.
+    * asks for AR24/ABGR32), but both map to MEDIA_BUS_FMT_RGB888_1X24.
     *
     * Same reasoning, and the same trap, as vi5_pad0_en() on the VI side.
     */
@@ -2168,19 +2169,7 @@ static ssize_t pixel_format_show(struct device *dev,
        s_data->colorfmt->pix_fmt == V4L2_PIX_FMT_Y14)
       return scnprintf(buf, PAGE_SIZE, "'Y14 ' (14-bit Greyscale)\n");
 
-   /* Dione always transmits RGB888 over CSI-2 (see tc358746_calculation.c) —
-    * what varies is which V4L2 fourcc gets used to report it: AB24 on L4T
-    * versions where EG_RGB888_AB24 is defined (36.x+/39.x, see the i2c
-    * Makefile), AR24 everywhere else — including L4T 35.4.1-35.6.4, where
-    * NVIDIA's own vi5_formats.h natively moved to RGBA32-only but EG
-    * re-adds ABGR32 because gst-plugins-good 1.16.3 (JetPack 5.x) doesn't
-    * recognize the RGBA32 V4L2 fourcc at all (see vi5_formats_mbus_fix.md
-    * in shared memory). */
-#ifdef EG_RGB888_AB24
-   return scnprintf(buf, PAGE_SIZE, "'AB24' (32-bit RGBA 8-8-8-8)\n");
-#else
-   return scnprintf(buf, PAGE_SIZE, "'AR24' (32-bit BGRA 8-8-8-8)\n");
-#endif
+   return scnprintf(buf, PAGE_SIZE, "%s\n", eg_rgb_capture_name(dev));
 }
 static DEVICE_ATTR_RO(pixel_format);
 
@@ -2211,12 +2200,11 @@ static ssize_t pixel_formats_show(struct device *dev,
    if (!has_y14)
       return 0;
 
-#ifdef EG_RGB888_AB24
-   return scnprintf(buf, PAGE_SIZE, "%s\n%s\n",
-         "'AB24' (32-bit RGBA 8-8-8-8)", "'Y14 ' (14-bit Greyscale)");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) && !defined(PRISTINE_KERNEL)
+   return pixel_format_show(dev, attr, buf);
 #else
    return scnprintf(buf, PAGE_SIZE, "%s\n%s\n",
-         "'AR24' (32-bit BGRA 8-8-8-8)", "'Y14 ' (14-bit Greyscale)");
+         eg_rgb_capture_name(dev), "'Y14 ' (14-bit Greyscale)");
 #endif
 }
 static DEVICE_ATTR_RO(pixel_formats);
@@ -2381,27 +2369,20 @@ static int dione_ir_probe(struct i2c_client *client,
             dione_ir_frmfmt[priv->mode].size.width;
       tc_dev->s_data->def_height = tc_dev->s_data->fmt_height =
             dione_ir_frmfmt[priv->mode].size.height;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) && !defined(PRISTINE_KERNEL)
+      /* STREAMON must also work before an application issues S_FMT.
+       * tegracam initializes the active mode to zero; default dimensions
+       * alone do not replace that mode for a different Dione model.
+       */
+      tc_dev->s_data->mode = tc_dev->s_data->def_mode;
+      tc_dev->s_data->mode_prop_idx = priv->mode;
+      tc_dev->s_data->sensor_mode_id = priv->mode;
+#endif
 
-      /*
-       * ⚠️ This camera's resolution is the only one it can produce, but we
-       * CANNOT restrict what is advertised by trimming s_data->frmfmt /
-       * numfmts. Tried on 2026-09-07: streaming stopped completely, both
-       * formats, 0 frames.
-       *
-       * Reason: the framework sets s_data->mode_prop_idx to the INDEX in
-       * frmfmt where the resolution matched, and then uses that same number to
-       * index the device-tree modes -- csi.c:320 reads
-       * sensor_modes[mode_prop_idx].signal_properties.pixel_clock to program
-       * the NVCSI link rate, and csi.c:149 reads mipi_clock the same way. With
-       * a one-entry table the index collapses to 0, i.e. device-tree mode0
-       * (640x480), so the CSI is set up for the wrong link frequency and every
-       * frame is discarded. frmfmt[i] must stay aligned with mode i.
-       *
-       * Consequence to know: the driver advertises every Dione model's
-       * resolution, so an application that asks for one this camera does not
-       * have gets it accepted and then fails at stream start. Tools we ship
-       * must not hardcode a resolution -- rt_frame_monitor.py defaulted to
-       * 640x480 and failed on every Dione but the 640 for exactly this reason.
+      /* Keep frmfmt indices aligned with the DT modes used for CSI timing.
+       * The EG framework filters public dimensions using def_width/def_height
+       * without compacting these tables. Unmodified vendor frameworks may
+       * still enumerate modes for other models.
        */
    }
 

@@ -84,6 +84,30 @@ For L4T 35.x and 36.x, the SoM is always Orin-family and no `-s` flag is needed.
 | `dtsi_platforms` | DTSI files to verify: path relative to `sources/common/source/`, `num_cams`, associated `platform_ids`, EC overlay pattern |
 | `cameras` | Camera specifications: resolutions, data lanes, modes, DT timing fields (`line_length`, `pix_clk_hz`, …) |
 
+The sensor's CSI-2 RGB888 data type and the V4L2 buffer byte order are separate.
+In the EG camera framework, Dione and EngineCore integrations expose AR24/BGRA
+by default. For another integration requiring RGBA buffers, set
+`exosens,rgb-capture-format = "AB24";` in the sensor node; `"AR24"` selects BGRA.
+On L4T 35.x and later, this optional property constrains enumeration and format negotiation for that
+camera without removing either packing mode from the platform table. Without
+an explicit property, unrelated sensors retain the platform's format selection.
+This policy requires the EG-patched camera framework and does not modify a
+pristine vendor kernel. Validate byte order with independent known-color inputs,
+including the initial capture and explicit format requests.
+
+The EG framework on L4T 35.x and later uses the dimensions detected at probe
+for Exosens integrations with fixed native geometry. V4L2 frame-size enumeration
+excludes the dimensions of other models sharing the same device tree. Requests
+for another size are rejected without changing the active format. EngineCore
+and Dione also reject a pixel format different from the active configuration;
+Drivers supporting runtime pixel-format selection retain that capability. Enumeration reports the possible camera formats at the detected size, while
+`--get-fmt-video` reports the current format. Reconfigure the
+camera and reload its driver to establish a new native format. The internal mode
+tables retain their original indices because NVCSI uses those indices to read
+the matching device-tree timing properties; do not compact these tables to
+restrict enumeration. Other sensor integrations retain their scalable modes.
+
+
 Within a `versions` entry:
 - `jetpack` — corresponding JetPack SDK version (e.g. `"6.2.1"`); included in the generated Debian package name as `jp<version>`
 - `vendor_soms` — maps each vendor to its list of SoMs (used to enumerate packages for 32.x)

@@ -101,11 +101,12 @@ class PixelTests(unittest.TestCase):
         self.assertEqual(v[0x50000508],1);self.assertEqual(v[0x50000510],2)
 
     def test_dione_restores_source_pattern_and_acquisition(self):
-        initial={0x80108:1,0x8012c:0x8073,0x8010c:1}
+        initial={0x80108:1,0x8012c:0x8073,0x8010c:1,0x81004:0,0x81404:1}
         t,v,w=self.transaction('dione',initial,body_failure=True)
         self.assertTrue(t.restored)
         for key,value in initial.items():self.assertEqual(v[key],value)
         self.assertIn((0x8012c,4),w);self.assertIn((0x80108,0),w)
+        self.assertIn((0x81004,1),w);self.assertIn((0x81404,0),w)
         self.assertNotIn(0x1002000c,[a for a,_ in w])
 
     def test_raw_samples_reject_even_one_bit_but_normalization_allows_one_level(self):

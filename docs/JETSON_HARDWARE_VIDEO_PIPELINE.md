@@ -19,12 +19,33 @@ is implied. CTI pristine keeps its vendor kernel and its camera-format restricti
 | V4L2 input | NVMM capture output | Display path | Qualification |
 | --- | --- | --- | --- |
 | YUYV | YUY2 raw or RGBA preview | CUDA BT.601 → RGBA → GPU | Tested |
-| AB24 (RGBA bytes) | RGBA | GPU display directly | Tested |
+| AB24 (RGBA bytes, when enabled for the camera) | RGBA | GPU display directly | See per-BSP qualification in the deployment matrix |
 | AR24 (BGRA bytes) | BGRA or BGRx | BGRx → VIC → RGBA → GPU | Tested on Forecr 35.6.0 |
 | Y16 | GRAY16_LE on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
 | Y14 | GRAY16_LE storage on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
 | Y16-BE | GRAY16_LE after GPU byte swap on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
 | UYVY | UYVY | VIC → NV12 → GPU | Requires target qualification |
+
+AR24 and AB24 describe the **byte order in captured memory**, not a change to
+the camera's CSI-2 RGB888 stream. AR24 stores B,G,R,A; AB24 stores R,G,B,A.
+EG-patched kernels expose AR24 by default for Dione and EngineCore cameras,
+independently of the L4T version. On L4T 35.x and later, a sensor node can select a different memory
+contract with `exosens,rgb-capture-format = "AB24"` (or `"AR24"`). Enumeration,
+the initial format and subsequent format negotiation follow this selection.
+The VI table retains both correctly packed formats for other integrations;
+selecting RGBA requires actual RGBA packing, not relabeling BGRA bytes.
+Applications must interpret raw buffers using the negotiated fourcc.
+EngineCore and Dione advertise their possible formats at the detected
+size; the current format is reported separately by `--get-fmt-video`. Requests differing from `--get-fmt-video` are rejected. To change an
+EngineCore camera format, configure/save/reboot the camera and reload its
+driver before capturing. The fixed-format Dione integration does not expose
+the optional bridge RAW14 conversion as an alternative to an active RGB mode.
+This selection requires the EG camera framework; an unmodified vendor kernel
+retains its own format policy.
+
+For Dione pseudo-mono
+data carried inside RGB888, the low component is at byte0 in AR24 but byte2 in
+AB24; green remains at byte1. Do not use a fixed byte offset across both formats.
 
 On **L4T 35.x**, YUYV and RGB use native NVIDIA surfaces. Y16, Y14 and
 Y16-BE require `preview=true` and output RGBA, with optional GPU normalization.

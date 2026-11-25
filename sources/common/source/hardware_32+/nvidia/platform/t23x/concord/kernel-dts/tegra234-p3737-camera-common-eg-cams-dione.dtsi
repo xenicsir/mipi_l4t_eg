@@ -1269,14 +1269,14 @@
 				 sensor_model = "titan";
 				 use_sensor_mode_id = "false";
 
-				 mode0 { // TITAN_MODE_1208x1024_RAW16_BE
+				 mode0 { // TITAN_MODE_1280x1024_RAW16_BE
 					num_lanes = "2";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -1309,14 +1309,14 @@
 					default_exp_time = "2495"; /* us */
 				 };
 
-				 mode1 { // TITAN_MODE_1208x1024_RAW14
+				 mode1 { // TITAN_MODE_1280x1024_RAW14
 					num_lanes = "2";
 					tegra_sinterface = "serial_a";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -2255,14 +2255,14 @@
 				 sensor_model = "titan";
 				 use_sensor_mode_id = "false";
 
-				 mode0 { // TITAN_MODE_1208x1024_RAW16_BE
+				 mode0 { // TITAN_MODE_1280x1024_RAW16_BE
 					num_lanes = "2";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -2295,14 +2295,14 @@
 					default_exp_time = "2495"; /* us */
 				 };
 
-				 mode1 { // TITAN_MODE_1208x1024_RAW14
+				 mode1 { // TITAN_MODE_1280x1024_RAW14
 					num_lanes = "2";
 					tegra_sinterface = "serial_g";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -3242,14 +3242,14 @@
 				 sensor_model = "titan";
 				 use_sensor_mode_id = "false";
 
-				 mode0 { // TITAN_MODE_1208x1024_RAW16_BE
+				 mode0 { // TITAN_MODE_1280x1024_RAW16_BE
 					num_lanes = "2";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -3282,14 +3282,14 @@
 					default_exp_time = "2495"; /* us */
 				 };
 
-				 mode1 { // TITAN_MODE_1208x1024_RAW14
+				 mode1 { // TITAN_MODE_1280x1024_RAW14
 					num_lanes = "2";
 					tegra_sinterface = "serial_e";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -4228,14 +4228,14 @@
 				 sensor_model = "titan";
 				 use_sensor_mode_id = "false";
 
-				 mode0 { // TITAN_MODE_1208x1024_RAW16_BE
+				 mode0 { // TITAN_MODE_1280x1024_RAW16_BE
 					num_lanes = "2";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";
@@ -4268,14 +4268,14 @@
 					default_exp_time = "2495"; /* us */
 				 };
 
-				 mode1 { // TITAN_MODE_1208x1024_RAW14
+				 mode1 { // TITAN_MODE_1280x1024_RAW14
 					num_lanes = "2";
 					tegra_sinterface = "serial_c";
 					phy_mode = "DPHY";
 					discontinuous_clk = "no";
 					dpcm_enable = "false";
 					cil_settletime = "0";
-					active_w = "1208";
+					active_w = "1280";
 					active_h = "1024";
 					line_length = "1280";
 					mode_type = "raw";

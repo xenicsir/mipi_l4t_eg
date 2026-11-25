@@ -21,6 +21,8 @@ import sys
 import tempfile
 import time
 
+from v4l2_contract import validate_metadata, check_rejections, parse_current, parse_details
+
 
 def corruption_policy(camera_name, count, first_index=None, last_index=None):
     """Temporary Dione exception: exactly one error on the first dequeued buffer."""
@@ -43,6 +45,9 @@ class Camera:
         self.video = video
         self.conformant_y14 = conformant_y14
         self.nvmm_exclusions = {}
+        self.native_size = None
+        self.reported_format = None
+        self.unsupported_reason = None
         self.groups = [] if groups is None else groups
 
     @property
@@ -62,6 +67,12 @@ def parse_configuration(text):
     for i, match in enumerate(headers):
         block = text[match.end():headers[i + 1].start() if i + 1 < len(headers) else len(text)]
         camera = Camera(int(match[1]), match[2], match[3] == 'connected')
+        resolution = re.search(r'^\s*Resolution:\s*(\d+)x(\d+)', block, re.M)
+        pixel = re.search(r"^\s*Pixel format:\s*'([^']+)'", block, re.M)
+        warning = re.search(r'^\s*Warning:\s*(.+)', block, re.M)
+        if resolution: camera.native_size = (int(resolution[1]), int(resolution[2]))
+        if pixel: camera.reported_format = pixel[1]
+        if warning: camera.unsupported_reason = warning[1]
         camera.conformant_y14 = bool(re.search(r'Y14 layout:\s*14 bits right-aligned', block))
         camera.nvmm_exclusions = dict(re.findall(r'^\s*NVMM unavailable for ([A-Z0-9_]+): (.+)$', block, re.M))
         for field, label in [('sysfs', 'Sysfs'), ('device', 'I2C device'), ('video', 'Video device')]:
@@ -86,7 +97,7 @@ def parse_configuration(text):
                 camera.groups[-1].setdefault(tool, words)
                 if tool in ('gst', 'gst_nvmm') and 'videocrop' not in words:
                     camera.groups[-1].setdefault('_gst_commands', []).append(words)
-        if camera.connected and not all((camera.sysfs, camera.device, camera.video, camera.groups)):
+        if camera.connected and not (all((camera.sysfs, camera.device, camera.video)) and (camera.groups or camera.unsupported_reason)):
             raise ValueError('Incomplete connected camera description: ' + camera.name)
         cameras.append(camera)
     return cameras
@@ -154,6 +165,14 @@ def streaming_command(tool, group, frames, folder, raw=None):
 
 def register_read_plan(camera):
     """Build read-only control checks from the discovered camera, not its port."""
+    if camera.enginecore:
+        if camera.groups:
+            width,height,pixel=format_spec(camera.groups[0])
+        else:
+            width,height=camera.native_size;pixel=camera.reported_format
+        return [dict(name=name,command=['ECSwCtrl','-i','i2c','-d',camera.device,'-c','ru '+hex(address)],
+                     kind='ec_integer',expected=value)
+                for name,address,value in [('width',0x180,width),('height',0x184,height),('pixel-format',0x260,ec_code(pixel))]]
     family = Path(camera.device).name.split('-', 1)[0]
     if family == 'dioneir':
         match = re.fullmatch(r'dioneir-i2c-(\d+)-[0-9a-fA-F]{4}-([0-9a-fA-F]{2})',
@@ -188,6 +207,11 @@ def register_read_plan(camera):
 def validate_register_read(check, returncode, text):
     if returncode:
         return False, None
+    if check['kind'] == 'ec_integer':
+        match=re.fullmatch(r'\s*(0x[0-9a-fA-F]+)\s+(\d+)\s*',text)
+        if not match or int(match[1],16)!=int(match[2]):return False,None
+        value=int(match[1],16)
+        return value==check['expected'],value
     if check['kind'] == 'integer':
         # egCamCtrl prints address = value; dioneCtrl prints just value.
         match = re.search(r'=\s*(0x[0-9a-fA-F]+)', text)
@@ -253,6 +277,17 @@ def stream_cadence(tool, text):
     else:
         values = [int(h)*3600+int(m)*60+float(s) for h,m,s in
                   re.findall(r'last-message = chain.*?\bpts:\s*(\d+):(\d+):(\d+\.\d+)', text)]
+        # Older v4l2src can clamp several pre-base-time startup buffers to
+        # PTS zero. Keep their counts/integrity checks, but do not let repeated
+        # startup zeros invalidate cadence measured after the warmup period.
+        zeros = 0
+        for value in values:
+            if value != 0:
+                break
+            zeros += 1
+        measured = timestamp_cadence(values[max(0, zeros-1):])
+        measured['startup_zero_pts'] = zeros
+        return dict(capture=measured, processing=measured)
     measured = timestamp_cadence(values)
     return dict(capture=measured, processing=measured)
 
@@ -319,6 +354,14 @@ class Runner:
         self.events = []
         self.environment_results = []
         self.pixel_results = []
+        self.camera_state_results = []
+        self.control_results = []
+        self.reference_results = []
+        self.reference_capabilities = {}
+        self.rejection_results = []
+        release = Path("/etc/nv_tegra_release")
+        match = re.search(r"# R(\d+)", release.read_text()) if release.is_file() else None
+        self.l4t_major = int(match[1]) if match else None
         self.fps_reads = []
         self.fps_targets = {}
         self.counter = 0
@@ -336,6 +379,9 @@ class Runner:
         tmp = self.out / 'results.json.new'
         tmp.write_text(json.dumps(dict(options=vars(self.options), results=self.results, register_results=self.register_results, format_results=self.format_results, xeneth_results=self.xeneth_results,
                                        events=self.events, environment_results=self.environment_results, pixel_results=self.pixel_results,
+                                       camera_reference_results=self.reference_results, native_rejection_results=self.rejection_results, control_results=self.control_results, camera_state_results=self.camera_state_results,
+                                       camera_reference_coverage=self.reference_coverage(),
+                                       camera_reference_coverage_complete=self.reference_coverage()['complete'],
                                        environment_coverage_complete=not self.skipped_captures and not any(x.get("status")=="not_run" for x in self.environment_results),
                                        pixel_coverage_complete=not any(x.get('status')=='not_run' for x in self.pixel_results),
                                        local_display=dict(available=self.local_display_available, reason=self.local_display_reason),
@@ -343,6 +389,13 @@ class Runner:
                                        display_coverage_complete=self.local_display_available and not self.skipped_captures,
                                        fps_reads=self.fps_reads), indent=2, default=str) + '\n')
         tmp.replace(self.out / 'results.json')
+
+    def reference_coverage(self):
+        expected = {(key, fmt.strip()) for key, formats in getattr(self, 'reference_capabilities', {}).items() for fmt in formats}
+        checked = {(r['key'], r['format'].strip()) for r in self.reference_results if r.get('passed') is True}
+        missing = sorted(expected - checked)
+        return dict(complete=bool(expected) and not missing and all(r.get('passed') is True for r in self.reference_results),
+                    missing=[dict(key=key, format=fmt) for key, fmt in missing])
 
     def pause(self, seconds, reason):
         if seconds:
@@ -437,7 +490,7 @@ done
 sha256sum /usr/bin/eg_dt_camera_config_get.sh /usr/bin/rt_frame_monitor.py
 cat /proc/sys/kernel/random/boot_id
 '''], check=True)
-        if not self.options.registers_only:
+        if not self.options.registers_only and not getattr(self.options, "contracts_only", False) and not getattr(self.options, 'camera_references_only', False):
             self.setup_displays()
         if shutil.which('gst-inspect-1.0'):
             plugin_record, plugin_text = self.run('nvmm-plugin', ['gst-inspect-1.0', 'egv4l2camerasrc'])
@@ -446,6 +499,8 @@ cat /proc/sys/kernel/random/boot_id
                 self.event('NVMM plugin identity', path=plugin_path[1],
                            sha256=hashlib.sha256(Path(plugin_path[1]).read_bytes()).hexdigest())
         self.event('Test script', sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+        self.event('Test kit', sha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in sorted(Path(__file__).resolve().parent.glob('*.py'))})
         self.run('dmesg-before', ['dmesg'])
 
     def check_local_display(self):
@@ -640,7 +695,7 @@ cat /proc/sys/kernel/random/boot_id
         result = dict(key=camera.key, camera=camera.name, phase=phase, reads=[], passed=False)
         self.register_results.append(result)
         for check in checks:
-            self.pause(self.options.control_pause, 'before register read')
+            self.pause(self.enginecore_control_pause() if camera.enginecore else self.options.control_pause, 'before register read')
             record, text = self.run('%s-%s-register-%s' % (camera.key, phase, check['name']),
                                     check['command'])
             passed, value = validate_register_read(check, record['returncode'], text)
@@ -733,6 +788,15 @@ cat /proc/sys/kernel/random/boot_id
                 return True
             self.event('EngineCore control failed', camera=camera.name, address=address,
                        value=value, attempt=attempt + 1, response=text.strip(), log=record.get('log'))
+            if int(address,0)==0x260 and not reboot:
+                self.pause(self.enginecore_control_pause(),'settling after uncertain format acknowledgement')
+                observed=self.read_ec_format(camera)
+                if observed==value:
+                    self.control_results.append(dict(camera=camera.name,address=address,value=value,
+                        passed=False,state_applied=True,response=text.strip(),log=record.get('log')))
+                    self.event('Format applied despite bad acknowledgement',camera=camera.name,value=value,
+                               reason='Continue readback/reboot validation and restoration; retain control failure')
+                    return False
             if reboot and record.get('returncode', 0) == 0 and text.strip() == '!-128':
                 self.event('EngineCore reboot acknowledgement uncertain', camera=camera.name,
                            reason='Do not repeat reset; validate readback and subsequent capture')
@@ -779,6 +843,102 @@ cat /proc/sys/kernel/random/boot_id
             raise RuntimeError('Camera format mismatch: driver=%s camera=%s requested=%s' % (actual, live, code))
         self.event('EngineCore ready', camera=camera.name, key=key, code=code, recovery=reboot, reboot_acknowledged=reboot_ack)
 
+    def fixed_capture(self, camera):
+        return camera.enginecore or Path(camera.device).name.startswith('dioneir-')
+
+    def expected_camera_formats(self, camera, enumeration):
+        if not camera.enginecore:
+            return None
+        formats = [entry['format'] for entry in parse_details(enumeration)]
+        codes = self.available_ec_codes(camera,formats)
+        prop=Path(camera.sysfs)/'of_node/exosens,rgb-capture-format'
+        rgb=prop.read_text().rstrip('\x00') if prop.is_file() else 'AR24'
+        return [{20:'Y16',21:rgb,22:'YUYV'}[code] for code in codes]
+
+    def check_metadata(self, camera, expected_format=None, label='metadata'):
+        if getattr(self.options, 'skip_format_contract', False):
+            self.format_results.append(dict(key=camera.key, test='metadata', status='not_run',
+                                            reason='Explicit --skip-format-contract'))
+            self.save(); return True
+        first = format_spec(camera.groups[0]) if camera.groups else tuple(camera.native_size)+(camera.reported_format,)
+        width, height = camera.native_size or first[:2]
+        enum_record, enumeration = self.run(label+'-list-'+camera.key,
+            ['v4l2-ctl','-d',camera.video,'--list-formats-ext'])
+        fmt_record, current = self.run(label+'-get-'+camera.key,
+            ['v4l2-ctl','-d',camera.video,'--get-fmt-video'])
+        fixed = self.fixed_capture(camera)
+        wanted = expected_format or (camera.reported_format or first[2] if fixed else None)
+        result = validate_metadata(enumeration,current,width,height,wanted,
+            active_only=False,
+            expected_formats=self.expected_camera_formats(camera,enumeration),
+            expected_fps=self.fps_targets.get(camera.key),fps_tolerance=self.options.fps_tolerance)
+        if fixed:
+            prop=Path(camera.sysfs)/'of_node/exosens,rgb-capture-format'
+            rgb=prop.read_text().rstrip('\x00') if prop.is_file() else 'AR24'
+            unexpected=[e['format'] for e in result['entries'] if e['format'] in ('AR24','AB24','RGB3','BGR3') and e['format']!=rgb]
+            if unexpected:
+                result['errors'].append('RGB aliases inconsistent with camera byte order: '+repr(unexpected))
+                result['passed']=False
+        self.reference_capabilities[camera.key] = self.expected_camera_formats(camera, enumeration) or [entry['format'] for entry in result['entries']]
+        result.update(key=camera.key,camera=camera.name,test='metadata',phase=label,
+                      records=[enum_record,fmt_record],legacy_observation=self.l4t_major==32)
+        result['passed'] = result['passed'] and enum_record['returncode']==0 and fmt_record['returncode']==0
+        self.format_results.append(result)
+        self.event('V4L2 metadata checked',camera=camera.name,passed=result['passed'],errors=result['errors'])
+        return result['passed']
+
+    def test_native_rejections(self, camera, label):
+        fixed_pixel_format=self.fixed_capture(camera)
+        native_geometry=fixed_pixel_format or Path(camera.device).name.split('-')[0] in ('ilumos','microlynx','titan')
+        if not native_geometry:
+            self.rejection_results.append(dict(key=camera.key,status='not_applicable',reason='No qualified native geometry policy'))
+            return True
+        if getattr(self.options, 'skip_format_contract', False):
+            self.rejection_results.append(dict(key=camera.key,status='not_run',reason='Explicit --skip-format-contract'))
+            return True
+        self.pause(self.options.stream_gap,'before direct V4L2 rejection checks')
+        startup_row,startup_text=self.run(label+'-native-before-format-ioctls',
+            ['v4l2-ctl','-d',camera.video,'--stream-mmap','--stream-count=30','--verbose'])
+        startup_buffers=v4l2_buffers(startup_text)
+        bad=[i for i,b in enumerate(startup_buffers) if b['corrupt']]
+        integrity=corruption_policy(camera.name,len(bad),bad[0] if bad else None,bad[-1] if bad else None)
+        startup_ok=(startup_row['returncode']==0 and len(startup_buffers)-len(bad)==30 and integrity['accepted'])
+        _,listing=self.run(label+'-rejection-capabilities',['v4l2-ctl','-d',camera.video,'--list-formats-ext'],check=True)
+        other_sizes=[]
+        for mode in (Path(camera.sysfs)/'of_node').glob('mode[0-9]*'):
+            dimensions=[mode/'active_w',mode/'active_h']
+            if all(p.is_file() for p in dimensions):
+                other_sizes.append(tuple(int(p.read_text().rstrip('\x00')) for p in dimensions))
+        record = check_rejections(camera.video,[entry['format'] for entry in parse_details(listing)],
+                                  fixed_pixel_format=fixed_pixel_format,other_sizes=other_sizes)
+        record.update(key=camera.key,camera=camera.name,label=label,required=self.l4t_major!=32,
+                      initial_capture_without_s_fmt=dict(passed=startup_ok,command=startup_row,integrity=integrity))
+        record['passed']=record['passed'] and startup_ok
+        if not record['required']:record['status']='legacy_observation'
+        self.rejection_results.append(record)
+        self.event('Native rejection checks complete',camera=camera.name,passed=record['passed'],required=record['required'])
+        return record['passed'] if record['required'] else startup_ok
+
+    def available_ec_codes(self, camera, enumerated):
+        # Use the DT integration as an independent capability reference, even
+        # if a broken ENUM_FMT implementation omits an available camera mode.
+        modes = list((Path(camera.sysfs)/'of_node').glob('mode[0-9]*'))
+        codes = set()
+        for mode in modes:
+            def value(key):
+                path=mode/key
+                return path.read_text().rstrip('\x00') if path.is_file() else ''
+            kind,phase,bits=value('mode_type'),value('pixel_phase'),value('csi_pixel_bit_depth')
+            pixel=value('pixel_t')
+            if kind=='rgb' or pixel.startswith('rgb_'):codes.add(21)
+            if kind=='yuv' or pixel.startswith('yuv_'):codes.add(22)
+            if kind=='raw' and phase=='grey' and bits=='16':codes.add(20)
+        if not modes:
+            codes={21,22}
+            if any(fmt.strip()=='Y16' for fmt in enumerated):codes.add(20)
+        if self.l4t_major==32:codes.discard(20)
+        return sorted(codes)
+
     def enumerate_formats(self, camera):
         record, text = self.run('enumeration-' + camera.key,
                                 ['v4l2-ctl', '-d', camera.video, '--list-formats-ext'], check=True)
@@ -803,6 +963,7 @@ cat /proc/sys/kernel/random/boot_id
             self.event('Display capture skipped', **record)
             return record
         expected_width, expected_height, expected_format = format_spec(group)
+        metadata_before = self.check_metadata(camera,label=label+'-before')
         self.pause(self.options.stream_gap, 'before ' + tool + ' stream')
         if display_context == 'local' and tool != 'v4l2' and shutil.which('xset'):
             _, display_state = self.run(label + '-display-state', ['xset', '-q'], timeout=3)
@@ -916,9 +1077,26 @@ cat /proc/sys/kernel/random/boot_id
             record['warning'] = 'Dione initial corrupted buffer accepted temporarily; investigation remains open'
             self.event('Dione startup warning', camera=camera.name, log=record['log'], corrupt_buffers=1)
         record['functional_pass'] = bool(passed)
+        metadata_after = self.check_metadata(camera,expected_format,label+'-after')
+        record['format_contract_passed'] = metadata_before and metadata_after
+        passed = passed and record['format_contract_passed']
         record.update(requested_frames=frames, display_context=display_context)
         measured = stream_cadence(tool, text)
         record['cadence'] = measured
+        if tool == 'v4l2' and not getattr(self.options,'skip_format_contract',False):
+            stamps=[b['timestamp'] for b in v4l2_buffers(text) if not b['corrupt'] and b['timestamp'] is not None]
+            observed=timestamp_cadence(stamps,warmup=0.1)
+            latest=next((x for x in reversed(self.format_results) if x.get('test')=='metadata' and x['key']==camera.key),None)
+            if latest and observed['steady_frames']>=10 and observed['steady_seconds']>=0.2:
+                rates=[rate for e in latest['entries'] if e['format']==expected_format.strip() for size in e['sizes'] for rate in size['fps']]
+                agrees=any(abs(rate-observed['steady_fps'])<=rate*self.options.fps_tolerance for rate in rates)
+                cadence_contract=dict(key=camera.key,camera=camera.name,test='observed-vs-declared-cadence',
+                    passed=agrees,declared_fps=rates,observed=observed,
+                    note='A mismatch can reflect camera rate/trigger configuration or inaccurate mode metadata')
+                self.format_results.append(cadence_contract)
+                record['declared_cadence_match']=agrees
+                passed=passed and agrees
+
         if expected_fps is not None:
             rate_ok = all(rate_matches(measured.get(key), expected_fps, self.options.fps_tolerance)
                           for key in ('capture', 'processing'))
@@ -934,6 +1112,79 @@ cat /proc/sys/kernel/random/boot_id
                    processing_fps=measured.get('processing', {}).get('steady_fps'),
                    cpu_percent_one_core=record.get('cpu_percent_one_core'), seconds=record['seconds'], log=record['log'])
         return record
+
+    def snapshot_ec_runtime(self, camera):
+        from camera_pixel_oracles import Controls
+        control=Controls(self,camera,camera.key+'-original-runtime')
+        folder=self.out/(camera.key+'-original-runtime');folder.mkdir(exist_ok=False)
+        before=folder/'palette.bin';second=folder/'palette-second.bin'
+        control.memory('rm',before);control.memory('rm',second)
+        if before.read_bytes()!=second.read_bytes():raise RuntimeError('Unstable original palette snapshot')
+        record=dict(key=camera.key,palette=str(before),color_enable=control.read(0x700),restored=False)
+        self.camera_state_results.append(record);self.save();return record
+
+    def restore_ec_runtime(self, camera, record):
+        from camera_pixel_oracles import Controls
+        control=Controls(self,camera,camera.key+'-restore-runtime')
+        before=Path(record['palette']);after=before.with_name('palette-restored.bin')
+        control.memory('wm',before);control.memory('rm',after)
+        if control.read(0x700)!=record['color_enable']:control.write(0x700,record['color_enable'])
+        record['restored']=(before.read_bytes()==after.read_bytes() and control.read(0x700)==record['color_enable'])
+        self.save()
+        if not record['restored']:
+            self.cancelled=True
+            raise RuntimeError('Original EngineCore runtime state not restored')
+
+    def capture_reference(self, camera, fmt, label, folder, reference):
+        import gzip
+        from camera_pixel_oracles import check_frame
+        metadata_ok=self.check_metadata(camera,fmt,label+'-reference-metadata')
+        self.pause(self.options.stream_gap,'before camera-reference capture')
+        _,text=self.run(label+'-format',['v4l2-ctl','-d',camera.video,'--get-fmt-video'],check=True)
+        active=parse_current(text)
+        width,height=camera.native_size or format_spec(camera.groups[0])[:2]
+        if (active['width'],active['height'],active['format']) != (width,height,fmt.strip()):
+            raise RuntimeError('Camera-reference capture does not match active format')
+        size=active['sizeimage'];stride=active['bytesperline']
+        if not size or not stride:raise RuntimeError('Missing V4L2 frame layout')
+        count=8
+        with tempfile.NamedTemporaryFile(prefix='eg-reference-',suffix='.raw',dir=raw_capture_directory(size*count)) as raw:
+            row,output=self.run(label+'-capture',['v4l2-ctl','-d',camera.video,'--stream-mmap',
+                '--stream-count='+str(count),'--stream-to='+raw.name,'--verbose'])
+            buffers=v4l2_buffers(output);bad=[i for i,b in enumerate(buffers) if b['corrupt']]
+            integrity=corruption_policy(camera.name,len(bad),bad[0] if bad else None,bad[-1] if bad else None)
+            if row['returncode'] or Path(raw.name).stat().st_size!=size*count:
+                return dict(passed=False,reason='Native reference capture failed or was short',command=row,integrity=integrity)
+            checks=[]
+            raw.seek(size*5)
+            for index in range(3):
+                payload=raw.read(size)
+                checks.append(check_frame(payload,fmt,width,height,stride,reference))
+                if index==0:
+                    with gzip.open(str(folder/(re.sub(r'\W','_',label)+'-native.raw.gz')),'wb') as saved:saved.write(payload)
+        return dict(passed=integrity['accepted'] and all(c['passed'] for c in checks), metadata_passed=metadata_ok,
+                    frames=checks,integrity=integrity,layout=active,command=row)
+
+    def test_camera_reference(self, camera, group, label):
+        record=dict(camera=camera.name,key=camera.key,format=format_spec(group)[2])
+        self.reference_results.append(record)
+        if getattr(self.options,'skip_camera_reference',False):
+            record.update(status='not_run',reason='Explicit --skip-camera-reference')
+            self.save();return True
+        folder=self.out/(label+'-camera-reference');folder.mkdir(exist_ok=False)
+        try:
+            from camera_pixel_oracles import execute_reference
+            passed=execute_reference(self,camera,format_spec(group)[2],label,folder,record)
+        except Exception as error:
+            record.update(passed=False,error=str(error));passed=False
+        finally:
+            self.save()
+        if record.get('restored') is False:
+            self.cancelled=True
+            raise RuntimeError('Camera reference restoration not verified; stop before another format save')
+        self.event('Independent camera pixels checked',camera=camera.name,format=record['format'],
+                   passed=passed,status=record.get('status'),restored=record.get('restored'))
+        return passed
 
     def test_pixels(self, camera, group, label):
         """Compare independent static-pattern captures using the real classic code."""
@@ -1038,11 +1289,26 @@ cat /proc/sys/kernel/random/boot_id
         attempts = []
         result = dict(key=key, format=expected_format, attempts=attempts, passed=False)
         self.results.append(result)
+        contract_camera=self.refresh(key)
+        contract_ok=self.test_native_rejections(contract_camera,key+'-'+re.sub(r'\W','_',expected_format))
+        result['native_contract_passed']=contract_ok
+        if getattr(self.options,'camera_references_only',False) and len(tools)>1:
+            camera=self.refresh(key)
+            group=next(g for g in camera.groups if format_spec(g)[2]==expected_format)
+            self.read_frame_rate(camera)
+            metadata=self.check_metadata(camera,label=key+'-reference-before')
+            reference=self.test_camera_reference(camera,group,key+'-'+re.sub(r'\W','_',expected_format))
+            restored=self.check_metadata(self.refresh(key),label=key+'-reference-after')
+            result['passed']=bool(contract_ok and metadata and reference and restored)
+            self.save();return result['passed']
         if getattr(self.options, 'pixels_only', False) and len(tools) > 1:
             camera = self.refresh(key)
             group = next(g for g in camera.groups if format_spec(g)[2] == expected_format)
             self.enumerate_formats(camera)
+            metadata_ok=self.check_metadata(camera,label=key+'-pixels-before')
             result['passed'] = self.test_pixels(camera, group, key+'-'+re.sub(r'\W', '_', expected_format))
+            reference_ok=self.test_camera_reference(camera,group,key+'-'+re.sub(r'\W','_',expected_format))
+            result['passed']=bool(result['passed'] and reference_ok and contract_ok and metadata_ok)
             self.save()
             return result['passed']
         for attempt in range(self.options.recoveries + 1):
@@ -1098,7 +1364,8 @@ cat /proc/sys/kernel/random/boot_id
                     fixed_ok = self.test_fixed_preview(camera, group, label)
                     environments_ok = environments_ok and fixed_ok
                 pixels_ok = self.test_pixels(camera, group, label) if len(tools) > 1 else True
-                result['passed'] = bool(passed and environments_ok and pixels_ok)
+                reference_ok=self.test_camera_reference(camera,group,label) if len(tools)>1 else True
+                result['passed'] = bool(passed and environments_ok and pixels_ok and reference_ok and contract_ok)
                 self.save()
                 return result['passed']
             self.run(label + '-dmesg-failure', ['dmesg'])
@@ -1130,6 +1397,20 @@ cat /proc/sys/kernel/random/boot_id
             return 0 if all(x['passed'] for x in self.register_results + self.xeneth_results) else 1
         for initial in cameras:
             camera = self.refresh(initial.key)
+            if not camera.groups:
+                self.check_metadata(camera,label='unsupported-configuration')
+                self.test_registers(camera,'unsupported-video-configuration')
+                self.results.append(dict(key=camera.key,passed=False,status='not_run',reason=camera.unsupported_reason))
+                self.event('Unsupported initial camera configuration',camera=camera.name,reason=camera.unsupported_reason)
+                continue
+            if getattr(self.options, 'contracts_only', False):
+                self.read_frame_rate(camera)
+                group=camera.groups[0]
+                rejected=self.test_native_rejections(camera,camera.key+'-contract')
+                row=self.capture(camera,group,'v4l2',camera.key+'-contract',display_context='headless')
+                row_after=self.capture(camera,group,'v4l2',camera.key+'-after-rejections',display_context='headless')
+                self.results.append(dict(key=camera.key,passed=bool(row.get('pass') and row_after.get('pass') and rejected),test='format-contract'))
+                continue
             if not self.test_registers(camera, 'before-video'):
                 continue
             if not self.test_xeneth(camera, 'before-video'):
@@ -1143,11 +1424,10 @@ cat /proc/sys/kernel/random/boot_id
                 supported = self.enumerate_formats(camera)
                 # Nano/TX2 cannot capture RAW16. Reject an unusable initial
                 # setup before entering a block that restores camera settings.
-                available_codes = [21, 22]
-                if any(fmt.strip() == 'Y16' for fmt in supported):
-                    available_codes.insert(0, 20)
+                available_codes = self.available_ec_codes(camera, supported)
                 if original_code not in available_codes:
                     raise RuntimeError('Initial camera format is unsupported by this target')
+            runtime_snapshot=self.snapshot_ec_runtime(camera) if camera.enginecore else None
             try:
                 if camera.enginecore:
                     codes = [original_code] if getattr(self.options, 'current_format_only', False) else [original_code] + [x for x in available_codes if x != original_code]
@@ -1163,6 +1443,8 @@ cat /proc/sys/kernel/random/boot_id
                 if not self.cancelled:
                     if camera.enginecore:
                         self.set_ec_format(camera.key, original_code)
+                        if runtime_snapshot is not None:
+                            self.restore_ec_runtime(self.refresh(camera.key),runtime_snapshot)
                     # Confirm a valid raw stream after restoring the camera's
                     # initial format. For GenCP cameras this happens at STREAMON.
                     current = self.refresh(camera.key)
@@ -1175,10 +1457,13 @@ cat /proc/sys/kernel/random/boot_id
         self.event('Finished', passed=sum(x['passed'] for x in self.results), total=len(self.results),
                    environment_checks=len(self.environment_results),
                    format_checks=len(self.format_results),
-                   format_checks_passed=sum(x['passed'] for x in self.format_results),
+                   format_checks_passed=sum(x.get('passed',False) for x in self.format_results),
                    skipped_local_captures=len(self.skipped_captures),
-                   coverage_complete=not self.skipped_captures and not any(x.get('status') == 'not_run' for x in self.environment_results))
-        return 0 if all(x['passed'] for x in self.results + self.register_results + self.xeneth_results + self.format_results +
+                   coverage_complete=(not any(getattr(self.options,key,False) for key in ('contracts_only','camera_references_only','pixels_only'))
+                       and self.local_display_available and not self.skipped_captures
+                       and self.reference_coverage()['complete']
+                       and not any(x.get('status') == 'not_run' for x in self.environment_results)))
+        return 0 if all(x['passed'] for x in self.results + self.register_results + self.xeneth_results + self.control_results + [x for x in self.format_results if 'passed' in x] +
                            [x for x in self.environment_results if 'passed' in x]) else 1
 
 
@@ -1186,6 +1471,10 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path, required=True, help='New directory for all logs and JSON results')
     p.add_argument('--only', action='append', default=[], help='Camera name or sysfs ID; repeat to select several')
+    p.add_argument('--camera-references-only', action='store_true', help='Only camera-generated absolute pixel references, control checks and restoration captures')
+    p.add_argument('--skip-camera-reference', action='store_true', help='Explicitly omit independent camera pixel references; coverage remains incomplete')
+    p.add_argument('--contracts-only', action='store_true', help='Only metadata, direct invalid-format ioctls and before/after native captures; no camera format cycling')
+    p.add_argument('--skip-format-contract', action='store_true', help='Explicitly omit metadata/rejection checks; recorded as not run')
     p.add_argument('--registers-only', action='store_true', help='Only read control registers; no video, format changes or GUI')
     p.add_argument('--xeneth-minimal', default='egXenethMinimal', help='ARM64 reference client built with the Xeneth SDK packet codec')
     p.add_argument('--xeneth-reads', type=int, default=20)

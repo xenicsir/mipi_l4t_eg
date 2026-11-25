@@ -242,6 +242,16 @@ class RegressionTests(unittest.TestCase):
         self.assertTrue(MODULE.rate_matches(MODULE.stream_cadence('gst_nvmm',gst)['capture'],60,.03))
         self.assertEqual(MODULE.stream_cadence('monitor','no measured rates'),{})
 
+    def test_gstreamer_startup_zero_pts_are_excluded_but_later_duplicates_fail(self):
+        def log(values):
+            return '\n'.join('last-message = chain pts: 0:00:%.9f' % v for v in values)
+        values=[0]*6+[i/60 for i in range(1,180)]
+        measured=MODULE.stream_cadence('gst',log(values))['capture']
+        self.assertEqual(measured['startup_zero_pts'],6)
+        self.assertTrue(MODULE.rate_matches(measured,60,.03))
+        values[100]=values[99]
+        self.assertFalse(MODULE.rate_matches(MODULE.stream_cadence('gst',log(values))['capture'],60,.03))
+
     def test_environment_scope_restores_local_display_even_after_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             runner=self.runner(tmp); previous=runner.env
@@ -315,6 +325,11 @@ class RegressionTests(unittest.TestCase):
         runner.check_local_display = Mock(return_value=True)
         runner.refresh = Mock(return_value=MODULE.parse_configuration(CONFIG)[0])
         runner.enumerate_formats = Mock(return_value=['Y16 ', 'AR24', 'AB24', 'YUYV'])
+        runner.check_metadata = Mock(return_value=True)
+        runner.test_native_rejections = Mock(return_value=True)
+        runner.test_camera_reference = Mock(return_value=True)
+        runner.snapshot_ec_runtime = Mock(return_value=None)
+        runner.restore_ec_runtime = Mock()
         runner.run = Mock(return_value=({}, ''))
         runner.event = Mock()
         runner.set_ec_format = Mock()
@@ -541,15 +556,26 @@ class RegressionTests(unittest.TestCase):
             runner.options.ec_control_pause = 9
             self.assertEqual(runner.enginecore_control_pause(), 9)
 
+    def test_enginecore_bad_ack_with_applied_format_remains_a_control_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner=self.runner(tmp);runner.pause=Mock()
+            runner.run=Mock(return_value=({'returncode':0,'log':'bad-ack.log'},'!-128\n'))
+            runner.read_ec_format=Mock(return_value=22)
+            self.assertFalse(runner.ec_control(runner.refresh.return_value,'0x260',22))
+            self.assertEqual(runner.run.call_count,1)
+            self.assertFalse(runner.control_results[0]['passed'])
+            self.assertTrue(runner.control_results[0]['state_applied'])
+
     def test_enginecore_zero_exit_with_protocol_error_is_retried_and_recorded(self):
         with tempfile.TemporaryDirectory() as tmp:
             runner = self.runner(tmp)
             runner.pause = Mock()
+            runner.read_ec_format = Mock(return_value=22)
             runner.run = Mock(side_effect=[({'returncode': 0}, '!-128'), ({'returncode': 0}, 'OK')])
             runner.ec_control(runner.refresh.return_value, '0x260', 20)
             self.assertEqual(runner.run.call_count, 2)
             self.assertEqual(runner.event.call_args.args[0], 'EngineCore control failed')
-            self.assertEqual(runner.pause.call_count, 1)
+            self.assertEqual(runner.pause.call_count, 2)
 
     def test_enginecore_failure_is_bounded_and_reboot_not_blindly_repeated(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -624,7 +650,7 @@ class RegressionTests(unittest.TestCase):
             self.assertTrue(all(c['command'][0] == 'egCamCtrl.py' for c in plan))
             self.assertEqual([c['command'][-3:] for c in plan[3:]],
                              [['read_string', '0x44', '64'], ['read_string', '0x144', '64']])
-        self.assertEqual(MODULE.register_read_plan(MODULE.parse_configuration(CONFIG)[0]), [])
+        self.assertEqual([x['command'][-1] for x in MODULE.register_read_plan(MODULE.parse_configuration(CONFIG)[0])], ['ru 0x180','ru 0x184','ru 0x260'])
 
     def test_dione_reads_use_discovered_fpga_address_without_forcing(self):
         group = MODULE.parse_configuration(CONFIG)[0].groups[0]
