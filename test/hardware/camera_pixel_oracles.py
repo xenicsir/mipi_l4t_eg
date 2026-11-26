@@ -36,11 +36,13 @@ def check_frame(payload, fmt, width, height, stride, reference):
         actual=data.reshape(height,width//2,4)
         delta=np.abs(actual.astype(np.int32)-np.asarray(reference['value'],dtype=np.int32))
         bad=np.repeat(np.any(delta>tolerance,axis=2),2,axis=1)
-    elif kind in ('counter16','gray'):
+    elif kind in ('counter16','gray','ilumos_vertical'):
         if fmt not in ('Y16','Y16 -BE','Y14'):raise ValueError('Gray oracle requires a gray format')
         actual=np.frombuffer(data.tobytes(),dtype='>u2' if fmt=='Y16 -BE' else '<u2').reshape(height,width)
         expected=((np.arange(width*height,dtype=np.uint32)&0xffff).reshape(height,width)
-                  if kind=='counter16' else np.asarray(reference['value'],dtype=np.uint32))
+                  if kind=='counter16' else np.asarray(reference.get('value',0),dtype=np.uint32))
+        if kind=='ilumos_vertical':
+            expected=(np.arange(height,dtype=np.uint32)[:,None]&1023) << (6 if fmt=='Y16 -BE' else 4)
         delta=np.abs(actual.astype(np.int32)-expected.astype(np.int32))
         bad=delta>tolerance
     else:raise ValueError('Unknown oracle '+kind)
@@ -54,7 +56,10 @@ class Controls:
     def __init__(self, runner, camera, label):
         self.r,self.camera,self.label=runner,camera,label
         self.prefix=None
-        if not camera.enginecore:
+        self.ilumos=Path(camera.device).name.startswith('ilumos-')
+        if self.ilumos:
+            self.prefix=['egCamCtrl.py', camera.device]
+        elif not camera.enginecore:
             m=re.fullmatch(r'dioneir-i2c-(\d+)-[0-9a-fA-F]{4}-([0-9a-fA-F]{2})',Path(camera.device).name)
             if not m:raise ValueError('No Dione control mapping')
             self.prefix=['dioneCtrl.py','--bus',m[1],'--dev-addr',hex(int(m[2],16))]
@@ -73,7 +78,7 @@ class Controls:
                 value=re.fullmatch(r'\s*(0x[0-9a-fA-F]+)\s+(\d+)\s*',text)
                 valid=value and int(value[1],16)==int(value[2])
             else:
-                value=re.search(r'^\s*(0x[0-9a-fA-F]+)',text,re.M)
+                value=re.search(r'=\s*(0x[0-9a-fA-F]+)' if self.ilumos else r'^\s*(0x[0-9a-fA-F]+)',text,re.M)
                 valid=bool(value)
             if row['returncode']==0 and valid:return int(value[1],16)
             self.r.event('Reference read failed',camera=self.camera.name,address=hex(address),
@@ -87,7 +92,9 @@ class Controls:
             self.r.ec_control(self.camera,hex(address),value)
         else:
             row,text=self.r.run(self.label+'-write-'+hex(address),self.prefix+['write_reg32',hex(address),hex(value)],check=True)
-            if not re.search(r'^\s*OK\s*$',text,re.M):raise RuntimeError('Write not acknowledged: '+text)
+            acknowledged=(re.search(r'^Written 0x[0-9a-fA-F]+.* to 0x[0-9a-fA-F]+',text,re.M) if self.ilumos
+                          else re.search(r'^\s*OK\s*$',text,re.M))
+            if not acknowledged:raise RuntimeError('Write not acknowledged: '+text)
 
     def memory(self,operation,path):
         if operation not in ('rm','wm'):
@@ -120,7 +127,8 @@ def execute_reference(r, camera, fmt, label, folder, record):
         result=r.capture_reference(camera,fmt,label+'-'+name,folder,reference)
         record['checks'].append(dict(name=name,reference=reference,**result));save()
     supported = ((camera.enginecore and fmt in ('AR24','AB24','YUYV','Y16')) or
-                 (Path(camera.device).name.startswith('dioneir-') and fmt in ('AR24','AB24')))
+                 (Path(camera.device).name.startswith('dioneir-') and fmt in ('AR24','AB24')) or
+                 (Path(camera.device).name.startswith('ilumos-') and fmt in ('Y14','Y16 -BE')))
     if not supported:
         record.update(status='not_run',reason='No independently qualified camera pattern profile for '+fmt)
         save();return False
@@ -171,6 +179,32 @@ def execute_reference(r, camera, fmt, label, folder, record):
                 capture('counter16',dict(kind='counter16'))
         finally:
             record['restored']=transaction.restored;save()
+    elif control.ilumos:
+        from camera_patterns import PatternTransaction
+        solid=control.read(0x5000050c)
+        def snapshot(values):
+            record['snapshot']={hex(k):v for k,v in values.items()}
+            record['snapshot']['0x5000050c']=solid
+            save()
+        transaction=PatternTransaction('ilumos',control.read,control.write,on_snapshot=snapshot)
+        record['notes']=['The first vertical-pattern frame can be displaced after changing the stimulus; report it, do not discard it.']
+        try:
+            with transaction:
+                record['restored']=False
+                try:
+                    for value in (0,1,0x155,0x2aa,0x3ff):
+                        control.write(0x50000504,0);control.write(0x5000050c,value)
+                        if control.read(0x50000504)!=0 or control.read(0x5000050c)!=value:
+                            raise RuntimeError('iLumos solid readback differs')
+                        capture('solid-%04x'%value,dict(kind='gray',value=value << (6 if fmt=='Y16 -BE' else 4)))
+                    control.write(0x50000504,2);control.write(0x5000050c,0)
+                    if control.read(0x50000504)!=2 or control.read(0x5000050c)!=0:raise RuntimeError('iLumos gradient readback differs')
+                    capture('vertical',dict(kind='ilumos_vertical'))
+                finally:
+                    control.write(0x5000050c,solid)
+        finally:
+            record['restored']=transaction.restored and control.read(0x5000050c)==solid
+            save()
     elif Path(camera.device).name.startswith('dioneir-') and fmt in ('AR24','AB24'):
         registers=(0x80108,0x8012c,0x8010c,0x80194,0x81404,0x81004)
         saved={a:control.read(a) for a in registers}

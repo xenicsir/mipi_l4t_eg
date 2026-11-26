@@ -46,6 +46,7 @@ class RegressionTests(unittest.TestCase):
             r.format_results=[dict(passed=False,errors=['Duplicate fourcc: YUYV'])]
             self.assertEqual(r.execute(),1)
             self.assertTrue(r.test_group.called)
+            r.test_stop_suite.assert_called_once()
 
     def test_old_and_new_v4l2_output_keep_duplicate_errors_visible(self):
         modern = "[0]: 'AR24' (BGRA)\n Size: Discrete 1024x768\n[1]: 'YUYV'\n Size: Discrete 640x480\n"
@@ -328,6 +329,7 @@ class RegressionTests(unittest.TestCase):
         runner.check_metadata = Mock(return_value=True)
         runner.test_native_rejections = Mock(return_value=True)
         runner.test_camera_reference = Mock(return_value=True)
+        runner.test_stop_suite = Mock(return_value=True)
         runner.snapshot_ec_runtime = Mock(return_value=None)
         runner.restore_ec_runtime = Mock()
         runner.run = Mock(return_value=({}, ''))

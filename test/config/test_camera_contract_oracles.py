@@ -223,7 +223,7 @@ class RestorationTests(unittest.TestCase):
     def test_missing_profile_is_not_a_pass_and_does_no_io(self):
         with tempfile.TemporaryDirectory() as tmp:
             runner=SimpleNamespace(save=Mock(),run=Mock(side_effect=AssertionError('unexpected I/O')))
-            camera=SimpleNamespace(enginecore=False,device='/dev/ilumos-10-0030')
+            camera=SimpleNamespace(enginecore=False,device='/dev/titan-10-0010')
             record={}
             self.assertFalse(execute_reference(runner,camera,'Y14','test',Path(tmp),record))
             self.assertEqual(record['status'],'not_run')

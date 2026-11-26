@@ -125,10 +125,84 @@ restoration rather than abandoning a changed camera.
 `--camera-references-only` runs these checks, register reads and restoration
 captures without requiring an NVMM checker. `--skip-camera-reference` records
 an explicit coverage gap. An unavailable or unqualified camera-pattern profile
-(currently including absolute iLumos Y14/Y16-BE references) is `not_run`, never a
+(such as Titan absolute pixels) is `not_run`, never a
 pixel pass. Backend pixel comparison remains a separate test. The JSON report
 lists missing reference coverage per camera and advertised format, including
 formats omitted by `--current-format-only`.
+
+## Stop/restart and kernel diagnostics
+
+The full regression run includes a final stop-test phase on the restored camera
+formats. Run that phase alone, without a display or NVMM dependency:
+
+```sh
+sudo python3 run_camera_regression.py --stop-tests-only --output /tmp/stop-results
+```
+
+Copy the entire test kit, including `capture_stop_audit.c`, to the target.
+The phase requires GCC, NumPy, the installed camera controls and v4l2-ctl; it
+compiles its own diagnostic executable inside the result directory. It does not
+install/reload drivers, switch packages, compare old/new drivers, or patch
+recording applications. The existing runner lock and camera-idle check apply.
+L4T 32.x is explicitly `not_run` for this VI5 qualification.
+
+`--stop-cycles N` (default 10) controls repeated captures per selected camera:
+2N finite captures, N SIGINT stops, ceil(N/2) early SIGINT stops, and N simultaneous
+batches when two or more cameras are selected. With two cameras per board this is 90
+individual capture sequences per board (180 across two boards), plus reference,
+priming and restoration captures. `--stop-frames` defaults to ten valid buffers.
+`--only` selects discovered camera names/IDs; no hostname, bus or video index is
+hard-coded. GenCP/Dione advertised formats are exercised; EngineCore keeps its
+current physical format. `--current-format-only` limits all families to their
+current format. Repeated stop streams intentionally use that native format
+without issuing S_FMT on every open; such failures are retained, not silently
+retried with a format reset. `--skip-stop-tests` records incomplete stop coverage. Focused
+register/contract/pixel/reference modes do not implicitly run this extra phase.
+
+For each qualified reference, the diagnostic copies valid buffers while owned by
+userspace, performs STREAMOFF, then writes/checks the saved bytes. All frames,
+including the first and last, are inspected for immediate stop and a one-second
+drained stop. Actual v4l2-ctl SIGINT captures are checked independently. First,
+last and first failing frames are retained compressed; every complete frame has
+pixel results and a hash. A partial SIGINT file has `file_complete=false`; its
+complete frames and partial prefix must match the oracle. This expected file-write
+limitation is separate from a driver/pixel failure and never presented as a
+complete file. The C helper logs DQBUF flags, byte counts, sequence/timestamps,
+STREAMOFF boundaries and the required failed dequeue after STREAMOFF.
+
+iLumos Y16-BE/Y14 references use five 10-bit input solids with the documented
+padding and a vertical ramp. The previously observed displaced first vertical
+frame is **not** silently skipped: it fails pixel qualification while the separate
+last-frame result remains visible. Horizontal patterns remain unqualified.
+Dione and EngineCore reuse the independent colour/palette references. Snapshot,
+readback and restoration records are retained. The no-image scenario is qualified
+only for iLumos: stop volatile acquisition during a live wait, verify output stops
+growing, send SIGINT, and require a subsequent successful capture. Other families
+record that scenario as not applicable, without inventing register mappings.
+
+Kernel checking applies to **all runner modes**, not just the stop phase.
+A dedicated nonblocking `/dev/kmsg` reader starts at the end of the existing log;
+it never clears dmesg. `kernel.jsonl` retains new records with sequence, timestamp,
+priority, device metadata and command/batch context. `kernel_checks` in
+`results.json` reports per-window messages, severity and coverage. Missing access,
+sequence gaps, overruns and reported log suppression are explicit coverage gaps.
+This reader does not claim access to unprinted RCE trace events.
+
+**Kernel messages are informational and never change the test exit status by
+themselves.** This includes status 0, status 14, SMMU/IOMMU faults and other kernel
+errors. `affects_test_result=false` makes that policy explicit; `clean=false` is a
+journal observation, not a failed capture. The verdict remains based on process
+completion, valid buffers, pixel correctness, stop deadlines and restoration.
+A kernel fault does not automatically stop a campaign when captures still work.
+Timeouts still require process-group cleanup and fail the affected test.
+
+The recurring `bwmgr API not supported` message has an explicit platform category.
+The existing Dione first ERROR-buffer exception remains a capture-integrity policy;
+a single status-14/flags-0/0x40 message can be annotated as correlated with that
+known startup context. Other bits/errors remain visible without that annotation.
+Simultaneous VI messages are attributed to the batch, never guessed to belong to
+a particular camera. Correct images with kernel messages therefore pass, while
+incorrect images fail even if the kernel log is clean.
 
 ## Temporary raw capture storage
 

@@ -358,6 +358,8 @@ class Runner:
         self.control_results = []
         self.reference_results = []
         self.reference_capabilities = {}
+        self.stop_results = []
+        self.kernel = None
         self.rejection_results = []
         release = Path("/etc/nv_tegra_release")
         match = re.search(r"# R(\d+)", release.read_text()) if release.is_file() else None
@@ -378,6 +380,10 @@ class Runner:
     def save(self):
         tmp = self.out / 'results.json.new'
         tmp.write_text(json.dumps(dict(options=vars(self.options), results=self.results, register_results=self.register_results, format_results=self.format_results, xeneth_results=self.xeneth_results,
+                                       kernel_checks=self.kernel.summary() if self.kernel else dict(available=False, complete=False),
+                                       kernel_coverage_complete=self.kernel.summary()['complete'] if self.kernel else False,
+                                       stop_results=self.stop_results,
+                                       stop_coverage_complete=bool(self.stop_results) and all(x.get("coverage_complete", False) for x in self.stop_results),
                                        events=self.events, environment_results=self.environment_results, pixel_results=self.pixel_results,
                                        camera_reference_results=self.reference_results, native_rejection_results=self.rejection_results, control_results=self.control_results, camera_state_results=self.camera_state_results,
                                        camera_reference_coverage=self.reference_coverage(),
@@ -407,6 +413,8 @@ class Runner:
         return max(self.options.control_pause, self.options.ec_control_pause)
 
     def run(self, label, args, check=False, timeout=None):
+        if self.kernel:
+            self.kernel.collect(label+'-before')
         self.counter += 1
         path = self.out / ('%04d-' % self.counter + re.sub(r'[^\w.-]', '_', label) + '.log')
         usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -435,6 +443,8 @@ class Runner:
             rc = 124
             if isinstance(error, KeyboardInterrupt):
                 path.write_bytes(data)
+                if self.kernel:
+                    self.kernel.collect(label+'-interrupted')
                 raise
         elapsed = time.monotonic() - start
         usage_after = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -446,9 +456,33 @@ class Runner:
                       cpu_user_seconds=round(cpu_user, 6), cpu_system_seconds=round(cpu_system, 6),
                       cpu_percent_one_core=round(100 * (cpu_user + cpu_system) / elapsed, 3),
                       cpu_scope='process and waited children; startup/shutdown included', log=path.name)
+        if self.kernel:
+            record['kernel'] = self.kernel.collect(label)
         if check and rc:
             raise RuntimeError(str(record))
         return record, text
+
+    def qualify_kernel(self, record, camera, integrity):
+        if 'kernel' in record:
+            from kernel_capture_log import qualify
+            qualify(record['kernel'], camera.name, integrity)
+
+    def finish_kernel(self):
+        if self.kernel is not None:
+            self.kernel.collect('campaign-tail')
+
+    def test_stop_suite(self, cameras):
+        if getattr(self.options, 'skip_stop_tests', False):
+            self.stop_results.append(dict(status='not_run', reason='Explicit --skip-stop-tests', coverage_complete=False))
+            self.save()
+            return True
+        from camera_stop_tests import StopSuite
+        suite = StopSuite(self)
+        self.stop_results.append(suite.report)
+        try:
+            return suite.execute(cameras)
+        finally:
+            self.save()
 
     def discover(self):
         _, text = self.run('generated-commands', ['eg_dt_camera_config_get.sh', '--all-streaming-backends'], check=True)
@@ -470,6 +504,8 @@ class Runner:
                     raise RuntimeError('Cannot verify camera is idle: ' + camera.video)
 
     def setup(self):
+        from kernel_capture_log import KernelCaptureLog
+        self.kernel = KernelCaptureLog(self.out)
         import fcntl
         self.lock = open('/run/lock/eg-camera-regression.lock', 'w')
         fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -490,7 +526,7 @@ done
 sha256sum /usr/bin/eg_dt_camera_config_get.sh /usr/bin/rt_frame_monitor.py
 cat /proc/sys/kernel/random/boot_id
 '''], check=True)
-        if not self.options.registers_only and not getattr(self.options, "contracts_only", False) and not getattr(self.options, 'camera_references_only', False):
+        if not self.options.registers_only and not getattr(self.options, "contracts_only", False) and not getattr(self.options, 'camera_references_only', False) and not getattr(self.options, 'stop_tests_only', False):
             self.setup_displays()
         if shutil.which('gst-inspect-1.0'):
             plugin_record, plugin_text = self.run('nvmm-plugin', ['gst-inspect-1.0', 'egv4l2camerasrc'])
@@ -500,7 +536,7 @@ cat /proc/sys/kernel/random/boot_id
                            sha256=hashlib.sha256(Path(plugin_path[1]).read_bytes()).hexdigest())
         self.event('Test script', sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
         self.event('Test kit', sha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                   for p in sorted(Path(__file__).resolve().parent.glob('*.py'))})
+                   for p in sorted(Path(__file__).resolve().parent.iterdir()) if p.suffix in ('.py', '.c')})
         self.run('dmesg-before', ['dmesg'])
 
     def check_local_display(self):
@@ -902,6 +938,7 @@ cat /proc/sys/kernel/random/boot_id
         startup_buffers=v4l2_buffers(startup_text)
         bad=[i for i,b in enumerate(startup_buffers) if b['corrupt']]
         integrity=corruption_policy(camera.name,len(bad),bad[0] if bad else None,bad[-1] if bad else None)
+        self.qualify_kernel(startup_row,camera,integrity)
         startup_ok=(startup_row['returncode']==0 and len(startup_buffers)-len(bad)==30 and integrity['accepted'])
         _,listing=self.run(label+'-rejection-capabilities',['v4l2-ctl','-d',camera.video,'--list-formats-ext'],check=True)
         other_sizes=[]
@@ -909,8 +946,15 @@ cat /proc/sys/kernel/random/boot_id
             dimensions=[mode/'active_w',mode/'active_h']
             if all(p.is_file() for p in dimensions):
                 other_sizes.append(tuple(int(p.read_text().rstrip('\x00')) for p in dimensions))
-        record = check_rejections(camera.video,[entry['format'] for entry in parse_details(listing)],
-                                  fixed_pixel_format=fixed_pixel_format,other_sizes=other_sizes)
+        if self.kernel:
+            self.kernel.collect(label+'-direct-ioctls-before')
+        try:
+            record = check_rejections(camera.video,[entry['format'] for entry in parse_details(listing)],
+                                      fixed_pixel_format=fixed_pixel_format,other_sizes=other_sizes)
+        finally:
+            rejection_kernel = self.kernel.collect(label+'-direct-ioctls') if self.kernel else None
+        if rejection_kernel:
+            record['kernel'] = rejection_kernel
         record.update(key=camera.key,camera=camera.name,label=label,required=self.l4t_major!=32,
                       initial_capture_without_s_fmt=dict(passed=startup_ok,command=startup_row,integrity=integrity))
         record['passed']=record['passed'] and startup_ok
@@ -1162,7 +1206,8 @@ cat /proc/sys/kernel/random/boot_id
                 checks.append(check_frame(payload,fmt,width,height,stride,reference))
                 if index==0:
                     with gzip.open(str(folder/(re.sub(r'\W','_',label)+'-native.raw.gz')),'wb') as saved:saved.write(payload)
-        return dict(passed=integrity['accepted'] and all(c['passed'] for c in checks), metadata_passed=metadata_ok,
+        self.qualify_kernel(row,camera,integrity)
+        return dict(passed=metadata_ok and integrity['accepted'] and all(c['passed'] for c in checks), metadata_passed=metadata_ok,
                     frames=checks,integrity=integrity,layout=active,command=row)
 
     def test_camera_reference(self, camera, group, label):
@@ -1386,6 +1431,11 @@ cat /proc/sys/kernel/random/boot_id
                    (not self.options.only or c.key in self.options.only or c.name in self.options.only)]
         if not cameras:
             raise RuntimeError('No matching connected cameras')
+        if getattr(self.options, 'stop_tests_only', False):
+            passed = self.test_stop_suite(cameras)
+            self.finish_kernel()
+            self.event('Stop tests finished', passed=passed)
+            return 0 if passed else 1
         if self.options.registers_only:
             for camera in cameras:
                 current = self.refresh(camera.key)
@@ -1394,6 +1444,7 @@ cat /proc/sys/kernel/random/boot_id
                     self.test_xeneth(current, 'registers-only')
             self.event('Register-only tests finished', passed=sum(x['passed'] for x in self.register_results),
                        total=len(self.register_results))
+            self.finish_kernel()
             return 0 if all(x['passed'] for x in self.register_results + self.xeneth_results) else 1
         for initial in cameras:
             camera = self.refresh(initial.key)
@@ -1453,6 +1504,11 @@ cat /proc/sys/kernel/random/boot_id
                     current = self.refresh(camera.key)
                     if self.test_registers(current, 'after-video'):
                         self.test_xeneth(current, 'after-video')
+        if not any(getattr(self.options, name, False) for name in ('contracts_only', 'camera_references_only', 'pixels_only')):
+            stop_passed = self.test_stop_suite([self.refresh(c.key) for c in cameras])
+        else:
+            stop_passed = True
+        self.finish_kernel()
         self.run('dmesg-after', ['dmesg'])
         self.event('Finished', passed=sum(x['passed'] for x in self.results), total=len(self.results),
                    environment_checks=len(self.environment_results),
@@ -1462,14 +1518,20 @@ cat /proc/sys/kernel/random/boot_id
                    coverage_complete=(not any(getattr(self.options,key,False) for key in ('contracts_only','camera_references_only','pixels_only'))
                        and self.local_display_available and not self.skipped_captures
                        and self.reference_coverage()['complete']
+                       and self.kernel is not None and self.kernel.summary()['complete']
+                       and bool(self.stop_results) and all(x.get('coverage_complete',False) for x in self.stop_results)
                        and not any(x.get('status') == 'not_run' for x in self.environment_results)))
-        return 0 if all(x['passed'] for x in self.results + self.register_results + self.xeneth_results + self.control_results + [x for x in self.format_results if 'passed' in x] +
+        return 0 if stop_passed and all(x['passed'] for x in self.results + self.register_results + self.xeneth_results + self.control_results + [x for x in self.format_results if 'passed' in x] +
                            [x for x in self.environment_results if 'passed' in x]) else 1
 
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path, required=True, help='New directory for all logs and JSON results')
+    p.add_argument('--stop-tests-only', action='store_true', help='Capture stop/restart, SIGINT, simultaneous cameras, last pixels and kernel checks; no driver replacement')
+    p.add_argument('--skip-stop-tests', action='store_true', help='Record an explicit stop-test coverage gap')
+    p.add_argument('--stop-cycles', type=int, default=10, help='SIGINT/simultaneous repetitions; finite uses twice this count, early SIGINT half (minimum one)')
+    p.add_argument('--stop-frames', type=int, default=10, help='Valid buffers in stop/reference captures')
     p.add_argument('--only', action='append', default=[], help='Camera name or sysfs ID; repeat to select several')
     p.add_argument('--camera-references-only', action='store_true', help='Only camera-generated absolute pixel references, control checks and restoration captures')
     p.add_argument('--skip-camera-reference', action='store_true', help='Explicitly omit independent camera pixel references; coverage remains incomplete')
@@ -1508,6 +1570,11 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
+    modes = [args.stop_tests_only, args.camera_references_only, args.contracts_only, args.registers_only, args.pixels_only]
+    if sum(modes) > 1 or (args.stop_tests_only and args.skip_stop_tests):
+        p.error('Only one focused test mode may be selected; stop-only cannot skip stop tests')
+    if not 1 <= args.stop_cycles <= 1000 or not 1 <= args.stop_frames <= 10000:
+        p.error('stop-cycles must be 1..1000 and stop-frames 1..10000')
     if args.frames <= 0 or args.forwarded_frames <= 0 or args.timeout <= 0 or args.recoveries < 0 or not 1 <= args.xeneth_reads <= 1000000:
         p.error('frames/timeout must be positive; recoveries must be nonnegative')
     if min(args.control_pause, args.ec_control_pause, args.boot_wait, args.probe_wait, args.stream_gap) < 0:
@@ -1527,16 +1594,21 @@ def main(argv=None):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     try:
-        return runner.execute()
+        rc = runner.execute()
     except KeyboardInterrupt:
         runner.cancelled = True
         runner.event('Interrupted; no further camera changes')
-        return 130
+        rc = 130
     except Exception as error:
         runner.event('Error', error=repr(error))
-        return 1
+        rc = 1
     finally:
+        if runner.kernel:
+            time.sleep(.1)
+            runner.kernel.collect("runner-exit")
+            runner.kernel.close()
         runner.save()
+    return rc
 
 
 if __name__ == '__main__':

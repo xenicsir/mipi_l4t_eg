@@ -645,10 +645,26 @@ uncorr_err:
 	spin_unlock_irqrestore(&chan->capture_state_lock, flags);
 }
 
+/* complete_all() during STREAMOFF wakes requests without an RCE status.
+ * Check after the wait: shutdown may have started while it was sleeping.
+ */
+static bool vi5_capture_cancelled(struct tegra_channel *chan, u32 status)
+{
+	unsigned long flags;
+	bool stopping;
+
+	spin_lock_irqsave(&chan->capture_state_lock, flags);
+	stopping = chan->capture_stopping;
+	spin_unlock_irqrestore(&chan->capture_state_lock, flags);
+
+	return stopping && status == CAPTURE_STATUS_UNKNOWN;
+}
+
 static void vi5_capture_dequeue(struct tegra_channel *chan,
 	struct tegra_channel_buffer *buf)
 {
 	int err = 0;
+	bool cancelled = false;
 	bool frame_err = false;
 	int vi_port = 0;
 	int gang_prev_frame_id = 0;
@@ -684,6 +700,9 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
 				dev_err(vi->dev, "uncorr_err: request err %d\n", err);
 			}
 			goto uncorr_err;
+		} else if (vi5_capture_cancelled(chan, descr->status.status)) {
+			/* UNKNOWN has no valid frame ID, flags or timestamps. */
+			cancelled = true;
 		} else if (descr->status.status != CAPTURE_STATUS_SUCCESS) {
 			if ((descr->status.flags
 					& CAPTURE_STATUS_FLAG_CHANNEL_IN_ERROR) != 0) {
@@ -707,7 +726,8 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
 			}
 		} else if (!vi_port) {
 			gang_prev_frame_id = descr->status.frame_id;
-		} else if (descr->status.frame_id != gang_prev_frame_id) {
+		} else if (!cancelled &&
+			   descr->status.frame_id != gang_prev_frame_id) {
 			dev_err(vi->dev, "frame_id out of sync: ch2 %d vs ch1 %d\n",
 					gang_prev_frame_id, descr->status.frame_id);
 			goto uncorr_err;
@@ -722,6 +742,11 @@ static void vi5_capture_dequeue(struct tegra_channel *chan,
 	}
 
 	wake_up_interruptible(&chan->start_wait);
+	if (cancelled) {
+		/* Account every port above, but never deliver an unfinished frame. */
+		buf->vb2_state = VB2_BUF_STATE_ERROR;
+		goto rel_buf;
+	}
 	/* Read SOF from capture descriptor */
 	ts = ns_to_timespec64((s64)descr->status.sof_timestamp);
 	trace_tegra_channel_capture_frame("sof", &ts);
@@ -1045,6 +1070,7 @@ static int vi5_channel_start_streaming(struct vb2_queue *vq, u32 count)
 
 			spin_lock_irqsave(&chan->capture_state_lock, flags);
 			chan->capture_state = CAPTURE_IDLE;
+			chan->capture_stopping = false;
 			spin_unlock_irqrestore(&chan->capture_state_lock, flags);
 
 			if (!chan->pg_mode) {
@@ -1167,8 +1193,14 @@ static int vi5_channel_stop_streaming(struct vb2_queue *vq)
 {
 	struct tegra_channel *chan = vb2_get_drv_priv(vq);
 	long err;
+	unsigned long flags;
 	int vi_port = 0;
 	if (!chan->bypass) {
+		/* Publish cancellation before waking the capture waiter. */
+		spin_lock_irqsave(&chan->capture_state_lock, flags);
+		chan->capture_stopping = true;
+		spin_unlock_irqrestore(&chan->capture_state_lock, flags);
+
 		for (vi_port = 0; vi_port < chan->valid_ports; vi_port++) {
 			complete_all(&chan->tegra_vi_channel[vi_port]->capture_data->capture_resp);
 		}
