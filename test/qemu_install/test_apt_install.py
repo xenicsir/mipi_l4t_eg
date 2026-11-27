@@ -53,6 +53,7 @@ sys.path.insert(0, f"{REPO}/test/config")
 sys.path.insert(0, f"{REPO}/test/packaging")
 
 from test_matrix import generate_matrix, Entry            # noqa: E402
+from jetson_io_checks import require_imports              # noqa: E402
 from test_postinst import (                               # noqa: E402
     prepare_fixtures, install_depmod_stub, maintscript_env, EXTLINUX, BOOT,
 )
@@ -231,7 +232,10 @@ CBH_TAG = "real_cbh_requires_full_jetson_sysfs"
 
 
 def cbh_only_failure(rc: int) -> bool:
-    return rc != 0 and os.path.exists("/etc/version_eg_cams")
+    installed = os.path.exists("/etc/version_eg_cams")
+    if installed:
+        require_imports()
+    return rc != 0 and installed
 
 
 def warning_fired(out: str) -> bool:

@@ -135,6 +135,17 @@ class PixelTests(unittest.TestCase):
 
 
 class ProcessTests(unittest.TestCase):
+    def test_readback_format_can_be_restored_with_v4l2_ctl(self):
+        from v4l2_contract import parse_current
+        suite = StopSuite.__new__(StopSuite)
+        suite.r = Mock()
+        camera = SimpleNamespace(key='10-0030', video='/dev/video0')
+        for fourcc in ('Y14 ', 'Y16 ', 'Y16 -BE', 'AR24'):
+            spec = parse_current("Width/Height : 1280/1024\nPixel Format : '%s'\n" % fourcc)
+            suite.set_format(camera, spec)
+            command = suite.r.run.call_args[0][1]
+            self.assertEqual(command[-1].split('pixelformat=', 1)[1], fourcc)
+
     def test_timeout_is_failure_and_child_is_reaped(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);binpath=root/'v4l2-ctl'

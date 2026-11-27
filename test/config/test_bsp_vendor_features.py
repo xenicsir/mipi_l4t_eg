@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[2]
 
 class VendorFeatureTests(unittest.TestCase):
     def test_sensor_parser_keeps_bayer_and_wdr_formats(self):
-        for version in ('36.5.2','39.2.1'):
+        for version in ('36.5.2','39.2.1','39.2.2'):
             with self.subTest(version=version),tempfile.TemporaryDirectory() as directory:
                 source=(ROOT/'sources'/version/'Linux_for_Tegra/source/nvidia-oot/drivers/media/platform/tegra/camera/sensor_common.c').read_text()
                 code=r'''
@@ -49,7 +49,7 @@ int main(void) {
                 subprocess.run([str(path/'test')],check=True)
 
     def test_native_bayer_tables_and_conftest_are_retained(self):
-        for version in ('36.5.2','39.2.1'):
+        for version in ('36.5.2','39.2.1','39.2.2'):
             root=ROOT/'sources'/version/'Linux_for_Tegra/source/nvidia-oot/drivers/media/platform/tegra/camera'
             common=(root/'camera_common.c').read_text();formats=(root/'vi/vi5_formats.h').read_text()
             self.assertIn('#include <nvidia/conftest.h>',common)

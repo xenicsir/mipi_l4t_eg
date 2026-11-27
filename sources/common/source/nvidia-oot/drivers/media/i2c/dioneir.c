@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/of.h>
@@ -31,8 +32,7 @@
 #include <media/tegra_v4l2_camera.h>
 #include <media/tegracam_core.h>
 #include "eg_rgb_capture_name.h"
-
-#include "../platform/tegra/camera/camera_gpio.h"
+#include "dione_gpio_compat.h"
 
 #include "tc358746_regs.h"
 #include "tc358746_calculation.h"
@@ -43,16 +43,6 @@
 #define V4L2_PIX_FMT_Y14 v4l2_fourcc('Y', '1', '4', ' ')
 #endif
 
-/*
- * gpio_cansleep() (legacy integer GPIO API) a été retiré du kernel en 6.x.
- * gpiod_cansleep()+gpio_to_desc() existent de 4.9 à 6.8 -> on garde les deux branches
- * pour que ce driver commun compile sur toutes les versions L4T (cf runbook §7.14).
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
-#define EG_GPIO_CANSLEEP(g)	gpiod_cansleep(gpio_to_desc(g))
-#else
-#define EG_GPIO_CANSLEEP(g)	gpio_cansleep(g)
-#endif
 
 /* Bring-up aid: dumps every tc358746_calculate() input and result, plus each
  * bridge register write. Uncomment when bringing up a new format or link rate --
@@ -444,16 +434,9 @@ static int dione_ir_power_on(struct camera_common_data *s_data)
    }
 
    if (!priv->quick_mode) {
-      if (pw->reset_gpio) {
+      if (dione_reset_present(pw)) {
          dev_info(dev, "%s camera power off.\n", __func__);
-         if (EG_GPIO_CANSLEEP(pw->reset_gpio))
-         {
-            gpio_set_value_cansleep(pw->reset_gpio, reset);
-         }
-         else
-         {
-            gpio_set_value(pw->reset_gpio, reset);
-         }
+         dione_reset_set(pw, reset);
       }
 
       if (unlikely(!(pw->avdd || pw->iovdd || pw->dvdd)))
@@ -482,12 +465,9 @@ static int dione_ir_power_on(struct camera_common_data *s_data)
       usleep_range(10, 20);
 
 skip_power_seqn:
-      if (pw->reset_gpio) {
+      if (dione_reset_present(pw)) {
          dev_info(dev, "%s camera power on.\n", __func__);
-         if (EG_GPIO_CANSLEEP(pw->reset_gpio))
-            gpio_set_value_cansleep(pw->reset_gpio, !reset);
-         else
-            gpio_set_value(pw->reset_gpio, !reset);
+         dione_reset_set(pw, !reset);
       }
 
       usleep_range(23000, 23100);
@@ -531,12 +511,9 @@ static int dione_ir_power_off(struct camera_common_data *s_data)
       }
    } else {
       if (!priv->quick_mode) {
-         if (pw->reset_gpio) {
+         if (dione_reset_present(pw)) {
             dev_info(dev, "%s camera power off.\n", __func__);
-            if (EG_GPIO_CANSLEEP(pw->reset_gpio))
-               gpio_set_value_cansleep(pw->reset_gpio, reset);
-            else
-               gpio_set_value(pw->reset_gpio, reset);
+            dione_reset_set(pw, reset);
          }
 
          usleep_range(10, 10);
@@ -582,8 +559,7 @@ static int dione_ir_power_put(struct tegracam_device *tc_dev)
    pw->avdd = NULL;
    pw->iovdd = NULL;
 
-   if (likely(pw->reset_gpio))
-      gpio_free(pw->reset_gpio);
+   dione_reset_put(pw);
 
    if (priv->fpga_client != NULL) {
       i2c_unregister_device(priv->fpga_client);
@@ -644,16 +620,9 @@ static int dione_ir_power_get(struct tegracam_device *tc_dev)
    }
 
    /* Reset or ENABLE GPIO */
-   pw->reset_gpio = pdata->reset_gpio;
-   if (pw->reset_gpio)
-   {
-      err = gpio_request(pw->reset_gpio, "cam_reset_gpio");
-      if (err < 0) {
-         dev_err(dev, "%s: unable to request reset_gpio (%d)\n",
-               __func__, err);
-         goto done;
-      }
-   }
+   err = dione_reset_get(dev, pw, pdata);
+   if (err < 0)
+      dev_err(dev, "%s: unable to request reset GPIO (%d)\n", __func__, err);
 
 done:
    pw->state = SWITCH_OFF;
@@ -672,7 +641,6 @@ static struct camera_common_pdata *dione_ir_parse_dt(
    const struct of_device_id *match;
    struct camera_common_pdata *ret = NULL;
    int err = 0;
-   int gpio;
 
    if (!np)
       return NULL;
@@ -688,14 +656,7 @@ static struct camera_common_pdata *dione_ir_parse_dt(
    if (!board_priv_pdata)
       return NULL;
 
-   gpio = of_get_named_gpio(np, "reset-gpios", 0);
-   if (gpio < 0) {
-      board_priv_pdata->reset_gpio = 0;
-   }
-   else
-   {
-      board_priv_pdata->reset_gpio = gpio;
-   }
+   dione_reset_parse(np, board_priv_pdata);
 
    err = of_property_read_string(np, "mclk", &board_priv_pdata->mclk_name);
    if (err)

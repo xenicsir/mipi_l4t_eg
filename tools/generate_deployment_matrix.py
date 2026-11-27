@@ -237,7 +237,7 @@ class DeploymentMatrixGenerator:
 
     def get_hardware_pipeline(self, platform_id, camera_id, l4t_version):
         """Software availability, filtered by enabled camera modes and platform limits."""
-        result = {'available': False, 'formats': [], 'camera_formats': [], 'validations': []}
+        result = {'available': False, 'formats': [], 'camera_formats': []}
         version = str(l4t_version)
         if camera_id not in self.camera_db.get('cameras', {}):
             return result
@@ -257,12 +257,6 @@ class DeploymentMatrixGenerator:
         formats = [fmt for fmt in supported if fmt in enabled and fmt not in restrictions and fmt not in hw_restrictions]
         result.update(available=bool(formats), formats=formats,
                       camera_formats=[fmt for fmt in self.camera_db['pixel_format_map'] if fmt in enabled and fmt not in restrictions])
-        for record in self.data.get('hardware_pipeline_validations', []):
-            if (str(record['l4t']), record['platform'], record['camera']) != (version, platform_id, camera_id):
-                continue
-            selected = [fmt for fmt in record['formats'] if fmt in formats and fmt in active.get(record['resolution'], set())]
-            if selected:
-                result['validations'].append(dict(record, formats=selected))
         return result
 
     def _hardware_label(self, platform_id, camera_id, version):
@@ -274,39 +268,31 @@ class DeploymentMatrixGenerator:
         modes = ('Formats: ' + ', '.join(hw['camera_formats'])) if hw['camera_formats'] else ''
         return (escape(modes) + '<br>' if modes else '') + escape(self._hardware_label(platform_id, camera_id, version))
 
-    HW_NOTE = ('HW means the NVMM/VIC/CUDA pixel pipeline in the current source configuration, '
-               'not basic CSI/VI capture. Yes requires a package containing egv4l2camerasrc and matching NVIDIA libraries; '
-               'historical package links may predate this feature. No means not enabled for this combination. '
-               'The camera-driver Tested status is independent of HW qualification. '
-               'Lists exclude disabled modes and platform restrictions. RGB888 is the camera format '
-               '(V4L2 AR24/AB24 according to the driver). On L4T 35.x, HW grayscale uses CUDA RGBA preview; '
-               'raw GRAY16 NVMM output is unavailable, while raw V4L2 capture is unchanged.')
+    HW_NOTE = ('HW identifies the NVMM/VIC/CUDA pixel pipeline available for the camera, '
+               'board and L4T combination. The HW format lists in the board tables account '
+               'for enabled camera modes and platform restrictions. The pipeline requires '
+               'a package containing egv4l2camerasrc and the matching NVIDIA multimedia runtime. '
+               'RGB888 is the camera format, exposed as V4L2 AR24/AB24 according to the driver.')
 
-    def hardware_validation_rows(self):
-        rows = []
-        for record in self.data.get('hardware_pipeline_validations', []):
-            if record['platform'] not in self.platforms_by_id or record['camera'] not in self.cameras_by_id:
-                continue
-            hw = self.get_hardware_pipeline(record['platform'], record['camera'], record['l4t'])
-            for active in hw['validations']:
-                if active['resolution'] != record['resolution'] or active['hardware'] != record['hardware']:
-                    continue
-                row = [str(active['l4t']), active['hardware'], self.cameras_by_id[active['camera']]['name'],
-                             active['resolution'], ', '.join(active['formats']),
-                             'Qualified' if active['result'] == 'qualified' else 'Issues observed', active.get('notes', '')]
-                if row not in rows:
-                    rows.append(row)
-        return rows
+    HW_CAPABILITIES = (
+        ('Capture', 'CSI/VI capture into NVIDIA NVMM surfaces for downstream hardware processing.'),
+        ('Color video', 'YUYV and RGB video with VIC/CUDA conversion and local GPU rendering, '
+                        'according to the selected format and pipeline.'),
+        ('Grayscale preview', 'Y16, Y14 and Y16-BE input converted by CUDA to RGBA, '
+                              'with fixed-range mapping or per-frame normalization.'),
+        ('Raw grayscale', 'GRAY16_LE NVMM output on supported L4T 36.x/39.x profiles, '
+                          'including GPU byte swapping for Y16-BE. '
+                          'L4T 35.x grayscale uses the RGBA preview path.'),
+        ('Headless operation', 'NVMM capture and processing without a display; '
+                               'local display can be added with NVIDIA rendering elements.'),
+    )
 
     def _hardware_section_html(self):
-        header = '<h2>Hardware pixel pipeline</h2><p>' + escape(self.HW_NOTE) + '</p>'
-        header += '<p>Target checks below apply only to the named hardware, resolution and formats. '
-        header += 'Unlisted combinations are not qualified by these checks.</p>'
-        header += '<table><thead><tr>' + ''.join('<th>'+x+'</th>' for x in
-                  ['L4T', 'Hardware tested', 'Camera', 'Resolution', 'HW formats checked', 'Result', 'Notes']) + '</tr></thead><tbody>'
-        for row in self.hardware_validation_rows():
-            header += '<tr>' + ''.join('<td>'+escape(value)+'</td>' for value in row) + '</tr>'
-        return header + '</tbody></table>'
+        section = '<h2>Hardware pixel pipeline</h2><p>' + escape(self.HW_NOTE) + '</p>'
+        section += '<table><thead><tr><th>Capability</th><th>Available processing</th></tr></thead><tbody>'
+        for row in self.HW_CAPABILITIES:
+            section += '<tr>' + ''.join('<td>'+escape(value)+'</td>' for value in row) + '</tr>'
+        return section + '</tbody></table>'
 
     def platform_available(self, platform_id, version):
         """Resolve carrier builds already declared in eg_config, without inventing BSPs."""
@@ -447,18 +433,6 @@ class DeploymentMatrixGenerator:
             declared = bool(hw_versions.get(str(version), {}).get('formats'))
             if integrated != declared:
                 issues.append(f"⚠️ HW pipeline {version}: source overlay and declared formats disagree")
-        for record in self.data.get('hardware_pipeline_validations', []):
-            if record['platform'] not in self.platforms_by_id:
-                issues.append('⚠️ Unknown HW qualification platform: ' + record['platform'])
-            if record['camera'] not in self._all_camera_modes:
-                issues.append('⚠️ Unknown HW qualification camera: ' + record['camera'])
-            if str(record['l4t']) not in hw_versions:
-                issues.append('⚠️ HW qualification references a pipeline not enabled in this L4T: ' + str(record['l4t']))
-            known = self._all_camera_modes.get(record['camera'], {}).get(record['resolution'], set())
-            if not known or set(record['formats']) - known:
-                issues.append('⚠️ Unknown camera resolution/format in HW qualification: ' + record['camera'])
-            if record['result'] not in ('qualified', 'issues'):
-                issues.append('⚠️ Unknown HW qualification result: ' + record['result'])
         eg_versions = self.camera_db.get('versions', {})
         matrix_l4t = self.data.get('l4t_versions', {})
         matrix_platform_ids = {p['id'] for p in self.data['platforms']}
@@ -649,14 +623,6 @@ class DeploymentMatrixGenerator:
             f.write("- (empty) - Data not available\n\n")
             f.write("**Acronyms:** EG = Exosens Group\n\n")
 
-            f.write("## Hardware pixel pipeline\n\n" + self.HW_NOTE + "\n\n")
-            f.write("HW qualification applies only to the hardware, resolution and formats below; unlisted cases are not qualified.\n\n")
-            f.write("| L4T | Hardware tested | Camera | Resolution | HW formats checked | Result | Notes |\n")
-            f.write("| --- | --- | --- | --- | --- | --- | --- |\n")
-            for row in self.hardware_validation_rows():
-                f.write('| ' + ' | '.join(row) + ' |\n')
-            f.write('\n')
-
             # For each platform
             for platform in self.data['platforms']:
                 platform_id = platform['id']
@@ -729,6 +695,12 @@ class DeploymentMatrixGenerator:
                     f.write("\n")
 
                 f.write("\n")
+
+            f.write("## Hardware pixel pipeline\n\n" + self.HW_NOTE + "\n\n")
+            f.write("| Capability | Available processing |\n| --- | --- |\n")
+            for row in self.HW_CAPABILITIES:
+                f.write('| ' + ' | '.join(row) + ' |\n')
+            f.write('\n')
 
             # Camera details section
             f.write("## Camera Details\n\n")
@@ -987,8 +959,6 @@ class DeploymentMatrixGenerator:
     </div>
 """
 
-        html_content += self._hardware_section_html()
-
         # Generate platform sections
         for platform in self.data['platforms']:
             platform_id = platform['id']
@@ -1101,6 +1071,8 @@ class DeploymentMatrixGenerator:
         </table>
     </div>
 """
+
+        html_content += self._hardware_section_html()
 
         # Camera details
         html_content += """
@@ -1216,8 +1188,6 @@ class DeploymentMatrixGenerator:
             "</div>",
         ]
 
-        lines.append(self._hardware_section_html())
-
         for platform in self.data['platforms']:
             pid  = platform['id']
             lines.append("<div class='platform-block'>")
@@ -1272,6 +1242,8 @@ class DeploymentMatrixGenerator:
                 lines.append("</tr>")
 
             lines.append("</tbody></table></div>")
+
+        lines.append(self._hardware_section_html())
 
         # Camera details
         lines.append("<div style='page-break-before: always;'>")

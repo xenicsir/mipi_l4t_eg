@@ -26,6 +26,7 @@ sys.path.insert(0, f"{REPO}/test/packaging")
 import shutil  # noqa: E402
 
 from test_matrix import generate_matrix, Entry  # noqa: E402
+from jetson_io_checks import require_imports  # noqa: E402
 from test_postinst import (                     # noqa: E402
     prepare_fixtures, install_depmod_stub, maintscript_env,
     INSTALL_STATES, EXTLINUX, BOOT,
@@ -142,6 +143,15 @@ def test_one(entry: Entry, state: str) -> tuple[str, str]:
     dpkg_purge(pkg_name)        # clean state before
 
     rc, out, err = dpkg_install(entry)
+
+    # A missing package module or executable is never an emulated-sysfs XFAIL,
+    # including on upgrades whose postinst reconfiguration is best-effort.
+    if os.path.exists("/etc/version_eg_cams"):
+        try:
+            require_imports()
+        except RuntimeError as exc:
+            return "fail", str(exc)
+
 
     # Forecr packages check /proc/device-tree/nvidia,dtsfilename. In this
     # container we cannot fake that path (procfs is read-only, Docker cannot

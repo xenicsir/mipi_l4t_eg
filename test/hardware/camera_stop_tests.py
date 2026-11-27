@@ -84,8 +84,11 @@ class StopSuite:
         return parse_current(text)
 
     def set_format(self, camera, spec):
+        # Metadata uses stripped names; v4l2-ctl requires the full fourcc,
+        # including the final space in Y14/Y16. Keep its Y16 -BE alias intact.
+        pixel_format = spec['format'].ljust(4)
         self.r.run(camera.key+'-stop-format', ['v4l2-ctl','-d',camera.video,
-            '--set-fmt-video=width=%d,height=%d,pixelformat=%s' % (spec['width'],spec['height'],spec['format'])], check=True)
+            '--set-fmt-video=width=%d,height=%d,pixelformat=%s' % (spec['width'],spec['height'],pixel_format)], check=True)
 
     def audit(self, camera, count, hold, raw, label):
         row, text = self.r.run(label, [str(self.binary), camera.video, str(count), '4', str(hold), str(raw), '-', '1'],

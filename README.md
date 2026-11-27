@@ -869,6 +869,13 @@ This appendix provides a summary of the integration scenarios. For detailed step
 
 ### Scenario D: Adding support for a new Nvidia BSP version
 
+JetPack 7.2.2 / L4T 39.2.2 is integrated for the existing generic Orin
+configurations (NVIDIA AGX Orin, Orin NX/Nano and Seeed reComputer J4012).
+Forecr remains on its previously supported BSPs until its matching patches are
+available; no 39.2.2 Forecr variant is generated. Thor support is outside this
+port. The deployment matrix lists available configurations and HW pipeline
+capabilities; detailed hardware qualification results are maintained internally.
+
 1. Add the new version to `eg_config.yaml` (BSP URLs, toolchain, vendors)
 2. Copy the version-specific directory from the closest existing version
 3. Adapt Makefiles, Kconfig, defconfig, and device tree bindings as needed

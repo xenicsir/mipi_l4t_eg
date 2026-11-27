@@ -524,6 +524,30 @@ versions:
       prefix: x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
 
 
+  # Forecr is intentionally deferred until its matching BSP patches are available.
+  "39.2.2":
+    jetpack: "7.2.2"
+    platform_ids: [agx_orin_devkit, orin_nx_nano_devkit, seeed_recomputer_j4012]
+    vendors: [generic]
+    standalone:
+      generic: {generic: true}
+    sources:
+      public:
+        filename: public_sources.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.2/sources/public_sources.tbz2
+      release:
+        filename: Jetson_Linux_R39.2.2_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.2/release/Jetson_Linux_R39.2.2_aarch64.tbz2
+      sample_fs:
+        filename: Tegra_Linux_Sample-Root-Filesystem_R39.2.2_aarch64.tbz2
+        url: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.2/release/Tegra_Linux_Sample-Root-Filesystem_R39.2.2_aarch64.tbz2
+    toolchain:
+      archive: x-tools.tbz2
+      url: https://developer.nvidia.com/downloads/embedded/L4T/r38_Release_v2.0/release/x-tools.tbz2
+      dir: x-tools
+      prefix: x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+
+
 # ---------------------------------------------------------------------------
 # Vendors and carriers
 # ---------------------------------------------------------------------------
@@ -656,6 +680,8 @@ hardware_pipeline:
     "36.5.2":
       formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
     "39.2.1":
+      formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
+    "39.2.2":
       formats: [YUYV, RGB888, Y16, Y14, "Y16 -BE"]
 
 # ---------------------------------------------------------------------------

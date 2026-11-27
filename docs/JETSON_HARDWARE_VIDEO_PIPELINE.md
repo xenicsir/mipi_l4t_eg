@@ -4,10 +4,12 @@
 
 The source tree integrates `egv4l2camerasrc` for every declared L4T 35.x,
 36.x and 39.2.x BSPs: 35.1, 35.3.1, 35.4.1, 35.5.0, 35.6.0, 35.6.1, 35.6.2,
-35.6.4, 36.4, 36.4.3, 36.4.4, 36.5.0, 36.5.2, 39.2 and 39.2.1. It is built against each BSP's
+35.6.4, 36.4, 36.4.3, 36.4.4, 36.5.0, 36.5.2, 39.2, 39.2.1 and 39.2.2. It is built against each BSP's
 native NVIDIA headers and runtime libraries and included in packages generated
 from those builds. Generic, Forecr and CTI builds use the matching BSP source.
-Historical packages may predate this integration. L4T 32.x is excluded.
+L4T 39.2.2 currently covers the generic Orin configurations only; Forecr is deferred
+until matching supplier patches are available. Its source/plugin integration does
+not imply target qualification. Historical packages may predate this integration. L4T 32.x is excluded.
 
 Software availability is separate from target qualification. Target checks cover
 Orin Nano 36.4.4/39.2, Forecr 35.6.0/35.6.4, Xavier NX 35.1 and AGX Orin on
@@ -19,11 +21,11 @@ is implied. CTI pristine keeps its vendor kernel and its camera-format restricti
 | V4L2 input | NVMM capture output | Display path | Qualification |
 | --- | --- | --- | --- |
 | YUYV | YUY2 raw or RGBA preview | CUDA BT.601 → RGBA → GPU | Tested |
-| AB24 (RGBA bytes, when enabled for the camera) | RGBA | GPU display directly | See per-BSP qualification in the deployment matrix |
+| AB24 (RGBA bytes, when enabled for the camera) | RGBA | GPU display directly | See available HW modes in the deployment matrix |
 | AR24 (BGRA bytes) | BGRA or BGRx | BGRx → VIC → RGBA → GPU | Tested on Forecr 35.6.0 |
-| Y16 | GRAY16_LE on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
-| Y14 | GRAY16_LE storage on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
-| Y16-BE | GRAY16_LE after GPU byte swap on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See per-BSP qualification in the deployment matrix |
+| Y16 | GRAY16_LE on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See available HW modes in the deployment matrix |
+| Y14 | GRAY16_LE storage on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See available HW modes in the deployment matrix |
+| Y16-BE | GRAY16_LE after GPU byte swap on 36.x/39.2; RGBA preview on 35.x | CUDA → RGBA → GPU | See available HW modes in the deployment matrix |
 | UYVY | UYVY | VIC → NV12 → GPU | Requires target qualification |
 
 AR24 and AB24 describe the **byte order in captured memory**, not a change to

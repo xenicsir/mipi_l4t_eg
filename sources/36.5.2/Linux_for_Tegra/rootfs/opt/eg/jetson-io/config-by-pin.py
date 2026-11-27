@@ -1,0 +1,1 @@
+/opt/nvidia/jetson-io/config-by-pin.py

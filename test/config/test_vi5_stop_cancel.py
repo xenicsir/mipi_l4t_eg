@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import yaml
 from test_v4l2_enumeration import function
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,12 +36,16 @@ struct timespec64 {s64 value;};
 struct capture_descriptor {struct {u32 status,flags,frame_id,err_data;uint64_t sof_timestamp,eof_timestamp;}status;};
 struct tegra_mc_vi {void *dev;};
 struct vb2_v4l2_buffer {struct {uint64_t timestamp;}vb2_buf;};
-struct tegra_channel_buffer {struct vb2_v4l2_buffer buf;int vb2_state;int capture_descr_index[2];};
+struct list_head {struct list_head *next,*prev;};
+static void INIT_LIST_HEAD(struct list_head *h) {h->next=h->prev=h;}
+static void list_add_tail(struct list_head *n,struct list_head *h) {n->prev=h->prev;n->next=h;h->prev->next=n;h->prev=n;}
+struct tegra_channel_buffer {struct list_head queue;struct vb2_v4l2_buffer buf;int vb2_state;int capture_descr_index[2];};
 struct device {void *of_node;};
 struct v4l2_subdev {struct device *dev;};
 struct camera_common_data {};
 struct tegra_channel {
- bool capture_stopping,queue_error; int capture_state,capture_state_lock,valid_ports,start_wait;
+ bool capture_stopping,queue_error,capture_timeout_recover; int capture_state,capture_state_lock,valid_ports,start_wait,start_lock;
+ struct list_head capture;unsigned capture_queue_depth;
  unsigned capture_reqs_enqueued; struct tegra_mc_vi *vi;
  struct capture_descriptor *request[2]; int tegra_vi_channel[2];
  struct v4l2_subdev *subdev_on_csi;
@@ -48,6 +53,8 @@ struct tegra_channel {
 static int warnings,errors,releases,wakes,traces,waits,wait_error;
 static bool stop_inside_wait,avt;
 static struct tegra_channel *waiting_chan;
+#define spin_lock(lock) do {assert(!*(lock));*(lock)=1;} while(0)
+#define spin_unlock(lock) do {assert(*(lock));*(lock)=0;} while(0)
 #define spin_lock_irqsave(lock,flags) do {assert(!*(lock));*(lock)=1;(flags)=0;} while(0)
 #define spin_unlock_irqrestore(lock,flags) do {assert(*(lock));*(lock)=0;(void)(flags);} while(0)
 #define dev_err(...) (++errors)
@@ -82,6 +89,7 @@ static void setup(int ports) {
   desc[p].status.status=CAPTURE_STATUS_SUCCESS;desc[p].status.frame_id=17;
   desc[p].status.sof_timestamp=1234;desc[p].status.eof_timestamp=2345;
  }
+ INIT_LIST_HEAD(&chan.capture);INIT_LIST_HEAD(&buf.queue);chan.capture_queue_depth=4;
  waiting_chan=&chan;buf.vb2_state=VB2_BUF_STATE_ACTIVE;buf.buf.vb2_buf.timestamp=999;
 }
 static void unknown(int p) {
@@ -132,7 +140,8 @@ class StopCancellation(unittest.TestCase):
 
     def test_real_dequeue_all_overlays(self):
         paths = sorted((ROOT/'sources').glob('*/Linux_for_Tegra/**/vi/vi5_fops.c'))
-        self.assertEqual(len(paths), 15)
+        expected={str(v) for v in yaml.safe_load((ROOT/'eg_config.yaml').read_text())['versions'] if int(str(v).split('.')[0])>=35}
+        self.assertEqual({p.relative_to(ROOT/'sources').parts[0] for p in paths},expected)
         cache = ROOT/'archives/CTI/merge-resolved/36.5.0/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_fops.c'
         if cache.exists():
             paths.append(cache)
@@ -146,12 +155,41 @@ class StopCancellation(unittest.TestCase):
                 self.assertLess(stop.index('capture_stopping = true'), stop.index('complete_all'))
                 self.assertLess(stop.index('complete_all'), stop.index('vi5_channel_stop_kthreads'))
                 self.assertLess(stop.index('vi5_channel_stop_kthreads'), stop.index('tegra_channel_set_stream'))
-                text = SHIM + function(source, 'vi5_capture_cancelled') + function(source, 'vi5_capture_dequeue') + CASES
+                requeue = function(source, 'vi5_requeue_capture_buffer') if 'static void vi5_requeue_capture_buffer(' in source else ''
+                text = SHIM + requeue + function(source, 'vi5_capture_cancelled') + function(source, 'vi5_capture_dequeue') + CASES
                 with tempfile.TemporaryDirectory() as d:
                     c=Path(d)/'test.c'; binary=Path(d)/'test'
                     c.write_text(text)
                     subprocess.run(['gcc','-std=gnu11','-g','-fsanitize=undefined','-fno-sanitize-recover=all',str(c),'-o',str(binary)],check=True,capture_output=True)
                     subprocess.run([str(binary)],check=True,capture_output=True)
+
+    def test_3922_retains_timeout_requeue_and_enqueue_gating(self):
+        source=(ROOT/'sources/39.2.2/Linux_for_Tegra/source/nvidia-oot/drivers/media/platform/tegra/camera/vi/vi5_fops.c').read_text()
+        # Select a finite wait only in this harness to exercise NVIDIA's retained
+        # recovery branch; production keeps the existing infinite MIPI wait.
+        code=SHIM.replace('#define MIPI_NO_TIMEOUT (-1)','#define MIPI_NO_TIMEOUT 200')
+        for name in ('vi5_requeue_capture_buffer','vi5_capture_cancelled','vi5_capture_dequeue','vi5_capture_enqueue_ready'):
+            code+=function(source,name)
+        code+=CASES[:CASES.index('int main(void)')]+r"""
+int main(void) {
+ setup(1);wait_error=-ETIMEDOUT;vi5_capture_dequeue(&chan,&buf);
+ assert(chan.capture_state==CAPTURE_ERROR && chan.capture_timeout_recover);
+ assert(!releases && chan.capture.next==&buf.queue && chan.capture.prev==&buf.queue);
+ assert(buf.vb2_state==VB2_BUF_STATE_ACTIVE && !chan.start_lock && !chan.capture_state_lock);
+ assert(!vi5_capture_enqueue_ready(&chan));
+ chan.capture_state=CAPTURE_IDLE;chan.capture_reqs_enqueued=0;
+ assert(vi5_capture_enqueue_ready(&chan));
+ chan.capture_reqs_enqueued=chan.capture_queue_depth*chan.valid_ports;
+ assert(!vi5_capture_enqueue_ready(&chan));
+ setup(1);wait_error=-EIO;vi5_capture_dequeue(&chan,&buf);
+ assert(releases==1 && !chan.capture_timeout_recover && chan.capture.next==&chan.capture);
+ return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'test.c').write_text(code)
+            subprocess.run(['gcc','-std=gnu11','-fsanitize=undefined','-fno-sanitize-recover=all',str(p/'test.c'),'-o',str(p/'test')],check=True)
+            subprocess.run([str(p/'test')],check=True)
 
 if __name__ == '__main__':
     unittest.main()

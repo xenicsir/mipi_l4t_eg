@@ -33,6 +33,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 EG_CONFIG = REPO_ROOT / "eg_config.yaml"
+sys.path.insert(0, str(REPO_ROOT / "test" / "packaging"))
+from jetson_io_checks import check_tree
+
 
 GREEN = "\033[92m"
 RED   = "\033[91m"
@@ -161,6 +164,13 @@ def check_package(deb_path, version_dir, label, som="", pristine_kernel=False):
         )
         if r.returncode != 0:
             return 0, 1, [f"dpkg-deb extract failed: {r.stderr.decode().strip()}"]
+
+        # Absolute NVIDIA links must be checked without dereferencing on the host.
+        jetsonio_errors = check_tree(extract_dir / "opt/eg/jetson-io")
+        if jetsonio_errors:
+            errors.extend(jetsonio_errors)
+        else:
+            passed += 1
 
         # --- Script present and executable ---
         for script_name in ("eg_dt_camera_config_set.sh", "egCamCtrl.py",

@@ -795,6 +795,72 @@ Include the NVMM source overlay with this BSP's native NvBufSurface header. Chec
 runtime ABI/library changes separately from kernel source changes. A successful
 plugin link does not qualify allocation, pixel integrity or rendering on hardware.
 
+### Step 2a: Preserve the complete JetsonIO delivery tree
+
+Inventory **regular files, symbolic links (including directory links) and executable
+modes** before seeding a new version. A file-only walk is incomplete:
+`Path.is_file()` follows symlinks and returns false for absolute target links that
+are intentionally dangling on the development host. Test `is_symlink()` first;
+use `lstat()`/`readlink()` for the link itself. Do not dereference target links
+against the host's `/opt` directory.
+
+If copying a directory layout, use `rsync -a --links`, `cp -a`, or Python
+`copytree(..., symlinks=True)` with `copy2` for regular files. Then perform the
+pristine-source review/rebase above; preserving metadata does not justify copying
+old NVIDIA code unchanged. Compare the expected input inventory with the new
+source tree, applied tree **and extracted delivery package**.
+
+For EG JetsonIO, retain the NVIDIA-backed `Headers` and `Utils` links, the
+`Jetson`/`Linux` package initializers and helper-module links, plus our modified
+`board.py`, `extlinux.py` and executable `config-by-hardware.py`. Validate the
+absolute links against the matching **target sysroot**, where
+`/opt/nvidia/jetson-io` comes from NVIDIA's installed package.
+
+A missing `Jetson/__init__.py` can make Python select the unrelated system
+`Jetson.GPIO` package instead of `Jetson.board`. Removing that system package or
+merely adjusting PYTHONPATH is not the repair: deliver the complete EG package
+graph and preserve entrypoint permissions. The same applies to `Linux` helpers.
+
+Run the regression guard and package checks on the exact new package:
+
+```sh
+python3 test/config/test_jetson_io_delivery.py
+python3 test/integration/check_packages.py
+```
+
+On a matching target (or a software-complete test root), verify imports before
+attempting board configuration:
+
+```sh
+/opt/eg/jetson-io/config-by-hardware.py --help
+sudo /opt/eg/jetson-io/config-by-hardware.py -l
+sudo detect_jetson_board.sh --camera-ports
+```
+
+`--help` must succeed without a camera graph or physical Jetson sysfs. Test with
+the system `Jetson.GPIO` package present to catch namespace collisions. `-l`
+additionally verifies real board/header discovery. On a freshly flashed BSP,
+missing live camera nodes do not establish the physical connector count: use
+known carrier identity where available and verify the result (for example, two
+ports on a P3768 Orin Nano/NX devkit).
+
+### Step 2b: Keep installation failures separate from emulation limits
+
+An `ImportError`, `ModuleNotFoundError`, syntax error, missing executable, broken
+supplier link or permission error is a **software-delivery failure**, never an
+expected physical-sysfs limitation. Import preflight must gate both fresh-install
+and upgrade tests, even if a best-effort postinst returns success. The presence of
+`/etc/version_eg_cams` only proves unpacking; it does not prove configuration.
+Retain the precise error output when classifying any expected environment failure.
+
+A mocked configuration script cannot validate the real Python import tree.
+Require package graph/mode checks and a real entrypoint import test in addition
+to mocked DT tests. Before declaring a release hardware-qualified, install its
+exact package on a freshly flashed matching board, require `dpkg --audit` to be
+empty and the package state to be `install ok installed`, inspect the boot
+configuration, then reboot and check the intended cameras. Report unavailable
+hardware tests explicitly rather than treating an emulation XFAIL as a pass.
+
 ### Step 3: Adapt version-specific files
 
 Review and update:

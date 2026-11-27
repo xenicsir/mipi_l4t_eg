@@ -269,6 +269,7 @@ detect_carrier() {
 # Detect number of camera ports from device tree
 #******************************************************************************
 detect_camera_ports() {
+    local compatible="${1:-}"
     local dt_base="/proc/device-tree"
     local port_count=0
 
@@ -331,6 +332,14 @@ detect_camera_ports() {
         fi
     done
 
+    # A fresh P3768 devkit can boot without any routed camera nodes. Its
+    # compatible identifies the two physical CSI connectors even in that state.
+    if [[ "$compatible" == *"nvidia,p3768-"* ]]; then
+        [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] Two camera ports from P3768 compatible" >&2
+        echo "2"
+        return 0
+    fi
+
     echo "0"
     return 1
 }
@@ -389,7 +398,7 @@ detect_board_type() {
 
     # Detect camera ports
     local camera_ports
-    camera_ports=$(detect_camera_ports)
+    camera_ports=$(detect_camera_ports "$compatible")
 
     # Export for output
     export DETECTED_MODEL="$model"

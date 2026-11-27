@@ -184,6 +184,7 @@ mode_fallback:
   "36.5.2": 36x
   "39.2":   39x
   "39.2.1": 39x
+  "39.2.2": 39x
 
 # ─── Auvidea base DTB directory (where test DTBs live) ──────────────────────
 auvidea_dtb_dir: test/dts/auvidea
